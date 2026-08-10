@@ -5447,43 +5447,29 @@ export type SmsBatchSummary = {
 };
 
 /**
- * Per-component cost breakdown. Returned on single-message reads; omitted from list rows.
+ * What was charged for a message, split into the components that make it up. Null until at least one component has been priced.
+ *
  */
-export type SmsCostBreakdown = {
+export type MessageCost = {
   /**
-   * Per-segment price as a decimal string.
-   */
-  per_segment: string;
-  /**
-   * Number of billable segments.
-   */
-  segments: number;
-  /**
-   * ISO 3166-1 alpha-2 destination country the price was resolved for.
-   */
-  country_code: string;
-  /**
-   * Carrier surcharge component as a decimal string (for example US 10DLC fees). `0.0000` when none applies.
-   */
-  carrier_surcharge: string;
-};
-
-/**
- * Cost of the message. Null until the message has been priced; the cost is populated as the message is processed, not at the moment it is accepted.
- */
-export type SmsCost = {
-  /**
-   * ISO 4217 currency code for the cost amount. Omitted when the cost is not denominated in a currency (for example a zero-priced internal send).
-   */
-  readonly currency_code?: CurrencyCode;
-  /**
-   * Total cost as a decimal string: the per-segment rate multiplied by the segment count, plus any surcharges.
+   * Total charged, as a decimal string: the sum of the components below. Net of tax, which applies to your wallet balance rather than to an individual charge.
+   *
    */
   readonly amount: string;
   /**
-   * Per-component cost breakdown. Returned on single-message reads; omitted from list rows.
+   * ISO 4217 currency code. Every component is denominated in this currency.
    */
-  breakdown?: SmsCostBreakdown;
+  readonly currency_code: CurrencyCode;
+  /**
+   * What Bird charged to carry the message, as a decimal string. Null when this component was not priced; `"0.00000"` when it priced at zero.
+   *
+   */
+  readonly transaction_amount: string | null;
+  /**
+   * Third-party fees Bird passes on, as a decimal string, such as US 10DLC carrier surcharges. Null when this component was not priced; `"0.00000"` when it priced at zero.
+   *
+   */
+  readonly passthrough_amount: string | null;
 } | null;
 
 /**
@@ -5554,9 +5540,9 @@ export type SmsMessage = {
    */
   segments: SmsSegments;
   /**
-   * Cost of the message. Null until the message has been priced.
+   * What the message cost, split into Bird's charge and any third-party fees passed through. Null until the message has been priced.
    */
-  cost?: SmsCost;
+  cost?: MessageCost;
   /**
    * Structured `{name, value}` filter labels applied to this message.
    */
@@ -8370,16 +8356,6 @@ export type SmsMessageBatchResponseWritable = {
   summary: SmsBatchSummary;
 };
 
-/**
- * Cost of the message. Null until the message has been priced; the cost is populated as the message is processed, not at the moment it is accepted.
- */
-export type SmsCostWritable = {
-  /**
-   * Per-component cost breakdown. Returned on single-message reads; omitted from list rows.
-   */
-  breakdown?: SmsCostBreakdown;
-} | null;
-
 export type SmsMessageWritable = {
   /**
    * Recipient phone number in E.164 format.
@@ -8398,10 +8374,6 @@ export type SmsMessageWritable = {
    * Content classification supplied on the send. Null for inbound messages.
    */
   category?: SmsMessageCategory | null;
-  /**
-   * Cost of the message. Null until the message has been priced.
-   */
-  cost?: SmsCostWritable;
   /**
    * Structured `{name, value}` filter labels applied to this message.
    */

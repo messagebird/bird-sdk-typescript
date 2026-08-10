@@ -10167,69 +10167,46 @@ export const SMSBatchSummarySchema = {
   },
 } as const;
 
-export const SMSCostBreakdownSchema = {
-  type: "object",
-  additionalProperties: false,
-  readOnly: true,
-  required: ["per_segment", "segments", "country_code", "carrier_surcharge"],
-  description:
-    "Per-component cost breakdown. Returned on single-message reads; omitted from list rows.",
-  properties: {
-    per_segment: {
-      type: "string",
-      minLength: 1,
-      description: "Per-segment price as a decimal string.",
-      example: "0.0079",
-    },
-    segments: {
-      type: "integer",
-      minimum: 1,
-      description: "Number of billable segments.",
-    },
-    country_code: {
-      type: "string",
-      minLength: 2,
-      maxLength: 2,
-      description:
-        "ISO 3166-1 alpha-2 destination country the price was resolved for.",
-      example: "US",
-    },
-    carrier_surcharge: {
-      type: "string",
-      minLength: 1,
-      description:
-        "Carrier surcharge component as a decimal string (for example US 10DLC fees). `0.0000` when none applies.",
-      example: "0.0000",
-    },
-  },
-} as const;
-
-export const SMSCostSchema = {
+export const MessageCostSchema = {
   type: ["object", "null"],
   additionalProperties: false,
-  required: ["amount"],
+  required: [
+    "amount",
+    "currency_code",
+    "transaction_amount",
+    "passthrough_amount",
+  ],
   description:
-    "Cost of the message. Null until the message has been priced; the cost is populated as the message is processed, not at the moment it is accepted.",
+    "What was charged for a message, split into the components that make it up. Null until at least one component has been priced.\n",
   properties: {
-    currency_code: {
-      readOnly: true,
-      $ref: "#/components/schemas/CurrencyCode",
-      description:
-        "ISO 4217 currency code for the cost amount. Omitted when the cost is not denominated in a currency (for example a zero-priced internal send).",
-      example: "USD",
-    },
     amount: {
       type: "string",
       minLength: 1,
       readOnly: true,
       description:
-        "Total cost as a decimal string: the per-segment rate multiplied by the segment count, plus any surcharges.",
-      example: "0.0079",
+        "Total charged, as a decimal string: the sum of the components below. Net of tax, which applies to your wallet balance rather than to an individual charge.\n",
+      example: "0.00990",
     },
-    breakdown: {
-      $ref: "#/components/schemas/SMSCostBreakdown",
+    currency_code: {
+      readOnly: true,
+      $ref: "#/components/schemas/CurrencyCode",
       description:
-        "Per-component cost breakdown. Returned on single-message reads; omitted from list rows.",
+        "ISO 4217 currency code. Every component is denominated in this currency.",
+      example: "USD",
+    },
+    transaction_amount: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        'What Bird charged to carry the message, as a decimal string. Null when this component was not priced; `"0.00000"` when it priced at zero.\n',
+      example: "0.00790",
+    },
+    passthrough_amount: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        'Third-party fees Bird passes on, as a decimal string, such as US 10DLC carrier surcharges. Null when this component was not priced; `"0.00000"` when it priced at zero.\n',
+      example: "0.00200",
     },
   },
 } as const;
@@ -10357,9 +10334,9 @@ export const SMSMessageSchema = {
       description: "Segment breakdown for the body.",
     },
     cost: {
-      $ref: "#/components/schemas/SMSCost",
+      $ref: "#/components/schemas/MessageCost",
       description:
-        "Cost of the message. Null until the message has been priced.",
+        "What the message cost, split into Bird's charge and any third-party fees passed through. Null until the message has been priced.",
     },
     tags: {
       type: "array",
@@ -15392,20 +15369,6 @@ export const SMSMessageBatchResponseWritableSchema = {
   },
 } as const;
 
-export const SMSCostWritableSchema = {
-  type: ["object", "null"],
-  additionalProperties: false,
-  description:
-    "Cost of the message. Null until the message has been priced; the cost is populated as the message is processed, not at the moment it is accepted.",
-  properties: {
-    breakdown: {
-      $ref: "#/components/schemas/SMSCostBreakdown",
-      description:
-        "Per-component cost breakdown. Returned on single-message reads; omitted from list rows.",
-    },
-  },
-} as const;
-
 export const SMSMessageWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -15442,11 +15405,6 @@ export const SMSMessageWritableSchema = {
       ],
       description:
         "Content classification supplied on the send. Null for inbound messages.",
-    },
-    cost: {
-      $ref: "#/components/schemas/SMSCostWritable",
-      description:
-        "Cost of the message. Null until the message has been priced.",
     },
     tags: {
       type: "array",

@@ -1,7 +1,7 @@
 {
   "name": "@messagebird/sdk",
-  "version": "0.22.0",
-  "description": "Official TypeScript SDK for the Bird API.",
+  "version": "0.23.0",
+  "description": "The official TypeScript SDK for the Bird API: email, SMS, WhatsApp, verification, and Realtime on one typed client.",
   "license": "MIT",
   "author": "Bird",
   "homepage": "https://bird.com/docs/sdks/typescript",
@@ -10,10 +10,14 @@
   },
   "keywords": [
     "bird",
-    "email",
-    "webhooks",
+    "api",
     "sdk",
-    "api"
+    "email",
+    "sms",
+    "whatsapp",
+    "verify",
+    "realtime",
+    "webhooks"
   ],
   "repository": {
     "type": "git",

@@ -1,6 +1,6 @@
 # @messagebird/realtime
 
-The Bird Realtime browser client. Subscribe to channels and receive events in real time over a WebSocket.
+The official Bird Realtime browser client: subscribe to channels and receive events in real time over a WebSocket.
 
 > Looking for the server-side SDK (send messages, manage resources, verify webhooks — including publishing Realtime events)? That's [`@messagebird/sdk`](https://www.npmjs.com/package/@messagebird/sdk).
 

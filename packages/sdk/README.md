@@ -1,6 +1,6 @@
 # @messagebird/sdk
 
-The official TypeScript SDK for the [Bird](https://bird.com) API — fully typed, edge-ready, ESM.
+The official TypeScript SDK for the [Bird](https://bird.com) API: email, SMS, WhatsApp, verification, and Realtime, over one typed client. Fully typed, edge-ready, ESM.
 
 📚 **Documentation:** https://bird.com/docs/sdks/typescript
 
