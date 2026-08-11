@@ -53,6 +53,9 @@ import type {
   CreateVerificationCheckResponses,
   CreateVerificationData,
   CreateVerificationErrors,
+  CreateVerificationNextChannelData,
+  CreateVerificationNextChannelErrors,
+  CreateVerificationNextChannelResponses,
   CreateVerificationResponses,
   CreateWhatsAppMessageData,
   CreateWhatsAppMessageErrors,
@@ -165,6 +168,9 @@ import type {
   GetSmsTemplateData,
   GetSmsTemplateErrors,
   GetSmsTemplateResponses,
+  GetVoiceCallData,
+  GetVoiceCallErrors,
+  GetVoiceCallResponses,
   GetWhatsAppMessageData,
   GetWhatsAppMessageErrors,
   GetWhatsAppMessageResponses,
@@ -216,6 +222,9 @@ import type {
   ListSmsTemplatesData,
   ListSmsTemplatesErrors,
   ListSmsTemplatesResponses,
+  ListVoiceCallsData,
+  ListVoiceCallsErrors,
+  ListVoiceCallsResponses,
   ListWhatsAppMessageEventsData,
   ListWhatsAppMessageEventsErrors,
   ListWhatsAppMessageEventsResponses,
@@ -1248,6 +1257,8 @@ export const unassignAudienceContact = <ThrowOnError extends boolean = false>(
  *
  * Returns the workspace's SMS messages as a cursor-paginated list, newest first. Filter by direction, status, category, recipient, sender, failure reason, tag, or creation time; pass the response's `next_cursor` back as `starting_after` to fetch the next page. To follow a single message's delivery, use [Get an SMS message](/docs/api/reference/get-sms-message) instead.
  *
+ * Messages are retained for **30 days**. A `created_after` earlier than that is accepted and raised to the retention bound rather than rejected, so a wider window returns what is still retained instead of failing. There is no way to read messages older than the window.
+ *
  */
 export const listSmsMessages = <ThrowOnError extends boolean = false>(
   options?: Options<ListSmsMessagesData, ThrowOnError>,
@@ -1434,7 +1445,7 @@ export const getSmsTemplate = <ThrowOnError extends boolean = false>(
 /**
  * Create a verification
  *
- * Creates a verification for a recipient and sends them a one-time passcode. Provide the recipient in `to`: an email address (verified over email), a phone number (verified over SMS), or both. With both, the passcode is sent over one channel at a time and delivery falls over to the other channel if the first fails; it is never sent to both at once.
+ * Creates a verification for a recipient and sends them a one-time passcode. Provide the recipient in `to`: an email address (verified over email), a phone number (verified over the phone channels enabled for its destination country), or both. The passcode is sent over one channel at a time and delivery falls over to the next channel in the plan if one fails; it is never sent over two channels at once.
  *
  * Calling this again for the same recipient resumes the verification in progress rather than starting a second one: within the resend cooldown the request returns the current state without sending, and after it a fresh passcode is sent. Use the same call to send and to resend.
  *
@@ -1500,9 +1511,47 @@ export const createVerificationCheck = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Advance a verification to its next channel
+ *
+ * Advances an in-progress verification to the next channel in its plan and sends a fresh passcode there, for a recipient who reports not receiving the code. Identify the verification by the same `to` used to create it; you do not need to store a verification ID.
+ *
+ * The send bypasses the resend cooldown (a deliberate channel switch is a different act from a same-channel resend), and every passcode already sent stays valid, so a code that arrives late can still be checked. The response is the verification with `last_channel` set to the channel the new passcode went to. Concurrent requests for the same recipient are safe: each advances the plan at most one step. When two race, the request that completes the newer send is the authoritative one; the other returns the verification's committed state, whose `last_channel` still names the most recent send that completed. A later read of the verification always reflects the settled outcome.
+ *
+ * An error status is returned when the verification cannot be advanced: `404` when no verification is in progress for the recipient, `422` with `NoNextChannel` when the plan has no further channel (fall back to a plain resend), `422` with `NoAvailableChannel` when every remaining channel failed to send, and `429` when sends for the account are requested too quickly.
+ *
+ */
+export const createVerificationNextChannel = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateVerificationNextChannelData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    CreateVerificationNextChannelResponses,
+    CreateVerificationNextChannelErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/verify/verifications/next-channel",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * List WhatsApp messages
  *
  * Returns the workspace's WhatsApp messages as a cursor-paginated list, newest first. Filter by direction, status, contact phone number, business-scoped user ID, template category, tag, or creation time; pass the response's `next_cursor` back as `starting_after` to fetch the next page. To follow a single message's delivery, use [Get a WhatsApp message](/docs/api/reference/get-whats-app-message) instead.
+ *
+ * Messages are retained for **30 days**. A `created_after` earlier than that is accepted and raised to the retention bound rather than rejected, so a wider window returns what is still retained instead of failing. There is no way to read messages older than the window.
  *
  */
 export const listWhatsAppMessages = <ThrowOnError extends boolean = false>(
@@ -2909,5 +2958,62 @@ export const listMailboxLabels = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/email/mailboxes/{mailbox_id}/labels",
+    ...options,
+  });
+
+/**
+ * List calls
+ *
+ * Returns a paginated list of the workspace's calls, ordered by start time descending.
+ *
+ * The `status` filter selects which side of the call lifecycle you get. Omit it, or pass only final statuses, and you get completed calls. Pass only the in-flight statuses (`ringing`, `in_progress`) and you get the calls happening right now. A call in flight carries no economics yet: `duration_ms`, `billable_ms`, `ended_at`, and `cost` are null until it ends, and the completed record then appears under the same `id`.
+ *
+ * In-flight and completed calls are paged separately, so a request that mixes in-flight and final statuses returns a 422 `validation_error`.
+ *
+ */
+export const listVoiceCalls = <ThrowOnError extends boolean = false>(
+  options?: Options<ListVoiceCallsData, ThrowOnError>,
+) =>
+  (options?.client ?? client).get<
+    ListVoiceCallsResponses,
+    ListVoiceCallsErrors,
+    ThrowOnError
+  >({
+    querySerializer: { parameters: { status: { array: { explode: false } } } },
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/calls",
+    ...options,
+  });
+
+/**
+ * Get a call
+ *
+ * Returns a single call at any point in its lifecycle. A call that is still ringing or connected answers with its in-flight `status` and no economics: `duration_ms`, `billable_ms`, `ended_at`, and `cost` fill in once it ends, at this same URL. Returns a 404 `not_found_error` if the call does not exist in the workspace.
+ *
+ */
+export const getVoiceCall = <ThrowOnError extends boolean = false>(
+  options: Options<GetVoiceCallData, ThrowOnError>,
+) =>
+  (options.client ?? client).get<
+    GetVoiceCallResponses,
+    GetVoiceCallErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/calls/{call_id}",
     ...options,
   });

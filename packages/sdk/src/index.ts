@@ -104,6 +104,7 @@ export type {
   VerificationCheckResult,
   VerifyVerificationsCreateParams,
   VerifyVerificationsCheckParams,
+  VerifyVerificationsNextChannelParams,
 } from "./resources/verifyVerifications.gen.js";
 export type {
   Contact,

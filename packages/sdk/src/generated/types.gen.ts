@@ -8,6 +8,227 @@ export type ClientOptions = {
     | (string & {});
 };
 
+export type VoiceCallList = {
+  data: Array<VoiceCall>;
+} & ListEnvelope;
+
+export type ListEnvelope = {
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. Null when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. Null when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor. Pass back as `ending_before` later to fetch items that have appeared since this response. Non-null whenever `data` is non-empty; null only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
+/**
+ * ISO 4217 three-letter currency code.
+ */
+export type CurrencyCode = string;
+
+export type Money = {
+  /**
+   * Decimal amount as a string, in major currency units.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency code.
+   */
+  currency_code: CurrencyCode;
+};
+
+export type VoiceMediaQuality = {
+  /**
+   * Mean opinion score, the single number for how the call sounded, from 1 (unintelligible) to 5 (as good as being in the same room). Anything at or above 4.0 is what most people would call a clear line, and below 3.5 is where callers start asking each other to repeat themselves. The three other fields are the impairments that move it.
+   *
+   */
+  readonly mos: number;
+  /**
+   * Variation in the arrival time of the audio packets, in milliseconds. Audio arriving unevenly is heard as choppiness even when no packets are lost at all.
+   */
+  readonly jitter_ms: number;
+  /**
+   * Percentage of audio packets that never arrived. Heard as brief gaps or clipped words, and the impairment that degrades a call fastest.
+   */
+  readonly packet_loss_pct: number;
+  /**
+   * Round-trip time between the two ends, in milliseconds. It does not distort the audio, but above roughly 300 ms the two parties start talking over each other.
+   */
+  readonly round_trip_time_ms: number;
+};
+
+/**
+ * Why Bird refused the call before dialing a carrier. Every refusal is signalled
+ * to your PBX as `503`, so `sip_response_code` alone cannot tell these causes
+ * apart. This field is where the cause lives.
+ *
+ * Most of them you can fix yourself:
+ *
+ * - `source_not_allowed`: the call came from an IP address that is not in the
+ * trunk's allowed-address list. Add the address your PBX sends from.
+ * - `caller_id_not_verified`: the number in the `From` header is not a verified
+ * caller ID for this workspace. Verify it, or present a number you have
+ * already verified.
+ * - `destination_not_enabled`: you have not turned on calling to this
+ * destination country. Enable it in your voice destination settings.
+ * - `insufficient_balance`: your wallet did not cover the call. Top up, or turn
+ * on automatic top-ups.
+ * - `daily_spend_exceeded`: the call would have passed your organization's daily
+ * voice spend limit. The limit resets at the start of the next UTC day.
+ * - `concurrent_calls_exceeded`: you already have as many calls in progress as
+ * your account allows. Wait for one to end, or ask support to raise the limit.
+ * - `calls_per_second_exceeded`: you placed calls faster than your account
+ * allows. Slow the rate you dial at, then retry.
+ *
+ * The rest need Bird to act, so contact support and quote the call `id`:
+ *
+ * - `routing_not_configured`: no dial plan is attached to this trunk yet.
+ * Expected on a trunk that was just created.
+ * - `no_route_found`: a dial plan is attached, but no rule in it covers this
+ * destination.
+ * - `destination_blocked`: the destination is blocked by Bird's routing
+ * configuration.
+ * - `call_not_permitted`: the call could not be priced for your account.
+ *
+ */
+export type VoiceCallRejectionReason =
+  | "source_not_allowed"
+  | "caller_id_not_verified"
+  | "routing_not_configured"
+  | "no_route_found"
+  | "destination_blocked"
+  | "destination_not_enabled"
+  | "insufficient_balance"
+  | "daily_spend_exceeded"
+  | "concurrent_calls_exceeded"
+  | "calls_per_second_exceeded"
+  | "call_not_permitted";
+
+/**
+ * Call status.
+ *
+ * A call that has ended carries answered, no_answer, failed, rejected, or unknown. A call that is still up carries ringing before it is picked up and in_progress once it is; both are what the `status` filter on the call list selects on to show calls happening right now.
+ *
+ * busy and canceled are declared ahead of the feature that produces them, so their arrival is not a breaking contract change: they come with inbound termination, and today both outcomes are folded into failed.
+ *
+ */
+export type VoiceCallStatus =
+  | "answered"
+  | "no_answer"
+  | "busy"
+  | "canceled"
+  | "failed"
+  | "rejected"
+  | "unknown"
+  | "ringing"
+  | "in_progress";
+
+export type SipTrunkId = string;
+
+export type AuditLogActor = {
+  /**
+   * Actor identifier.
+   */
+  id: string;
+  /**
+   * Actor type (e.g. user, api_key, system).
+   */
+  type: string;
+  /**
+   * Display name of the actor — the user's email address for user actors, or the API key's name for API-key actors. Absent when it could not be resolved.
+   *
+   */
+  readonly display_name?: string | null;
+};
+
+/**
+ * Whether the call originated from your PBX (outbound) or arrived from a remote party (inbound).
+ */
+export type VoiceCallDirection = "inbound" | "outbound";
+
+export type WorkspaceId = string;
+
+export type VoiceSessionId = string;
+
+export type VoiceCallId = string;
+
+export type VoiceCall = {
+  /**
+   * Unique identifier for this call record.
+   */
+  readonly id: VoiceCallId;
+  /**
+   * Session identifier shared across all legs of a multi-party or transferred call. Use this to correlate related call records. Null when session correlation is not available for the call.
+   */
+  readonly session_id?: VoiceSessionId | null;
+  readonly workspace_id: WorkspaceId;
+  readonly direction: VoiceCallDirection;
+  /**
+   * Calling party number in E.164 format.
+   */
+  readonly from: string;
+  /**
+   * Called party number in E.164 format.
+   */
+  readonly to: string;
+  /**
+   * Who placed the call. Either the API key whose credentials it used, or the user who placed it from a browser or the Bird CLI. Absent when the call was admitted by its source IP address alone, since no credential identifies a caller there, and for calls placed before Bird started recording this.
+   */
+  readonly actor?: AuditLogActor;
+  /**
+   * Identifier of the SIP trunk that originated this call. Null when no trunk is associated.
+   */
+  readonly sip_trunk_id?: SipTrunkId | null;
+  readonly status: VoiceCallStatus;
+  /**
+   * Final SIP response code received from the carrier. Null when no SIP response was received, for example on timeout or DNS failure.
+   */
+  readonly sip_response_code?: number | null;
+  /**
+   * Why Bird refused the call before dialing a carrier. Absent when Bird did not refuse it, meaning the call either connected or it failed at the carrier, where `sip_response_code` is the whole story.
+   */
+  readonly rejection_reason?: VoiceCallRejectionReason;
+  /**
+   * When the call was initiated.
+   */
+  readonly started_at: string;
+  /**
+   * When the call was answered (200 OK received). Null for unanswered calls.
+   */
+  readonly answered_at?: string | null;
+  /**
+   * When the call ended (BYE or final non-2xx response). Null for calls that ended abnormally without a recorded end event.
+   */
+  readonly ended_at?: string | null;
+  /**
+   * Total call duration in milliseconds, measured from the first INVITE to the BYE or final response. Null while the call is still in progress and has no final duration yet.
+   */
+  readonly duration_ms?: number | null;
+  /**
+   * Post-dial delay in milliseconds: how long the caller heard nothing between dialing and the phone starting to ring at the other end. High values are what callers experience as the call "not going through". Absent when the call never rang, either because it failed first or because the carrier answered it immediately.
+   *
+   */
+  readonly pdd_ms?: number;
+  /**
+   * Billable duration in milliseconds, measured from answer to call end. Zero for unanswered calls, and null while the call is still in progress.
+   */
+  readonly billable_ms?: number | null;
+  /**
+   * How the audio sounded, as opposed to whether the call connected. Absent when the call carried no audio, or when the far end reported nothing to measure from.
+   */
+  media_quality?: VoiceMediaQuality;
+  /**
+   * Amount billed for this call, net of tax, at full precision. Absent until the call has been rated; unanswered or unpriced calls have no cost.
+   */
+  cost?: Money;
+};
+
 export type WebhookAttemptList = {
   /**
    * Delivery attempts, newest first.
@@ -190,8 +411,6 @@ export type WhatsAppAddress = {
    */
   bsuid?: string;
 };
-
-export type WorkspaceId = string;
 
 export type WhatsAppMessageId = string;
 
@@ -397,15 +616,6 @@ export type EventWhatsAppAccepted = {
 export type EventVoiceCallInitiatedData = EventVoiceBase;
 
 /**
- * Whether the call originated from your PBX (outbound) or arrived from a remote party (inbound).
- */
-export type VoiceCallDirection = "inbound" | "outbound";
-
-export type VoiceSessionId = string;
-
-export type VoiceCallId = string;
-
-/**
  * Identity fields shared by every voice call lifecycle event payload.
  */
 export type EventVoiceBase = {
@@ -446,25 +656,6 @@ export type EventVoiceCallInitiated = {
   timestamp: string;
   data: EventVoiceCallInitiatedData;
 };
-
-/**
- * Call status.
- *
- * A call that has ended carries answered, no_answer, failed, rejected, or unknown. A call that is still up carries ringing before it is picked up and in_progress once it is; both are what the `status` filter on the call list selects on to show calls happening right now.
- *
- * busy and canceled are declared ahead of the feature that produces them, so their arrival is not a breaking contract change: they come with inbound termination, and today both outcomes are folded into failed.
- *
- */
-export type VoiceCallStatus =
-  | "answered"
-  | "no_answer"
-  | "busy"
-  | "canceled"
-  | "failed"
-  | "rejected"
-  | "unknown"
-  | "ringing"
-  | "in_progress";
 
 /**
  * Payload of the voice_call.ended event.
@@ -810,6 +1001,32 @@ export type SmsError = {
   occurred_at: string;
 } | null;
 
+/**
+ * What was charged for a message, split into the components that make it up. Null until at least one component has been priced.
+ *
+ */
+export type MessageCost = {
+  /**
+   * Total charged, as a decimal string: the sum of the components below. Net of tax, which applies to your wallet balance rather than to an individual charge.
+   *
+   */
+  readonly amount: string;
+  /**
+   * ISO 4217 currency code. Every component is denominated in this currency.
+   */
+  readonly currency_code: CurrencyCode;
+  /**
+   * What Bird charged to carry the message, as a decimal string. Null when this component was not priced; `"0.00000"` when it priced at zero.
+   *
+   */
+  readonly transaction_amount: string | null;
+  /**
+   * Third-party fees Bird passes on, as a decimal string, such as US 10DLC carrier surcharges. Null when this component was not priced; `"0.00000"` when it priced at zero.
+   *
+   */
+  readonly passthrough_amount: string | null;
+} | null;
+
 export type SmsMessageId = string;
 
 /**
@@ -825,11 +1042,13 @@ export type EventSmsBase = {
    */
   workspace_id: WorkspaceId;
   /**
-   * Recipient phone number in E.164 format.
+   * Where the message went. On an outbound message this is the recipient's phone number in E.164 format; on an inbound one it is your own number that received it.
+   *
    */
   to: string;
   /**
-   * Sender the message was sent from — an E.164 number, an alphanumeric sender ID, or a short code.
+   * Where the message came from. On an outbound message this is the sender you sent it from: an E.164 number, an alphanumeric sender ID, or a short code. On an inbound one it is the phone number that sent it to you.
+   *
    */
   from: string;
   /**
@@ -844,6 +1063,13 @@ export type EventSmsBase = {
   metadata: {
     [key: string]: unknown;
   } | null;
+  /**
+   * What the message had cost as of this event, split into Bird's charge and any third-party fees passed through. Null on an event that priced nothing.
+   *
+   * Components are named so you can merge them per component rather than replacing the object: webhook delivery is not ordered, so an older event arriving late would otherwise overwrite a newer figure. Take the latest `occurred_at` you have seen for each component. `amount` is the sum of the components in THIS payload, not a settled total.
+   *
+   */
+  cost?: MessageCost;
 };
 
 /**
@@ -2165,21 +2391,6 @@ export type WebhookEndpointCreate = {
 export type WebhookEndpointList = {
   data: Array<WebhookEndpoint>;
 } & ListEnvelopeWithTotal;
-
-export type ListEnvelope = {
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. Null when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. Null when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor. Pass back as `ending_before` later to fetch items that have appeared since this response. Non-null whenever `data` is non-empty; null only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
-};
 
 export type ListEnvelopeWithTotal = ListEnvelope & {
   /**
@@ -5092,22 +5303,6 @@ export type WhatsAppMessageList = {
 } & ListEnvelope;
 
 /**
- * ISO 4217 three-letter currency code.
- */
-export type CurrencyCode = string;
-
-export type Money = {
-  /**
-   * Decimal amount as a string, in major currency units.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency code.
-   */
-  currency_code: CurrencyCode;
-};
-
-/**
  * Delivery status. `accepted` (the initial status of an outbound send) means Bird accepted the request and it is queued for sending. `sent` means it was handed to the WhatsApp network. `delivered` is confirmed delivery to the recipient's device. `failed` is a terminal permanent failure. `rejected` means Bird refused the message before sending it to WhatsApp, because the recipient is on the workspace's suppression list, the wallet had insufficient balance, or the destination is unpriced. A rejected message was not sent and not charged. There is no `read` status: a read receipt is reported as `read_at` and a `whatsapp.read` event, not a status value. The remaining values are reserved and not returned today: `scheduled` (queued to send at a future time), `canceled` (a scheduled message canceled before sending), and `received` (a message a contact sent you).
  *
  */
@@ -5195,7 +5390,10 @@ export type WhatsAppMessage = {
    * When the message was read by the recipient. Null until then.
    */
   readonly read_at?: string | null;
-  cost?: Money | null;
+  /**
+   * What the message cost, split into Bird's charge and any third-party fees passed through. Null until the message has been priced, and on messages that were rejected before pricing. The rate depends on the message category and the recipient's country.
+   */
+  readonly cost?: MessageCost;
   /**
    * Structured `{name, value}` filter labels applied to this message.
    */
@@ -5206,6 +5404,10 @@ export type WhatsAppMessage = {
   metadata?: {
     [key: string]: unknown;
   };
+};
+
+export type VerificationNextChannelRequest = {
+  to: VerificationTo;
 };
 
 export type VerificationCheckResult = {
@@ -5247,7 +5449,7 @@ export type Verification = {
   readonly reason?: VerificationTerminalReason | null;
   readonly to: VerificationTo;
   /**
-   * The channels this verification uses to deliver the passcode, in attempt order: the first entry is tried first and later entries are fallbacks. An email recipient is verified over email; a phone recipient is verified over SMS.
+   * The channels this verification uses to deliver the passcode, in attempt order: the first entry is tried first and later entries are fallbacks. An email recipient is verified over email; a phone recipient is verified over the phone channels enabled for its destination country, in the order that country's configuration sets.
    */
   readonly channels: Array<VerificationChannelEntry>;
   /**
@@ -5447,32 +5649,6 @@ export type SmsBatchSummary = {
 };
 
 /**
- * What was charged for a message, split into the components that make it up. Null until at least one component has been priced.
- *
- */
-export type MessageCost = {
-  /**
-   * Total charged, as a decimal string: the sum of the components below. Net of tax, which applies to your wallet balance rather than to an individual charge.
-   *
-   */
-  readonly amount: string;
-  /**
-   * ISO 4217 currency code. Every component is denominated in this currency.
-   */
-  readonly currency_code: CurrencyCode;
-  /**
-   * What Bird charged to carry the message, as a decimal string. Null when this component was not priced; `"0.00000"` when it priced at zero.
-   *
-   */
-  readonly transaction_amount: string | null;
-  /**
-   * Third-party fees Bird passes on, as a decimal string, such as US 10DLC carrier surcharges. Null when this component was not priced; `"0.00000"` when it priced at zero.
-   *
-   */
-  readonly passthrough_amount: string | null;
-} | null;
-
-/**
  * Segment breakdown for the message body. Segment count drives billing.
  */
 export type SmsSegments = {
@@ -5519,18 +5695,20 @@ export type SmsMessage = {
   readonly direction: "outbound" | "inbound";
   readonly status: SmsMessageStatus;
   /**
-   * Recipient phone number in E.164 format.
+   * Where the message went. On an outbound message this is the recipient's phone number in E.164 format; on an inbound one it is your own number that received it.
+   *
    */
   to: string;
   /**
-   * Sender the message was sent from: an E.164 number, an alphanumeric sender ID, or a short code.
+   * Where the message came from. On an outbound message this is the sender you sent it from (an E.164 number, an alphanumeric sender ID, or a short code); on an inbound one it is the phone number that sent it to you.
+   *
    */
   from: string;
   /**
-   * The message body as sent. For a template send, this is the rendered text after parameter substitution. When `category` is `authentication` (a message carrying a one-time code), this is `**REDACTED**`: the code still reaches the recipient, Bird just does not persist it for later reads.
+   * The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text. For a template send, this is the rendered text after parameter substitution. When `category` is `authentication` (a message carrying a one-time code), this is `**REDACTED**`: the code still reaches the recipient, Bird just does not persist it for later reads.
    *
    */
-  text: string;
+  text?: string;
   /**
    * Content classification supplied on the send. Null for inbound messages.
    */
@@ -5558,13 +5736,13 @@ export type SmsMessage = {
    */
   readonly validity_period?: number;
   /**
-   * Carrier that handled the message, when known. Populated once a delivery receipt identifies it.
+   * Carrier that handled the message. Absent until a delivery receipt identifies it, and on a received message the carrier reports it only where a carrier fee applies.
    */
-  readonly carrier?: string | null;
+  readonly carrier?: string;
   /**
-   * Mobile country code and mobile network code of the carrier, when known.
+   * Mobile country code and mobile network code of the carrier. Absent until the carrier is identified.
    */
-  readonly mcc_mnc?: string | null;
+  readonly mcc_mnc?: string;
   /**
    * Failure detail on a terminally failed or rejected message. Present only when the message failed.
    */
@@ -5783,6 +5961,10 @@ export type Contact = {
   data?: {
     [key: string]: unknown;
   };
+  /**
+   * The audiences this contact belongs to, most-recently-joined first. Only present when listing contacts; omitted from every other contact operation.
+   */
+  readonly audiences?: Array<AudienceRef>;
 } & Timestamps;
 
 export type AudienceMember = {
@@ -6064,6 +6246,11 @@ export type ContactList = {
    */
   data: Array<Contact>;
 } & ListEnvelopeWithTotal;
+
+/**
+ * Which identifier a contact has on file, `email` for an email address or `phone` for a phone number.
+ */
+export type ContactIdentifierFilter = "email" | "phone";
 
 /**
  * The body content of a sent email message, as delivered. A send that used a template stores the template's body, so these report it with the send's `parameters` substituted in.
@@ -7224,6 +7411,28 @@ export type ErrorBody = {
   unmet_gates?: Array<UnmetGate>;
 };
 
+export type VoiceCallListWritable = {
+  data: Array<VoiceCallWritable>;
+} & ListEnvelope;
+
+export type AuditLogActorWritable = {
+  /**
+   * Actor identifier.
+   */
+  id: string;
+  /**
+   * Actor type (e.g. user, api_key, system).
+   */
+  type: string;
+};
+
+export type VoiceCallWritable = {
+  /**
+   * Amount billed for this call, net of tax, at full precision. Absent until the call has been rated; unanswered or unpriced calls have no cost.
+   */
+  cost?: Money;
+};
+
 export type WebhookAttemptListWritable = {
   /**
    * Delivery attempts, newest first.
@@ -7352,7 +7561,7 @@ export type EventWhatsAppFailedWritable = {
 /**
  * Payload of the sms.undelivered event.
  */
-export type EventSmsUndeliveredDataWritable = EventSmsBase & {
+export type EventSmsUndeliveredDataWritable = EventSmsBaseWritable & {
   /**
    * Why the message was not delivered.
    */
@@ -7379,6 +7588,42 @@ export type SmsErrorWritable = {
 } | null;
 
 /**
+ * Identity fields shared by every SMS lifecycle event payload.
+ */
+export type EventSmsBaseWritable = {
+  /**
+   * ID of the SMS message.
+   */
+  sms_id: SmsMessageId;
+  /**
+   * ID of the workspace.
+   */
+  workspace_id: WorkspaceId;
+  /**
+   * Where the message went. On an outbound message this is the recipient's phone number in E.164 format; on an inbound one it is your own number that received it.
+   *
+   */
+  to: string;
+  /**
+   * Where the message came from. On an outbound message this is the sender you sent it from: an E.164 number, an alphanumeric sender ID, or a short code. On an inbound one it is the phone number that sent it to you.
+   *
+   */
+  from: string;
+  /**
+   * Tags provided on the send request, echoed on every event for the message so you can route and correlate without an extra lookup. Null when the message carried no tags.
+   *
+   */
+  tags: Array<Tag> | null;
+  /**
+   * The metadata object provided on the send request, echoed on every event for the message so you can correlate events with your own records. Null when the message carried no metadata.
+   *
+   */
+  metadata: {
+    [key: string]: unknown;
+  } | null;
+};
+
+/**
  * The carrier reported a non-permanent failure to deliver the message.
  */
 export type EventSmsUndeliveredWritable = {
@@ -7394,9 +7639,38 @@ export type EventSmsUndeliveredWritable = {
 };
 
 /**
+ * Payload of the sms.sent event.
+ */
+export type EventSmsSentDataWritable = EventSmsBaseWritable & {
+  /**
+   * Carrier that handled the message, or null when not known.
+   */
+  carrier: string | null;
+  /**
+   * Mobile country code and mobile network code of the carrier, or null when not known.
+   */
+  mcc_mnc: string | null;
+};
+
+/**
+ * Bird handed the message to the carrier for delivery.
+ */
+export type EventSmsSentWritable = {
+  /**
+   * Event type.
+   */
+  type: "sms.sent";
+  /**
+   * Time the message was handed to the carrier.
+   */
+  timestamp: string;
+  data: EventSmsSentDataWritable;
+};
+
+/**
  * Payload of the sms.rejected event.
  */
-export type EventSmsRejectedDataWritable = EventSmsBase & {
+export type EventSmsRejectedDataWritable = EventSmsBaseWritable & {
   /**
    * Why the message was rejected before reaching the carrier.
    */
@@ -7421,7 +7695,7 @@ export type EventSmsRejectedWritable = {
 /**
  * Payload of the sms.failed event.
  */
-export type EventSmsFailedDataWritable = EventSmsBase & {
+export type EventSmsFailedDataWritable = EventSmsBaseWritable & {
   /**
    * Why the message terminally failed.
    */
@@ -7441,6 +7715,75 @@ export type EventSmsFailedWritable = {
    */
   timestamp: string;
   data: EventSmsFailedDataWritable;
+};
+
+/**
+ * Payload of the sms.expired event.
+ */
+export type EventSmsExpiredDataWritable = EventSmsBaseWritable;
+
+/**
+ * The message's validity period elapsed before it could be delivered.
+ */
+export type EventSmsExpiredWritable = {
+  /**
+   * Event type.
+   */
+  type: "sms.expired";
+  /**
+   * Time the message expired.
+   */
+  timestamp: string;
+  data: EventSmsExpiredDataWritable;
+};
+
+/**
+ * Payload of the sms.delivered event.
+ */
+export type EventSmsDeliveredDataWritable = EventSmsBaseWritable & {
+  /**
+   * Carrier that delivered the message, or null when not known.
+   */
+  carrier: string | null;
+  /**
+   * Mobile country code and mobile network code of the carrier, or null when not known.
+   */
+  mcc_mnc: string | null;
+};
+
+/**
+ * The carrier confirmed delivery of the message to the recipient handset.
+ */
+export type EventSmsDeliveredWritable = {
+  /**
+   * Event type.
+   */
+  type: "sms.delivered";
+  /**
+   * Time the carrier confirmed delivery.
+   */
+  timestamp: string;
+  data: EventSmsDeliveredDataWritable;
+};
+
+/**
+ * Payload of the sms.accepted event.
+ */
+export type EventSmsAcceptedDataWritable = EventSmsBaseWritable;
+
+/**
+ * Bird accepted the SMS send request and queued it for processing.
+ */
+export type EventSmsAcceptedWritable = {
+  /**
+   * Event type.
+   */
+  type: "sms.accepted";
+  /**
+   * Time Bird accepted the request.
+   */
+  timestamp: string;
+  data: EventSmsAcceptedDataWritable;
 };
 
 /**
@@ -7532,13 +7875,13 @@ export type WebhookEventWritable =
     } & EventEmailSuppressionCreated)
   | ({
       type: "sms.accepted";
-    } & EventSmsAccepted)
+    } & EventSmsAcceptedWritable)
   | ({
       type: "sms.delivered";
-    } & EventSmsDelivered)
+    } & EventSmsDeliveredWritable)
   | ({
       type: "sms.expired";
-    } & EventSmsExpired)
+    } & EventSmsExpiredWritable)
   | ({
       type: "sms.failed";
     } & EventSmsFailedWritable)
@@ -7547,7 +7890,7 @@ export type WebhookEventWritable =
     } & EventSmsRejectedWritable)
   | ({
       type: "sms.sent";
-    } & EventSmsSent)
+    } & EventSmsSentWritable)
   | ({
       type: "sms.undelivered";
     } & EventSmsUndeliveredWritable)
@@ -8358,18 +8701,20 @@ export type SmsMessageBatchResponseWritable = {
 
 export type SmsMessageWritable = {
   /**
-   * Recipient phone number in E.164 format.
+   * Where the message went. On an outbound message this is the recipient's phone number in E.164 format; on an inbound one it is your own number that received it.
+   *
    */
   to: string;
   /**
-   * Sender the message was sent from: an E.164 number, an alphanumeric sender ID, or a short code.
+   * Where the message came from. On an outbound message this is the sender you sent it from (an E.164 number, an alphanumeric sender ID, or a short code); on an inbound one it is the phone number that sent it to you.
+   *
    */
   from: string;
   /**
-   * The message body as sent. For a template send, this is the rendered text after parameter substitution. When `category` is `authentication` (a message carrying a one-time code), this is `**REDACTED**`: the code still reaches the recipient, Bird just does not persist it for later reads.
+   * The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text. For a template send, this is the rendered text after parameter substitution. When `category` is `authentication` (a message carrying a one-time code), this is `**REDACTED**`: the code still reaches the recipient, Bird just does not persist it for later reads.
    *
    */
-  text: string;
+  text?: string;
   /**
    * Content classification supplied on the send. Null for inbound messages.
    */
@@ -9765,6 +10110,10 @@ export type ListContactsData = {
      * Case-insensitive substring match against the contact's email address, first name, last name, or phone number. Phone matching is over the digits of the international form, so a full pasted number, a formatted number, or trailing digits all match; a national form with a leading trunk zero does not.
      */
     q?: string;
+    /**
+     * Filter to contacts that have a specific identifier on file.
+     */
+    identifier?: ContactIdentifierFilter;
     /**
      * Maximum number of items to return per page.
      */
@@ -11618,6 +11967,82 @@ export type CreateVerificationCheckResponses = {
 
 export type CreateVerificationCheckResponse =
   CreateVerificationCheckResponses[keyof CreateVerificationCheckResponses];
+
+export type CreateVerificationNextChannelData = {
+  body: VerificationNextChannelRequest;
+  headers?: {
+    /**
+     * Workspace context. Required for session auth; derived from API key otherwise.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Two distinct 409 errors signal misuse:
+     * - `request_in_progress` (E01004): the same key is currently being
+     * processed by a concurrent request. Wait briefly and retry; the lock
+     * expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/verify/verifications/next-channel";
+};
+
+export type CreateVerificationNextChannelErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Unprocessable request. Either field validation failed (type: validation_error, includes details array) or a business rule was violated (e.g. domain_not_verified). Both use the unified Error envelope; validation errors include the details array.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The data behind this endpoint is temporarily unavailable. The request is safe to retry; responses resume automatically once availability is restored.
+   *
+   */
+  503: Error;
+};
+
+export type CreateVerificationNextChannelError =
+  CreateVerificationNextChannelErrors[keyof CreateVerificationNextChannelErrors];
+
+export type CreateVerificationNextChannelResponses = {
+  /**
+   * The verification after the advance, with `last_channel` set to the channel the new passcode was sent on. When a concurrent advance for the same recipient owns the newest send, `last_channel` reflects the most recent completed send instead; a later read shows the settled outcome.
+   */
+  200: Verification;
+};
+
+export type CreateVerificationNextChannelResponse =
+  CreateVerificationNextChannelResponses[keyof CreateVerificationNextChannelResponses];
 
 export type ListWhatsAppMessagesData = {
   body?: never;
@@ -15216,3 +15641,143 @@ export type ListMailboxLabelsResponses = {
 
 export type ListMailboxLabelsResponse =
   ListMailboxLabelsResponses[keyof ListMailboxLabelsResponses];
+
+export type ListVoiceCallsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Return only calls in this direction.
+     */
+    direction?: VoiceCallDirection;
+    /**
+     * Return only calls with one of these statuses, comma-separated. The in-flight statuses (`ringing`, `in_progress`) cannot be combined with final ones in the same request.
+     *
+     */
+    status?: Array<VoiceCallStatus>;
+    /**
+     * Return only calls belonging to this session, which is how the legs of one multi-party or transferred call are correlated.
+     */
+    session_id?: VoiceSessionId;
+    /**
+     * Return only calls carried by this SIP trunk.
+     */
+    sip_trunk_id?: SipTrunkId;
+    /**
+     * Return only calls placed from this calling party number, matched as a whole number rather than as a fragment. Give it in international form: `+14155551234`, `14155551234`, and `0014155551234` all select the same calls, because a call record keeps the number exactly as the calling equipment presented it. A number given without a country code matches only calls recorded in that same form, since it names a different number in every country. Use `number` instead to match part of a number, or either side of the call.
+     *
+     */
+    from?: string;
+    /**
+     * Return only calls placed to this called party number, matched as a whole number rather than as a fragment. Give it in international form: `+16505559876`, `16505559876`, and `0016505559876` all select the same calls, because a call record keeps the number exactly as the calling equipment presented it. A number given without a country code matches only calls recorded in that same form, since it names a different number in every country. Use `number` instead to match part of a number, or either side of the call.
+     *
+     */
+    to?: string;
+    /**
+     * Return only calls where the calling or called number contains this value. Matches a partial number, so a country or area-code prefix returns every call to or from it. Combines with `from`/`to`, which match one side exactly.
+     */
+    number?: string;
+    /**
+     * Return only calls that started at or after this instant, inclusive. RFC 3339 timestamp.
+     */
+    started_after?: string;
+    /**
+     * Return only calls that started at or before this instant, inclusive. RFC 3339 timestamp.
+     */
+    started_before?: string;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/voice/calls";
+};
+
+export type ListVoiceCallsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Unprocessable request. Either field validation failed (type: validation_error, includes details array) or a business rule was violated (e.g. domain_not_verified). Both use the unified Error envelope; validation errors include the details array.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListVoiceCallsError =
+  ListVoiceCallsErrors[keyof ListVoiceCallsErrors];
+
+export type ListVoiceCallsResponses = {
+  /**
+   * Paginated list of call records.
+   */
+  200: VoiceCallList;
+};
+
+export type ListVoiceCallsResponse =
+  ListVoiceCallsResponses[keyof ListVoiceCallsResponses];
+
+export type GetVoiceCallData = {
+  body?: never;
+  path: {
+    call_id: VoiceCallId;
+  };
+  query?: never;
+  url: "/v1/voice/calls/{call_id}";
+};
+
+export type GetVoiceCallErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetVoiceCallError = GetVoiceCallErrors[keyof GetVoiceCallErrors];
+
+export type GetVoiceCallResponses = {
+  /**
+   * Call record.
+   */
+  200: VoiceCall;
+};
+
+export type GetVoiceCallResponse =
+  GetVoiceCallResponses[keyof GetVoiceCallResponses];

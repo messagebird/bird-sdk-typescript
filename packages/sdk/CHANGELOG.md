@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.24.0
+
+- Listing contacts gains an `identifier` filter (`email` or `phone`), and each contact now includes its `audiences`.
+- **Breaking:** an SMS message's `carrier` and `mcc_mnc` are omitted rather than `null` when Bird does not have them; replace a `=== null` check on either with an `undefined` or falsy one.
+- **Breaking:** an SMS event's `carrier` and `mcc_mnc` are omitted rather than `null` before the carrier is identified; replace a `=== null` check on either with an `undefined` or falsy one.
+- **Breaking:** an SMS message's `text` is now optional — a message you sent always carries one, but a received message may not. Handle its absence rather than assuming every message has a body.
+- Every `sms.*` webhook payload now carries `cost`, split into `transaction_amount` and `passthrough_amount` over one currency. The figure is as of that event, and the components are named so a subscriber merges them per component rather than replacing the object, since webhook delivery is not ordered.
+- Verify gains a next-channel action: when a recipient reports the passcode never arrived, send a fresh one on the next channel in the verification's plan without waiting out the resend cooldown. Identify the verification by the same recipient you started it with, as with a check — there is still no id to store. Every passcode already sent stays valid, so a late arrival can still be checked. Available as `verify.verifications.nextChannel` / `NextChannel` / `next_channel` / `nextChannel` on the TypeScript, Go, Python, and PHP SDKs, `bird verify verifications next-channel` on the CLI, and the `verify_verifications_next_channel` MCP tool. A verification whose channel plan is exhausted answers `422 NoNextChannel`.
+- Add a `voice` resource for reading the call log: list the workspace's calls with the dashboard's filters, and fetch one call at any point in its lifecycle.
+- A voice call now reports `actor`, the API key or user that placed it. It is absent on calls that ended before Bird began recording it, and on any call your trunk admitted by source IP address, since that path carries no credential to identify a caller.
+- A WhatsApp message's `cost` now names its components, matching SMS: `transaction_amount` is what Bird charged to send the message, and `passthrough_amount` is reserved for third-party fees. `amount` remains the total.
+- Message reads on SMS and WhatsApp are now bounded to a 30-day retention window: a `created_after` earlier than the bound is raised to it rather than returning a silently truncated page, and a message older than the window is not retrievable by id.
+- The create-verification docs no longer name SMS as the phone channel: a phone recipient is verified over the phone channels enabled for its destination country, in that country's configured order.
+
 ## 0.23.0
 
 - An SMS message's `cost` now names its components: `transaction_amount` is what Bird charged to carry the message, and `passthrough_amount` is reserved for third-party fees such as US 10DLC carrier surcharges. `amount` remains the total.

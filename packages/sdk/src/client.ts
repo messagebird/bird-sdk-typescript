@@ -23,6 +23,7 @@ import { ContactsResource } from "./resources/contacts.gen.js";
 import { SmsResource } from "./resources/sms.js";
 import { SmsTemplatesResource } from "./resources/smsTemplates.gen.js";
 import { WhatsappResource } from "./resources/whatsapp.js";
+import { VoiceResource } from "./resources/voice.gen.js";
 import { VerifyResource } from "./resources/verify.js";
 import { WebhooksResource, type WebhookOptions } from "./resources/webhooks.js";
 import { RealtimeResource, type RealtimeOptions } from "./resources/realtime.js";
@@ -172,6 +173,9 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
   /** The WhatsApp channel — `bird.whatsapp.send(...)`, `.get(...)`, `.list(...)`, `.listEvents(...)`. */
   readonly whatsapp: WhatsappResource;
 
+  /** The Voice call log — `bird.voice.list(...)`, `.get(...)`. Calls are placed by your own SIP equipment, so this is a read surface. */
+  readonly voice: VoiceResource;
+
   /** The Verify product — `bird.verify.verifications.create(...)`, `.check(...)`. */
   readonly verify: VerifyResource;
 
@@ -247,6 +251,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
     this.sms = new SmsResource(this.core, this.#client);
     this.smsTemplates = new SmsTemplatesResource(this.core, this.#client);
     this.whatsapp = new WhatsappResource(this.core, this.#client);
+    this.voice = new VoiceResource(this.core, this.#client);
     this.verify = new VerifyResource(this.core, this.#client);
     this.contacts = new ContactsResource(this.core, this.#client);
     this.audiences = new AudiencesResource(this.core, this.#client);

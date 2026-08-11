@@ -23,3 +23,10 @@ export async function verifyVerificationsCheck() {
   });
   console.log(result.success);
 }
+
+export async function verifyVerificationsNextChannel() {
+  const verification = await bird.verify.verifications.nextChannel({
+    to: { phone_number: "+15551234567" },
+  });
+  console.log(verification.last_channel);
+}

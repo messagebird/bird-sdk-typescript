@@ -614,28 +614,47 @@ console.log(verification.id, verification.status);
 }
 
 export async function _ex_90() {
+const verification = await bird.verify.verifications.nextChannel({
+  to: { phone_number: "+15551234567" },
+});
+console.log(verification.last_channel);
+}
+
+export async function _ex_91() {
+const call = await bird.voice.get("vcl_01k0p3v9wera3v6q6xw3e9y2mh");
+// A call still ringing or connected carries no economics yet.
+call.status; // "answered" | "no_answer" | "ringing" | …
+}
+
+export async function _ex_92() {
+for await (const call of bird.voice.list({ status: ["ringing", "in_progress"] })) {
+  console.log(call.id, call.status);
+}
+}
+
+export async function _ex_93() {
 // Pass the RAW request body; set the secret via new BirdClient({ webhooks: { secret } }).
 const event = bird.webhooks.unwrap(rawBody, headers);
 console.log(event.type); // discriminated union: narrow on event.type
 }
 
-export async function _ex_91() {
+export async function _ex_94() {
 const msg = await bird.whatsapp.get("wa_abc123");
 msg.status; // "accepted" | "delivered" | …
 }
 
-export async function _ex_92() {
+export async function _ex_95() {
 for await (const msg of bird.whatsapp.list({ status: ["delivered"] })) {
   console.log(msg.id, msg.status);
 }
 }
 
-export async function _ex_93() {
+export async function _ex_96() {
 const { data } = await bird.whatsapp.listEvents("wa_abc123");
 for (const event of data) console.log(event.type, event.occurred_at);
 }
 
-export async function _ex_94() {
+export async function _ex_97() {
 const msg = await bird.whatsapp.send({
   to: "+15551234567",
   template: {
