@@ -34,6 +34,7 @@ export const WebhookEventType = {
   SmsDelivered: "sms.delivered",
   SmsExpired: "sms.expired",
   SmsFailed: "sms.failed",
+  SmsReceived: "sms.received",
   SmsRejected: "sms.rejected",
   SmsSent: "sms.sent",
   SmsUndelivered: "sms.undelivered",

@@ -269,6 +269,7 @@ export type WebhookEventType =
   | "sms.delivered"
   | "sms.expired"
   | "sms.failed"
+  | "sms.received"
   | "sms.rejected"
   | "sms.sent"
   | "sms.undelivered"
@@ -825,7 +826,7 @@ export type EventVerifyVerificationCreated = {
 };
 
 /**
- * Why a passcode send did not deliver. Open enum — new reasons may be added over time, so treat any unrecognized value as a future reason rather than an error. Emitted reasons are `carrier_rejected` (SMS), `hard_bounce` (email, permanent bounce), `soft_bounce` (email, transient bounce such as a full mailbox), `undelivered` (a generic delivery failure), `channel_unavailable` (the channel could not be used and the verification failed over), and `channel_disabled` (Bird has temporarily stopped sending over that channel, so the verification moved on to the next one).
+ * Why a passcode send did not deliver. Open enum — new reasons may be added over time, so treat any unrecognized value as a future reason rather than an error. Emitted reasons are `carrier_rejected` (SMS), `hard_bounce` (email, permanent bounce), `soft_bounce` (email, transient bounce such as a full mailbox), `undelivered` (a generic delivery failure), `channel_unavailable` (the channel could not be used and the verification failed over), `channel_disabled` (Bird has temporarily stopped sending over that channel, so the verification moved on to the next one), and `delivery_timeout` (no delivery confirmation arrived before the channel's timeout, so the verification failed over).
  */
 export type VerificationAttemptFailureReason =
   | "carrier_rejected"
@@ -834,6 +835,7 @@ export type VerificationAttemptFailureReason =
   | "undelivered"
   | "channel_unavailable"
   | "channel_disabled"
+  | "delivery_timeout"
   | (string & {});
 
 /**
@@ -1093,13 +1095,13 @@ export type EventSmsUndelivered = {
  */
 export type EventSmsSentData = EventSmsBase & {
   /**
-   * Carrier that handled the message, or null when not known.
+   * Carrier that handled the message. Absent when the carrier does not report one.
    */
-  carrier: string | null;
+  carrier?: string;
   /**
-   * Mobile country code and mobile network code of the carrier, or null when not known.
+   * Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.
    */
-  mcc_mnc: string | null;
+  mcc_mnc?: string;
 };
 
 /**
@@ -1140,6 +1142,70 @@ export type EventSmsRejected = {
    */
   timestamp: string;
   data: EventSmsRejectedData;
+};
+
+/**
+ * Payload of the sms.received event.
+ */
+export type EventSmsReceivedData = EventSmsBase &
+  unknown & {
+    /**
+     * The message body, so you can act on it without a follow-up read. Absent when the message carried only attachments and no text of its own.
+     *
+     */
+    text?: string;
+    /**
+     * Segment breakdown of the received body.
+     */
+    segments: SmsSegments;
+    /**
+     * Carrier the message came in over. Absent where the carrier does not report one.
+     */
+    carrier?: string;
+    /**
+     * Mobile country code and mobile network code of the carrier. Absent when not known.
+     */
+    mcc_mnc?: string;
+    /**
+     * Subject line. Absent when the message carried none.
+     */
+    subject?: string;
+  };
+
+/**
+ * Segment breakdown for the message body. Segment count drives billing.
+ */
+export type SmsSegments = {
+  /**
+   * Number of segments the body is split into. Each segment is a billable unit.
+   */
+  readonly count: number;
+  /**
+   * Encoding used for the body. `GSM_7BIT` fits 160 characters in a single segment (153 per part when multi-segment); `UCS2` is used when the body contains any character outside the GSM 03.38 alphabet (emoji, CJK, some accented characters) and fits 70 characters in a single segment (67 per part when multi-segment).
+   *
+   */
+  readonly encoding: "GSM_7BIT" | "UCS2";
+  /**
+   * Character count of the body under the selected encoding.
+   */
+  readonly characters: number;
+};
+
+/**
+ * Event type.
+ */
+export type SmsReceivedEventType = "sms.received";
+
+/**
+ * A message was received on one of your numbers.
+ */
+export type EventSmsReceived = {
+  type: SmsReceivedEventType;
+  /**
+   * Time the sender sent the message.
+   */
+  timestamp: string;
+  data: EventSmsReceivedData;
 };
 
 /**
@@ -1197,13 +1263,13 @@ export type EventSmsExpired = {
  */
 export type EventSmsDeliveredData = EventSmsBase & {
   /**
-   * Carrier that delivered the message, or null when not known.
+   * Carrier that delivered the message. Absent when the carrier does not report one.
    */
-  carrier: string | null;
+  carrier?: string;
   /**
-   * Mobile country code and mobile network code of the carrier, or null when not known.
+   * Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.
    */
-  mcc_mnc: string | null;
+  mcc_mnc?: string;
 };
 
 /**
@@ -1224,7 +1290,12 @@ export type EventSmsDelivered = {
 /**
  * Payload of the sms.accepted event.
  */
-export type EventSmsAcceptedData = EventSmsBase;
+export type EventSmsAcceptedData = EventSmsBase & {
+  /**
+   * Segment breakdown of the body Bird accepted, which is what the send is billed on.
+   */
+  segments: SmsSegments;
+};
 
 /**
  * Bird accepted the SMS send request and queued it for processing.
@@ -2236,6 +2307,9 @@ export type WebhookEvent =
   | ({
       type: "sms.failed";
     } & EventSmsFailed)
+  | ({
+      type: "sms.received";
+    } & EventSmsReceived)
   | ({
       type: "sms.rejected";
     } & EventSmsRejected)
@@ -5692,25 +5766,6 @@ export type SmsBatchSummary = {
 };
 
 /**
- * Segment breakdown for the message body. Segment count drives billing.
- */
-export type SmsSegments = {
-  /**
-   * Number of segments the body is split into. Each segment is a billable unit.
-   */
-  readonly count: number;
-  /**
-   * Encoding used for the body. `GSM_7BIT` fits 160 characters in a single segment (153 per part when multi-segment); `UCS2` is used when the body contains any character outside the GSM 03.38 alphabet (emoji, CJK, some accented characters) and fits 70 characters in a single segment (67 per part when multi-segment).
-   *
-   */
-  readonly encoding: "GSM_7BIT" | "UCS2";
-  /**
-   * Character count of the body under the selected encoding.
-   */
-  readonly characters: number;
-};
-
-/**
  * Delivery status. `accepted` (the initial status of an outbound send) means Bird accepted the request and it is awaiting handoff to the carrier network. `sent` means it was handed to the carrier and is awaiting a delivery receipt. `delivered` is confirmed delivery. `undelivered` is a non-permanent non-delivery (handset off or unreachable). `failed` is a terminal permanent failure. `rejected` means Bird refused it before it reached the carrier (for example insufficient balance). `expired` means the validity period elapsed without a terminal receipt. `scheduled` means the message is queued to send at a future time and has not been dispatched yet, and `canceled` means a scheduled message was canceled before it was sent. `received` applies to inbound messages.
  *
  */
@@ -7686,13 +7741,13 @@ export type EventSmsUndeliveredWritable = {
  */
 export type EventSmsSentDataWritable = EventSmsBaseWritable & {
   /**
-   * Carrier that handled the message, or null when not known.
+   * Carrier that handled the message. Absent when the carrier does not report one.
    */
-  carrier: string | null;
+  carrier?: string;
   /**
-   * Mobile country code and mobile network code of the carrier, or null when not known.
+   * Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.
    */
-  mcc_mnc: string | null;
+  mcc_mnc?: string;
 };
 
 /**
@@ -7733,6 +7788,42 @@ export type EventSmsRejectedWritable = {
    */
   timestamp: string;
   data: EventSmsRejectedDataWritable;
+};
+
+/**
+ * Payload of the sms.received event.
+ */
+export type EventSmsReceivedDataWritable = EventSmsBaseWritable &
+  unknown & {
+    /**
+     * The message body, so you can act on it without a follow-up read. Absent when the message carried only attachments and no text of its own.
+     *
+     */
+    text?: string;
+    /**
+     * Carrier the message came in over. Absent where the carrier does not report one.
+     */
+    carrier?: string;
+    /**
+     * Mobile country code and mobile network code of the carrier. Absent when not known.
+     */
+    mcc_mnc?: string;
+    /**
+     * Subject line. Absent when the message carried none.
+     */
+    subject?: string;
+  };
+
+/**
+ * A message was received on one of your numbers.
+ */
+export type EventSmsReceivedWritable = {
+  type: SmsReceivedEventType;
+  /**
+   * Time the sender sent the message.
+   */
+  timestamp: string;
+  data: EventSmsReceivedDataWritable;
 };
 
 /**
@@ -7790,13 +7881,13 @@ export type EventSmsExpiredWritable = {
  */
 export type EventSmsDeliveredDataWritable = EventSmsBaseWritable & {
   /**
-   * Carrier that delivered the message, or null when not known.
+   * Carrier that delivered the message. Absent when the carrier does not report one.
    */
-  carrier: string | null;
+  carrier?: string;
   /**
-   * Mobile country code and mobile network code of the carrier, or null when not known.
+   * Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.
    */
-  mcc_mnc: string | null;
+  mcc_mnc?: string;
 };
 
 /**
@@ -7933,6 +8024,9 @@ export type WebhookEventWritable =
   | ({
       type: "sms.failed";
     } & EventSmsFailedWritable)
+  | ({
+      type: "sms.received";
+    } & EventSmsReceivedWritable)
   | ({
       type: "sms.rejected";
     } & EventSmsRejectedWritable)

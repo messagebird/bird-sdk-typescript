@@ -56,6 +56,7 @@ export const VerificationAttemptFailureReason = {
   CarrierRejected: "carrier_rejected",
   ChannelDisabled: "channel_disabled",
   ChannelUnavailable: "channel_unavailable",
+  DeliveryTimeout: "delivery_timeout",
   HardBounce: "hard_bounce",
   SoftBounce: "soft_bounce",
   Undelivered: "undelivered",

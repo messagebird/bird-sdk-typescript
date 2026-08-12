@@ -440,6 +440,7 @@ export const WebhookEventTypeSchema = {
     "sms.delivered",
     "sms.expired",
     "sms.failed",
+    "sms.received",
     "sms.rejected",
     "sms.sent",
     "sms.undelivered",
@@ -1421,9 +1422,10 @@ export const VerificationAttemptFailureReasonSchema = {
     "undelivered",
     "channel_unavailable",
     "channel_disabled",
+    "delivery_timeout",
   ],
   description:
-    "Why a passcode send did not deliver. Open enum — new reasons may be added over time, so treat any unrecognized value as a future reason rather than an error. Emitted reasons are `carrier_rejected` (SMS), `hard_bounce` (email, permanent bounce), `soft_bounce` (email, transient bounce such as a full mailbox), `undelivered` (a generic delivery failure), `channel_unavailable` (the channel could not be used and the verification failed over), and `channel_disabled` (Bird has temporarily stopped sending over that channel, so the verification moved on to the next one).",
+    "Why a passcode send did not deliver. Open enum — new reasons may be added over time, so treat any unrecognized value as a future reason rather than an error. Emitted reasons are `carrier_rejected` (SMS), `hard_bounce` (email, permanent bounce), `soft_bounce` (email, transient bounce such as a full mailbox), `undelivered` (a generic delivery failure), `channel_unavailable` (the channel could not be used and the verification failed over), `channel_disabled` (Bird has temporarily stopped sending over that channel, so the verification moved on to the next one), and `delivery_timeout` (no delivery confirmation arrived before the channel's timeout, so the verification failed over).",
 } as const;
 
 export const EventVerifyAttemptUndeliveredDataSchema = {
@@ -1850,18 +1852,17 @@ export const EventSMSSentDataSchema = {
     },
     {
       type: "object",
-      required: ["carrier", "mcc_mnc"],
       properties: {
         carrier: {
-          type: ["string", "null"],
+          type: "string",
           description:
-            "Carrier that handled the message, or null when not known.",
+            "Carrier that handled the message. Absent when the carrier does not report one.",
           example: "Verizon",
         },
         mcc_mnc: {
-          type: ["string", "null"],
+          type: "string",
           description:
-            "Mobile country code and mobile network code of the carrier, or null when not known.",
+            "Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.",
           example: "311480",
         },
       },
@@ -1939,6 +1940,118 @@ export const EventSMSRejectedSchema = {
     },
     data: {
       $ref: "#/components/schemas/EventSMSRejectedData",
+    },
+  },
+} as const;
+
+export const EventSMSReceivedDataSchema = {
+  type: "object",
+  description: "Payload of the sms.received event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventSMSBase",
+    },
+    {
+      type: "object",
+      required: ["segments"],
+      anyOf: [
+        {
+          required: ["text"],
+        },
+        {
+          required: ["media"],
+        },
+      ],
+      properties: {
+        text: {
+          type: "string",
+          minLength: 1,
+          description:
+            "The message body, so you can act on it without a follow-up read. Absent when the message carried only attachments and no text of its own.\n",
+          example: "STOP",
+        },
+        segments: {
+          $ref: "#/components/schemas/SMSSegments",
+          description: "Segment breakdown of the received body.",
+        },
+        carrier: {
+          type: "string",
+          description:
+            "Carrier the message came in over. Absent where the carrier does not report one.",
+          example: "Verizon",
+        },
+        mcc_mnc: {
+          type: "string",
+          description:
+            "Mobile country code and mobile network code of the carrier. Absent when not known.",
+          example: "311480",
+        },
+        subject: {
+          type: "string",
+          description: "Subject line. Absent when the message carried none.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const SMSSegmentsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["count", "encoding", "characters"],
+  description:
+    "Segment breakdown for the message body. Segment count drives billing.",
+  properties: {
+    count: {
+      type: "integer",
+      minimum: 1,
+      readOnly: true,
+      description:
+        "Number of segments the body is split into. Each segment is a billable unit.",
+    },
+    encoding: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      enum: ["GSM_7BIT", "UCS2"],
+      description:
+        "Encoding used for the body. `GSM_7BIT` fits 160 characters in a single segment (153 per part when multi-segment); `UCS2` is used when the body contains any character outside the GSM 03.38 alphabet (emoji, CJK, some accented characters) and fits 70 characters in a single segment (67 per part when multi-segment).\n",
+    },
+    characters: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Character count of the body under the selected encoding.",
+    },
+  },
+} as const;
+
+export const SMSReceivedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["sms.received"],
+  description: "Event type.",
+  example: "sms.received",
+} as const;
+
+export const EventSMSReceivedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "A message was received on one of your numbers.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/SMSReceivedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the sender sent the message.",
+      example: "2026-05-21T12:00:00.000Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventSMSReceivedData",
     },
   },
 } as const;
@@ -2046,18 +2159,17 @@ export const EventSMSDeliveredDataSchema = {
     },
     {
       type: "object",
-      required: ["carrier", "mcc_mnc"],
       properties: {
         carrier: {
-          type: ["string", "null"],
+          type: "string",
           description:
-            "Carrier that delivered the message, or null when not known.",
+            "Carrier that delivered the message. Absent when the carrier does not report one.",
           example: "Verizon",
         },
         mcc_mnc: {
-          type: ["string", "null"],
+          type: "string",
           description:
-            "Mobile country code and mobile network code of the carrier, or null when not known.",
+            "Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.",
           example: "311480",
         },
       },
@@ -2098,6 +2210,17 @@ export const EventSMSAcceptedDataSchema = {
   allOf: [
     {
       $ref: "#/components/schemas/EventSMSBase",
+    },
+    {
+      type: "object",
+      required: ["segments"],
+      properties: {
+        segments: {
+          $ref: "#/components/schemas/SMSSegments",
+          description:
+            "Segment breakdown of the body Bird accepted, which is what the send is billed on.",
+        },
+      },
     },
   ],
 } as const;
@@ -3774,6 +3897,9 @@ export const WebhookEventSchema = {
       $ref: "#/components/schemas/EventSMSFailed",
     },
     {
+      $ref: "#/components/schemas/EventSMSReceived",
+    },
+    {
       $ref: "#/components/schemas/EventSMSRejected",
     },
     {
@@ -3865,6 +3991,7 @@ export const WebhookEventSchema = {
       "sms.delivered": "#/components/schemas/EventSMSDelivered",
       "sms.expired": "#/components/schemas/EventSMSExpired",
       "sms.failed": "#/components/schemas/EventSMSFailed",
+      "sms.received": "#/components/schemas/EventSMSReceived",
       "sms.rejected": "#/components/schemas/EventSMSRejected",
       "sms.sent": "#/components/schemas/EventSMSSent",
       "sms.undelivered": "#/components/schemas/EventSMSUndelivered",
@@ -10597,37 +10724,6 @@ export const SMSBatchSummarySchema = {
   },
 } as const;
 
-export const SMSSegmentsSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["count", "encoding", "characters"],
-  description:
-    "Segment breakdown for the message body. Segment count drives billing.",
-  properties: {
-    count: {
-      type: "integer",
-      minimum: 1,
-      readOnly: true,
-      description:
-        "Number of segments the body is split into. Each segment is a billable unit.",
-    },
-    encoding: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      enum: ["GSM_7BIT", "UCS2"],
-      description:
-        "Encoding used for the body. `GSM_7BIT` fits 160 characters in a single segment (153 per part when multi-segment); `UCS2` is used when the body contains any character outside the GSM 03.38 alphabet (emoji, CJK, some accented characters) and fits 70 characters in a single segment (67 per part when multi-segment).\n",
-    },
-    characters: {
-      type: "integer",
-      minimum: 0,
-      readOnly: true,
-      description: "Character count of the body under the selected encoding.",
-    },
-  },
-} as const;
-
 export const SMSMessageStatusSchema = {
   type: "string",
   minLength: 1,
@@ -14289,18 +14385,17 @@ export const EventSMSSentDataWritableSchema = {
     },
     {
       type: "object",
-      required: ["carrier", "mcc_mnc"],
       properties: {
         carrier: {
-          type: ["string", "null"],
+          type: "string",
           description:
-            "Carrier that handled the message, or null when not known.",
+            "Carrier that handled the message. Absent when the carrier does not report one.",
           example: "Verizon",
         },
         mcc_mnc: {
-          type: ["string", "null"],
+          type: "string",
           description:
-            "Mobile country code and mobile network code of the carrier, or null when not known.",
+            "Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.",
           example: "311480",
         },
       },
@@ -14378,6 +14473,74 @@ export const EventSMSRejectedWritableSchema = {
     },
     data: {
       $ref: "#/components/schemas/EventSMSRejectedDataWritable",
+    },
+  },
+} as const;
+
+export const EventSMSReceivedDataWritableSchema = {
+  type: "object",
+  description: "Payload of the sms.received event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventSMSBaseWritable",
+    },
+    {
+      type: "object",
+      anyOf: [
+        {
+          required: ["text"],
+        },
+        {
+          required: ["media"],
+        },
+      ],
+      properties: {
+        text: {
+          type: "string",
+          minLength: 1,
+          description:
+            "The message body, so you can act on it without a follow-up read. Absent when the message carried only attachments and no text of its own.\n",
+          example: "STOP",
+        },
+        carrier: {
+          type: "string",
+          description:
+            "Carrier the message came in over. Absent where the carrier does not report one.",
+          example: "Verizon",
+        },
+        mcc_mnc: {
+          type: "string",
+          description:
+            "Mobile country code and mobile network code of the carrier. Absent when not known.",
+          example: "311480",
+        },
+        subject: {
+          type: "string",
+          description: "Subject line. Absent when the message carried none.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EventSMSReceivedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "A message was received on one of your numbers.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/SMSReceivedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the sender sent the message.",
+      example: "2026-05-21T12:00:00.000Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventSMSReceivedDataWritable",
     },
   },
 } as const;
@@ -14485,18 +14648,17 @@ export const EventSMSDeliveredDataWritableSchema = {
     },
     {
       type: "object",
-      required: ["carrier", "mcc_mnc"],
       properties: {
         carrier: {
-          type: ["string", "null"],
+          type: "string",
           description:
-            "Carrier that delivered the message, or null when not known.",
+            "Carrier that delivered the message. Absent when the carrier does not report one.",
           example: "Verizon",
         },
         mcc_mnc: {
-          type: ["string", "null"],
+          type: "string",
           description:
-            "Mobile country code and mobile network code of the carrier, or null when not known.",
+            "Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.",
           example: "311480",
         },
       },
@@ -14657,6 +14819,9 @@ export const WebhookEventWritableSchema = {
       $ref: "#/components/schemas/EventSMSFailedWritable",
     },
     {
+      $ref: "#/components/schemas/EventSMSReceivedWritable",
+    },
+    {
       $ref: "#/components/schemas/EventSMSRejectedWritable",
     },
     {
@@ -14748,6 +14913,7 @@ export const WebhookEventWritableSchema = {
       "sms.delivered": "#/components/schemas/EventSMSDeliveredWritable",
       "sms.expired": "#/components/schemas/EventSMSExpiredWritable",
       "sms.failed": "#/components/schemas/EventSMSFailedWritable",
+      "sms.received": "#/components/schemas/EventSMSReceivedWritable",
       "sms.rejected": "#/components/schemas/EventSMSRejectedWritable",
       "sms.sent": "#/components/schemas/EventSMSSentWritable",
       "sms.undelivered": "#/components/schemas/EventSMSUndeliveredWritable",

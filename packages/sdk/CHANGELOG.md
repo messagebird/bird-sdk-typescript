@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.25.1
+
+- A verification attempt can now report `delivery_timeout` as its failure reason, meaning no delivery confirmation arrived before the channel's timeout and the verification failed over to the next channel.
+
 ## 0.25.0
 
 - **Breaking:** an SMS error `code` is now an open enum, so a reason added by a newer server type-checks instead of being rejected; a `switch` over `SmsErrorCode` that relied on the set being closed needs a `default` branch. The values known at this version are exported as `SMSErrorCode`.
