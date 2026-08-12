@@ -1663,7 +1663,7 @@ export const EventSMSUndeliveredDataSchema = {
 export const SMSErrorCodeSchema = {
   type: "string",
   minLength: 1,
-  enum: [
+  "x-extensible-enum": [
     "invalid_destination",
     "unreachable",
     "blocked_by_carrier",
@@ -1677,7 +1677,7 @@ export const SMSErrorCodeSchema = {
     "unknown",
   ],
   description:
-    "Bird-stable failure reason. `invalid_destination`: the number is not assigned, ported out, or malformed. `unreachable`: handset off or out of coverage. `blocked_by_carrier`: the carrier filtered the message. `blocked_by_recipient`: the recipient device blocked the sender. `landline_unreachable`: the destination is a landline that does not accept SMS. `content_rejected`: the carrier rejected the content. `sender_unregistered`: the sender is not registered for the destination. `recipient_opted_out`: the recipient is on a suppression list. `provider_unavailable`: an upstream failure after retries. `insufficient_balance`: the workspace wallet had insufficient balance to send the message. `unknown`: an unmapped failure.\n",
+    "Bird-stable failure reason. Open enum: Bird adds reasons as the carrier platform's own buckets are covered, so treat an unrecognized value as a future reason rather than an error. `invalid_destination`: the number is not assigned, ported out, or malformed. `unreachable`: handset off or out of coverage. `blocked_by_carrier`: the carrier filtered the message. `blocked_by_recipient`: the recipient device blocked the sender. `landline_unreachable`: the destination is a landline that does not accept SMS. `content_rejected`: the carrier rejected the content. `sender_unregistered`: the sender is not registered for the destination. `recipient_opted_out`: the recipient is on a suppression list. `provider_unavailable`: an upstream failure after retries. `insufficient_balance`: the workspace wallet had insufficient balance to send the message. `unknown`: an unmapped failure.\n",
 } as const;
 
 export const SMSErrorSchema = {
@@ -1700,8 +1700,7 @@ export const SMSErrorSchema = {
     carrier_error_code: {
       type: ["string", "null"],
       description:
-        "Raw carrier-supplied error code, when available, for low-level debugging.",
-      example: "30007",
+        "Raw provider-supplied error code, finer-grained than the `code` that normalizes it. Not a Bird-defined value, so quote it to support when asking why a message failed. Null when the provider sent none, including any failure decided before one was reached.",
     },
     occurred_at: {
       type: "string",
@@ -1996,6 +1995,17 @@ export const EventSMSExpiredDataSchema = {
   allOf: [
     {
       $ref: "#/components/schemas/EventSMSBase",
+    },
+    {
+      type: "object",
+      required: ["error"],
+      properties: {
+        error: {
+          $ref: "#/components/schemas/SMSError",
+          description:
+            "Why the message was still undelivered when its validity period elapsed. Typically `unreachable`, the handset having stayed off or out of coverage for the whole window.",
+        },
+      },
     },
   ],
 } as const;
@@ -9577,18 +9587,50 @@ export const WhatsAppMessageSendRequestSchema = {
   },
 } as const;
 
+export const WhatsAppMessageTemplateCardComponentSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  description: "The values that fill one block of one carousel card.",
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": ["header", "body", "button"],
+      description:
+        "Which part of the card this fills in: `header` for the card's image or video, `body` for its text, `button` for a button's variable.\n",
+      example: "header",
+    },
+    parameters: {
+      type: "array",
+      description:
+        "The values that fill this part's placeholders, in placeholder order.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppMessageTemplateComponentParameter",
+      },
+    },
+  },
+} as const;
+
 export const WhatsAppTemplateParameterTypeSchema = {
   type: "string",
   minLength: 1,
-  "x-extensible-enum": ["text"],
+  "x-extensible-enum": [
+    "text",
+    "image",
+    "video",
+    "gif",
+    "document",
+    "location",
+  ],
   description:
-    "The kind of value a template parameter accepts. `text` (the only kind today) is a plain string substituted into the placeholder. Open enum: more kinds may be added over time.\n",
+    "The kind of value a template parameter carries, which follows the block it fills. `text` is a plain string substituted into a placeholder, including a coupon button's code, which the recipient copies from the button. `image`, `video`, `gif` and `document` carry a media header's file in `url`, each matching its header's `format`. `location` fills a location header and carries a point on the map. Open enum: more kinds may be added over time.\n",
 } as const;
 
 export const WhatsAppMessageTemplateComponentParameterSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["type", "text"],
+  required: ["type"],
   properties: {
     type: {
       allOf: [
@@ -9597,19 +9639,44 @@ export const WhatsAppMessageTemplateComponentParameterSchema = {
         },
       ],
       description:
-        "The kind of value this parameter carries. `text` is the only kind today.",
+        "The kind of value this parameter carries, which decides which of the fields below to send.",
     },
     text: {
       type: "string",
       minLength: 1,
       description:
-        "The value substituted into the placeholder, as a plain string.",
+        "The value substituted into the placeholder, as a plain string. Send it on a `text` parameter.",
+    },
+    url: {
+      type: "string",
+      format: "uri",
+      minLength: 1,
+      description:
+        "Public `https` URL of the file a media header shows. Send it on an `image`, `video`, `gif` or `document` parameter. WhatsApp fetches it at send time, so it must still be reachable then, the same way a free-form media message's `url` must.\n",
+      example: "https://cdn.example.com/receipts/a1b2c3.png",
     },
     name: {
       type: "string",
       minLength: 1,
       description:
         "Required when the template declares named parameters: the placeholder this value fills (for example `first_name`), matching exactly one of the names the template declares. Name every parameter in that case; order does not matter once names are supplied. Omit this field for a positional template, which takes its values in `{{n}}` order instead. Sending the wrong set of names, or leaving one out that the template requires, returns a `422` `WhatsAppTemplateParameterMismatch`.\n",
+    },
+  },
+} as const;
+
+export const WhatsAppMessageTemplateCardSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["components"],
+  description:
+    "The values that fill one card of a carousel. Cards fill in the order the template was approved with, so send one entry per card and keep them in that order.\n",
+  properties: {
+    components: {
+      type: "array",
+      description: "The values that fill this card's blocks.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppMessageTemplateCardComponent",
+      },
     },
   },
 } as const;
@@ -9622,16 +9689,26 @@ export const WhatsAppMessageTemplateComponentSchema = {
     type: {
       type: "string",
       minLength: 1,
-      "x-extensible-enum": ["header", "body", "button"],
+      "x-extensible-enum": ["header", "body", "button", "carousel"],
       description:
-        "Which part of the template this fills in: `body` for the main text, `button` for a button's variable, `header` for the header. Bird manages header values itself, so a `header` entry supplied on a send is ignored.\n",
+        "Which part of the template this fills in: `body` for the main text, `button` for a button's variable, `header` for the header's text, media or location, `carousel` for the cards.\n",
     },
     parameters: {
       type: "array",
       description:
-        "The values that fill this part's placeholders. A positional template takes them in `{{n}}` placeholder order; a template with named parameters requires each parameter's `name` to match one the template declares, and order then carries no meaning.\n",
+        "The values that fill this part's placeholders. A positional template takes them in `{{n}}` placeholder order; a template with named parameters requires each parameter's `name` to match one the template declares, and order then carries no meaning. Send it on every part except `carousel`, which carries its values on `cards`.\n",
       items: {
         $ref: "#/components/schemas/WhatsAppMessageTemplateComponentParameter",
+      },
+    },
+    cards: {
+      type: "array",
+      minItems: 2,
+      maxItems: 10,
+      description:
+        "The values that fill each card of a carousel. Send it only on a `carousel` part. A carousel sends exactly the number of cards its template was approved with, so every card needs an entry.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppMessageTemplateCard",
       },
     },
   },
@@ -9697,7 +9774,7 @@ export const WhatsAppTemplateSendSchema = {
         },
       ],
       description:
-        "Which of the template's languages to send, as a BCP-47 tag (for example `en` or `pt-BR`). Meta's underscore form (`pt_BR`) is accepted and normalized; the accepted message echoes the canonical BCP-47 form. May be omitted when the template has a single language; when it is stocked in several, omitting the language returns a `422` that names the available tags.\n",
+        "Which of the template's languages to send, as a BCP-47 tag (for example `en` or `pt-BR`). Meta's underscore form (`pt_BR`) is accepted and normalized; the accepted message echoes the canonical BCP-47 form. May be omitted, in which case the template's default language is sent. A language the template is not stocked in returns a `422` that names the available tags.\n",
       example: "pt-BR",
     },
     components: {
@@ -9817,7 +9894,7 @@ export const WhatsAppMessageStatusSchema = {
     "received",
   ],
   description:
-    "Delivery status. `accepted` (the initial status of an outbound send) means Bird accepted the request and it is queued for sending. `sent` means it was handed to the WhatsApp network. `delivered` is confirmed delivery to the recipient's device. `failed` is a terminal permanent failure. `rejected` means Bird refused the message before sending it to WhatsApp, because the recipient is on the workspace's suppression list, the wallet had insufficient balance, or the destination is unpriced. A rejected message was not sent and not charged. There is no `read` status: a read receipt is reported as `read_at` and a `whatsapp.read` event, not a status value. The remaining values are reserved and not returned today: `scheduled` (queued to send at a future time), `canceled` (a scheduled message canceled before sending), and `received` (a message a contact sent you).\n",
+    "Delivery status. `accepted` (the initial status of an outbound send) means Bird accepted the request and it is queued for sending. `sent` means it was handed to the WhatsApp network. `delivered` is confirmed delivery to the recipient's device. `failed` is a terminal permanent failure. `rejected` means Bird refused the message before sending it to WhatsApp, because the recipient is on the workspace's suppression list, the wallet had insufficient balance, or the destination is unpriced. A rejected message was not sent and not charged. There is no `read` status: a read receipt is reported as `read_at` and a `whatsapp.read` event, not a status value. `received` is the status of an inbound message, one a contact sent you. The remaining values are reserved and not returned today: `scheduled` (queued to send at a future time) and `canceled` (a scheduled message canceled before sending).\n",
 } as const;
 
 export const WhatsAppTemplateCategorySchema = {
@@ -9972,7 +10049,7 @@ export const WhatsAppMessageSchema = {
       readOnly: true,
       $ref: "#/components/schemas/MessageCost",
       description:
-        "What the message cost, split into Bird's charge and any third-party fees passed through. Null until the message has been priced, and on messages that were rejected before pricing. The rate depends on the message category and the recipient's country.",
+        "What the message cost, split into Bird's charge and any third-party fees passed through. Null on an inbound message, which is never priced, on an outbound message that has not been priced yet, and on one rejected before pricing. The rate depends on the message category and the recipient's country.",
     },
     tags: {
       type: "array",
@@ -10269,7 +10346,7 @@ export const TemplateVariableSchema = {
       type: "string",
       minLength: 1,
       readOnly: true,
-      description: "The parameters key this slot is filled with.",
+      description: "The parameter key this slot is filled with.",
     },
     type: {
       type: "string",
@@ -10293,7 +10370,7 @@ export const TemplateVariableSchema = {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether the slot must be supplied when sending. Advisory for email templates, where a missing value renders as empty rather than rejecting the send.\n",
+        "Whether the slot must be supplied when sending. A send that leaves a required slot unset is rejected.\n",
     },
     constraint: {
       type: "string",
@@ -10684,7 +10761,7 @@ export const SMSMessageSchema = {
     last_error: {
       $ref: "#/components/schemas/SMSError",
       description:
-        "Failure detail on a terminally failed or rejected message. Present only when the message failed.",
+        "Failure detail on a message that failed, was rejected, was not delivered, or expired. Absent otherwise.",
     },
     created_at: {
       type: "string",
@@ -11079,13 +11156,13 @@ export const ContactSchema = {
           type: ["string", "null"],
           maxLength: 100,
           description:
-            "The contact's first name. Available in broadcast templates as the `contact.first_name` variable.",
+            "The contact's first name. Available in broadcast templates as `bird.contact.first_name`.",
         },
         last_name: {
           type: ["string", "null"],
           maxLength: 100,
           description:
-            "The contact's last name. Available in broadcast templates as the `contact.last_name` variable.",
+            "The contact's last name. Available in broadcast templates as `bird.contact.last_name`.",
         },
         external_id: {
           type: ["string", "null"],
@@ -11097,7 +11174,7 @@ export const ContactSchema = {
           type: "object",
           additionalProperties: true,
           description:
-            "Custom property values for this contact, available as template variables in broadcasts. Each key is a property created via the contact properties API, and each value is a string, number, boolean, or RFC 3339 datetime matching the property's declared type (strings up to 500 characters). Total size is capped at 2 KB serialized. Values stored under a property that was later archived remain readable here.\n",
+            "Custom property values for this contact, available in broadcast templates as `bird.contact.<key>`. Each key is a property created via the contact properties API, and each value is a string, number, boolean, or RFC 3339 datetime matching the property's declared type (strings up to 500 characters). Total size is capped at 2 KB serialized. Values stored under a property that was later archived remain readable here.\n",
         },
         audiences: {
           type: "array",
@@ -11228,7 +11305,7 @@ export const ContactPropertyCreateRequestSchema = {
       maxLength: 50,
       pattern: "^[a-z][a-z0-9_]*$",
       description:
-        "The property key, used as the key in contact data and as the template variable name in broadcasts. Lowercase letters, digits, and underscores, starting with a letter. Cannot be changed after creation.",
+        "The property key, used as the key in contact data and as the attribute in the `bird.contact.<key>` broadcast template variable. Lowercase letters, digits, and underscores, starting with a letter. Cannot be changed after creation.",
     },
     type: {
       $ref: "#/components/schemas/ContactPropertyType",
@@ -11306,7 +11383,7 @@ export const ContactPropertySchema = {
           maxLength: 50,
           pattern: "^[a-z][a-z0-9_]*$",
           description:
-            "The property key, used as the key in contact data and as the template variable name in broadcasts. Lowercase letters, digits, and underscores, starting with a letter. Cannot be changed after creation.",
+            "The property key, used as the key in contact data and as the attribute in the `bird.contact.<key>` broadcast template variable. Lowercase letters, digits, and underscores, starting with a letter. Cannot be changed after creation.",
         },
         type: {
           $ref: "#/components/schemas/ContactPropertyType",
@@ -12172,7 +12249,7 @@ export const EmailTemplateSendSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A send-by-template reference. Identify the template by its `id` or its `slug` (supply exactly one), and pass its variable values in `parameters`.\n",
+    "A send-by-template reference. Identify the template by its `id` or its `slug` (supply exactly one), and pass its parameter values in `parameters`.\n",
   oneOf: [
     {
       required: ["id"],
@@ -12205,9 +12282,9 @@ export const EmailTemplateSendSchema = {
       type: "object",
       additionalProperties: true,
       description:
-        'Values for the template\'s variables, keyed by variable name. A token with no matching value renders empty. Nest values to fill dotted tokens: `{"contact": {"first_name": "Ada"}}` fills `{{ contact.first_name }}`. Send everything the template\'s `variables` lists rather than only what you expect the chosen language to use: languages need not reference the same variables, and a value no language uses is ignored. Cap: 16 KB serialized.\n',
+        "Values for the template's parameters, keyed by parameter name. A parameter name is a single word, and every parameter the template's `variables` lists needs a value here: a send that omits one is rejected rather than delivered with a blank. Send everything `variables` lists rather than only what you expect the chosen language to use, since languages need not reference the same parameters and a value no language uses is ignored. Cap: 16 KB serialized.\n",
       example: {
-        first_name: "Ada",
+        animal: "otter",
       },
     },
   },
@@ -12307,7 +12384,7 @@ export const EmailMessageSendRequestSchema = {
     parameters: {
       type: "object",
       description:
-        "Template variables used to personalize inline content. Tokens in the subject and body (e.g. `{{ first_name }}`) are replaced with these values at send time. Shared across all recipients of this send. A token with no matching key renders empty. Cap: 16 KB serialized. When sending a stored `template`, put the values in `template.parameters` instead.\n",
+        "Parameter values used to personalize inline content. A parameter is a single word, and a token in the subject or body (for example `{{ animal }}`) is replaced with the value of that name at send time. Shared across all recipients of this send. A token with no matching key renders empty. Cap: 16 KB serialized. When sending a stored `template`, put the values in `template.parameters` instead.\n",
       additionalProperties: true,
     },
     template: {
@@ -14118,8 +14195,7 @@ export const SMSErrorWritableSchema = {
     carrier_error_code: {
       type: ["string", "null"],
       description:
-        "Raw carrier-supplied error code, when available, for low-level debugging.",
-      example: "30007",
+        "Raw provider-supplied error code, finer-grained than the `code` that normalizes it. Not a Bird-defined value, so quote it to support when asking why a message failed. Null when the provider sent none, including any failure decided before one was reached.",
     },
     occurred_at: {
       type: "string",
@@ -14358,6 +14434,17 @@ export const EventSMSExpiredDataWritableSchema = {
   allOf: [
     {
       $ref: "#/components/schemas/EventSMSBaseWritable",
+    },
+    {
+      type: "object",
+      required: ["error"],
+      properties: {
+        error: {
+          $ref: "#/components/schemas/SMSErrorWritable",
+          description:
+            "Why the message was still undelivered when its validity period elapsed. Typically `unreachable`, the handset having stayed off or out of coverage for the whole window.",
+        },
+      },
     },
   ],
 } as const;
@@ -16031,7 +16118,7 @@ export const SMSMessageWritableSchema = {
     last_error: {
       $ref: "#/components/schemas/SMSErrorWritable",
       description:
-        "Failure detail on a terminally failed or rejected message. Present only when the message failed.",
+        "Failure detail on a message that failed, was rejected, was not delivered, or expired. Absent otherwise.",
     },
   },
 } as const;
@@ -16119,13 +16206,13 @@ export const ContactWritableSchema = {
           type: ["string", "null"],
           maxLength: 100,
           description:
-            "The contact's first name. Available in broadcast templates as the `contact.first_name` variable.",
+            "The contact's first name. Available in broadcast templates as `bird.contact.first_name`.",
         },
         last_name: {
           type: ["string", "null"],
           maxLength: 100,
           description:
-            "The contact's last name. Available in broadcast templates as the `contact.last_name` variable.",
+            "The contact's last name. Available in broadcast templates as `bird.contact.last_name`.",
         },
         external_id: {
           type: ["string", "null"],
@@ -16137,7 +16224,7 @@ export const ContactWritableSchema = {
           type: "object",
           additionalProperties: true,
           description:
-            "Custom property values for this contact, available as template variables in broadcasts. Each key is a property created via the contact properties API, and each value is a string, number, boolean, or RFC 3339 datetime matching the property's declared type (strings up to 500 characters). Total size is capped at 2 KB serialized. Values stored under a property that was later archived remain readable here.\n",
+            "Custom property values for this contact, available in broadcast templates as `bird.contact.<key>`. Each key is a property created via the contact properties API, and each value is a string, number, boolean, or RFC 3339 datetime matching the property's declared type (strings up to 500 characters). Total size is capped at 2 KB serialized. Values stored under a property that was later archived remain readable here.\n",
         },
       },
     },
@@ -16188,7 +16275,7 @@ export const ContactPropertyWritableSchema = {
           maxLength: 50,
           pattern: "^[a-z][a-z0-9_]*$",
           description:
-            "The property key, used as the key in contact data and as the template variable name in broadcasts. Lowercase letters, digits, and underscores, starting with a letter. Cannot be changed after creation.",
+            "The property key, used as the key in contact data and as the attribute in the `bird.contact.<key>` broadcast template variable. Lowercase letters, digits, and underscores, starting with a letter. Cannot be changed after creation.",
         },
         type: {
           $ref: "#/components/schemas/ContactPropertyType",

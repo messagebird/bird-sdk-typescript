@@ -26,6 +26,28 @@ export const EmailEventType = {
 export type EmailEventTypeValue = (typeof EmailEventType)[keyof typeof EmailEventType];
 
 /**
+ * Values of SMSErrorCode known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const SMSErrorCode = {
+  BlockedByCarrier: "blocked_by_carrier",
+  BlockedByRecipient: "blocked_by_recipient",
+  ContentRejected: "content_rejected",
+  InsufficientBalance: "insufficient_balance",
+  InvalidDestination: "invalid_destination",
+  LandlineUnreachable: "landline_unreachable",
+  ProviderUnavailable: "provider_unavailable",
+  RecipientOptedOut: "recipient_opted_out",
+  SenderUnregistered: "sender_unregistered",
+  Unknown: "unknown",
+  Unreachable: "unreachable",
+} as const;
+
+/** A known SMSErrorCode value. */
+export type SMSErrorCodeValue = (typeof SMSErrorCode)[keyof typeof SMSErrorCode];
+
+/**
  * Values of VerificationAttemptFailureReason known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -107,7 +129,12 @@ export type WhatsAppTemplateCategoryValue = (typeof WhatsAppTemplateCategory)[ke
  * these with a `default` branch rather than treating the set as closed.
  */
 export const WhatsAppTemplateParameterType = {
+  Document: "document",
+  Gif: "gif",
+  Image: "image",
+  Location: "location",
   Text: "text",
+  Video: "video",
 } as const;
 
 /** A known WhatsAppTemplateParameterType value. */

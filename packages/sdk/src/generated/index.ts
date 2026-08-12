@@ -1093,6 +1093,8 @@ export type {
   WhatsAppMessageSendRequest,
   WhatsAppMessageStatus,
   WhatsAppMessageTemplate,
+  WhatsAppMessageTemplateCard,
+  WhatsAppMessageTemplateCardComponent,
   WhatsAppMessageTemplateComponent,
   WhatsAppMessageTemplateComponentParameter,
   WhatsAppMessageTemplateWritable,

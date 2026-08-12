@@ -9,7 +9,7 @@ export type VoiceListQuery = NonNullable<ListVoiceCallsData["query"]>;
 
 export class VoiceResource extends Resource {
   /**
-   * List the workspace's calls, newest first. Filter to `ringing`/`in_progress` for the calls in progress right now, or to final statuses for completed records. The two cannot be combined in one request. Use `from`/`to` for one known party number in international form, and `number` to search either side by fragment. These are per-call records: for rates and totals over a period use voice_stats_summary rather than summing them here, and voice_get to follow one call to settlement.
+   * List the workspace's calls, newest first. Filter to `ringing`/`in_progress` for the calls in progress right now, to final statuses for completed records, or to any mix of the two. Use `from`/`to` for one known party number in international form, and `number` to search either side by fragment. These are per-call records: for rates and totals over a period use voice_stats_summary rather than summing them here, and voice_get to follow one call to settlement.
    *
    * @example Iterate the calls happening right now
    * for await (const call of bird.voice.list({ status: ["ringing", "in_progress"] })) {

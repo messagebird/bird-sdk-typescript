@@ -2966,9 +2966,9 @@ export const listMailboxLabels = <ThrowOnError extends boolean = false>(
  *
  * Returns a paginated list of the workspace's calls, ordered by start time descending.
  *
- * The `status` filter selects which side of the call lifecycle you get. Omit it, or pass only final statuses, and you get completed calls. Pass only the in-flight statuses (`ringing`, `in_progress`) and you get the calls happening right now. A call in flight carries no economics yet: `duration_ms`, `billable_ms`, `ended_at`, and `cost` are null until it ends, and the completed record then appears under the same `id`.
+ * The `status` filter selects where in the lifecycle you look, and any combination is a single page: in-flight statuses (`ringing`, `in_progress`), final ones, or both together. Omit it and you get completed calls, which is what this list has always returned.
  *
- * In-flight and completed calls are paged separately, so a request that mixes in-flight and final statuses returns a 422 `validation_error`.
+ * A call in flight carries no economics yet: `duration_ms`, `billable_ms`, `ended_at`, and `cost` are null until it ends. It keeps the same `id` throughout, so the same call answers under one identity from the first ring to settlement.
  *
  */
 export const listVoiceCalls = <ThrowOnError extends boolean = false>(

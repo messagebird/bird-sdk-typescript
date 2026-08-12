@@ -168,6 +168,7 @@ export { WebhookEventType } from "./event-types.gen.js";
 export type { WebhookEventTypeValue } from "./event-types.gen.js";
 export {
   EmailEventType,
+  SMSErrorCode,
   VerificationAttemptFailureReason,
   VerificationChannel,
   VerificationTerminalReason,
@@ -177,6 +178,7 @@ export {
 } from "./open-enums.gen.js";
 export type {
   EmailEventTypeValue,
+  SMSErrorCodeValue,
   VerificationAttemptFailureReasonValue,
   VerificationChannelValue,
   VerificationTerminalReasonValue,
