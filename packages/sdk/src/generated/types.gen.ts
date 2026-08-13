@@ -736,14 +736,14 @@ export type EventVerifyVerificationVerifiedData = EventVerifyBase & {
 export type VerificationChannel = "email" | "sms" | "whatsapp" | (string & {});
 
 /**
- * The recipient to verify. Provide an `email_address`, a `phone_number`, or both; at least one is required. The addresses also identify the verification: a check must supply exactly the set used on the create call, so a verification created with both addresses is not found by either one alone.
+ * The recipient to verify. Provide an `email`, a `phone_number`, or both; at least one is required. The addresses also identify the verification: a check must supply exactly the set used on the create call, so a verification created with both addresses is not found by either one alone.
  *
  */
 export type VerificationTo = {
   /**
    * The recipient's email address. Case does not matter; the address is lowercased before use.
    */
-  email_address?: string;
+  email?: string;
   /**
    * The recipient's phone number in E.164 format, with the leading `+` and country code (for example `+15551234567`). A number in any other format is rejected as an invalid recipient (`422`).
    */
@@ -5766,6 +5766,18 @@ export type SmsBatchSummary = {
 };
 
 /**
+ * The settings Bird applied to this message. Every option is reported, whether you set it on the send or took the default that was in force at the time.
+ *
+ */
+export type SmsMessageEffectiveOptions = {
+  /**
+   * Whether Bird replaced characters outside the GSM-7 alphabet in this message's body with their closest equivalent before sending it. When `true`, `text` is the body as sent and `segments` describes that body.
+   *
+   */
+  smart_encoding: boolean;
+};
+
+/**
  * Delivery status. `accepted` (the initial status of an outbound send) means Bird accepted the request and it is awaiting handoff to the carrier network. `sent` means it was handed to the carrier and is awaiting a delivery receipt. `delivered` is confirmed delivery. `undelivered` is a non-permanent non-delivery (handset off or unreachable). `failed` is a terminal permanent failure. `rejected` means Bird refused it before it reached the carrier (for example insufficient balance). `expired` means the validity period elapsed without a terminal receipt. `scheduled` means the message is queued to send at a future time and has not been dispatched yet, and `canceled` means a scheduled message was canceled before it was sent. `received` applies to inbound messages.
  *
  */
@@ -5830,6 +5842,11 @@ export type SmsMessage = {
     [key: string]: unknown;
   };
   /**
+   * Settings Bird applied to this message, with any option you omitted filled in with the default that was in force when you sent it. Absent on inbound messages, and on outbound messages sent before Bird began recording these settings.
+   *
+   */
+  readonly options?: SmsMessageEffectiveOptions;
+  /**
    * How long, in seconds, Bird keeps trying to deliver before the message transitions to `expired`.
    */
   readonly validity_period?: number;
@@ -5888,6 +5905,30 @@ export type SmsTemplateSend = unknown & {
   };
 };
 
+/**
+ * Settings that change how Bird processes this message. Each option applies to this send only; omit one to use its default.
+ *
+ */
+export type SmsSendOptions = {
+  /**
+   * Replace characters outside the GSM-7 alphabet with their closest GSM-7 equivalent before sending: typically curly quotes, dashes, ellipses, fullwidth forms, and non-breaking spaces.
+   *
+   * One such character forces the whole body into `UCS2`, which more than halves the characters that fit in a segment, so replacing them often lowers the segment count and the cost.
+   *
+   * Disabled by default, because it alters the body you composed. The replacement is all-or-nothing: a body that still holds a character outside the alphabet afterwards, such as an emoji or a non-Latin script, is sent exactly as you supplied it. Read the message back to see what was applied: `text` is the body as sent.
+   *
+   */
+  smart_encoding?: boolean;
+  /**
+   * Preview feature: link click tracking. Defaults to `false`. Currently unavailable; setting this to `true` returns `422 SMSUnsupportedFeature`.
+   */
+  track_clicks?: boolean;
+  /**
+   * Preview feature: per-segment price ceiling. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.
+   */
+  max_price_per_segment?: number;
+};
+
 export type SmsMessageSendRequest = unknown & {
   /**
    * Recipient phone number in E.164 format (for example `+15551234567`). One recipient per message.
@@ -5926,6 +5967,11 @@ export type SmsMessageSendRequest = unknown & {
     [key: string]: unknown;
   };
   /**
+   * What Bird does to this message on its way out, such as `smart_encoding`. The message being relayed stays at the top level: its recipient, sender, content, and the delivery instructions the carrier acts on.
+   *
+   */
+  options?: SmsSendOptions;
+  /**
    * Preview feature: multimedia (MMS) attachments. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.
    */
   media_urls?: Array<string>;
@@ -5963,19 +6009,11 @@ export type SmsMessageSendRequest = unknown & {
    */
   topic_id?: string;
   /**
-   * Preview feature: per-segment price ceiling. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.
-   */
-  max_price_per_segment?: number;
-  /**
    * Preview feature: per-recipient substitution for batch sends. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.
    */
   personalization?: {
     [key: string]: unknown;
   };
-  /**
-   * Preview feature: link click tracking. Defaults to `false`. Currently unavailable; setting this to `true` returns `422 SMSUnsupportedFeature`.
-   */
-  track_clicks?: boolean;
 };
 
 export type SmsMessageList = {
@@ -6039,7 +6077,7 @@ export type Contact = {
   /**
    * The contact's phone number in normalized international form (a leading `+` and four to 15 digits), which may differ from the form it was supplied in. Bird normalizes formatting but does not verify the number against numbering-plan metadata. Unique within the workspace. Carriers recycle disconnected numbers, so a long-stored number can come to belong to someone else; `external_id` is the durable key for your own records. Null when the contact has no phone number.
    */
-  phone: string | null;
+  phone_number: string | null;
   /**
    * The contact's first name. Available in broadcast templates as `bird.contact.first_name`.
    */
@@ -6195,7 +6233,7 @@ export type ContactUpdateRequest = {
   /**
    * New phone number for the contact, in E.164 format with the leading `+` and country code. Spaces and punctuation are accepted and stripped. Stored in its canonical form, which may differ from what you send, and unique within the workspace. Omit to keep the current number; set to null to remove it, as long as the contact keeps at least one identifier. An empty string behaves as null.
    */
-  phone?: string | null;
+  phone_number?: string | null;
   /**
    * The contact's first name. Set to null to clear.
    */
@@ -6242,7 +6280,7 @@ export type ContactUpsertError = {
 /**
  * Which identifier matched a batch entry to an existing contact. Null when the entry created a new contact.
  */
-export type ContactMatchedOn = "email" | "phone" | "external_id" | null;
+export type ContactMatchedOn = "email" | "phone_number" | "external_id" | null;
 
 /**
  * The identifiers a batch entry supplied, in the normalized form they were matched with, null where the entry carried none. An echo of the request row for correlation, never the contact's current state.
@@ -6255,7 +6293,7 @@ export type ContactUpsertEntry = {
   /**
    * Phone number this entry carried, in its normalized international form. Null when the entry carried none. A row rejected for an invalid phone echoes the value as sent, trimmed, since no normalized form exists.
    */
-  phone: string | null;
+  phone_number: string | null;
   /**
    * Your own identifier for this entry, when the entry supplied one.
    */
@@ -6306,7 +6344,7 @@ export type ContactUpsertRequest = {
 /**
  * A contact identifier a batch entry can be matched on.
  */
-export type ContactMatchKey = "email" | "phone" | "external_id";
+export type ContactMatchKey = "email" | "phone_number" | "external_id";
 
 export type ContactCreateRequest = {
   /**
@@ -6316,7 +6354,7 @@ export type ContactCreateRequest = {
   /**
    * The contact's phone number in E.164 format, including the leading `+` and country code. Spaces and punctuation are accepted and stripped; the number is stored in its canonical form, which may differ from what you send, and is unique within the workspace. An empty string is treated as if the field were omitted. Supply an email address, a phone number, or both.
    */
-  phone?: string;
+  phone_number?: string;
   /**
    * The contact's first name.
    */
@@ -6346,9 +6384,9 @@ export type ContactList = {
 } & ListEnvelopeWithTotal;
 
 /**
- * Which identifier a contact has on file, `email` for an email address or `phone` for a phone number.
+ * Which identifier a contact has on file, `email` for an email address or `phone_number` for a phone number.
  */
-export type ContactIdentifierFilter = "email" | "phone";
+export type ContactIdentifierFilter = "email" | "phone_number";
 
 /**
  * The body content of a sent email message, as delivered. A send that used a template stores the template's body, so these report it with the send's `parameters` substituted in.
@@ -8909,7 +8947,7 @@ export type ContactWritable = {
   /**
    * The contact's phone number in normalized international form (a leading `+` and four to 15 digits), which may differ from the form it was supplied in. Bird normalizes formatting but does not verify the number against numbering-plan metadata. Unique within the workspace. Carriers recycle disconnected numbers, so a long-stored number can come to belong to someone else; `external_id` is the durable key for your own records. Null when the contact has no phone number.
    */
-  phone: string | null;
+  phone_number: string | null;
   /**
    * The contact's first name. Available in broadcast templates as `bird.contact.first_name`.
    */
@@ -10243,7 +10281,7 @@ export type ListContactsData = {
     /**
      * Return the contact with exactly this phone number in international E.164 form. Encode the leading plus sign as `%2B` (an unencoded `+` arrives as a space and is rejected). Phone numbers are unique within a workspace, so this matches at most one contact. Non-canonical forms of the same number match the contact they canonicalize to; a value that is not a phone number shape, or an empty value, is a validation error, never an unfiltered page.
      */
-    phone?: string;
+    phone_number?: string;
     /**
      * Return the contact with exactly this external_id (your own identifier for the contact). Unique within a workspace, so this matches at most one contact. An empty value is a validation error, never an unfiltered page.
      */

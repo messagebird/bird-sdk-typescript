@@ -1263,9 +1263,9 @@ export const VerificationToSchema = {
   additionalProperties: false,
   minProperties: 1,
   description:
-    "The recipient to verify. Provide an `email_address`, a `phone_number`, or both; at least one is required. The addresses also identify the verification: a check must supply exactly the set used on the create call, so a verification created with both addresses is not found by either one alone.\n",
+    "The recipient to verify. Provide an `email`, a `phone_number`, or both; at least one is required. The addresses also identify the verification: a check must supply exactly the set used on the create call, so a verification created with both addresses is not found by either one alone.\n",
   properties: {
-    email_address: {
+    email: {
       type: "string",
       minLength: 1,
       format: "email",
@@ -10724,6 +10724,24 @@ export const SMSBatchSummarySchema = {
   },
 } as const;
 
+export const SMSMessageEffectiveOptionsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The settings Bird applied to this message. Every option is reported, whether you set it on the send or took the default that was in force at the time.\n",
+  required: ["smart_encoding"],
+  properties: {
+    smart_encoding: {
+      type: "boolean",
+      description:
+        "Whether Bird replaced characters outside the GSM-7 alphabet in this message's body with their closest equivalent before sending it. When `true`, `text` is the body as sent and `segments` describes that body.\n",
+    },
+  },
+  example: {
+    smart_encoding: true,
+  },
+} as const;
+
 export const SMSMessageStatusSchema = {
   type: "string",
   minLength: 1,
@@ -10833,6 +10851,16 @@ export const SMSMessageSchema = {
       additionalProperties: true,
       description:
         "Arbitrary JSON metadata stored on the message and echoed in webhook payloads.",
+    },
+    options: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSMessageEffectiveOptions",
+        },
+      ],
+      description:
+        "Settings Bird applied to this message, with any option you omitted filled in with the default that was in force when you sent it. Absent on inbound messages, and on outbound messages sent before Bird began recording these settings.\n",
     },
     validity_period: {
       type: "integer",
@@ -10945,6 +10973,34 @@ export const SMSTemplateSendSchema = {
   },
 } as const;
 
+export const SMSSendOptionsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Settings that change how Bird processes this message. Each option applies to this send only; omit one to use its default.\n",
+  properties: {
+    smart_encoding: {
+      type: "boolean",
+      default: false,
+      description:
+        "Replace characters outside the GSM-7 alphabet with their closest GSM-7 equivalent before sending: typically curly quotes, dashes, ellipses, fullwidth forms, and non-breaking spaces.\n\nOne such character forces the whole body into `UCS2`, which more than halves the characters that fit in a segment, so replacing them often lowers the segment count and the cost.\n\nDisabled by default, because it alters the body you composed. The replacement is all-or-nothing: a body that still holds a character outside the alphabet afterwards, such as an emoji or a non-Latin script, is sent exactly as you supplied it. Read the message back to see what was applied: `text` is the body as sent.\n",
+    },
+    track_clicks: {
+      type: "boolean",
+      description:
+        "Preview feature: link click tracking. Defaults to `false`. Currently unavailable; setting this to `true` returns `422 SMSUnsupportedFeature`.",
+    },
+    max_price_per_segment: {
+      type: "number",
+      description:
+        "Preview feature: per-segment price ceiling. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.",
+    },
+  },
+  example: {
+    smart_encoding: true,
+  },
+} as const;
+
 export const SMSMessageSendRequestSchema = {
   type: "object",
   additionalProperties: false,
@@ -11015,6 +11071,15 @@ export const SMSMessageSendRequestSchema = {
       description:
         "Arbitrary JSON object stored on the message, returned on API reads, and echoed in webhook payloads. Maximum 2 KB serialized. Use metadata for per-send context like internal IDs and foreign keys. For low-cardinality filterable labels, use `tags` instead.\n",
     },
+    options: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSSendOptions",
+        },
+      ],
+      description:
+        "What Bird does to this message on its way out, such as `smart_encoding`. The message being relayed stays at the top level: its recipient, sender, content, and the delivery instructions the carrier acts on.\n",
+    },
     media_urls: {
       type: "array",
       items: {
@@ -11068,21 +11133,11 @@ export const SMSMessageSendRequestSchema = {
       description:
         "Preview feature: topic-gated sends. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.",
     },
-    max_price_per_segment: {
-      type: "number",
-      description:
-        "Preview feature: per-segment price ceiling. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.",
-    },
     personalization: {
       type: "object",
       additionalProperties: true,
       description:
         "Preview feature: per-recipient substitution for batch sends. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.",
-    },
-    track_clicks: {
-      type: "boolean",
-      description:
-        "Preview feature: link click tracking. Defaults to `false`. Currently unavailable; setting this to `true` returns `422 SMSUnsupportedFeature`.",
     },
   },
   example: {
@@ -11090,6 +11145,9 @@ export const SMSMessageSendRequestSchema = {
     from: "+15557654321",
     text: "Your verification code is 123456.",
     category: "authentication",
+    options: {
+      smart_encoding: true,
+    },
     tags: [
       {
         name: "campaign",
@@ -11226,7 +11284,7 @@ export const ContactSchema = {
   allOf: [
     {
       type: "object",
-      required: ["id", "email", "phone", "created_at", "updated_at"],
+      required: ["id", "email", "phone_number", "created_at", "updated_at"],
       properties: {
         id: {
           readOnly: true,
@@ -11241,7 +11299,7 @@ export const ContactSchema = {
           description:
             "The contact's email address, in its stored form, trimmed and lowercased before uniqueness is checked. Unique within the workspace. Null when the contact has no email address.",
         },
-        phone: {
+        phone_number: {
           type: ["string", "null"],
           minLength: 5,
           maxLength: 16,
@@ -11579,7 +11637,7 @@ export const ContactUpdateRequestSchema = {
       description:
         "New email address for the contact. Trimmed and lowercased before it is stored and checked for uniqueness. Must not be in use by another contact in the workspace. Omit to keep the current address; set to null to remove it, as long as the contact keeps at least one identifier.",
     },
-    phone: {
+    phone_number: {
       type: ["string", "null"],
       maxLength: 32,
       description:
@@ -11657,7 +11715,7 @@ export const ContactUpsertErrorSchema = {
 
 export const ContactMatchedOnSchema = {
   type: ["string", "null"],
-  enum: ["email", "phone", "external_id", null],
+  enum: ["email", "phone_number", "external_id", null],
   description:
     "Which identifier matched a batch entry to an existing contact. Null when the entry created a new contact.",
 } as const;
@@ -11665,7 +11723,7 @@ export const ContactMatchedOnSchema = {
 export const ContactUpsertEntrySchema = {
   type: "object",
   additionalProperties: false,
-  required: ["email", "phone", "external_id"],
+  required: ["email", "phone_number", "external_id"],
   description:
     "The identifiers a batch entry supplied, in the normalized form they were matched with, null where the entry carried none. An echo of the request row for correlation, never the contact's current state.",
   properties: {
@@ -11674,7 +11732,7 @@ export const ContactUpsertEntrySchema = {
       description:
         "Email address this entry carried, trimmed and lowercased. Null when the entry carried none.",
     },
-    phone: {
+    phone_number: {
       type: ["string", "null"],
       description:
         "Phone number this entry carried, in its normalized international form. Null when the entry carried none. A row rejected for an invalid phone echoes the value as sent, trimmed, since no normalized form exists.",
@@ -11776,7 +11834,7 @@ export const ContactUpsertRequestSchema = {
 
 export const ContactMatchKeySchema = {
   type: "string",
-  enum: ["email", "phone", "external_id"],
+  enum: ["email", "phone_number", "external_id"],
   description: "A contact identifier a batch entry can be matched on.",
 } as const;
 
@@ -11791,7 +11849,7 @@ export const ContactCreateRequestSchema = {
       description:
         "The contact's email address. Trimmed and lowercased before it is stored and checked for uniqueness. Unique within the workspace. Supply an email address, a phone number, or both.",
     },
-    phone: {
+    phone_number: {
       type: "string",
       maxLength: 32,
       description:
@@ -11823,7 +11881,7 @@ export const ContactCreateRequestSchema = {
   },
   example: {
     email: "alice@acme.com",
-    phone: "+31612345678",
+    phone_number: "+31612345678",
     first_name: "Alice",
     last_name: "Anderson",
   },
@@ -11852,9 +11910,9 @@ export const ContactListSchema = {
 
 export const ContactIdentifierFilterSchema = {
   type: "string",
-  enum: ["email", "phone"],
+  enum: ["email", "phone_number"],
   description:
-    "Which identifier a contact has on file, `email` for an email address or `phone` for a phone number.",
+    "Which identifier a contact has on file, `email` for an email address or `phone_number` for a phone number.",
 } as const;
 
 export const EmailMessageContentSchema = {
@@ -16352,7 +16410,7 @@ export const ContactWritableSchema = {
   allOf: [
     {
       type: "object",
-      required: ["email", "phone", "created_at", "updated_at"],
+      required: ["email", "phone_number", "created_at", "updated_at"],
       properties: {
         email: {
           type: ["string", "null"],
@@ -16361,7 +16419,7 @@ export const ContactWritableSchema = {
           description:
             "The contact's email address, in its stored form, trimmed and lowercased before uniqueness is checked. Unique within the workspace. Null when the contact has no email address.",
         },
-        phone: {
+        phone_number: {
           type: ["string", "null"],
           minLength: 5,
           maxLength: 16,
