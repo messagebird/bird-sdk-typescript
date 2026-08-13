@@ -11,6 +11,7 @@ export type _SmsTemplates = Pick<BirdClient["smsTemplates"], "list" | "get">;
 export type _Whatsapp = Pick<BirdClient["whatsapp"], "send" | "get" | "list" | "listEvents">;
 export type _Voice = Pick<BirdClient["voice"], "list" | "get">;
 export type _VerifyVerifications = Pick<BirdClient["verify"]["verifications"], "create" | "check" | "nextChannel">;
+export type _Lookup = Pick<BirdClient["lookup"], "phoneNumber" | "email">;
 export type _Domains = Pick<BirdClient["domains"], "list" | "get" | "create" | "verify" | "update" | "delete">;
 export type _Webhooks = Pick<BirdClient["webhooks"], "unwrap">;
 export type _Contacts = Pick<BirdClient["contacts"], "list" | "get" | "create" | "update" | "delete" | "batch">;

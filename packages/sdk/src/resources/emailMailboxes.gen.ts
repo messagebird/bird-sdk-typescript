@@ -28,7 +28,7 @@ export class EmailMailboxesResourceBase extends Resource {
   }
 
   /**
-   * Create a mailbox: a durable agent identity that owns an email address, groups mail into threads, and remembers conversations for its retention tier.
+   * Create a mailbox: a durable agent identity that owns an email address, groups mail into conversations, and remembers conversations for its retention tier.
    *
    * @example Create a mailbox
    * const mailbox = await bird.email.mailboxes.create({ display_name: "Support" });
@@ -40,7 +40,7 @@ export class EmailMailboxesResourceBase extends Resource {
   }
 
   /**
-   * Read one mailbox by id. A mailbox deleted within its 30-day restore window is still returned, carrying a non-null `deleted_at`; once that window closes it is gone and this returns 404.
+   * Read one mailbox by ID. A mailbox deleted within its 30-day restore window is still returned, with a non-null `deleted_at`. Once that window closes it is gone and this returns 404.
    *
    * @example Get a mailbox
    * const mailbox = await bird.email.mailboxes.get("mbx_01abc");
@@ -52,7 +52,7 @@ export class EmailMailboxesResourceBase extends Resource {
   }
 
   /**
-   * Update a mailbox's display name, reply-to, receive policy, retention tier, IP pool, or metadata. Lowering the retention tier onto remembered messages older than the new horizon requires confirm=true.
+   * Update a mailbox's display name, reply-to, receive policy, retention tier, IP pool, or metadata. Lowering the retention tier requires `confirm=true` when it would delete remembered messages older than the new cutoff.
    *
    * @example Change a mailbox's receive policy
    * const mailbox = await bird.email.mailboxes.update("mbx_01abc", {
@@ -66,7 +66,7 @@ export class EmailMailboxesResourceBase extends Resource {
   }
 
   /**
-   * Delete a mailbox. The address stops receiving immediately and is quarantined; the mailbox and its remembered messages stay restorable for 30 days via the restore endpoint, then are permanently deleted.
+   * Delete a mailbox. The address stops receiving immediately and is quarantined. The mailbox and its remembered messages stay restorable for 30 days through the restore endpoint, then are permanently deleted.
    *
    * @example Delete a mailbox
    * await bird.email.mailboxes.delete("mbx_01abc");
@@ -77,7 +77,7 @@ export class EmailMailboxesResourceBase extends Resource {
   }
 
   /**
-   * Restore a mailbox deleted less than 30 days ago: the address starts receiving again and the remembered messages are back. Past the window the mailbox is permanently deleted and returns 404; a mailbox that is not deleted returns 409.
+   * Restore a mailbox deleted less than 30 days ago: the address starts receiving again and the remembered messages are back. Past the window the mailbox is permanently deleted and returns 404. A mailbox that is not deleted returns 409.
    *
    * @example Restore a deleted mailbox
    * const mailbox = await bird.email.mailboxes.restore("mbx_01abc");
@@ -89,7 +89,7 @@ export class EmailMailboxesResourceBase extends Resource {
   }
 
   /**
-   * Reactivate a suspended mailbox so it can send and receive again and its threads become visible. Fails if your plan does not have room for another active mailbox (or another custom inbox.ai handle); delete an active mailbox or upgrade first. A mailbox that is not suspended returns 409.
+   * Resume a suspended mailbox so it can send and receive again and its conversations become visible. Fails if your plan does not have room for another active mailbox (or another custom inbox.ai handle). Delete an active mailbox or upgrade first. A mailbox that is not suspended returns 409.
    *
    * @example Resume a suspended mailbox
    * const mailbox = await bird.email.mailboxes.resume("mbx_01abc");

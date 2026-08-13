@@ -70,31 +70,31 @@ export type VoiceMediaQuality = {
  *
  * Most of them you can fix yourself:
  *
- * - `source_not_allowed`: the call came from an IP address that is not in the
+ * - `source_not_allowed`: The call came from an IP address that is not in the
  * trunk's allowed-address list. Add the address your PBX sends from.
- * - `caller_id_not_verified`: the number in the `From` header is not a verified
+ * - `caller_id_not_verified`: The number in the `From` header is not a verified
  * caller ID for this workspace. Verify it, or present a number you have
  * already verified.
- * - `destination_not_enabled`: you have not turned on calling to this
+ * - `destination_not_enabled`: You have not turned on calling to this
  * destination country. Enable it in your voice destination settings.
- * - `insufficient_balance`: your wallet did not cover the call. Top up, or turn
+ * - `insufficient_balance`: Your wallet did not cover the call. Top up, or turn
  * on automatic top-ups.
- * - `daily_spend_exceeded`: the call would have passed your organization's daily
+ * - `daily_spend_exceeded`: The call would have passed your organization's daily
  * voice spend limit. The limit resets at the start of the next UTC day.
- * - `concurrent_calls_exceeded`: you already have as many calls in progress as
+ * - `concurrent_calls_exceeded`: You already have as many calls in progress as
  * your account allows. Wait for one to end, or ask support to raise the limit.
- * - `calls_per_second_exceeded`: you placed calls faster than your account
+ * - `calls_per_second_exceeded`: You placed calls faster than your account
  * allows. Slow the rate you dial at, then retry.
  *
  * The rest need Bird to act, so contact support and quote the call `id`:
  *
- * - `routing_not_configured`: no dial plan is attached to this trunk yet.
+ * - `routing_not_configured`: No dial plan is attached to this trunk yet.
  * Expected on a trunk that was just created.
- * - `no_route_found`: a dial plan is attached, but no rule in it covers this
+ * - `no_route_found`: A dial plan is attached, but no rule in it covers this
  * destination.
- * - `destination_blocked`: the destination is blocked by Bird's routing
+ * - `destination_blocked`: The destination is blocked by our routing
  * configuration.
- * - `call_not_permitted`: the call could not be priced for your account.
+ * - `call_not_permitted`: The call could not be priced for your account.
  *
  */
 export type VoiceCallRejectionReason =
@@ -1725,7 +1725,17 @@ export type EventEmailScheduled = {
 
 /**
  * Why an email was rejected before delivery.
- * `recipient_suppressed` means the recipient is on the workspace suppression list, so Bird did not attempt delivery. `transmission_failed` means the message could not be transmitted for delivery. `generation_failure` means the message could not be built for delivery (a template or content issue). `policy_rejection` means the message was refused by sending policy. `domain_unverified` means the sending domain was not verified. `quota_exceeded` means the organization's send quota was reached. `recipient_not_allowed` means a recipient was not permitted for this send (for shared onboarding-domain sends, recipients must be verified workspace members).
+ *
+ * - `recipient_suppressed`: The recipient is on the workspace suppression list, so
+ * delivery was never attempted.
+ * - `transmission_failed`: The message could not be transmitted for delivery.
+ * - `generation_failure`: The message could not be built for delivery (template or
+ * content issue).
+ * - `policy_rejection`: The message was refused by sending policy.
+ * - `domain_unverified`: The sending domain was not verified.
+ * - `quota_exceeded`: The organization's send quota was reached.
+ * - `recipient_not_allowed`: A recipient was not permitted for this send (for shared
+ * onboarding-domain sends, recipients must be verified workspace members).
  *
  */
 export type EmailRejectionReason =
@@ -1764,7 +1774,7 @@ export type EventEmailRejected = {
  */
 export type EventEmailReceivedData = {
   /**
-   * ID of the received email. Use it with GET /v1/email/inbound-messages/{id} to fetch the body, raw content, and attachments.
+   * ID of the received email. Fetch its parsed metadata with `GET /v1/email/inbound-messages/{id}`, and its content from that message's `/body`, `/raw`, and `/attachments` sub-resources.
    */
   inbound_message_id: InboundEmailMessageId;
   /**
@@ -1809,13 +1819,13 @@ export type EventEmailReceivedData = {
    */
   dmarc_pass?: boolean | null;
   /**
-   * Spam score for the message. Always null at present; reserved for a future content-scoring capability.
+   * Spam score carried on the received message, or null when it carries no score.
    */
   spam_score?: number | null;
 };
 
 /**
- * Bird received and parsed an inbound email. The payload carries the message's identifiers, sender and recipients, subject, threading reference, and authentication results — enough to route and triage without a fetch. Fetch the body, full headers, and attachments with GET /v1/email/inbound-messages/{id}.
+ * Bird received and parsed an inbound email. The payload carries the message's identifiers, sender and recipients, subject, threading reference, and authentication results, which is enough to route and triage without a fetch. Content is fetched separately: the parsed body with `GET /v1/email/inbound-messages/{id}/body`, the original MIME with `GET /v1/email/inbound-messages/{id}/raw`, and attachment bytes with `GET /v1/email/inbound-messages/{id}/attachments/{attachment_id}`.
  */
 export type EventEmailReceived = {
   /**
@@ -1874,7 +1884,13 @@ export type EventEmailOutOfBandBounceData = EventEmailBase & {
 };
 
 /**
- * Bounce classification. `hard` is a permanent failure (invalid address or non-existent domain). `soft` is a transient failure (mailbox full, server temporarily unavailable). `block` indicates the receiving mail server blocked the sending IP for reputation reasons. `admin` indicates an administrative refusal (relaying denied, blocklisted domain). `undetermined` is used when the receiving server's response is ambiguous.
+ * Bounce classification.
+ *
+ * - `hard`: A permanent failure, such as an invalid address or a domain that does not exist.
+ * - `soft`: A transient failure, such as a full mailbox or a server that is temporarily unavailable.
+ * - `block`: The receiving mail server refused the sending IP on reputation grounds.
+ * - `admin`: An administrative refusal, such as relaying denied or a blocklisted domain.
+ * - `undetermined`: The receiving server's response was ambiguous.
  *
  */
 export type EmailBounceType =
@@ -2437,11 +2453,11 @@ export type WebhookEndpoint = {
   /**
    * Delivery state of the endpoint.
    *
-   * - `active`: the initial state; events are being delivered normally.
-   * - `degraded`: recent deliveries are failing. Bird keeps delivering and retrying,
+   * - `active`: The initial state; events are being delivered normally.
+   * - `degraded`: Recent deliveries are failing. We keep delivering and retrying,
    * and the endpoint returns to `active` automatically once deliveries succeed
    * again.
-   * - `paused`: all delivery is stopped, either because an update set `status` to
+   * - `paused`: All delivery is stopped, either because an update set `status` to
    * `paused` or automatically after sustained delivery failures. A paused endpoint
    * never resumes on its own: re-enable it with
    * [Update a webhook endpoint](/docs/api/reference/update-webhook), then recover
@@ -2480,7 +2496,7 @@ export type ListEnvelopeWithTotal = ListEnvelope & {
 };
 
 /**
- * Desired changes to the SMTP config for the key. A field you omit is left unchanged; if no config exists yet for this key, omitted fields take their documented defaults instead.
+ * Desired changes to the SMTP config for the key. A field you omit is left unchanged. If no config exists yet for this key, omitted fields take their documented defaults instead.
  *
  */
 export type EmailSmtpConfigUpdate = {
@@ -2490,7 +2506,13 @@ export type EmailSmtpConfigUpdate = {
    */
   ip_pool_id?: string | null;
   /**
-   * Content classification — independent of which endpoint messages are submitted through. Controls suppression policy: `marketing` blocks on all suppression reasons; `transactional` allows delivery through complaint and unsubscribe suppressions. Omit to leave unchanged.
+   * Content classification, independent of which endpoint messages are
+   * submitted through. Controls suppression policy:
+   *
+   * - `marketing`: Blocks on all suppression reasons.
+   * - `transactional`: Allows delivery through complaint and unsubscribe suppressions.
+   *
+   * Omit to leave unchanged.
    *
    */
   category?: "marketing" | "transactional";
@@ -2530,12 +2552,16 @@ export type EmailSmtpConfig = {
    */
   ip_pool_id?: string | null;
   /**
-   * Content classification applied to messages submitted over SMTP with this key. Controls suppression policy: `marketing` blocks on all suppression reasons; `transactional` allows delivery through complaint and unsubscribe suppressions.
+   * Content classification applied to messages submitted over SMTP with
+   * this key. Controls suppression policy:
+   *
+   * - `marketing`: Blocks on all suppression reasons.
+   * - `transactional`: Allows delivery through complaint and unsubscribe suppressions.
    *
    */
   category: "marketing" | "transactional";
   /**
-   * Structured `{name, value}` labels applied to every message submitted over SMTP with this key — the same tags used by the email sending API. See EmailMessageSendRequest for how tags are used for filtering and analytics.
+   * Structured `{name, value}` labels applied to every message submitted over SMTP with this key, the same tags used by the email sending API. Use tags to filter and break down your email statistics.
    *
    */
   tags: Array<Tag>;
@@ -2565,26 +2591,36 @@ export type EmailMailboxLabel = {
    */
   readonly name: string;
   /**
-   * `system` labels are built in and carry state — the placements `inbox`, `archive`, `spam`, `blocked`, and `sent`, plus `trash` and `unread`. `custom` labels are the workspace's own tags.
+   * `system` labels are the built-in placements a message can be in:
+   *
+   * - Inbox.
+   * - Archive.
+   * - Spam.
+   * - Blocked.
+   * - Sent.
+   * - Trash.
+   * - Unread.
+   *
+   * `custom` labels are the workspace's own tags.
    */
   readonly type: "system" | "custom";
 };
 
 /**
- * A new message sent from a mailbox, starting a new conversation. Mirrors the plain send request minus `from` — the mailbox is the sender identity — and minus `scheduled_at` (mailbox sends are immediate). Bird mints the RFC 5322 Message-ID so replies thread back to this conversation. At least one of `html` or `text` must be provided.
+ * A new message sent from a mailbox, starting a new conversation. Mirrors the plain send request without `from`, because the mailbox is who the message comes from, and without `scheduled_at`, because a mailbox sends immediately. We set the RFC 5322 Message-ID so replies thread back into this conversation. At least one of `html` or `text` must be provided.
  *
  */
 export type EmailMailboxComposeRequest = {
   /**
-   * Primary recipients. Each entry is a plain email string, an RFC 5322 mailbox string (`Jane <jane@example.com>`), or an object with an optional display name.
+   * Primary recipients. Each entry is a plain email string, an RFC 5322 mailbox string (`Jane <jane@acme.com>`), or an object with an optional display name.
    */
   to: Array<EmailAddressInput>;
   /**
-   * CC recipients. Each entry is a plain email string, an RFC 5322 mailbox string (`Jane <jane@example.com>`), or an object with an optional display name.
+   * CC recipients. Each entry is a plain email string, an RFC 5322 mailbox string (`Jane <jane@acme.com>`), or an object with an optional display name.
    */
   cc?: Array<EmailAddressInput>;
   /**
-   * BCC recipients. Each entry is a plain email string, an RFC 5322 mailbox string (`Jane <jane@example.com>`), or an object with an optional display name.
+   * BCC recipients. Each entry is a plain email string, an RFC 5322 mailbox string (`Jane <jane@acme.com>`), or an object with an optional display name.
    */
   bcc?: Array<EmailAddressInput>;
   /**
@@ -2605,7 +2641,7 @@ export type EmailMailboxComposeRequest = {
    */
   reply_to?: Array<EmailAddressInput>;
   /**
-   * File attachments. The send is rejected when the estimated generated message size exceeds 20 MB (bodies plus all attachments after base64 encoding). Attachment metadata endures on the message's `attachment_manifest`; the bytes are downloadable for 30 days.
+   * File attachments. The send is rejected when the estimated generated message size exceeds 20 MB (bodies plus all attachments after base64 encoding). Keep total raw attachment content at or below 15 MB for reliable headroom. Attachment metadata stays on the message's `attachment_manifest`, and the bytes are downloadable for 30 days.
    *
    */
   attachments?: Array<EmailAttachment>;
@@ -2625,42 +2661,41 @@ export type EmailMailboxComposeRequest = {
 };
 
 /**
- * Content classification. Controls suppression policy: `marketing` blocks on all suppression reasons; `transactional` allows delivery through complaint and unsubscribe suppressions, for receipts, password resets, and similar operational mail.
+ * Content classification, which controls suppression policy:
+ *
+ * - `marketing`: Blocks on all suppression reasons.
+ * - `transactional`: Allows delivery through complaint and unsubscribe suppressions, for receipts, password resets, and similar operational mail.
  *
  */
 export type EmailMessageCategory = "marketing" | "transactional";
 
 /**
- * File attached to an email send. The attachment bytes are passed as base64-encoded `content` directly in the request body (required). The `path` field (provide a URL and Bird fetches the attachment for you) is a preview feature and currently unavailable. Requests are rejected with 422 if `content` is missing — `path` alone does not satisfy the schema. When `path` becomes generally available, the schema will be relaxed so that exactly one of `content` or `path` is required.
- * Inline images for `<img src="cid:..."/>` references in the HTML body use the `content_id` field together with `content`.
- * Bird enforces a **20 MB estimated generated message size** cap. The estimate is the HTML and text body plus all attachments and inline images measured after base64 encoding. This is not a raw file-size cap. As a rule of thumb, keep total raw attachment content at or below **15 MB** so the generated message has enough room after encoding and MIME wrapping.
- * Recipient-side delivery reality: downstream limits vary by product and tenant/server policy. Gmail personal and Outlook.com document 25 MB attachment limits. Exchange Online defaults to 35 MB send / 36 MB receive, but admins can configure limits; on-prem Exchange Server organizational defaults are 10 MB. Sends close to Bird's 20 MB generated-message cap may be accepted by Bird but bounce at the recipient's mail server.
- * Batch sends can include attachments on individual message objects. Each message still has the 20 MB estimated generated-size cap, and the serialized JSON request body for the whole batch has a hard 20 MB cap. Certain executable / script content types are rejected at validation time.
+ * A file attached to an email. Put the file's bytes in `content`, base64-encoded, and give it the `filename` the recipient will see.
+ *
+ * To show an image inline, so that `<img src="cid:..."/>` in your HTML body picks it up, set `content_id` alongside `content`.
+ *
+ * Each message can be at most **20 MB** once it has been generated. That figure covers the HTML body, the text body, and every attachment and inline image, all measured after base64 encoding rather than as raw files. Base64 and MIME wrapping add roughly a third, so keep the raw content of your attachments at or below **15 MB** to stay under the cap.
+ *
+ * A message we accept can still bounce at the other end, because every mail provider sets its own limit. Gmail and Outlook.com both publish a 25 MB limit. Exchange Online defaults to 35 MB for sending and 36 MB for receiving, though an administrator can change both, and on-premise Exchange Server defaults to 10 MB. So a message close to 20 MB is worth testing against the providers your recipients actually use.
+ *
+ * A batch send can attach files to each message in the batch. Every message is still held to the same 20 MB, and the whole request body is capped at 20 MB as well. Executable and script content types are refused when the request is validated.
  *
  */
 export type EmailAttachment = {
   /**
-   * Filename shown to the recipient. Required.
+   * The name the recipient sees on the attachment.
    */
   filename: string;
   /**
-   * Base64-encoded attachment bytes. Required. Counts toward the 20 MB estimated generated message-size cap after encoding and MIME wrapping.
-   *
+   * The file's bytes, base64-encoded. What you send here counts toward the message's 20 MB limit after encoding and MIME wrapping, not at its raw size.
    */
   content: string;
   /**
-   * Preview feature — provide a URL and Bird fetches the attachment for you. Currently unavailable. Use `content` instead. The schema currently requires `content`, so a request with only `path` is rejected with 422 for missing `content`; a request supplying both `content` and `path` is rejected with 422 `UnsupportedEmailFeature` until this preview ships. When generally available: HTTPS-only, single redirect followed and re-validated, private IP ranges blocked, request timeout enforced, fetched content counts toward the 20 MB estimated generated message-size cap after encoding and MIME wrapping.
-   *
-   */
-  path?: string;
-  /**
-   * MIME type. Inferred from `filename` extension when omitted. Used to enforce the blocklist of disallowed executable / script types.
-   *
+   * The file's MIME type. Leave it out and we work it out from the extension on `filename`. This is what we check against the list of executable and script types we refuse.
    */
   content_type?: string;
   /**
-   * RFC 2392 Content-ID. When set, the attachment is rendered inline and can be referenced from the HTML body as `<img src="cid:{content_id}"/>`. When omitted, the attachment is rendered as a regular file attachment.
-   *
+   * An RFC 2392 Content-ID for the file. Set it and the attachment is shown inline, so your HTML body can point at it with `<img src="cid:{content_id}"/>`. Leave it out and the file arrives as an ordinary attachment the recipient downloads.
    */
   content_id?: string;
 };
@@ -2680,7 +2715,7 @@ export type EmailAddress = {
 };
 
 /**
- * A sender or recipient address. Accepts a plain email string (`jane@example.com`), an RFC 5322 mailbox string with an embedded display name (`Jane Doe <jane@example.com>`), or an object carrying the address and an optional display name. All forms can be mixed freely within one request; responses always return the object form.
+ * A sender or recipient address. Accepts a plain email string (`jane@acme.com`), an RFC 5322 mailbox string with an embedded display name (`Jane Doe <jane@acme.com>`), or an object carrying the address and an optional display name. All forms can be mixed freely within one request. Responses always return the object form.
  *
  */
 export type EmailAddressInput = string | EmailAddress;
@@ -2716,7 +2751,7 @@ export type EmailThreadMessageReplyRequest = {
   };
   category?: EmailMessageCategory;
   /**
-   * File attachments to include with the reply. The send is rejected when the estimated generated message size exceeds 20 MB (bodies plus all attachments after base64 encoding). Keep total raw attachment content at or below 15 MB for reliable headroom. Attachment metadata endures on the message's `attachment_manifest`; the bytes are downloadable for 30 days.
+   * File attachments to include with the reply. The send is rejected when the estimated generated message size exceeds 20 MB (bodies plus all attachments after base64 encoding). Keep total raw attachment content at or below 15 MB for reliable headroom. Attachment metadata stays on the message's `attachment_manifest`, and the bytes are downloadable for 30 days.
    *
    */
   attachments?: Array<EmailAttachment>;
@@ -2730,7 +2765,7 @@ export type EmailThreadMessageAttachmentList = {
 };
 
 /**
- * Attachment metadata on a conversation message. The metadata remains readable for the mailbox's retention period; the attachment bytes are downloadable for 30 days after the message occurred.
+ * Attachment metadata on a conversation message. The metadata stays readable for the mailbox's retention tier. The attachment bytes are downloadable for 30 days after the message occurred.
  *
  */
 export type EmailThreadMessageAttachment = {
@@ -2753,7 +2788,7 @@ export type EmailThreadMessageAttachment = {
 };
 
 /**
- * The original rendered body of a conversation message. Available for 30 days after the message occurred; after that the endpoint returns `410 Gone` while the message's extracted text remains readable on the message itself.
+ * The original rendered body of a conversation message. Available for 30 days after the message occurred. After that, the endpoint returns `410 Gone`, but the message's extracted text stays readable on the message itself.
  *
  */
 export type EmailThreadMessageBody = {
@@ -2781,7 +2816,7 @@ export type EmailThreadMessageUpdateRequest = {
 export type ContactId = string;
 
 /**
- * Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. System labels express state changes: on a conversation, adding `spam` files it as spam, adding `archive` files it away without deleting it, adding `inbox` (or removing `spam` or `archive`) returns it to the inbox, and removing `unread` marks all retained received messages as read in one call; on a message, adding or removing `unread` flips read state, and adding or removing `trash` moves it to or out of the trash. Changes that contradict this model are rejected: adding more than one placement label in one request, adding `blocked` (blocking a sender is a receive-rule decision), removing `inbox` without adding a destination, adding `trash` or `unread` to a conversation (removing `unread` is the mark-all-read shortcut; `trash` uses the DELETE verb), placement labels on a message (move its conversation instead), and `unread` on a sent message. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be used as custom labels, in any casing. A conversation or message carries at most 20 labels, system labels included.
+ * Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. System labels express state changes: on a conversation, adding `spam` files it as spam, adding `archive` files it away without deleting it, adding `inbox` (or removing `spam`, `blocked`, or `archive`) returns it to the inbox, and removing `unread` marks all retained received messages as read in one call; on a message, adding or removing `unread` flips read state, and adding or removing `trash` moves it to or out of the trash. Changes that contradict this model are rejected: adding more than one placement label in one request, adding `blocked` (blocking a sender is a receive-rule decision), removing `inbox` without adding a destination, adding `trash` or `unread` to a conversation (removing `unread` is the mark-all-read shortcut; `trash` uses the DELETE verb), placement labels on a message (move its conversation instead), and `unread` on a sent message. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be used as custom labels, in any casing. A conversation or message has at most 20 labels, system labels included.
  *
  */
 export type EmailLabelsUpdate = {
@@ -2800,7 +2835,7 @@ export type EmailThreadMessageList = {
 } & ListEnvelope;
 
 /**
- * Link to the message's entry in the received-message or sent-message log, which carries delivery analytics such as per-recipient events. Log entries expire 30 days after the message occurred.
+ * Link to the message's entry in the received-message or sent-message log, which has delivery analytics such as per-recipient events. Log entries expire 30 days after the message occurred.
  *
  */
 export type EmailThreadMessageSource = {
@@ -2815,7 +2850,7 @@ export type EmailThreadMessageSource = {
 };
 
 /**
- * One recipient's terminal delivery outcome on a sent conversation message, folded into the message's durable memory when the outcome becomes known.
+ * One recipient's terminal delivery outcome on a sent conversation message, recorded once the outcome becomes known.
  *
  */
 export type EmailThreadMessageRecipient = {
@@ -2830,21 +2865,21 @@ export type EmailThreadMessageRecipient = {
 };
 
 /**
- * A message in a mailbox conversation, either direction. Message metadata and extracted text remain readable for the mailbox's retention period; the original rendered source (HTML body, raw MIME, attachment bytes) is available through the body, raw, and attachment endpoints for 30 days after the message occurred.
+ * A message in a mailbox conversation, either direction. Message metadata and extracted text stay readable for the mailbox's retention tier. The original rendered source (HTML body, raw MIME, attachment bytes) is available through the body, raw, and attachment endpoints for 30 days after the message occurred.
  *
  */
 export type EmailThreadMessage = {
   /**
-   * Message ID. Received messages carry a `rem_` ID, sent messages an `em_` ID — the same IDs used by the received-message and sent-message logs.
+   * Message ID. Received messages have a `rem_` ID, sent messages an `em_` ID: the same IDs used by the received-message and sent-message logs.
    *
    */
   readonly id: string;
   /**
-   * Direction of the message — `inbound` for a received message, `outbound` for a sent one.
+   * Which way the message went. `inbound` means you received it, `outbound` means you sent it.
    */
   readonly direction: "inbound" | "outbound";
   /**
-   * Channel this message was carried on. Always `email`.
+   * Channel this message lives on. Always `email`.
    */
   readonly channel: string;
   /**
@@ -2877,47 +2912,61 @@ export type EmailThreadMessage = {
    */
   readonly preview: string | null;
   /**
-   * Plain-text content of the message with quoted history stripped — readable for the mailbox's full retention period, both directions. Always present when fetching a single message; on list endpoints it is included only when the request sets `include=extracted_text`. Null when no text could be extracted.
+   * Plain-text content of the message with quoted history stripped. Readable for the mailbox's full retention tier, in both directions. Always present when fetching a single message. On list endpoints it is included only when the request sets `include=extracted_text`. Null when no text could be extracted.
    *
    */
   readonly extracted_text?: string | null;
   /**
-   * Labels on this message. System labels carry its state: a received message holds exactly one placement label — `inbox` for accepted mail, `archive` when its conversation was filed away, `spam` (failed sender authentication), or `blocked` (rejected by the mailbox's receive policy or rules) — plus `unread` until it is read. `trash` marks a message in the trash, either direction. Custom labels share the same list; a message carries at most 20.
+   * Labels on this message. A received message always has exactly one placement label:
+   *
+   * - `inbox`: Accepted mail.
+   * - `archive`: The message's conversation was filed away.
+   * - `spam`: The message failed sender authentication.
+   * - `blocked`: The message was rejected by the mailbox's receive policy or rules.
+   *
+   * A received message also has `unread` until it is read. `trash` marks a message in the trash, in either direction. Custom labels share the same list, and a message has at most 20 labels in total.
    *
    */
   labels: Array<string>;
   /**
-   * Folded delivery status of a sent message: `accepted`, `sent` (provider handoff), `delivered` (all attempted recipients delivered), or `failed` (terminal failure). Null for received messages.
+   * Folded delivery status of a sent message:
+   *
+   * - `accepted`: Accepted for sending.
+   * - `sent`: Handed off to the provider.
+   * - `delivered`: All attempted recipients delivered.
+   * - `failed`: Terminal failure.
+   *
+   * Null for received messages.
    *
    */
   readonly status: string | null;
   /**
-   * Terminal per-recipient delivery outcomes of a sent message, folded in as they become known — part of the message's durable memory. Null for received messages and before any recipient reaches a terminal state. Per-recipient event detail lives on the sent-message log (`source`) for 30 days.
+   * Terminal per-recipient delivery outcomes of a sent message, filled in as each one becomes known and kept for the mailbox's full retention tier. Null for received messages and before any recipient reaches a terminal state. Per-recipient event detail lives on the sent-message log (`source`) for 30 days.
    *
    */
   readonly recipients: Array<EmailThreadMessageRecipient> | null;
   /**
-   * Whether the sender of a received message was authenticated. `pass` means the sender's identity was verified; `fail` means it was checked and did not verify; `unknown` means no verdict could be determined and the sender should not be treated as verified. Null for sent messages. Part of the message's durable memory — readable for the mailbox's full retention period, so the verdict survives after the 30-day inbound log has expired.
+   * Whether the sender of a received message was authenticated. `pass` means the sender's identity was verified. `fail` means it was checked and did not verify. `unknown` means no verdict could be determined, and the sender should not be treated as verified. Null for sent messages. This field is readable for the mailbox's full retention tier, so the verdict is still available after the 30-day received-message log has expired.
    *
    */
   readonly authentication: "pass" | "fail" | "unknown" | null;
   /**
-   * Whether SPF passed for the sender of a received message. Null for sent messages and when no verdict is available. Durable for the mailbox's retention period.
+   * Whether SPF passed for the sender of a received message. Null for sent messages and when no verdict is available. This field is kept for the mailbox's retention tier.
    *
    */
   readonly spf_pass: boolean | null;
   /**
-   * Whether DKIM passed for the sender of a received message. Null for sent messages and when no verdict is available. Durable for the mailbox's retention period.
+   * Whether DKIM passed for the sender of a received message. Null for sent messages and when no verdict is available. This field is kept for the mailbox's retention tier.
    *
    */
   readonly dkim_pass: boolean | null;
   /**
-   * Whether DMARC passed for the sender of a received message. Null for sent messages and when no verdict is available. Durable for the mailbox's retention period.
+   * Whether DMARC passed for the sender of a received message. Null for sent messages and when no verdict is available. This field is kept for the mailbox's retention tier.
    *
    */
   readonly dmarc_pass: boolean | null;
   /**
-   * When the message will be permanently deleted: the end of the mailbox's retention period, pulled nearer (at most 30 days out) while the message is in the trash. Restore a trashed message before then with `PATCH {"labels": {"remove": ["trash"]}}`.
+   * When the message will be permanently deleted: the end of the mailbox's retention tier, pulled nearer (at most 30 days out) while the message is in the trash. Restore a trashed message before then with `PATCH {"labels": {"remove": ["trash"]}}`.
    *
    */
   readonly purge_at: string;
@@ -2926,7 +2975,7 @@ export type EmailThreadMessage = {
    */
   readonly attachment_count: number;
   /**
-   * Attachment metadata (filename, content type, size). Remains readable for the mailbox's retention period even after the attachment bytes themselves have expired.
+   * Attachment metadata (filename, content type, size). Stays readable for the mailbox's retention tier even after the attachment bytes themselves have expired.
    *
    */
   readonly attachment_manifest: Array<EmailThreadMessageAttachment>;
@@ -2976,7 +3025,7 @@ export type EmailThreadHighlights = {
 };
 
 /**
- * A conversation in a mailbox. Threads group related messages both directions — mail the mailbox received and replies it sent — and carry the conversation-level read state, labels, and participant list. Message counts reflect the messages currently retained under the mailbox's retention period.
+ * A conversation in a mailbox. It groups every message in both directions, the mail the mailbox received and the replies it sent, and it holds the conversation's read state, labels, and participant list. A message is retained until it is trashed or ages past the mailbox's retention tier. Only retained messages count toward the totals below.
  *
  */
 export type EmailThread = {
@@ -3017,11 +3066,18 @@ export type EmailThread = {
    */
   readonly last_message_at: string;
   /**
-   * Direction of the most recent message — `inbound` for a received message, `outbound` for a sent one.
+   * Direction of the most recent message: `inbound` for a received message, `outbound` for a sent one.
    */
   readonly last_direction: "inbound" | "outbound";
   /**
-   * Labels on this conversation. Exactly one system placement label is always present — `inbox`, `archive` (filed away, done for now), `spam` (the opening message failed sender authentication), or `blocked` (rejected by the mailbox's receive policy or rules) — set by the message that started the conversation. Move a conversation by updating its labels: add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox` — or remove `spam`, `blocked`, or `archive` — to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list; a conversation carries at most 20.
+   * Labels on this conversation. Exactly one system placement label is always present, set by the message that started the conversation:
+   *
+   * - `inbox`: The conversation is in the inbox.
+   * - `archive`: The conversation was filed away and is done for now.
+   * - `spam`: The conversation's opening message failed sender authentication.
+   * - `blocked`: The conversation's opening message was rejected by the mailbox's receive policy or rules.
+   *
+   * Move a conversation by updating its labels. Add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox`, or remove `spam`, `blocked`, or `archive`, to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list, and a conversation has at most 20 labels in total.
    *
    */
   labels: Array<string>;
@@ -3034,7 +3090,7 @@ export type EmailThread = {
    */
   readonly updated_at: string;
   /**
-   * Matched search fragments, keyed by the field that matched. Returned only by thread search; omitted when listing threads.
+   * Matched search fragments, keyed by the field that matched. Returned only by thread search. Omitted when listing threads.
    *
    */
   readonly highlights?: EmailThreadHighlights;
@@ -3053,7 +3109,7 @@ export type InboundRouteUpdate = {
    */
   match_value?: string | null;
   /**
-   * What happens to matching mail. `deliver_to_mailbox` delivers it to `target_mailbox_id` (required); `drop` discards it silently, with nothing stored and no webhook fired.
+   * What happens to matching mail. `deliver_to_mailbox` delivers it to `target_mailbox_id` (required). `drop` discards it silently, with nothing stored and no webhook fired.
    */
   action?: "deliver_to_mailbox" | "drop";
   /**
@@ -3061,7 +3117,7 @@ export type InboundRouteUpdate = {
    */
   target_mailbox_id?: MailboxId | null;
   /**
-   * Evaluation order — lowest number wins. Explicit routes accept 11–1000; the mailbox's own address always matches at priority 10.
+   * The order routes are tried in, lowest number first. Your own routes take a priority from 11 to 1000. The mailbox's own address always matches at priority 10.
    */
   priority?: number;
   /**
@@ -3075,19 +3131,19 @@ export type InboundRouteUpdate = {
  */
 export type InboundRouteCreate = {
   /**
-   * The domain the route applies to — one of your inbound-enabled custom domains.
+   * The domain the route applies to. It has to be one of your inbound-enabled custom domains.
    */
   domain: string;
   /**
-   * How the route matches recipients. `address` matches one local part and requires `match_value`; `catch_all` matches every recipient on the domain that nothing else matched.
+   * How the route matches recipients. `address` matches one local part and requires `match_value`. `catch_all` matches every recipient on the domain that nothing else matched.
    */
   match_type: "address" | "catch_all";
   /**
-   * The local part an `address` route matches. Required for `address` routes; stored lowercase.
+   * The local part an `address` route matches. Required for `address` routes. Stored lowercase.
    */
   match_value?: string;
   /**
-   * What happens to matching mail. `deliver_to_mailbox` delivers it to `target_mailbox_id` (required); `drop` discards it silently, with nothing stored and no webhook fired.
+   * What happens to matching mail. `deliver_to_mailbox` delivers it to `target_mailbox_id` (required). `drop` discards it silently, with nothing stored and no webhook fired.
    */
   action: "deliver_to_mailbox" | "drop";
   /**
@@ -3095,7 +3151,7 @@ export type InboundRouteCreate = {
    */
   target_mailbox_id?: MailboxId;
   /**
-   * Evaluation order — lowest number wins. Explicit routes accept 11–1000; the mailbox's own address always matches at priority 10, so a route can never pre-empt exact-address delivery.
+   * The order routes are tried in, lowest number first. Your own routes take a priority from 11 to 1000. The mailbox's own address always matches at priority 10, so a route can never pre-empt exact-address delivery.
    */
   priority?: number;
   /**
@@ -3114,7 +3170,7 @@ export type InboundRouteList = {
 export type EmailInboundRouteId = string;
 
 /**
- * A routing rule that directs inbound mail on one of your domains into a mailbox, or drops it. Routes are evaluated in priority order — lowest number first. Each mailbox's own address is always matched at priority 10 and explicit routes accept 11–1000, so exact-address delivery always takes precedence.
+ * A routing rule that directs inbound mail on one of your domains into a mailbox, or drops it. Routes are tried in priority order, lowest number first. Each mailbox's own address always matches at priority 10 and your own routes take a priority from 11 to 1000, so delivery to an exact address always takes precedence.
  *
  */
 export type InboundRoute = {
@@ -3127,7 +3183,7 @@ export type InboundRoute = {
    */
   readonly domain: string;
   /**
-   * How the route matches recipients. `address` matches one local part; `catch_all` matches every recipient on the domain that nothing else matched.
+   * How the route matches recipients. `address` matches one local part. `catch_all` matches every recipient on the domain that nothing else matched.
    */
   match_type: "address" | "catch_all";
   /**
@@ -3135,7 +3191,7 @@ export type InboundRoute = {
    */
   match_value: string | null;
   /**
-   * What happens to matching mail. `deliver_to_mailbox` delivers it to `target_mailbox_id`; `drop` discards it silently, with nothing stored and no webhook fired.
+   * What happens to matching mail. `deliver_to_mailbox` delivers it to `target_mailbox_id`. `drop` discards it silently, with nothing stored and no webhook fired.
    */
   action: "deliver_to_mailbox" | "drop";
   /**
@@ -3143,7 +3199,7 @@ export type InboundRoute = {
    */
   target_mailbox_id: MailboxId | null;
   /**
-   * Evaluation order — lowest number wins. Explicit routes accept 11–1000 (default 100); the mailbox's own address always matches at priority 10.
+   * The order routes are tried in, lowest number first. Your own routes take a priority from 11 to 1000, and default to 100. A mailbox's own address always matches at priority 10.
    */
   priority: number;
   /**
@@ -3220,7 +3276,7 @@ export type ReceiveRule = {
 };
 
 /**
- * A mailbox's sent and received email statistics: a period-wide summary plus a bucketed time series. `period` echoes the range and grain the server computed against; `data` is one row per bucket in chronological order.
+ * A mailbox's sent and received email statistics: a period-wide summary plus a bucketed time series. `period` echoes the range and grain actually used. `data` is one row per bucket in chronological order.
  *
  */
 export type MailboxStatsResponse = {
@@ -3233,7 +3289,7 @@ export type MailboxStatsResponse = {
 };
 
 /**
- * Per-mailbox email activity for one time bucket, bucketed by event time. Sent-mail metrics carry the same delivery, engagement, and latency breakdowns as the email stats endpoints; `received` counts mail that arrived at the mailbox. Buckets with no activity are included with zero counts and null latency percentiles.
+ * Per-mailbox email activity for one time bucket, bucketed by event time. Sent-mail metrics use the same delivery, engagement, and latency breakdowns as the email stats endpoints. `received` counts mail that arrived at the mailbox. Buckets with no activity are included with zero counts and null latency percentiles.
  *
  */
 export type MailboxStatsPoint = {
@@ -3277,9 +3333,9 @@ export type EmailLatencyQuantiles = {
 /**
  * Latency percentiles (p50, p95, p99) in milliseconds for the bucket. On the summary endpoint these are computed across the whole period rather than per bucket. Three families are reported:
  *
- * - `processing`: time from accepting the send to handing the message off for delivery, covering internal queue depth and handoff. Measured per processed recipient; null when no recipient in the bucket has reached the processed stage.
- * - `delivery`: time from handoff to the receiving mail server accepting the message, dominated by recipient-side delivery behaviour. Measured per delivered recipient; null when no deliveries occurred in the bucket.
- * - `total`: end-to-end time from accepting the send to delivery, the most useful tile for a customer SLO. Measured per delivered recipient; null when no deliveries occurred in the bucket.
+ * - `processing`: Time from accepting the send to handing the message off for delivery. Measured per processed recipient; null when no recipient in the bucket has reached the processed stage.
+ * - `delivery`: Time from handoff to the receiving mail server accepting the message, dominated by recipient-side delivery behavior. Measured per delivered recipient; null when no deliveries occurred in the bucket.
+ * - `total`: End-to-end time from accepting the send to delivery, and the number most worth watching against your own delivery targets. Measured per delivered recipient; null when no deliveries occurred in the bucket.
  *
  * Each family is reported independently and is omitted entirely when no qualifying event contributed a latency measurement in the bucket (including when latency for that stage has not yet been recorded for the workspace), so `processing` can be present while `delivery` and `total` are absent. A client must handle a missing family, and a null p50/p95/p99 within a present family, by rendering a placeholder rather than assuming a number.
  *
@@ -3291,7 +3347,7 @@ export type EmailLatencyStats = {
 };
 
 /**
- * Engagement counts and rates for the scope of the containing row (a time bucket, a breakdown dimension, or the whole period). `opens`, `opens_non_prefetched` and `clicks` count distinct engagement events (deduplicated occurrences); the `unique_*` fields count distinct recipients; `unsubscribes` counts distinct unsubscribe events. Counts are attributed by event time (not send time), so an open recorded today for a message sent earlier counts in today's row. Counts are deduplicated with a scalable approximate counting method, so very large counts are close estimates rather than exact tallies. Each rate divides the counts in this scope and is null when its denominator is zero.
+ * Engagement counts and rates for the scope of the containing row (a time bucket, a breakdown dimension, or the whole period). `opens`, `opens_non_prefetched` and `clicks` count distinct engagement events (deduplicated occurrences). The `unique_*` fields count distinct recipients. `unsubscribes` counts distinct unsubscribe events. Counts are attributed by event time (not send time), so an open recorded today for a message sent earlier counts in today's row. Counts are deduplicated with a scalable approximate counting method, so very large counts are close estimates rather than exact tallies. Each rate divides the counts in this scope and is null when its denominator is zero.
  *
  */
 export type EmailEngagementStats = {
@@ -3357,7 +3413,7 @@ export type EmailBounceStatsWithRates = {
    */
   readonly soft: number;
   /**
-   * Distinct recipients bounced by an upstream policy block (relaying denied, blocklisted domain).
+   * Distinct recipients refused by a policy at the receiving end, such as relaying denied or a blocklisted domain.
    */
   readonly admin: number;
   /**
@@ -3396,12 +3452,21 @@ export type EmailBounceStatsWithRates = {
 };
 
 /**
- * Delivery pipeline counts and rates for the scope of the containing row (a time bucket, a breakdown dimension, or the whole period). Every count is the number of distinct recipients that reached the named lifecycle stage in scope (on the period summary, the sum of the per-bucket distinct counts), attributed by event time (not send time): a recipient delivered on Monday counts in Monday's row, and a recipient who bounced then succeeded on a retry can appear in both `bounced` and `delivered`. Counts are deduplicated with a scalable approximate counting method, so very large counts are close estimates rather than exact tallies. These counts are successive lifecycle stages, not interchangeable categories: `rejected` happens before any send attempt (suppression, policy, generation failure); `deferred` is a temporary in-flight delay still being retried; `bounced` (with its hard/soft/admin/block/undetermined sub-types) is a delivery failure; and `complained` is post-delivery spam feedback. Each rate is a fraction in the range 0 to 1 and is null when its denominator is zero. `accepted` is reported only where it can be attributed (time buckets and the period summary); breakdown rows omit it.
+ * Delivery counts and rates for the scope of the containing row (a time bucket, a breakdown dimension, or the whole period). Every count is the number of distinct recipients that reached the named lifecycle stage in scope (on the period summary, the sum of the per-bucket distinct counts), attributed by event time (not send time): a recipient delivered on Monday counts in Monday's row, and a recipient who bounced then succeeded on a retry can appear in both `bounced` and `delivered`. Very large counts are close estimates rather than exact tallies.
+ *
+ * These counts are successive lifecycle stages, so a recipient can appear in more than one:
+ *
+ * - `rejected`: Happens before any send attempt, from suppression, policy, or a generation failure.
+ * - `deferred`: A temporary in-flight delay that is still being retried.
+ * - `bounced`: A delivery failure, with its own hard, soft, admin, block, and undetermined sub-types.
+ * - `complained`: Post-delivery spam feedback.
+ *
+ * Each rate is a fraction in the range 0 to 1 and is null when its denominator is zero. `accepted` is reported only where it can be attributed (time buckets and the period summary). Breakdown rows omit it.
  *
  */
 export type EmailDeliveryStats = {
   /**
-   * Distinct recipients accepted for delivery after suppression filtering. Reported on time buckets and the period summary; omitted on breakdown rows, whose rollups do not carry it.
+   * Distinct recipients accepted for delivery after suppression filtering. Reported on time buckets and the period summary. Breakdown rows leave it out, because their rollups do not have it.
    */
   readonly accepted?: number;
   /**
@@ -3413,7 +3478,7 @@ export type EmailDeliveryStats = {
    */
   readonly delivered: number;
   /**
-   * Distinct recipients whose delivery failed. Approximately the sum of the five `bounces.*` sub-counts (hard, soft, admin, block, undetermined); the totals are computed independently so they may differ slightly at the approximation error.
+   * Distinct recipients whose delivery failed. This is approximately the sum of the five `bounces.*` sub-counts (hard, soft, admin, block, undetermined). The two totals are worked out independently, so they can differ slightly.
    *
    */
   readonly bounced: number;
@@ -3455,7 +3520,7 @@ export type EmailDeliveryStats = {
    */
   readonly delivery_rate: number | null;
   /**
-   * Share of this scope's delivery attempts that ultimately failed (inband or out-of-band), computed as `all_bounces / (delivered + bounced)`. Because `oob_bounces` counts events rather than recipients, `all_bounces` can exceed the attempt count; the rate is clamped to 1. Null when there were no attempts.
+   * Share of this scope's delivery attempts that ultimately failed (inband or out-of-band), computed as `all_bounces / (delivered + bounced)`. Because `oob_bounces` counts events rather than recipients, `all_bounces` can exceed the attempt count. The rate is clamped to 1. Null when there were no attempts.
    *
    */
   readonly bounce_rate: number | null;
@@ -3467,7 +3532,7 @@ export type EmailDeliveryStats = {
 };
 
 /**
- * Single-row aggregate of the mailbox's email activity across the full requested period. Counts are sums of per-bucket counts across the window; latency percentiles are computed across the whole period rather than summed per bucket. Rates are null when their denominator is zero.
+ * Single-row aggregate of the mailbox's email activity across the full requested period. Counts are sums of per-bucket counts across the window. Latency percentiles are computed across the whole period rather than summed per bucket. Rates are null when their denominator is zero.
  *
  */
 export type MailboxStatsSummary = {
@@ -3495,23 +3560,23 @@ export type StatsGrain = "day" | "hour";
  */
 export type EmailStatsSeriesPeriod = {
   /**
-   * Inclusive start of the window. A calendar day (YYYY-MM-DD, in the requested `timezone`) on the day grain; on the hour grain, an RFC 3339 UTC instant marking the start of the first hour bucket, which falls on a local hour boundary when `timezone` is set.
+   * Inclusive start of the window. A calendar day (YYYY-MM-DD, in the requested `timezone`) on the day grain. On the hour grain, an RFC 3339 UTC instant marking the start of the first hour bucket, which falls on a local hour boundary when `timezone` is set.
    */
   readonly from: string;
   /**
-   * Inclusive end of the window. A calendar day (YYYY-MM-DD, in the requested `timezone`) on the day grain; on the hour grain, an RFC 3339 UTC instant marking the start of the last hour bucket, which falls on a local hour boundary when `timezone` is set.
+   * Inclusive end of the window. A calendar day (YYYY-MM-DD, in the requested `timezone`) on the day grain. On the hour grain, an RFC 3339 UTC instant marking the start of the last hour bucket, which falls on a local hour boundary when `timezone` is set.
    */
   readonly to: string;
   readonly grain: StatsGrain;
   /**
-   * The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response is near-real-time but not live; use this field to label data freshness rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.
+   * The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.
    *
    */
   readonly data_as_of?: string | null;
 };
 
 /**
- * Fields to update on a mailbox. Omitted fields are unchanged; fields set to null are cleared. The address and domain are immutable.
+ * Fields to update on a mailbox. Omitted fields are unchanged. Fields set to null are cleared. The address and domain are immutable.
  */
 export type MailboxUpdate = {
   /**
@@ -3527,11 +3592,11 @@ export type MailboxUpdate = {
    */
   receive_policy?: "open" | "replies_only" | "allowlist" | "drop";
   /**
-   * How long the mailbox remembers message metadata and extracted text. Lowering the tier deletes memory older than the new horizon and requires `confirm=true` when messages older than the new horizon would be deleted. Only `30d` is available today; additional tiers are planned.
+   * How long the mailbox remembers message metadata and extracted text. Lowering the tier deletes remembered messages older than the new horizon, and requires `confirm=true` when that would happen.
    */
   retention_tier?: "30d";
   /**
-   * Replaces the mailbox's key/value data. Up to 2 KB; keys starting with `__bird` are reserved.
+   * Replaces the mailbox's key/value data. Up to 2 KB. Keys starting with `__bird` are reserved.
    */
   metadata?: {
     [key: string]: unknown;
@@ -3543,11 +3608,11 @@ export type MailboxUpdate = {
  */
 export type MailboxCreate = {
   /**
-   * The local part of the mailbox address (the part before `@`). Letters, digits, dots, underscores, and hyphens; stored lowercase. On the shared `inbox.ai` domain, separators must sit between letters or digits (no leading, trailing, or repeated separators), reserved names such as `postmaster` or `abuse` are unavailable, and choosing your own local part uses one of your plan's custom-handle allowance slots (generated addresses are always available). Omit to have Bird generate a random local part.
+   * The local part of the mailbox address (the part before `@`). Letters, digits, dots, underscores, and hyphens. Stored lowercase. On the shared `inbox.ai` domain, separators must sit between letters or digits (no leading, trailing, or repeated separators), reserved names such as `postmaster` or `abuse` are unavailable, and choosing your own local part uses one of your plan's custom-handle allowance slots (generated addresses are always available). Omit it and we generate a random local part.
    */
   local_part?: string;
   /**
-   * The domain the address lives under. Defaults to `inbox.ai`, Bird's shared mailbox domain, where creating the mailbox claims the address for your organization: first come, first served, and permanently reserved to your organization even after the mailbox is deleted. May instead name one of your own domains that is enabled for receiving email.
+   * The domain the address lives under. Defaults to `inbox.ai`, our shared mailbox domain, where creating the mailbox claims the address for your organization: first come, first served, and permanently reserved to your organization even after the mailbox is deleted. May instead name one of your own domains that is enabled for receiving email.
    */
   domain?: string;
   /**
@@ -3559,15 +3624,23 @@ export type MailboxCreate = {
    */
   default_reply_to?: string;
   /**
-   * Which inbound mail the mailbox accepts. `open` accepts everything not blocked by a rule; `replies_only` accepts only replies to messages this mailbox has sent (a reply must match a message the mailbox sent, not merely land in an existing thread); `allowlist` accepts only senders matching an allow rule; `drop` stores nothing.
+   * Which inbound mail the mailbox accepts:
+   *
+   * - `open`: Accepts everything not blocked by a rule.
+   * - `replies_only`: Accepts only replies to messages this mailbox has
+   * sent. A reply must match a message the mailbox sent. Landing in an
+   * existing thread by itself does not count.
+   * - `allowlist`: Accepts only senders matching an allow rule.
+   * - `drop`: Stores nothing.
+   *
    */
   receive_policy?: "open" | "replies_only" | "allowlist" | "drop";
   /**
-   * How long the mailbox remembers message metadata and extracted text. Original rendered source is always available for 30 days regardless of tier. Only `30d` is available today; additional tiers are planned.
+   * How long the mailbox remembers message metadata and extracted text. Original rendered source is always available for 30 days regardless of tier.
    */
   retention_tier?: "30d";
   /**
-   * Your own key/value data to attach to the mailbox. Up to 2 KB; keys starting with `__bird` are reserved.
+   * Your own key/value data to attach to the mailbox. Up to 2 KB. Keys starting with `__bird` are reserved.
    */
   metadata?: {
     [key: string]: unknown;
@@ -3616,11 +3689,20 @@ export type Mailbox = {
    */
   default_reply_to: string | null;
   /**
-   * Which inbound mail the mailbox accepts. `open` accepts everything not blocked by a rule; `replies_only` accepts only replies to messages this mailbox has sent (a reply must match a message the mailbox sent, not merely land in an existing thread); `allowlist` accepts only senders matching an allow rule (replies to prior outbound are always admitted unless blocked); `drop` stores nothing.
+   * Which inbound mail the mailbox accepts:
+   *
+   * - `open`: Accepts everything not blocked by a rule.
+   * - `replies_only`: Accepts only replies to messages this mailbox has
+   * sent. A reply must match a message the mailbox sent. Landing in an
+   * existing thread by itself does not count.
+   * - `allowlist`: Accepts only senders matching an allow rule. Replies to
+   * prior outbound mail are always admitted unless blocked.
+   * - `drop`: Stores nothing.
+   *
    */
   receive_policy: "open" | "replies_only" | "allowlist" | "drop";
   /**
-   * Lifecycle state. Suspended mailboxes stop emitting events; inbound mail is retained as blocked.
+   * Lifecycle state. Suspended mailboxes stop emitting events. Inbound mail is retained as blocked.
    */
   readonly state: "active" | "suspended";
   /**
@@ -3633,7 +3715,7 @@ export type Mailbox = {
    */
   readonly inbound_address_id: InboundAddressId;
   /**
-   * How long the mailbox remembers message metadata and extracted text. Original rendered source (HTML, raw message, attachments) is always available for 30 days regardless of tier. `3y` and `10y` are reserved future tiers.
+   * How long the mailbox remembers message metadata and extracted text. Original rendered source (HTML, raw message, attachments) is always available for 30 days regardless of tier.
    */
   retention_tier: "30d" | "90d" | "1y";
   /**
@@ -3650,13 +3732,13 @@ export type Mailbox = {
    */
   readonly unread_thread_count?: number | null;
   /**
-   * Your own key/value data attached to the mailbox. Up to 2 KB; keys starting with `__bird` are reserved.
+   * Your own key/value data attached to the mailbox. Up to 2 KB. Keys starting with `__bird` are reserved.
    */
   metadata: {
     [key: string]: unknown;
   };
   /**
-   * Whether Bird generated the local part of the address. `false` means a custom handle was chosen at creation; on the shared `inbox.ai` domain a custom handle counts against your plan's custom-handle allowance.
+   * Whether we generated the local part of the address. `false` means a custom handle was chosen at creation. On the shared `inbox.ai` domain a custom handle counts against your plan's custom-handle allowance.
    */
   readonly local_part_generated?: boolean;
   /**
@@ -3674,7 +3756,7 @@ export type Mailbox = {
 };
 
 /**
- * The attachments on a received email. Not paginated — a message carries a small, bounded set of attachments, all returned at once.
+ * The attachments on a received email. There is no pagination here, because a message only has a small number of attachments and they all come back at once.
  */
 export type InboundAttachmentList = {
   /**
@@ -3686,7 +3768,7 @@ export type InboundAttachmentList = {
 export type InboundAttachmentId = string;
 
 /**
- * Metadata for a file attached to a received email. The raw bytes are fetched separately with `GET /v1/email/inbound-messages/{id}/attachments/{attachment_id}`.
+ * Metadata for a file attached to a received email. The raw bytes are fetched separately with `GET /v1/email/inbound-messages/{inbound_message_id}/attachments/{attachment_id}`.
  *
  */
 export type InboundAttachment = {
@@ -3730,7 +3812,7 @@ export type InboundEmailMessageList = {
 } & ListEnvelope;
 
 /**
- * An email Bird received on your behalf, parsed from the original message. Fetch the body with `/body`, the original MIME with `/raw`, and attachment bytes with `/attachments/{attachment_id}`.
+ * An email received on your behalf, parsed from the original message. Fetch the body with `/body`, the original MIME with `/raw`, and attachment bytes with `/attachments/{attachment_id}`.
  *
  */
 export type InboundEmailMessage = {
@@ -3759,36 +3841,40 @@ export type InboundEmailMessage = {
    */
   message_id: string | null;
   /**
-   * In-Reply-To header — the Message-ID this message replies to, or null when it is not a reply.
+   * The In-Reply-To header, which holds the Message-ID this message is replying to. Null when the message is not a reply.
    */
   in_reply_to: string | null;
   /**
-   * References header — the chain of Message-IDs in this conversation, oldest first. Absent when the message had no References header.
+   * The References header, which holds every Message-ID in this conversation, oldest first. Left out when the message arrived without one.
    */
   references?: Array<string>;
   /**
-   * Conversation this message belongs to. Always null until threading is available.
+   * Conversation this message belongs to, or null when it is not grouped into one.
    */
   thread_id: string | null;
   /**
-   * Whether the sender of the received message was authenticated. `pass` means the sender's identity was verified; `fail` means it was checked and did not verify; `unknown` means no verdict is available and the sender should not be treated as verified.
+   * Whether the sender of the received message was authenticated:
+   *
+   * - `pass`: The sender's identity was verified.
+   * - `fail`: The sender's identity was checked and did not verify.
+   * - `unknown`: No verdict is available, so the sender should not be treated as verified.
    *
    */
   authentication: "pass" | "fail" | "unknown" | null;
   /**
-   * Whether SPF passed for the sender, parsed from the message's authentication results. Null when the result did not carry an SPF verdict.
+   * Whether SPF passed for the sender, parsed from the message's authentication results. Null when the authentication results did not include an SPF verdict.
    */
   spf_pass: boolean | null;
   /**
-   * Whether DKIM passed for the sender, parsed from the message's authentication results. Null when the result did not carry a DKIM verdict.
+   * Whether DKIM passed for the sender, parsed from the message's authentication results. Null when the authentication results did not include a DKIM verdict.
    */
   dkim_pass: boolean | null;
   /**
-   * Whether DMARC passed for the sender, parsed from the message's authentication results. Null when the result did not carry a DMARC verdict.
+   * Whether DMARC passed for the sender, parsed from the message's authentication results. Null when the authentication results did not include a DMARC verdict.
    */
   dmarc_pass: boolean | null;
   /**
-   * Spam score for the message. Always null at present; reserved for a future content-scoring capability.
+   * Spam score on the received message, or null when there is no score.
    */
   spam_score: number | null;
   /**
@@ -3796,7 +3882,7 @@ export type InboundEmailMessage = {
    */
   attachments: Array<InboundAttachment>;
   /**
-   * When Bird received the message.
+   * When the message was received.
    */
   readonly received_at: string;
 };
@@ -3806,7 +3892,7 @@ export type InboundEmailMessage = {
  */
 export type InboundAddressUpdate = {
   /**
-   * Your own label for this address, typically the source mailbox it maps to. Send `null` to clear it; omit the field to leave it unchanged.
+   * Your own label for this address, typically the source mailbox it maps to. Send `null` to clear it. Omit the field to leave it unchanged.
    */
   label?: string | null;
 };
@@ -3829,7 +3915,7 @@ export type InboundAddressList = {
 } & ListEnvelope;
 
 /**
- * A Bird-minted email address that receives mail on your behalf. Forward a real mailbox (for example, a support inbox) to this address and Bird parses every message it receives into a received email.
+ * An email address we create for you, which receives mail on your behalf. Forward a real mailbox (for example, a support inbox) to this address, and every message that arrives there is parsed into a received email you can read back.
  *
  */
 export type InboundAddress = {
@@ -3838,7 +3924,7 @@ export type InboundAddress = {
    */
   readonly id: InboundAddressId;
   /**
-   * The address to forward your mailbox to. Minted by Bird when the inbound address is created.
+   * The address to forward your mailbox to. We generate it when the inbound address is created.
    */
   readonly address: string;
   /**
@@ -3872,7 +3958,17 @@ export type SuppressionList = {
 
 export type SuppressionScope = {
   /**
-   * The scope this suppression applies to. Suppressions are currently workspace-scoped; the other scope types are reserved for future use.
+   * How wide this suppression reaches. It is always `workspace`, which
+   * means the address is blocked for every email your workspace sends.
+   * The `id` beside it is then your workspace ID.
+   *
+   * This only affects email. Your WhatsApp suppressions are a separate
+   * list, and blocking an address here does nothing to them.
+   *
+   * The enum lists five narrower values as well: `category`, `audience`,
+   * `topic`, `contact` and `domain`. You will never get one of them back,
+   * because every suppression is workspace-wide. If you are writing code,
+   * you can treat this field as always reading `workspace`.
    *
    */
   type: "workspace" | "category" | "audience" | "topic" | "contact" | "domain";
@@ -3891,17 +3987,35 @@ export type Suppression = {
   email: string;
   scope: SuppressionScope;
   /**
-   * Why the address is suppressed: `hard_bounce` (a delivery permanently failed), `complaint` (the recipient reported a message as spam), `unsubscribe` (the recipient opted out), or `manual` (added through the API or dashboard). An address can hold one record per reason. This list grows over time; treat unknown values as informational rather than rejecting the record.
+   * Why the address is suppressed:
+   *
+   * - `hard_bounce`: A delivery permanently failed.
+   * - `complaint`: The recipient reported a message as spam.
+   * - `unsubscribe`: The recipient opted out.
+   * - `manual`: Added through the API or dashboard.
+   *
+   * An address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.
    *
    */
   reason: string;
   /**
-   * How the suppression came to exist: `bounce_event` (created automatically from a hard bounce), `complaint_event` (from a spam complaint), `unsubscribe_event` (from an unsubscribe reported for a message, such as the recipient's mail client's unsubscribe action), `unsubscribe_link` (the recipient opted out through the unsubscribe page linked from a message), `api_key` (added through the API with an API key), or `user` (added by a user in the dashboard). This list grows over time; treat unknown values as informational rather than rejecting the record.
+   * How the suppression came to exist:
+   *
+   * - `bounce_event`: Created automatically from a hard bounce.
+   * - `complaint_event`: Created from a spam complaint.
+   * - `unsubscribe_event`: Created from an unsubscribe reported for a
+   * message, such as the recipient's mail client's unsubscribe action.
+   * - `unsubscribe_link`: The recipient opted out through the unsubscribe
+   * page linked from a message.
+   * - `api_key`: Added through the API with an API key.
+   * - `user`: Added by a user in the dashboard.
+   *
+   * This list grows over time. Treat unknown values as informational rather than rejecting the record.
    *
    */
   origin: string;
   /**
-   * Which sends the suppression blocks. `all` blocks every message category, including transactional. `non_transactional` blocks marketing and future non-transactional categories but allows transactional, so a recipient who complained or unsubscribed can still receive mail like password resets. `category` is reserved for category-specific preferences. This list grows over time; treat an unknown value as blocking at least non-transactional mail.
+   * Which sends the suppression blocks. `all` blocks every message category, including transactional. `non_transactional` blocks marketing but allows transactional, so a recipient who complained or unsubscribed can still receive mail like password resets. `category` scopes the block to a preference category and blocks every category until one is set. This list grows over time, and any value other than `non_transactional` blocks every category, so treat an unknown value as blocking the send.
    *
    */
   applies_to: string;
@@ -4322,18 +4436,18 @@ export type EmailStatsByBroadcastResponse = {
    */
   readonly data: Array<EmailBroadcastStatsPoint>;
   /**
-   * Total number of distinct broadcasts with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct broadcasts with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
    *
    */
   readonly total: number;
 };
 
 /**
- * Aggregate delivery, engagement, and latency stats for the messages of a single broadcast over the requested period.
+ * Delivery, engagement and latency figures for one broadcast's messages over the period you asked for.
  */
 export type EmailBroadcastStatsPoint = {
   /**
-   * The broadcast this row aggregates, the same identifier returned by the broadcast endpoints. Only messages sent as part of a broadcast carry a broadcast identifier; one-off and transactional sends are not included in this breakdown.
+   * The broadcast this row covers, the same ID the broadcast endpoints return. Only mail sent as part of a broadcast has a broadcast ID, so one-off and transactional sends do not appear in this breakdown at all.
    */
   readonly broadcast_id: string;
   readonly delivery: EmailDeliveryStats;
@@ -4342,7 +4456,7 @@ export type EmailBroadcastStatsPoint = {
 };
 
 /**
- * The date range the server actually computed against. Echoed back so clients can render the period without tracking it themselves and so cached responses can be keyed by what was queried.
+ * The date range this response was actually computed against. Echoed back so clients can render the period without tracking it themselves and so cached responses can be keyed by what was queried.
  *
  */
 export type EmailStatsPeriod = {
@@ -4355,7 +4469,7 @@ export type EmailStatsPeriod = {
    */
   readonly to: string;
   /**
-   * The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response is near-real-time but not live; use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.
+   * The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.
    *
    */
   readonly data_as_of?: string | null;
@@ -4374,14 +4488,14 @@ export type EmailStatsByComplaintTypeResponse = {
    */
   readonly data: Array<EmailComplaintTypeStatsPoint>;
   /**
-   * Total number of distinct feedback types with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct feedback types with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
    *
    */
   readonly total: number;
 };
 
 /**
- * Complaint counts for a single feedback-loop complaint type over the requested period. A complaint type is recorded only on spam-complaint events, so this breakdown reports the complained count for each type and nothing else (a complaint event carries no delivery or engagement context to aggregate).
+ * Complaint counts for a single feedback-loop complaint type over the requested period. A complaint type is recorded only on spam-complaint events, so this breakdown reports the complained count for each type and nothing else. A complaint event has no delivery or engagement information attached to it, so there is nothing else here to count.
  *
  */
 export type EmailComplaintTypeStatsPoint = {
@@ -4408,7 +4522,7 @@ export type EmailStatsByBounceCodeResponse = {
    */
   readonly data: Array<EmailBounceCodeStatsPoint>;
   /**
-   * Total number of distinct SMTP error codes with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct SMTP error codes with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
    *
    */
   readonly total: number;
@@ -4430,7 +4544,7 @@ export type EmailBounceStats = {
    */
   readonly soft: number;
   /**
-   * Distinct recipients bounced by an upstream policy block (relaying denied, blocklisted domain). Triage usually focuses on content or sender configuration rather than recipient cleanup.
+   * Distinct recipients refused by a policy at the receiving end, such as relaying denied or a blocklisted domain. Fixing these usually means changing your content or your sender configuration, not cleaning up the recipient list.
    *
    */
   readonly admin: number;
@@ -4447,7 +4561,7 @@ export type EmailBounceStats = {
 };
 
 /**
- * Bounce counts for a single SMTP status code over the requested period, with the per-type breakdown. This is a deliverability-debugging view keyed on what the receiving server returned, so it reports the failure side only (bounced recipients and their hard/soft/admin/block/undetermined split) and carries no delivered, open, or rate fields.
+ * Bounce counts for a single SMTP status code over the requested period, with the per-type breakdown. This is a deliverability-debugging view keyed on what the receiving mail server returned, so it only reports the failure side: bounced recipients, and their `hard`, `soft`, `admin`, `block`, and `undetermined` split. It has no delivered, open, or rate fields.
  *
  */
 export type EmailBounceCodeStatsPoint = {
@@ -4456,7 +4570,7 @@ export type EmailBounceCodeStatsPoint = {
    */
   readonly smtp_error_code: string;
   /**
-   * Distinct recipients whose delivery failed with this SMTP status code. Approximately the sum of the five `bounces.*` sub-counts; the totals are computed independently so they may differ slightly at the approximation error.
+   * Distinct recipients whose delivery failed with this SMTP status code, approximately equal to the sum of the five `bounces.*` sub-counts. The two are computed independently, so they can differ slightly because of approximation.
    */
   readonly bounced: number;
   readonly bounces: EmailBounceStats;
@@ -4475,14 +4589,14 @@ export type EmailStatsByClientResponse = {
    */
   readonly data: Array<EmailClientStatsPoint>;
   /**
-   * Total number of distinct values of the requested `group_by` facet with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct values of the requested `group_by` facet with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
    *
    */
   readonly total: number;
 };
 
 /**
- * Open and click counts for a breakdown row whose dimension is resolved from engagement events only. `opens`, `opens_non_prefetched` and `clicks` count distinct engagement events (deduplicated occurrences); the `unique_*` fields count distinct recipients. Rates and unsubscribe counts are not included: there is no per-dimension delivered denominator for a rate, and unsubscribe events do not carry the engagement context this breakdown is keyed on.
+ * Open and click counts for a breakdown row whose dimension is resolved from engagement events only. `opens`, `opens_non_prefetched`, and `clicks` count events, not people: the same recipient opening or clicking more than once counts each time. The `unique_*` fields count distinct recipients instead, so a recipient who opened five times only counts once there. Rates and unsubscribe counts are not included here. There is no per-dimension delivered count to use as a rate's denominator, and an unsubscribe event has none of the information this breakdown is grouped by, so it cannot be placed on a row.
  *
  */
 export type EmailEngagementCounts = {
@@ -4515,20 +4629,20 @@ export type EmailEngagementCounts = {
 };
 
 /**
- * Engagement counts for messages opened or clicked from a single email client, operating system, or device type over the requested period. The reading environment is resolved from open and click events only, so this breakdown reports engagement activity (opens, clicks, and the recipients behind them); it carries no delivery counts and no open/click rates, because the receiving mail server reports delivery without a client or device, leaving no per-client delivered denominator to divide by. Exactly one of `email_client`, `os`, and `device_type` is populated, selected by the request's `group_by`; the other two are null. Engagement environment is detected from the opening client and is subject to the same inbox-privacy prefetch effects as the open counts (the `opens_non_prefetched` figure excludes auto-fetched opens).
+ * Engagement counts for messages opened or clicked from a single email client, operating system, or device type over the requested period. The reading environment is resolved from open and click events only, so this breakdown reports engagement activity: opens, clicks, and the recipients behind them. It has no delivery counts and no open or click rates, because the receiving mail server reports delivery without a client or device, so there is no per-client delivered denominator to divide by. Exactly one of `email_client`, `os`, and `device_type` is populated, selected by the request's `group_by`. The other two are null. The detected client is also affected by inbox-privacy prefetching, the same way open counts are: `opens_non_prefetched` excludes opens that were auto-fetched by an inbox privacy feature rather than by a person actually opening the message.
  *
  */
 export type EmailClientStatsPoint = {
   /**
-   * The mail client this row aggregates (for example `Gmail`, `Apple Mail`, `Outlook`). Populated only when `group_by=email_client`; null otherwise.
+   * The mail client this row aggregates (for example `Gmail`, `Apple Mail`, `Outlook`). Populated only when `group_by=email_client`. Null otherwise.
    */
   readonly email_client: string | null;
   /**
-   * The operating system this row aggregates (for example `iOS`, `Android`, `Windows`, `macOS`). Populated only when `group_by=os`; null otherwise.
+   * The operating system this row aggregates (for example `iOS`, `Android`, `Windows`, `macOS`). Populated only when `group_by=os`. Null otherwise.
    */
   readonly os: string | null;
   /**
-   * The device type this row aggregates (for example `mobile`, `desktop`, `tablet`). Populated only when `group_by=device_type`; null otherwise.
+   * The device type this row aggregates (for example `mobile`, `desktop`, `tablet`). Populated only when `group_by=device_type`. Null otherwise.
    */
   readonly device_type: string | null;
   readonly engagement: EmailEngagementCounts;
@@ -4547,14 +4661,14 @@ export type EmailStatsByLocationResponse = {
    */
   readonly data: Array<EmailLocationStatsPoint>;
   /**
-   * Total number of distinct locations at the requested `group_by` level with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct locations at the requested `group_by` level with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
    *
    */
   readonly total: number;
 };
 
 /**
- * Open and click counts for messages engaged with from a single location over the requested period. Location is resolved from open and click events only, so this breakdown reports engagement activity (opens, clicks, and the recipients behind them); it carries no delivery counts and no open/click rates, because the receiving mail server reports delivery without a recipient location, leaving no per-location delivered denominator to divide by. Each row always includes all three of `country`, `region`, and `city`; the levels below the requested `group_by` are null.
+ * Open and click counts for messages engaged with from a single location over the requested period. Location is resolved from open and click events only, so this breakdown reports engagement activity: opens, clicks, and the recipients behind them. It has no delivery counts and no open or click rates, because the receiving mail server reports delivery without a recipient location, so there is no per-location delivered denominator to divide by. Each row always includes all three of `country`, `region`, and `city`; the levels below the requested `group_by` are null.
  *
  */
 export type EmailLocationStatsPoint = {
@@ -4586,26 +4700,29 @@ export type EmailEngagementSortMetric =
   | "unique_clicks";
 
 /**
- * Per-template breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * A breakdown of stats per template for the requested period. Rows are ranked by the `sort` metric (`processed` by default) descending, and capped at the requested `limit` (50 by default, 200 at most).
+ *
  */
 export type EmailStatsByTemplateResponse = {
   /**
-   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   * The date range this response covers, echoed back from what you requested, plus `data_as_of`: how far the underlying data is currently up to date.
+   *
    */
   period: EmailStatsPeriod;
   /**
-   * Template breakdown rows, ranked by the `sort` metric (default `processed`) descending. Empty when no templated messages were active in the period.
+   * One row per template, ranked by the `sort` metric (`processed` by default) descending. Empty when no messages were sent with a template during the period.
+   *
    */
   readonly data: Array<EmailTemplateStatsPoint>;
   /**
-   * Total number of distinct templates with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   * How many distinct templates had activity in the period, regardless of `limit`. When this is higher than the number of rows in `data`, the ranking got cut off. Raise `limit` (up to 200), or narrow the date range, to see the rest.
    *
    */
   readonly total: number;
 };
 
 /**
- * One point in a breakdown row's trend series: the headline delivery and engagement rates for that row's dimension value over a single day or hour. Returned only when `include_trend=true`; the bucket grain (day or hour) follows the `trend_grain` parameter. Counts and rates are approximate at scale.
+ * One point in a breakdown row's trend series: the headline delivery and engagement rates for that row's dimension value over a single day or hour. Returned only when `include_trend=true`. The bucket grain (day or hour) follows the `trend_grain` parameter. Counts and rates are approximate at scale.
  *
  */
 export type EmailStatsSeriesPoint = {
@@ -4630,15 +4747,15 @@ export type EmailStatsSeriesPoint = {
    */
   readonly bounce_rate: number | null;
   /**
-   * Complaint rate for this bucket, as a fraction; event-time attribution can push it above 1 when complaints outrun the bucket's deliveries. Null when nothing was delivered in the bucket. On a sending-IP row complaints are not attributed to the IP, so this reads 0 in buckets that had deliveries and null in buckets that had none.
+   * Complaint rate for this bucket, as a fraction. Event-time attribution can push it above 1 when complaints outrun the bucket's deliveries. Null when nothing was delivered in the bucket. On a sending-IP row complaints are not attributed to the IP, so this reads 0 in buckets that had deliveries and null in buckets that had none.
    */
   readonly complaint_rate: number | null;
   /**
-   * Open rate for this bucket, as a fraction; event-time attribution can push it above 1 when opens outrun the bucket's deliveries. Null when nothing was delivered in the bucket. On a sending-IP row engagement is not attributed to the IP, so this reads 0 in buckets that had deliveries and null in buckets that had none.
+   * Open rate for this bucket, as a fraction. Event-time attribution can push it above 1 when opens outrun the bucket's deliveries. Null when nothing was delivered in the bucket. On a sending-IP row engagement is not attributed to the IP, so this reads 0 in buckets that had deliveries and null in buckets that had none.
    */
   readonly open_rate: number | null;
   /**
-   * Click rate for this bucket, as a fraction; event-time attribution can push it above 1 when clicks outrun the bucket's deliveries. Null when nothing was delivered in the bucket. On a sending-IP row engagement is not attributed to the IP, so this reads 0 in buckets that had deliveries and null in buckets that had none.
+   * Click rate for this bucket, as a fraction. Event-time attribution can push it above 1 when clicks outrun the bucket's deliveries. Null when nothing was delivered in the bucket. On a sending-IP row engagement is not attributed to the IP, so this reads 0 in buckets that had deliveries and null in buckets that had none.
    */
   readonly click_rate: number | null;
 };
@@ -4646,18 +4763,20 @@ export type EmailStatsSeriesPoint = {
 export type EmailTemplateId = string;
 
 /**
- * Aggregate delivery, engagement, and latency stats for the messages sent with a single template over the requested period.
+ * Delivery, engagement, and latency numbers for every message sent with one template over the requested period.
  */
 export type EmailTemplateStatsPoint = {
   /**
-   * The template this row aggregates, the same identifier returned by the email-template endpoints. Only messages sent with a template appear in this breakdown; a template deleted after sending still appears by its ID.
+   * The template this row is about, using the same `id` the email template endpoints return. Only messages sent with a template appear in this breakdown at all. If the template was deleted after it was used to send, this row still appears, keyed by that same `id`.
+   *
    */
   readonly template_id: EmailTemplateId;
   readonly delivery: EmailDeliveryStats;
   readonly engagement: EmailEngagementStats;
   readonly latency: EmailLatencyStats;
   /**
-   * Per-bucket rate series for this template over the window. Present only when `include_trend=true`.
+   * A short series of this template's delivery and engagement rates, one point per time bucket over the window. Only present when you set `include_trend=true` on the request.
+   *
    */
   readonly trend?: Array<EmailStatsSeriesPoint>;
 };
@@ -4675,7 +4794,7 @@ export type EmailStatsByRecipientDomainResponse = {
    */
   readonly data: Array<EmailRecipientDomainStatsPoint>;
   /**
-   * Total number of distinct recipient domains with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct recipient domains with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
    *
    */
   readonly total: number;
@@ -4711,7 +4830,7 @@ export type EmailStatsByMailboxProviderRegionResponse = {
    */
   readonly data: Array<EmailMailboxProviderRegionStatsPoint>;
   /**
-   * Total number of distinct mailbox provider and region pairs with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct mailbox provider and region pairs with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
    *
    */
   readonly total: number;
@@ -4720,10 +4839,10 @@ export type EmailStatsByMailboxProviderRegionResponse = {
 /**
  * Latency percentiles (p50, p95, p99) in milliseconds for the messages in this breakdown row, for breakdowns whose dimension is known only from delivery onward (sending IP, mailbox provider).
  *
- * - `delivery`: time from handing the message off to the receiving mail server accepting it. Null when no deliveries occurred for this row in the period.
- * - `total`: end-to-end time from accepting the send to delivery. Null when no deliveries occurred for this row in the period.
+ * - `delivery`: Time from handing the message off to the receiving mail server accepting it. Null when no deliveries occurred for this row in the period.
+ * - `total`: End-to-end time from accepting the send to delivery. Null when no deliveries occurred for this row in the period.
  *
- * These breakdowns have no `processing` latency family. Bird only learns a row's dimension (the sending IP or recipient mailbox provider) after the upstream mail-transfer system reports delivery, bounce, deferral, or late bounce; the accept-to-processed phase happens before that binding decision, so it cannot be attributed to the dimension. Use `GET /v1/email/stats/daily` for workspace-wide processing-latency percentiles.
+ * These breakdowns have no `processing` latency family. Which row a message belongs to, meaning which sending IP carried it or which mailbox provider received it, is only known once the receiving mail server has reported back with a delivery, a bounce, a deferral or a late bounce. The accept-to-processed phase is over before then, so there is no way to attribute it to a row. Use `GET /v1/email/stats/daily` for processing-latency percentiles across the whole workspace.
  *
  */
 export type EmailDeliveryLatencyStats = {
@@ -4732,7 +4851,7 @@ export type EmailDeliveryLatencyStats = {
 };
 
 /**
- * Delivery counts and rates for messages attributed to a single recipient mailbox provider. Per-provider results do not include `accepted` or `processed` counts because Bird only learns the recipient's mailbox provider after the upstream mail transfer system reports delivery/bounce/deferral/late bounce. Earlier lifecycle states (accepted, processed) cannot be attributed to a specific provider.
+ * Delivery counts and rates for messages attributed to a single recipient mailbox provider. Per-provider results do not include `accepted` or `processed` counts, because we only learn the recipient's mailbox provider once the receiving mail server reports delivery, a bounce, a deferral, or a late bounce. Earlier lifecycle states (accepted, processed) cannot be attributed to a specific provider.
  *
  */
 export type EmailMailboxProviderDeliveryStats = {
@@ -4805,19 +4924,19 @@ export type EmailStatsByMailboxProviderResponse = {
    */
   readonly data: Array<EmailMailboxProviderStatsPoint>;
   /**
-   * Total number of distinct mailbox providers with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct mailbox providers with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
    *
    */
   readonly total: number;
 };
 
 /**
- * Delivery, engagement, and deliverability stats for messages grouped by a single recipient mailbox provider (`gmail`, `microsoft`, `yahoo`, `apple`, ...) over the requested period. A recipient's mailbox provider is reported by the receiving mail system, so per-provider rows cover the delivery stage onward: they omit the `accepted` and `processed` counts and the `processing` latency family, which never appear (they are not returned as null). Engagement (opens, clicks, and their rates) is included because those events are post-delivery and carry the mailbox provider.
+ * Delivery, engagement, and deliverability stats for messages grouped by a single recipient mailbox provider (`gmail`, `microsoft`, `yahoo`, `apple`, ...) over the requested period. We learn a recipient's mailbox provider from the receiving mail server, so per-provider rows cover the delivery stage onward: they omit the `accepted` and `processed` counts and the `processing` latency family, which never appear at all rather than appearing as null. Engagement (opens and clicks, and their rates) is included because those events happen after delivery, once the mailbox provider is already known.
  *
  */
 export type EmailMailboxProviderStatsPoint = {
   /**
-   * The recipient mailbox provider this row aggregates, as a lowercased classifier bucket (e.g. `gmail`, `yahoo`, `microsoft`, `apple`). The set is open and grows as new providers are categorised.
+   * The recipient mailbox provider this row aggregates, as a lowercased classifier bucket (e.g. `gmail`, `yahoo`, `microsoft`, `apple`). The set is open and grows as new providers are categorized.
    */
   readonly mailbox_provider: string;
   readonly delivery: EmailMailboxProviderDeliveryStats;
@@ -4830,7 +4949,7 @@ export type EmailMailboxProviderStatsPoint = {
 };
 
 /**
- * Metric to rank rows by, applied descending. Shared by the breakdowns whose attribution begins at delivery (mailbox providers, mailbox provider regions): `processed`, `rejected`, and `oob_bounces` are not part of those rows, so they are not sortable. Any count or rate the rows carry may be used; rows whose rate is undefined (zero denominator) sort last. Bounce sub-types are addressed by their nested location in each row, for example `bounces.hard` and `bounces.hard_rate`.
+ * Metric to rank rows by, applied descending. Shared by the breakdowns whose attribution begins at delivery (mailbox providers, mailbox provider regions): `processed`, `rejected`, and `oob_bounces` are not part of those rows, so they are not sortable. Any count or rate on the row can be used; rows whose rate is undefined (zero denominator) sort last. Bounce sub-types use their nested location in each row, for example `bounces.hard` and `bounces.hard_rate`.
  *
  */
 export type EmailMailboxProviderSortMetric =
@@ -4875,7 +4994,7 @@ export type EmailStatsByCategoryResponse = {
    */
   readonly data: Array<EmailCategoryStatsPoint>;
   /**
-   * Total number of distinct categories with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct categories with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
    *
    */
   readonly total: number;
@@ -4886,7 +5005,7 @@ export type EmailStatsByCategoryResponse = {
  */
 export type EmailCategoryStatsPoint = {
   /**
-   * The category this row aggregates, as set at send time. `transactional` is one-to-one mail triggered by a user action; `marketing` is bulk sending. New categories may be added over time.
+   * The category this row aggregates, as set at send time. `transactional` is one-to-one mail triggered by a user action. `marketing` is bulk sending. New categories may be added over time.
    */
   readonly category: string;
   readonly delivery: EmailDeliveryStats;
@@ -4911,7 +5030,7 @@ export type EmailStatsBySendingDomainResponse = {
    */
   readonly data: Array<EmailSendingDomainStatsPoint>;
   /**
-   * Total number of distinct sending domains with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct sending domains with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
    *
    */
   readonly total: number;
@@ -4947,14 +5066,14 @@ export type EmailStatsBySendingIpResponse = {
    */
   readonly data: Array<EmailSendingIpStatsPoint>;
   /**
-   * Total number of distinct sending IP addresses with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct sending IP addresses with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
    *
    */
   readonly total: number;
 };
 
 /**
- * Delivery counts and rates for messages attributed to a single sending IP. Per-IP results do not include `accepted` or `processed` counts because Bird only learns which sending IP a message used after the upstream mail transfer system reports delivery/bounce/deferral/late bounce. Earlier lifecycle states (accepted, processed) cannot be attributed to a specific IP. Spam complaints and out-of-band bounce notifications are also not attributed per IP on this breakdown, so `complained` and `oob_bounces` read 0 (their rates read 0 where the denominator is non-zero, null where it is zero), `effective_delivered` equals `delivered`, and `all_bounces` equals `bounced`.
+ * Delivery counts and rates for messages attributed to a single sending IP. Per-IP results do not include `accepted` or `processed` counts: we only learn which sending IP a message used once it has been delivered, bounced, deferred, or bounced late, so those earlier lifecycle states cannot be attributed to a specific IP. Spam complaints and out-of-band bounce notifications are also not attributed per IP on this breakdown, so `complained` and `oob_bounces` read 0 (their rates read 0 where the denominator is non-zero, null where it is zero), `effective_delivered` equals `delivered`, and `all_bounces` equals `bounced`.
  *
  */
 export type EmailSendingIpDeliveryStats = {
@@ -4963,11 +5082,11 @@ export type EmailSendingIpDeliveryStats = {
    */
   readonly delivered: number;
   /**
-   * Distinct recipients whose delivery failed. Approximately the sum of the five `bounces.*` sub-counts (hard, soft, admin, block, undetermined); the totals are computed independently so they may differ slightly at the approximation error.
+   * Distinct recipients whose delivery failed. This is approximately the sum of the five `bounces.*` sub-counts (hard, soft, admin, block, undetermined). The two are computed independently, so they can differ slightly.
    */
   readonly bounced: number;
   /**
-   * Distinct recipients who reported the message as spam. Complaints are not attributed to a sending IP, so this reads 0 on this breakdown; read complaint counts from the summary or time-series statistics instead.
+   * Distinct recipients who reported the message as spam. Complaints are not attributed to a sending IP, so this reads 0 on this breakdown. Read complaint counts from the summary or time-series statistics instead.
    */
   readonly complained: number;
   /**
@@ -4975,7 +5094,7 @@ export type EmailSendingIpDeliveryStats = {
    */
   readonly deferred: number;
   /**
-   * Out-of-band bounce events: failure notifications received after the receiving server had initially confirmed delivery. Not attributed to a sending IP on this breakdown, so this reads 0; workspace-wide out-of-band counts are on the summary and time-series statistics.
+   * Out-of-band bounce events: failure notifications received after the receiving server had initially confirmed delivery. Not attributed to a sending IP on this breakdown, so this reads 0. Workspace-wide out-of-band counts are on the summary and time-series statistics.
    *
    */
   readonly oob_bounces: number;
@@ -5012,7 +5131,7 @@ export type EmailSendingIpDeliveryStats = {
 export type IpPoolId = string;
 
 /**
- * Delivery and latency stats for messages sent from a single IP address over the requested period. Per-IP attribution begins only after a message is processed: the upstream mail-transfer system reports the IP it used on delivery, bounce, deferral, and late-bounce events, but not at acceptance or processing time. As a result, per-IP rows omit the `accepted` and `processed` counts and the `processing` latency family, which never appear (they are not returned as null).
+ * Delivery and latency stats for messages sent from a single IP address over the requested period. Per-IP attribution begins only after a message is processed: we learn which IP a message used only from its delivery, bounce, deferral, and late-bounce events, not from its acceptance or processing. As a result, per-IP rows omit the `accepted` and `processed` counts and the `processing` latency family. Those fields never appear on a per-IP row. They are not returned as null.
  *
  */
 export type EmailSendingIpStatsPoint = {
@@ -5034,9 +5153,21 @@ export type EmailSendingIpStatsPoint = {
 };
 
 /**
- * Single-row aggregate across the full requested period, including delivery and engagement counts plus derived rates. Use this endpoint for KPI tiles, campaign reporting, and any metric that needs a meaningful denominator; the daily and hourly endpoints carry the same rates per bucket, dividing each bucket's own counts.
+ * A single row that aggregates delivery and engagement counts, plus derived
+ * rates, across the whole requested period. Use this endpoint for KPI
+ * tiles, campaign reporting, and anywhere you need a rate with a meaningful
+ * denominator. The daily and hourly endpoints report the same rates, but
+ * per bucket, each one dividing that bucket's own counts.
  *
- * Every count is a sum of per-bucket counts across the window (per day for day windows, per hour for hour windows), so a recipient (or message) active in two buckets contributes one to each bucket and two to the period total. This matches common provider reporting and is not double-counting; it does not yield a period-distinct count. Latency percentiles, by contrast, are computed across the whole period rather than summed per bucket. Rates are null when their denominator is zero.
+ * Every count is a sum of per-bucket counts across the window (per day for
+ * day windows, per hour for hour windows). A recipient, or a message, that
+ * is active in two buckets contributes to each of them, so it is counted
+ * twice in the period total. This matches how most mailbox providers report
+ * their own numbers. The effect to plan for is that the total is a sum of
+ * per-bucket activity rather than a count of distinct recipients or messages
+ * across the whole period. Latency percentiles work differently: they are computed
+ * once across the whole period rather than summed from the buckets. A rate
+ * is null when its denominator is zero.
  *
  */
 export type EmailStatsSummary = {
@@ -5055,7 +5186,7 @@ export type EmailStatsSummary = {
 };
 
 /**
- * The change in each headline metric from the preceding period to the requested one. A `*_pct_change` is a signed relative change in a count, computed as `(current - previous) / previous` (so `0.5` means 50% higher, `-0.2` means 20% lower), and is null when the previous period's count was zero. A `*_rate_pp` is the signed arithmetic difference between the two periods' rate values, where each rate is a fraction in `[0,1]` (so `0.012` means the rate rose by 0.012, i.e. 1.2 percentage points; `-0.003` means it fell by 0.3 points), and is null when either period's rate is undefined (its denominator was zero). A `*_rate_pp` value ranges from `-1` to `1`: the most a rate can move between periods is from 0 to 1, or 1 to 0.
+ * The change in each headline metric from the preceding period to the requested one. A `*_pct_change` field is a signed relative change in a count, computed as `(current - previous) / previous`, so `0.5` means 50% higher and `-0.2` means 20% lower. It is null when the previous period's count was zero, because there is nothing to compute a relative change from. A `*_rate_pp` field is the signed difference between the two periods' rate values, each expressed as a fraction, so `0.012` means the rate rose by 1.2 percentage points and `-0.003` means it fell by 0.3 points. It is null when either period's rate is undefined, because its denominator was zero. `delivery_rate_pp` and `bounce_rate_pp` range from `-1` to `1`, because the rates behind them cannot exceed 1. The engagement deltas have no fixed bound, because events are counted when they arrive rather than when the message was sent, which can push their rate above 1.
  *
  */
 export type EmailStatsComparisonDelta = {
@@ -5125,20 +5256,20 @@ export type EmailStatsComparison = {
 };
 
 /**
- * The window the server actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants). The grain of `from` and `to` mirrors the grain of the request's bounds; days and hour boundaries follow the requested `timezone` (UTC when omitted).
+ * The window this response was actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants). The grain of `from` and `to` mirrors the grain of the request's bounds. Days and hour boundaries follow the requested `timezone` (UTC when omitted).
  *
  */
 export type EmailStatsSummaryPeriod = {
   /**
-   * Inclusive start of the window the response covers. A calendar day (YYYY-MM-DD, in the requested `timezone`) for day windows; for hour windows, an RFC 3339 UTC instant marking the start of the first hour, which falls on a local hour boundary when `timezone` is set.
+   * Inclusive start of the window the response covers. A calendar day (YYYY-MM-DD, in the requested `timezone`) for day windows. For hour windows, an RFC 3339 UTC instant marking the start of the first hour, which falls on a local hour boundary when `timezone` is set.
    */
   readonly from: string;
   /**
-   * Inclusive end of the window the response covers. A calendar day (YYYY-MM-DD, in the requested `timezone`) for day windows; for hour windows, an RFC 3339 UTC instant marking the start of the last hour, which falls on a local hour boundary when `timezone` is set.
+   * Inclusive end of the window the response covers. A calendar day (YYYY-MM-DD, in the requested `timezone`) for day windows. For hour windows, an RFC 3339 UTC instant marking the start of the last hour, which falls on a local hour boundary when `timezone` is set.
    */
   readonly to: string;
   /**
-   * The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response is near-real-time but not live; use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.
+   * The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.
    *
    */
   readonly data_as_of?: string | null;
@@ -5157,7 +5288,7 @@ export type EmailStatsTagsResponse = {
    */
   readonly data: Array<EmailTagStatsPoint>;
   /**
-   * Total number of distinct tags (name and value pairs) with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct tags (name and value pairs) with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
    *
    */
   readonly total: number;
@@ -5182,7 +5313,7 @@ export type EmailTagStatsPoint = {
 };
 
 /**
- * Metric to rank breakdown rows by, applied descending. Shared by the breakdowns whose rows carry the full delivery, engagement, and latency block (tags, sending domains, categories, recipient domains, templates, broadcasts). Any count or rate may be used; rows whose rate is undefined (zero denominator) sort last. Bounce sub-types are addressed by their nested location in each row, for example `bounces.hard` and `bounces.hard_rate`.
+ * Metric to rank breakdown rows by, applied descending. Shared by the breakdowns whose rows have the full delivery, engagement, and latency block: tags, sending domains, categories, recipient domains, templates, and broadcasts. Any count or rate can be used. A row whose rate is undefined, because its denominator was zero, sorts last. A bounce sub-type is nested under `bounces` in each row, so its sort name reflects that, for example `bounces.hard` and `bounces.hard_rate`.
  *
  */
 export type EmailStatsSortMetric =
@@ -5218,7 +5349,7 @@ export type EmailStatsSortMetric =
   | "bounces.undetermined_rate";
 
 /**
- * Time-series stats payload. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
+ * Time-series stats payload. `period` echoes the range and bucket grain actually computed against. `data` is one row per bucket in chronological order.
  *
  */
 export type EmailStatsResponse = {
@@ -5235,7 +5366,7 @@ export type EmailStatsResponse = {
  */
 export type EmailStatsPoint = {
   /**
-   * The day (YYYY-MM-DD, in the requested `timezone`) or hour this point covers, matching the period's grain. An hour bucket is an RFC 3339 UTC instant marking the start of the hour; it falls on a local hour boundary when `timezone` is set, which is on the UTC hour only for whole-hour offsets.
+   * The day (YYYY-MM-DD, in the requested `timezone`) or hour this point covers, matching the period's grain. An hour bucket is an RFC 3339 UTC instant marking the start of the hour. It falls on a local hour boundary when `timezone` is set, which is on the UTC hour only for whole-hour offsets.
    */
   readonly bucket: string;
   /**
@@ -5384,7 +5515,7 @@ export type WhatsAppMessageTemplateComponent = {
 export type LanguageTag = string;
 
 /**
- * A template's slug: its permanent, workspace-unique handle and API address. Lowercase letters, numbers, hyphens, and underscores. Fixed at creation, so anything that references it never breaks; the display name is the label to change freely.
+ * A template's slug: what you send it by, for example `welcome-email`. You choose it when you create the template, and it cannot be changed afterwards. It can contain lowercase letters, numbers, hyphens, and underscores, has to start and end with a letter or a number, and can be up to 63 characters long.
  *
  */
 export type TemplateSlug = string;
@@ -5623,6 +5754,376 @@ export type VerificationOptions = {
 };
 
 /**
+ * What we can tell you about an email address: whether it will accept mail, how confident that is, why not when it will not, and what the address looks like it was meant to be when it looks misspelled.
+ *
+ * `result` is the field to decide on; `delivery_confidence` grades it, and `flags` describes the address itself rather than its deliverability, so a perfectly valid address can still have `role` or `disposable`.
+ *
+ * Fields with nothing behind them are left out rather than sent as null, so anything you can read in the response is something we actually resolved.
+ *
+ */
+export type EmailLookup = {
+  /**
+   * The address that was looked up, exactly as you sent it.
+   */
+  readonly email: string;
+  /**
+   * Whether the address is well-formed and its domain is set up to receive mail at all. It says nothing about the mailbox itself, so a `valid` domain with no such mailbox is `true` here and `undeliverable` in `result`.
+   */
+  readonly valid: boolean;
+  readonly result: EmailLookupResult;
+  /**
+   * How likely mail to this address is to be delivered, from 0 (certain not to be) to 100 (certain to be). Read it alongside `result` rather than instead of it, because the same score can sit under `neutral` or `risky` for different reasons.
+   */
+  readonly delivery_confidence: number;
+  /**
+   * Notable characteristics of the address. Empty when none apply.
+   */
+  readonly flags: Array<EmailLookupFlag>;
+  /**
+   * Why the address cannot receive mail. Absent unless `result` is `undeliverable`.
+   */
+  readonly reason?: EmailLookupReason;
+  /**
+   * The address this one looks like a misspelling of. Absent unless a correction was found, which in practice means `result` is `typo`. Offer it to whoever typed the original rather than sending to it unasked, because it is a guess and the address they meant may be neither one.
+   */
+  readonly did_you_mean?: string;
+};
+
+/**
+ * Why an address cannot receive mail. `invalid_syntax` means the address is not a well-formed address at all, `invalid_domain` means the domain does not accept mail anywhere, and `invalid_recipient` means the domain accepts mail but this mailbox does not exist.
+ *
+ * Open enum: further reasons may be added over time, so treat an unrecognized value as a future one rather than an error. `result` is what to branch on; this field explains it.
+ *
+ */
+export type EmailLookupReason =
+  "invalid_syntax" | "invalid_domain" | "invalid_recipient" | (string & {});
+
+/**
+ * A notable characteristic of an email address. `role` means it addresses a function rather than a person (`support@`, `info@`), so replies and consent are ambiguous and complaints are more likely. `disposable` means it belongs to a throwaway-address provider and will stop existing. `free_provider` means it belongs to a consumer mailbox provider such as Gmail or Outlook.com, which is ordinary for consumer mail and a signal when you expected a business address.
+ *
+ * Open enum: more flags may be added over time, so treat an unrecognized value as a future flag rather than an error.
+ *
+ */
+export type EmailLookupFlag =
+  "role" | "disposable" | "free_provider" | (string & {});
+
+/**
+ * The verdict on the address, and the one field to decide on.
+ *
+ * `valid` means the address exists and accepts mail. `neutral` means it could not be confirmed either way, usually because the receiving domain answers every recipient the same. `risky` means it will probably accept the mail but is likelier than most to bounce or complain (a role, disposable, or low-reputation address). `undeliverable` means it will not accept mail, and `reason` says why. `typo` means the address looks like a misspelling of a real one, and `did_you_mean` has the correction.
+ *
+ * Open enum: further verdicts may be added over time, so treat an unrecognized value as a future one rather than an error. Branch on the values you know and fall back on `delivery_confidence`, which is always present and always comparable.
+ *
+ */
+export type EmailLookupResult =
+  "valid" | "neutral" | "risky" | "undeliverable" | "typo" | (string & {});
+
+export type EmailLookupRequest = {
+  /**
+   * The email address to look up. Send it exactly as you hold it: the part before the `@` is case-sensitive, so nothing is lowercased for you, and a display-name form such as `Aisha <aisha@example.com>` is rejected rather than unwrapped.
+   *
+   */
+  email: string;
+};
+
+/**
+ * What Bird knows about a phone number.
+ *
+ * The number, its flags and its line type are the free baseline and are always present; the country and the two networks join them whenever they could be identified. Each property you request through `type` comes back as a block of the same name, carrying its own `status`. A property you did not request is absent altogether, and a property that could not be answered is present with its `status` alone. You are billed for exactly the properties whose status is `ok`.
+ *
+ * Fields with nothing behind them are left out rather than sent as null, so anything you can read in the response is something Bird actually resolved.
+ *
+ */
+export type PhoneNumberLookup = {
+  /**
+   * The number that was looked up, in E.164 format.
+   */
+  readonly phone_number: string;
+  /**
+   * The ISO 3166-1 alpha-2 country of the number. Absent when the number belongs to no single country, as a non-geographic range does.
+   */
+  readonly country_code?: CountryCode | null;
+  /**
+   * The network that serves the number today. Absent when no network could be identified.
+   */
+  readonly network_info?: LookupNetworkInfo | null;
+  /**
+   * The network that issued the number's range. It differs from `network_info` when the number has been ported. Absent when the issuing network could not be identified.
+   */
+  readonly original_network_info?: LookupNetworkInfo | null;
+  /**
+   * Notable characteristics of the number. Empty when none apply.
+   */
+  readonly flags: Array<LookupFlag>;
+  readonly line_type: LookupLineType;
+  /**
+   * The allocated service of the number's range. Absent unless you requested the `classification` property.
+   */
+  readonly classification?: LookupClassification;
+  /**
+   * Whether the number is live on its network. Absent unless you requested the `presence` property.
+   */
+  readonly presence?: LookupPresence;
+  /**
+   * Whether the number is roaming. Absent unless you requested the `roaming` property.
+   */
+  readonly roaming?: LookupRoaming;
+  /**
+   * When the number's SIM last changed. Absent unless you requested the `sim_swap` property.
+   */
+  readonly sim_swap?: LookupSimSwap;
+  /**
+   * The number's porting record. Absent unless you requested the `porting` property.
+   */
+  readonly porting?: LookupPorting;
+  /**
+   * The number's credibility score. Absent unless you requested the `score` property.
+   */
+  readonly score?: LookupScore;
+};
+
+/**
+ * A credibility score for the number. Returned when you request the `score` property.
+ */
+export type LookupScore = {
+  readonly status: LookupPropertyStatus;
+  /**
+   * Credibility from 0 (low) to 100 (high). A low score means the number looks less credible than a typical subscriber line in the same range; it is a signal to weigh, not a verdict. It is a composite and is not derivable from the other properties. Present only when `status` is `ok`.
+   *
+   */
+  readonly value?: number;
+};
+
+/**
+ * How a requested property resolved.
+ *
+ * `ok` means the property was answered and its value is in the response.
+ *
+ * `unavailable` means no answer arrived, so the property adds nothing: its block is null, or for `classification`, `line_type` is left as the free baseline resolved it. The property is not billed.
+ *
+ * `inconclusive` means an answer arrived but does not resolve the property, either because the number is outside the coverage of the data behind it or because the answer is one we cannot yet place. It is a real answer rather than a missing one, and it is not billed either.
+ *
+ * Open enum: further statuses may be added over time, so treat an unrecognized value as a future one rather than an error. Only `ok` carries a value and only `ok` is billed, so branching on `ok` and treating everything else as "not answered" stays correct however the vocabulary grows.
+ *
+ */
+export type LookupPropertyStatus =
+  "ok" | "unavailable" | "inconclusive" | (string & {});
+
+/**
+ * One recorded move of a number between networks.
+ */
+export type LookupPortingEvent = {
+  /**
+   * When the move was recorded, null when the record carries no date.
+   */
+  readonly occurred_at: string | null;
+  /**
+   * What the record describes, as the number's registry reports it. Registries use their own short codes rather than a shared vocabulary, so treat this as a label to display rather than a value to branch on.
+   */
+  readonly action: string | null;
+};
+
+/**
+ * Whether the number has ever moved network, when it last did, and its full porting record. Returned when you request the `porting` property; the baseline only reports whether a number has ever ported, through the `ported` flag.
+ *
+ */
+export type LookupPorting = {
+  readonly status: LookupPropertyStatus;
+  /**
+   * Whether the number has ever moved network. False is a positive finding rather than a lack of one: the registry was consulted and holds no move for this number. Present only when `status` is `ok`.
+   *
+   */
+  readonly ported?: boolean;
+  /**
+   * When the number last moved network. Absent when it has never ported or when no date is on record.
+   */
+  readonly last_ported_at?: string | null;
+  /**
+   * Whether `last_ported_at` is an approximation. Some registries record only the period a move happened in, not the day.
+   */
+  readonly last_ported_at_is_approximate?: boolean;
+  /**
+   * Every move on record, oldest first. Absent when the number has never ported or when its registry publishes no history.
+   */
+  readonly history?: Array<LookupPortingEvent>;
+};
+
+/**
+ * When the number's SIM last changed. Returned when you request the `sim_swap` property.
+ */
+export type LookupSimSwap = {
+  readonly status: LookupPropertyStatus;
+  /**
+   * When the SIM was last changed. Absent when only a recency band is known.
+   */
+  readonly last_swapped_at?: string | null;
+  /**
+   * The lower bound, in days, of how long ago the SIM was last changed. Networks that do not release an exact date report a band instead; absent when no lower bound is known.
+   */
+  readonly min_days?: number | null;
+  /**
+   * The upper bound, in days, of how long ago the SIM was last changed. Absent when no upper bound is known; with a lower bound present, that means the change was at least `min_days` ago.
+   */
+  readonly max_days?: number | null;
+};
+
+/**
+ * Whether the number is roaming, and on which network. Returned when you request the `roaming` property.
+ */
+export type LookupRoaming = {
+  readonly status: LookupPropertyStatus;
+  /**
+   * Whether the number is currently roaming outside its home network. Present only when `status` is `ok`.
+   */
+  readonly is_roaming?: boolean;
+  /**
+   * The mobile country code of the visited network. Absent when the number is not roaming or the visited network is not reported.
+   */
+  readonly mcc?: string | null;
+  /**
+   * The mobile network code of the visited network. Absent when the number is not roaming or the visited network is not reported.
+   */
+  readonly mnc?: string | null;
+};
+
+/**
+ * Whether the number is live on its network right now. Returned when you request the `presence` property.
+ *
+ * This is the one property no database can answer: it is a real-time query to the network the number is registered on.
+ *
+ */
+export type LookupPresence = {
+  readonly status: LookupPropertyStatus;
+  /**
+   * Whether the number is registered on a network and able to receive traffic. False means the network answered and reported the number as not currently reachable, which is different from us being unable to find out. Present only when `status` is `ok`.
+   *
+   */
+  readonly reachable?: boolean;
+};
+
+/**
+ * The allocated service of the number's range, at the precision the intelligence source publishes it.
+ *
+ * This is a finer vocabulary than `line_type`, which reports what the carrier platform alone can tell. Eleven of these values have no carrier equivalent at all: a number the carrier can only call `service` may be `premium_rate`, `shared_cost`, `universal_access` or a voicemail platform, and those carry very different cost and fraud implications. Where the two fields do overlap, they are two independent opinions rather than one refining the other.
+ *
+ */
+export type LookupClassificationValue =
+  | "mobile"
+  | "fixed_line"
+  | "fixed_line_or_mobile"
+  | "voip"
+  | "toll_free"
+  | "premium_rate"
+  | "shared_cost"
+  | "local_rate"
+  | "national_rate"
+  | "personal_number"
+  | "universal_access"
+  | "satellite"
+  | "pager"
+  | "payphone"
+  | "m2m"
+  | "isp"
+  | "vpn"
+  | "voice_mail"
+  | "calling_cards"
+  | "short_codes"
+  | "service"
+  | "other";
+
+/**
+ * The allocated service of the number's range. Returned when you request the `classification` property.
+ *
+ * This sits beside `line_type` rather than replacing it, so you can always see which source answered: `line_type` is what the carrier platform reports and costs nothing, `classification` is what the intelligence source reports and is what you paid for.
+ *
+ */
+export type LookupClassification = {
+  readonly status: LookupPropertyStatus;
+  /**
+   * The allocated service of the range. Present only when `status` is `ok`.
+   */
+  readonly value?: LookupClassificationValue;
+};
+
+/**
+ * What kind of line the number is, as reported by the carrier platform.
+ *
+ * This is part of the free baseline and is returned on every lookup, whatever you request. It never changes with what you buy. `unknown` means the carrier platform holds no classification for the range, and `other` means it holds one that has no equivalent here.
+ *
+ * For the allocated service of the range at finer precision, request the `classification` property. That answers from a different source, with its own wider vocabulary, and is reported separately so you can always tell the two apart.
+ *
+ */
+export type LookupLineType =
+  | "mobile"
+  | "fixed_line"
+  | "voip"
+  | "toll_free"
+  | "premium_rate"
+  | "satellite"
+  | "pager"
+  | "payphone"
+  | "m2m"
+  | "service"
+  | "other"
+  | "unknown";
+
+/**
+ * A notable characteristic of a number. `ported` means the number has moved from the network that issued it to another one, so `network_info` and `original_network_info` name different carriers.
+ *
+ * Open enum: more flags may be added over time, so treat an unrecognized value as a future flag rather than an error.
+ *
+ */
+export type LookupFlag = "ported" | (string & {});
+
+/**
+ * The network a number belongs to.
+ */
+export type LookupNetworkInfo = {
+  /**
+   * The carrier's name, absent when the carrier could not be identified.
+   */
+  readonly carrier_name?: string | null;
+  /**
+   * The mobile country code, absent for a network that has none or could not be identified.
+   */
+  readonly mcc?: string | null;
+  /**
+   * The mobile network code, absent for a network that has none or could not be identified.
+   */
+  readonly mnc?: string | null;
+};
+
+/**
+ * ISO 3166-1 alpha-2 country code.
+ */
+export type CountryCode = string;
+
+export type PhoneNumberLookupRequest = {
+  /**
+   * The phone number to look up, in E.164 format, which is a leading `+`, the country calling code, then the national number.
+   */
+  phone_number: string;
+  /**
+   * The paid properties to enrich the answer with. Omit it, or send an empty array, to get the free baseline and make no vendor call.
+   *
+   * Each delivered property is billed on top of the lookup itself. A property that could not be answered is reported in `properties` and is not billed.
+   *
+   */
+  type?: Array<LookupProperty>;
+};
+
+/**
+ * An intelligence property you can buy for a number, beyond the free baseline.
+ *
+ * `classification` resolves `line_type` to its precise allocated service (premium rate, satellite, machine-to-machine, payphone) where the baseline only distinguishes broad categories. `porting` returns when the number last moved network and its full porting record. `presence` reports whether the number is live on the network right now. `roaming` reports whether it is roaming and on which network. `sim_swap` returns when its SIM last changed. `score` returns a credibility score from 0 to 100.
+ *
+ * Each property you request is billed separately, and only when it is delivered.
+ *
+ */
+export type LookupProperty =
+  "classification" | "porting" | "presence" | "roaming" | "sim_swap" | "score";
+
+/**
  * Bucket grain for a stats trend series.
  */
 export type StatsTrendGrain = "daily" | "hourly";
@@ -5637,30 +6138,30 @@ export type SmsTemplateList = {
 export type SmsTemplateVersionId = string;
 
 /**
- * A single variable slot a template fills in from the values supplied when sending. Shared across channels (SMS, email) so template introspection reads the same everywhere.
+ * One variable a template's content uses, filled in from the values you give when you send. Templates on every channel report their variables this way, so this reads the same whether you are looking at an SMS template or an email one.
  *
  */
 export type TemplateVariable = {
   /**
-   * The parameter key this slot is filled with.
+   * The variable's name, the key you use for it in `parameters` when you send.
    */
   readonly key: string;
   /**
-   * The value type this slot accepts. Open enum — treat any unrecognized value as a future type rather than an error. SMS templates use the typed slots (`code`, `amount`, …); email templates use `text`.
+   * The value type this variable accepts. We can add new types to this list over time, so treat a value you do not recognize as a new type rather than as an error. SMS templates use the typed values, such as `code` and `amount`. Email templates only use `text`.
    *
    */
   readonly type: string;
   /**
-   * Whether the slot must be supplied when sending. A send that leaves a required slot unset is rejected.
+   * Whether a value has to be supplied when sending. A send that leaves a required variable unset is rejected.
    *
    */
   readonly required: boolean;
   /**
-   * A human-readable description of the accepted values.
+   * A plain-language description of what values this variable accepts.
    */
   readonly constraint: string;
   /**
-   * Whether this slot's value is redacted before it reaches storage. A sensitive slot's rendered value never appears in message content read back through the API: a stand-in placeholder is stored instead.
+   * Whether this variable's value gets redacted before it is stored. When it does, the rendered value never appears in message content you read back through the API: a placeholder is stored in its place instead.
    *
    */
   readonly sensitive?: boolean;
@@ -5673,12 +6174,12 @@ export type SmsMessageCategory =
   "transactional" | "marketing" | "authentication" | "service";
 
 /**
- * Whether the template is a built-in Bird template (`system`) or one your workspace authored (`workspace`).
+ * Whether the template is one of our built-in templates (`system`) or one your workspace created (`workspace`).
  */
 export type TemplateScope = "system" | "workspace";
 
 /**
- * A template's send-by handle — the stable reference used in place of the template id when sending. Lowercase letters, numbers, hyphens, and underscores; starts and ends with a letter or number.
+ * A template's name: the stable handle you send it by, used in place of the template id. It can contain lowercase letters, numbers, hyphens, and underscores, has to start and end with a letter or a number, and can be up to 63 characters long.
  *
  */
 export type TemplateName = string;
@@ -6030,14 +6531,14 @@ export type MessageDirection = "outbound" | "inbound";
 
 export type AudienceContactsRemoveRequest = {
   /**
-   * Contacts to remove from the audience. Removing a contact that is not a member has no effect; duplicate IDs in the list are collapsed. If any ID does not exist in the workspace, the whole request fails with a validation error and no memberships are removed.
+   * Contacts to remove from the audience. Removing a contact that is not a member has no effect. Duplicate IDs in the list are collapsed. If any ID does not exist in the workspace, the whole request fails with a validation error and no memberships are removed.
    */
   contact_ids: Array<ContactId>;
 };
 
 export type AudienceContactsAddRequest = {
   /**
-   * Contacts to add to the audience. Adding a contact that is already a member has no effect and keeps its original join time; duplicate IDs in the list are collapsed. If any ID does not exist in the workspace, the whole request fails with a validation error and no contacts are added.
+   * Contacts to add to the audience. Adding a contact that is already a member has no effect and keeps its original join time. Duplicate IDs in the list are collapsed. If any ID does not exist in the workspace, the whole request fails with a validation error and no contacts are added.
    */
   contact_ids: Array<ContactId>;
 };
@@ -6117,7 +6618,7 @@ export type AudienceMember = {
 
 export type AudienceUpdateRequest = {
   /**
-   * New display name for the audience. Omit to keep the current name; the name cannot be cleared, and a whitespace-only value returns a validation error.
+   * New display name for the audience. Omit to keep the current name. The name cannot be cleared, and a whitespace-only value returns a validation error.
    */
   name?: string;
   /**
@@ -6136,10 +6637,9 @@ export type AudienceCreateRequest = {
    */
   description?: string;
   /**
-   * How the audience's recipients are determined. `static` (the default) is an explicit member list you manage via the API. `dynamic` and `external` are preview values and currently unavailable; creating an audience with either returns a validation error.
-   *
+   * How the audience's recipients are determined. `static` is an explicit member list you manage by adding and removing contacts.
    */
-  type?: "static" | "dynamic" | "external";
+  type?: "static";
 };
 
 export type ContactPropertyUpdateRequest = {
@@ -6219,10 +6719,9 @@ export type Audience = {
    */
   description?: string | null;
   /**
-   * How the audience's recipients are determined. `static` (the default) is an explicit member list you manage via the API. `dynamic` and `external` are preview values and currently unavailable; creating an audience with either returns a validation error.
-   *
+   * How the audience's recipients are determined. `static` is an explicit member list you manage by adding and removing contacts.
    */
-  type: "static" | "dynamic" | "external";
+  type: "static";
 } & Timestamps;
 
 export type ContactUpdateRequest = {
@@ -6411,7 +6910,25 @@ export type EmailEventList = {
 } & ListEnvelope;
 
 /**
- * Type of an event in a message's per-recipient delivery timeline. Open enum — new event types may be added over time, so treat any unrecognized value as a future event rather than an error. The values below are the types known at this version.
+ * Type of an event in a message's per-recipient delivery timeline.
+ *
+ * - `email.scheduled`: We accepted a send scheduled for a future time. Fires once per message, not per recipient.
+ * - `email.accepted`: We accepted the send and are getting ready to deliver it. Fires once per requested recipient.
+ * - `email.processed`: We queued the message for delivery to the recipient's mail server.
+ * - `email.deferred`: The recipient's mail server temporarily refused the message, and delivery will be retried. Can fire more than once per recipient.
+ * - `email.delivered`: The recipient's mail server accepted the message.
+ * - `email.bounced`: Delivery permanently failed at the recipient's mail server.
+ * - `email.out_of_band_bounce`: A bounce notification arrived after the message had already been accepted for delivery.
+ * - `email.rejected`: We rejected the message before attempting delivery, for example because the recipient is suppressed.
+ * - `email.canceled`: A scheduled send was canceled before it fired. Fires once per message, not per recipient.
+ * - `email.opened`: The recipient opened the message. Can fire more than once per recipient.
+ * - `email.clicked`: The recipient clicked a tracked link in the message. Can fire more than once per recipient.
+ * - `email.unsubscribed`: The recipient opted out through a tracked unsubscribe link in the message.
+ * - `email.list_unsubscribed`: The recipient opted out through the one-click unsubscribe control in their mail client.
+ * - `email.complained`: The recipient reported the message as spam through their mailbox provider.
+ *
+ * We can add new event types to this list over time, so treat a value you do not recognize as a new type rather than as an error.
+ *
  */
 export type EmailEventType =
   | "email.accepted"
@@ -6436,7 +6953,7 @@ export type EmailEvent = {
    */
   readonly id: string;
   /**
-   * Event type. `email.processed` means Bird has processed the message and queued it for delivery.
+   * The event's type. `email.processed`, for example, means the message has been processed and queued for delivery.
    *
    */
   type: EmailEventType;
@@ -6454,7 +6971,7 @@ export type EmailEvent = {
    */
   bounce_type?: "hard" | "soft" | "undetermined" | "admin" | "block" | null;
   /**
-   * Numeric bounce classification for fine-grained deliverability triage. Lets you distinguish, for example, a DNS failure from a spam block when both would be `bounce_type: soft` or `bounce_type: block`. Present on `email.bounced`, `email.out_of_band_bounce`, and `email.deferred`.
+   * A more detailed numeric bounce code, useful for telling apart failures that share the same `bounce_type`. For example, a DNS failure and a spam block can both come through as `bounce_type: soft` or `bounce_type: block`; this field tells you which one actually happened. Present on `email.bounced`, `email.out_of_band_bounce`, and `email.deferred` events.
    *
    */
   bounce_class?: number | null;
@@ -6464,11 +6981,19 @@ export type EmailEvent = {
    */
   bounce_code?: string | null;
   /**
-   * Human-readable bounce reason. Present on `email.bounced` and `email.deferred` events.
+   * The bounce reason, in plain language, as reported by the mail server. Present on `email.bounced` and `email.deferred` events.
    */
   bounce_description?: string | null;
   /**
-   * Specific cause of rejection. Present on `email.rejected` events only. See `EmailRecipient.rejection_reason` for the meaning of each value.
+   * Specific cause of rejection. Present on `email.rejected` events only.
+   *
+   * - `recipient_suppressed`: The recipient is on the workspace suppression list.
+   * - `transmission_failed`: The message could not be transmitted for delivery.
+   * - `generation_failure`: The message could not be built for delivery, because of a template or content issue.
+   * - `policy_rejection`: The message was refused by sending policy.
+   * - `domain_unverified`: The sending domain was not verified.
+   * - `quota_exceeded`: The organization's send quota was reached.
+   * - `recipient_not_allowed`: This recipient was not allowed for this send. For a send from the shared onboarding domain, every recipient has to be a verified member of the workspace.
    *
    */
   rejection_reason?:
@@ -6481,12 +7006,12 @@ export type EmailEvent = {
     | "recipient_not_allowed"
     | null;
   /**
-   * The IP address Bird used to send this message. Useful when investigating deliverability issues that correlate with specific IPs. Present on `email.delivered`, `email.bounced`, `email.out_of_band_bounce`, and `email.deferred` events.
+   * The IP address used to send this message. Useful for spotting a deliverability problem that is tied to one specific sending IP rather than affecting all of them. Present on `email.delivered`, `email.bounced`, `email.out_of_band_bounce`, and `email.deferred` events.
    *
    */
   sending_ip?: string | null;
   /**
-   * True when the open was auto-fetched by an inbox privacy feature (Apple Mail Privacy Protection, Gmail image proxy) rather than a real user action. Useful for accurate open-rate calculation. Present on `email.opened` only.
+   * True when the open was auto-fetched by an inbox privacy feature (Apple Mail Privacy Protection, the Gmail image proxy) rather than a person actually opening the message. Use it to calculate open rate accurately. Present on `email.opened` events only.
    *
    */
   is_prefetched?: boolean | null;
@@ -6537,14 +7062,15 @@ export type EmailRecipient = {
    */
   name?: string | null;
   /**
-   * Delivery status for this recipient. `accepted` means Bird has the send and is
-   * preparing to deliver; `processed` means the message was handed to the delivery
-   * pipeline for this recipient; `deferred` means the recipient's mailbox provider
-   * asked Bird to retry and delivery attempts continue; `delivered` means the
-   * recipient's mail server accepted the message; `bounced` means delivery permanently
-   * failed (see `bounce_type` for hard vs soft); `complained` means the recipient
-   * reported the message as spam; `rejected` means Bird did not attempt delivery (see
-   * `rejection_reason` for why).
+   * Delivery status for this recipient:
+   *
+   * - `accepted`: The send has been taken and is being prepared for delivery.
+   * - `processed`: This recipient's message is on its way out.
+   * - `deferred`: The recipient's mailbox provider asked for a retry, and delivery attempts continue.
+   * - `delivered`: The recipient's mail server accepted the message.
+   * - `bounced`: Delivery permanently failed (see `bounce_type` for hard vs soft).
+   * - `complained`: The recipient reported the message as spam.
+   * - `rejected`: Delivery was never attempted (see `rejection_reason` for why).
    *
    */
   readonly status:
@@ -6558,15 +7084,15 @@ export type EmailRecipient = {
   /**
    * Present on `status: rejected` rows. Specifies why the recipient was rejected:
    *
-   * - `recipient_suppressed`: the recipient is on the workspace suppression list. Bird
-   * did not attempt delivery.
-   * - `transmission_failed`: the message could not be transmitted for delivery.
-   * - `generation_failure`: the message could not be built for delivery (template or
+   * - `recipient_suppressed`: The recipient is on the workspace suppression list, so
+   * delivery was never attempted.
+   * - `transmission_failed`: The message could not be transmitted for delivery.
+   * - `generation_failure`: The message could not be built for delivery (template or
    * content issue).
-   * - `policy_rejection`: the message was refused by sending policy.
-   * - `domain_unverified`: the sending domain was not verified.
-   * - `quota_exceeded`: the organization's send quota was reached.
-   * - `recipient_not_allowed`: a recipient was not permitted for this send (for shared
+   * - `policy_rejection`: The message was refused by sending policy.
+   * - `domain_unverified`: The sending domain was not verified.
+   * - `quota_exceeded`: The organization's send quota was reached.
+   * - `recipient_not_allowed`: A recipient was not permitted for this send (for shared
    * onboarding-domain sends, recipients must be verified workspace members).
    *
    */
@@ -6594,7 +7120,7 @@ export type EmailRecipient = {
    */
   readonly bounce_description?: string | null;
   /**
-   * When Bird processed the message and queued it for delivery to the recipient's mail server, or null if not yet processed.
+   * When the message was prepared and queued for delivery to the recipient's mail server, or null if that has not happened yet.
    */
   readonly processed_at?: string | null;
   /**
@@ -6602,11 +7128,11 @@ export type EmailRecipient = {
    */
   readonly delivered_at?: string | null;
   /**
-   * Time between Bird accepting the send and processing the message for delivery, in milliseconds. Null until processed.
+   * Time between the send being accepted and the message being prepared for delivery, in milliseconds. Null until processed.
    */
   readonly processing_latency_ms?: number | null;
   /**
-   * Time between Bird processing the message and the receiving mail server accepting it, in milliseconds. Null until delivered.
+   * Time between the message being prepared and the receiving mail server accepting it, in milliseconds. Null until delivered.
    */
   readonly delivery_latency_ms?: number | null;
   /**
@@ -6651,7 +7177,7 @@ export type EmailMessageBatchItem = {
    */
   readonly requested_language?: LanguageTag | null;
   /**
-   * The template language this item was actually delivered in, in canonical form. Null when the item used no template. A value here differing from `requested_language` means the template did not carry the language asked for and its `on_missing_language` policy chose this one.
+   * The template language this item was actually delivered in, in canonical form. Null when the item used no template. A value here differing from `requested_language` means the template did not have the language asked for and its `on_missing_language` policy chose this one.
    *
    */
   readonly resolved_language?: LanguageTag | null;
@@ -6683,12 +7209,16 @@ export type EmailTemplateSend = unknown & {
    */
   slug?: TemplateSlug;
   /**
-   * Which of the template's languages to send. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not carry the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected.
+   * Which of the template's languages to send. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not have the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected.
    *
    */
   language?: LanguageTag;
   /**
-   * Values for the template's parameters, keyed by parameter name. A parameter name is a single word, and every parameter the template's `variables` lists needs a value here: a send that omits one is rejected rather than delivered with a blank. Send everything `variables` lists rather than only what you expect the chosen language to use, since languages need not reference the same parameters and a value no language uses is ignored. Cap: 16 KB serialized.
+   * Values for the template's variables, keyed by the variable name. A variable name is a single word.
+   *
+   * Every variable the template's `variables` lists needs a value here. A send that leaves one out is rejected rather than delivered with a blank in it. Send values for everything in that list rather than only what you expect the language you are sending to use, because languages do not have to use the same variables and a value no language uses is simply ignored.
+   *
+   * `bird` is reserved for the values we fill in ourselves, so a send that sets it is rejected. `parameters` is capped at 16 KB once serialized.
    *
    */
   parameters?: {
@@ -6698,23 +7228,23 @@ export type EmailTemplateSend = unknown & {
 
 export type EmailMessageSendRequest = {
   /**
-   * Sender address, as a plain email string, an RFC 5322 mailbox string (`Jane <jane@example.com>`), or an object with an optional display name. Must be from a verified domain in this workspace.
+   * Sender address, as a plain email string, an RFC 5322 mailbox string (`Jane <jane@acme.com>`), or an object with an optional display name. Must be from a verified domain in this workspace.
    */
   from: EmailAddressInput;
   /**
-   * Primary recipients. Each entry is a plain email string, an RFC 5322 mailbox string (`Jane <jane@example.com>`), or an object with an optional display name.
+   * Primary recipients. Each entry is a plain email string, an RFC 5322 mailbox string (`Jane <jane@acme.com>`), or an object with an optional display name.
    */
   to: Array<EmailAddressInput>;
   /**
-   * CC recipients. Each entry is a plain email string, an RFC 5322 mailbox string (`Jane <jane@example.com>`), or an object with an optional display name.
+   * CC recipients. Each entry is a plain email string, an RFC 5322 mailbox string (`Jane <jane@acme.com>`), or an object with an optional display name.
    */
   cc?: Array<EmailAddressInput>;
   /**
-   * BCC recipients. Each entry is a plain email string, an RFC 5322 mailbox string (`Jane <jane@example.com>`), or an object with an optional display name.
+   * BCC recipients. Each entry is a plain email string, an RFC 5322 mailbox string (`Jane <jane@acme.com>`), or an object with an optional display name.
    */
   bcc?: Array<EmailAddressInput>;
   /**
-   * Message subject line. Required for inline sends; omit it when sending a `template` (the template supplies the subject).
+   * Message subject line. Required for inline sends. Omit it when sending a `template` (the template supplies the subject).
    */
   subject?: string;
   /**
@@ -6726,24 +7256,30 @@ export type EmailMessageSendRequest = {
    */
   text?: string;
   /**
-   * Reply-To addresses, each a plain email string, an RFC 5322 mailbox string, or an object with an optional display name. RFC 5322 allows multiple. Every recipient reply hits all listed addresses, so 1-2 is typical; the 25 cap exists to prevent runaway header sizes that some MTAs reject.
+   * Reply-To addresses, each a plain email string, an RFC 5322 mailbox string, or an object with an optional display name. RFC 5322 allows multiple. Every recipient reply hits all listed addresses, so 1-2 is typical. The 25 cap exists to prevent header sizes that some receiving mail servers reject.
    *
    */
   reply_to?: Array<EmailAddressInput>;
   /**
-   * Custom email headers as key-value pairs (for example `References`, `In-Reply-To`, or your own `X-*` headers). Reserved headers are rejected with a `422`: set the message's addressing and subject through the dedicated fields (`from`, `to`, `cc`, `bcc`, `reply_to`, `subject`) rather than here, and headers the platform generates for you — `Content-Type`, `Content-Transfer-Encoding`, `DKIM-Signature`, `Received`, and `Return-Path` — cannot be overridden. `List-Unsubscribe` and `List-Unsubscribe-Post` are honored as-is on `transactional` sends; on `marketing` sends the platform sets a compliant unsubscribe header for you, so supplying them there is rejected with a `422`. Header values may not contain carriage-return or line-feed characters.
+   * Custom email headers as key-value pairs (for example `References`, `In-Reply-To`, or your own `X-*` headers). Reserved headers are rejected with a `422`. Set the message's addressing and subject through the dedicated fields (`from`, `to`, `cc`, `bcc`, `reply_to`, `subject`) rather than here, and the headers generated for you automatically (`Content-Type`, `Content-Transfer-Encoding`, `DKIM-Signature`, `Received`, and `Return-Path`) cannot be overridden. `List-Unsubscribe` and `List-Unsubscribe-Post` are honored as-is on `transactional` sends. On a `marketing` send a compliant unsubscribe header is set for you, so supplying either one there is rejected with a `422`. Header values may not contain carriage-return or line-feed characters. Up to 25 headers per send, each value up to 998 characters.
    *
    */
   headers?: {
     [key: string]: string;
   };
   /**
-   * Structured `{name, value}` labels for **filtering and analytics**. Tags become first-class query dimensions: filter the list endpoint by tag name, slice analytics rollups by tag, and surface in webhook payloads. Cap: 20 tags per send. Use tags for low-cardinality dimensions (`category`, `experiment_variant`, `template_id`). For arbitrary structured context that you do not need as a filter dimension, use `metadata` instead.
+   * Structured `{name, value}` labels for **filtering and analytics**. Tags become first-class query dimensions:
+   *
+   * - Filter the list endpoint by tag name.
+   * - Slice analytics rollups by tag.
+   * - Surface in webhook payloads.
+   *
+   * Cap: 20 tags per send. Use tags for low-cardinality dimensions (`category`, `experiment_variant`, `template_id`). For arbitrary structured context that you do not need as a filter dimension, use `metadata` instead.
    *
    */
   tags?: Array<Tag>;
   /**
-   * Arbitrary JSON object **stored, returned on API reads, and echoed in webhook payloads**. Path-queryable in analytics (e.g. filter on `metadata.order_id`) but not surfaced as a first-class dashboard filter dimension. Cap: 2 KB serialized. Use metadata for per-send context like internal IDs, foreign keys, and structured payloads you want round-tripped through events. For low-cardinality filterable labels, use `tags` instead.
+   * Arbitrary JSON object **stored, returned on API reads, and echoed in webhook payloads**. Path-queryable in analytics (for example, filter on `metadata.order_id`) but not surfaced as a first-class dashboard filter dimension. Cap: 2 KB serialized. Use metadata for per-send context like internal IDs, foreign keys, and structured payloads you want round-tripped through events. For low-cardinality filterable labels, use `tags` instead.
    *
    */
   metadata?: {
@@ -6757,7 +7293,7 @@ export type EmailMessageSendRequest = {
     [key: string]: unknown;
   };
   /**
-   * Send a stored template instead of inline content. When set, omit `subject`/`html`/`text` — the template supplies them; personalize with `template.parameters`.
+   * Send a stored template instead of inline content. When set, omit `subject`, `html` and `text`, because the template supplies them. Personalize with `template.parameters`. A template send goes out immediately: `template` and `scheduled_at` are mutually exclusive, and combining them is rejected with a `422`.
    *
    */
   template?: EmailTemplateSend;
@@ -6775,33 +7311,25 @@ export type EmailMessageSendRequest = {
    */
   ip_pool_id?: string;
   /**
-   * Content classification. Controls suppression policy: `marketing` blocks on all suppression reasons; `transactional` allows delivery through complaint and unsubscribe suppressions, for receipts, password resets, and similar operational mail. When you send with `template` and omit this field, the message takes the template's own classification, so a template created as `transactional` sends as transactional. Set this field to classify a single send differently from its template; it always takes precedence. Sends that carry no template and no category are `marketing`.
+   * Content classification, which controls suppression policy:
+   *
+   * - `marketing`: Blocks on all suppression reasons.
+   * - `transactional`: Allows delivery through complaint and unsubscribe suppressions, for receipts, password resets, and similar operational mail.
+   *
+   * When you send with `template` and omit this field, the message takes the template's own classification, so a template created as `transactional` sends as transactional. Set this field to classify a single send differently from its template. It always takes precedence. A send with no template and no category defaults to `marketing`.
    *
    */
   category?: EmailMessageCategory;
   /**
-   * Preview feature — threaded replies. Currently unavailable; supplying this field returns `422 UnsupportedEmailFeature`. When generally available, sets In-Reply-To and References headers automatically.
-   */
-  in_reply_to_message_id?: EmailId;
-  /**
-   * File attachments. Bird rejects sends whose estimated generated message size exceeds 20 MB. The estimate is the HTML and text body plus all attachments and inline images measured after base64 encoding. Keep total raw attachment content at or below 15 MB for reliable headroom. In batch sends, this per-message cap still applies and the serialized JSON request body for the whole batch has a hard 20 MB cap. See the EmailAttachment schema for the full field contract.
+   * Files to attach, up to 20 per message. A message can be at most 20 MB once it has been generated, and we refuse a send that would go over. That figure covers the HTML body, the text body and every attachment and inline image, all measured after base64 encoding, which adds roughly a third. So 15 MB of raw files already accounts for most of the budget, and the body competes for the same space. A batch send is held to the same 20 MB per message, and the whole request body is capped at 20 MB as well.
    *
    */
   attachments?: Array<EmailAttachment>;
   /**
-   * Schedule the message to send at a future time instead of immediately. Must be at least 30 seconds and at most 30 days ahead — outside that range the request is rejected with `422`. The message returns with status `accepted` and shows as `scheduled` on reads until it sends; cancel it before then with the message cancel endpoint. Scheduled sends count against your plan's monthly scheduled-email allowance; exceeding it is rejected with a `422`.
+   * Schedule the message to send at a future time instead of immediately. Must be at least 30 seconds and at most 30 days ahead. Outside that range the request is rejected with `422`. The message returns with status `accepted` and shows as `scheduled` on reads until it sends. Cancel it before then with the message cancel endpoint. Scheduled sends count against your plan's monthly scheduled-email allowance. Exceeding it is rejected with a `422`. A scheduled message has inline content: `scheduled_at` and `template` are mutually exclusive, and combining them is rejected with a `422`. This field is only accepted on a single send, not on a batch item.
    *
    */
   scheduled_at?: string;
-  /**
-   * Preview feature — contact-targeted sends. Currently unavailable; supplying this field returns `422 UnsupportedEmailFeature`.
-   */
-  contact_id?: string;
-  /**
-   * Preview feature — topic-gated sends. Currently unavailable; supplying this field returns `422 UnsupportedEmailFeature`. When generally available, a non-empty `topic_id` gates delivery on the recipient's opt-in state for that topic — if the recipient is opt_out, the send is silently suppressed and an `email.suppressed` event fires with `reason: topic_opt_out`.
-   *
-   */
-  topic_id?: string;
 };
 
 export type EmailMessageList = {
@@ -6814,7 +7342,7 @@ export type EmailMessageList = {
 export type EmailAttachmentId = string;
 
 /**
- * Attachment metadata returned on API reads. The original content is not echoed back inline — only the metadata needed for display and audit. To download the raw attachment bytes (while content storage is enabled and within the retention window), use `GET /v1/email/messages/{message_id}/attachments/{attachment_id}`, which returns the file with its own content type and a Content-Disposition filename.
+ * Attachment metadata returned on API reads. The original content is not sent back inline, only the metadata you need to display and audit it. To download the raw attachment bytes (while content storage is enabled and within the retention window), use `GET /v1/email/messages/{message_id}/attachments/{attachment_id}`, which returns the file with its own content type and a Content-Disposition filename.
  *
  */
 export type EmailAttachmentRef = {
@@ -6848,19 +7376,20 @@ export type EmailAttachmentRef = {
 /**
  * Aggregate delivery status of an email, derived from its recipients' states.
  *
- * In flight: `scheduled` means the message is queued to send at a future time and has
- * not been dispatched yet; `accepted` (the initial status of an immediate send) means
- * Bird has queued the message for its recipients; `processed` means delivery is underway
- * (at least one recipient has been handed to the delivery pipeline and none has failed);
- * `deferred` means at least one recipient's mailbox provider asked Bird to retry and
- * delivery attempts continue.
+ * In flight:
  *
- * Final: `delivered` means every recipient's mail server accepted the message; `bounced`
- * means every recipient permanently failed (bounced or was rejected); `rejected` means
- * every recipient was rejected before a delivery attempt (for example, all recipients
- * suppressed); `partial_failure` means some recipients permanently failed while others
- * were delivered or are still in flight; `canceled` means a scheduled message was
- * canceled before it was sent.
+ * - `scheduled`: The message is queued to send at a future time and has not been dispatched yet.
+ * - `accepted`: The initial status of an immediate send. The message is queued for its recipients.
+ * - `processed`: Delivery is underway, so at least one recipient's message is on its way out and none has failed.
+ * - `deferred`: At least one recipient's mailbox provider asked for a retry, and delivery attempts continue.
+ *
+ * Final:
+ *
+ * - `delivered`: Every recipient's mail server accepted the message.
+ * - `bounced`: Every recipient permanently failed (bounced or was rejected).
+ * - `rejected`: Every recipient was rejected before a delivery attempt (for example, all recipients were suppressed).
+ * - `partial_failure`: Some recipients permanently failed while others were delivered or are still in flight.
+ * - `canceled`: A scheduled message was canceled before it was sent.
  *
  * `complained` takes precedence over every other status: at least one recipient reported
  * the message as spam, regardless of what happened to the rest.
@@ -6888,7 +7417,7 @@ export type EmailMessage = {
    */
   from: EmailAddress;
   /**
-   * Primary recipients. Length is the recipient count; use the broadcasts endpoint for audience-targeted sends. Each entry's `name` is present when a display name was provided on the send.
+   * Primary recipients. Length is the recipient count. Use the broadcasts endpoint for audience-targeted sends. Each entry's `name` is present when a display name was provided on the send.
    */
   to: Array<EmailAddress>;
   /**
@@ -6909,21 +7438,17 @@ export type EmailMessage = {
    * Reply-To addresses, if set on the send. Empty/null when no Reply-To was provided.
    */
   reply_to?: Array<EmailAddress> | null;
-  /**
-   * Aggregate delivery status derived from recipient states. `scheduled` means the message is queued to send at a future time and has not been dispatched yet. `accepted` means Bird has the send and is preparing to deliver. `processed` means Bird has processed the message and queued it for delivery to the recipient's mail server. `canceled` means a scheduled message was canceled before it was sent.
-   *
-   */
   readonly status: EmailMessageStatus;
   /**
-   * Number of recipients currently in the `accepted` state — Bird has the send and is preparing to deliver.
+   * How many recipients are in the `accepted` state, meaning we have the message and are getting ready to deliver it.
    */
   readonly accepted_count: number;
   /**
-   * Number of recipients for whom Bird has processed the message and queued it for delivery.
+   * How many recipients the message has been prepared for and queued for delivery.
    */
   readonly processed_count: number;
   /**
-   * Number of recipients whose messages were accepted by the remote MTA.
+   * How many recipients' messages were accepted by their mail server.
    */
   readonly delivered_count: number;
   /**
@@ -6935,16 +7460,16 @@ export type EmailMessage = {
    */
   readonly complained_count: number;
   /**
-   * Number of recipients in transient delivery deferral; the provider is retrying.
+   * Number of recipients in transient delivery deferral. Their mail server asked for a retry, and delivery attempts continue.
    */
   readonly deferred_count: number;
   /**
-   * Number of recipients rejected before delivery. See the per-recipient `rejection_reason` field on `GET /v1/email/messages/{message_id}/recipients` for the specific cause (suppression match, transmission failure, generation failure, or policy refusal).
+   * Number of recipients rejected before delivery. Read the per-recipient `rejection_reason` field on `GET /v1/email/messages/{message_id}/recipients` for the specific cause.
    *
    */
   readonly rejected_count: number;
   /**
-   * Time between Bird accepting the send and the message being processed for delivery, in milliseconds, for the fastest recipient. Null until the first recipient reaches `processed`.
+   * Time between the send being accepted and the message being prepared for delivery, in milliseconds, for the fastest recipient. Null until the first recipient reaches `processed`.
    *
    */
   readonly processing_latency_ms?: number | null;
@@ -6987,11 +7512,11 @@ export type EmailMessage = {
    */
   readonly template_version_id?: EmailTemplateVersionId | null;
   /**
-   * Structured `{name, value}` filter labels applied to this send. See EmailMessageSendRequest for the tags vs metadata distinction.
+   * Labels on this message, each one a `name` and a `value`, that you can filter and search messages by. Use tags for anything you want to find messages by later, and `metadata` for data you only want handed back to you.
    */
   tags?: Array<Tag>;
   /**
-   * Arbitrary JSON metadata stored on the message object and echoed in webhook payloads. See EmailMessageSendRequest for the tags vs metadata distinction.
+   * Any JSON you kept on the message. We store it and hand it back in webhook payloads, and that is all it does. If you want to search or filter by it, use `tags` instead.
    */
   metadata?: {
     [key: string]: unknown;
@@ -7004,7 +7529,7 @@ export type EmailMessage = {
     [key: string]: unknown;
   } | null;
   /**
-   * Attachment metadata for the send. Empty when no attachments were included. Raw content is not echoed; when content storage is enabled, download an attachment by its `id` via the message's attachment endpoint.
+   * Attachment metadata for the send. Empty when no attachments were included. Raw content is not echoed. When content storage is enabled, download an attachment by its `id` via the message's attachment endpoint.
    */
   attachments?: Array<EmailAttachmentRef>;
   /**
@@ -7020,7 +7545,7 @@ export type EmailMessage = {
    */
   readonly created_at: string;
   /**
-   * Thread this message belongs to. Null until threading is enabled.
+   * Thread this message belongs to, or null when the message is not part of one.
    */
   readonly thread_id?: string | null;
   /**
@@ -8159,12 +8684,16 @@ export type EmailSmtpConfigWritable = {
    */
   ip_pool_id?: string | null;
   /**
-   * Content classification applied to messages submitted over SMTP with this key. Controls suppression policy: `marketing` blocks on all suppression reasons; `transactional` allows delivery through complaint and unsubscribe suppressions.
+   * Content classification applied to messages submitted over SMTP with
+   * this key. Controls suppression policy:
+   *
+   * - `marketing`: Blocks on all suppression reasons.
+   * - `transactional`: Allows delivery through complaint and unsubscribe suppressions.
    *
    */
   category: "marketing" | "transactional";
   /**
-   * Structured `{name, value}` labels applied to every message submitted over SMTP with this key — the same tags used by the email sending API. See EmailMessageSendRequest for how tags are used for filtering and analytics.
+   * Structured `{name, value}` labels applied to every message submitted over SMTP with this key, the same tags used by the email sending API. Use tags to filter and break down your email statistics.
    *
    */
   tags: Array<Tag>;
@@ -8197,12 +8726,19 @@ export type EmailThreadMessageListWritable = {
 } & ListEnvelope;
 
 /**
- * A message in a mailbox conversation, either direction. Message metadata and extracted text remain readable for the mailbox's retention period; the original rendered source (HTML body, raw MIME, attachment bytes) is available through the body, raw, and attachment endpoints for 30 days after the message occurred.
+ * A message in a mailbox conversation, either direction. Message metadata and extracted text stay readable for the mailbox's retention tier. The original rendered source (HTML body, raw MIME, attachment bytes) is available through the body, raw, and attachment endpoints for 30 days after the message occurred.
  *
  */
 export type EmailThreadMessageWritable = {
   /**
-   * Labels on this message. System labels carry its state: a received message holds exactly one placement label — `inbox` for accepted mail, `archive` when its conversation was filed away, `spam` (failed sender authentication), or `blocked` (rejected by the mailbox's receive policy or rules) — plus `unread` until it is read. `trash` marks a message in the trash, either direction. Custom labels share the same list; a message carries at most 20.
+   * Labels on this message. A received message always has exactly one placement label:
+   *
+   * - `inbox`: Accepted mail.
+   * - `archive`: The message's conversation was filed away.
+   * - `spam`: The message failed sender authentication.
+   * - `blocked`: The message was rejected by the mailbox's receive policy or rules.
+   *
+   * A received message also has `unread` until it is read. `trash` marks a message in the trash, in either direction. Custom labels share the same list, and a message has at most 20 labels in total.
    *
    */
   labels: Array<string>;
@@ -8217,7 +8753,7 @@ export type EmailThreadListWritable = {
 } & ListEnvelope;
 
 /**
- * A conversation in a mailbox. Threads group related messages both directions — mail the mailbox received and replies it sent — and carry the conversation-level read state, labels, and participant list. Message counts reflect the messages currently retained under the mailbox's retention period.
+ * A conversation in a mailbox. It groups every message in both directions, the mail the mailbox received and the replies it sent, and it holds the conversation's read state, labels, and participant list. A message is retained until it is trashed or ages past the mailbox's retention tier. Only retained messages count toward the totals below.
  *
  */
 export type EmailThreadWritable = {
@@ -8226,7 +8762,14 @@ export type EmailThreadWritable = {
    */
   contact_id: ContactId | null;
   /**
-   * Labels on this conversation. Exactly one system placement label is always present — `inbox`, `archive` (filed away, done for now), `spam` (the opening message failed sender authentication), or `blocked` (rejected by the mailbox's receive policy or rules) — set by the message that started the conversation. Move a conversation by updating its labels: add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox` — or remove `spam`, `blocked`, or `archive` — to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list; a conversation carries at most 20.
+   * Labels on this conversation. Exactly one system placement label is always present, set by the message that started the conversation:
+   *
+   * - `inbox`: The conversation is in the inbox.
+   * - `archive`: The conversation was filed away and is done for now.
+   * - `spam`: The conversation's opening message failed sender authentication.
+   * - `blocked`: The conversation's opening message was rejected by the mailbox's receive policy or rules.
+   *
+   * Move a conversation by updating its labels. Add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox`, or remove `spam`, `blocked`, or `archive`, to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list, and a conversation has at most 20 labels in total.
    *
    */
   labels: Array<string>;
@@ -8240,12 +8783,12 @@ export type InboundRouteListWritable = {
 } & ListEnvelope;
 
 /**
- * A routing rule that directs inbound mail on one of your domains into a mailbox, or drops it. Routes are evaluated in priority order — lowest number first. Each mailbox's own address is always matched at priority 10 and explicit routes accept 11–1000, so exact-address delivery always takes precedence.
+ * A routing rule that directs inbound mail on one of your domains into a mailbox, or drops it. Routes are tried in priority order, lowest number first. Each mailbox's own address always matches at priority 10 and your own routes take a priority from 11 to 1000, so delivery to an exact address always takes precedence.
  *
  */
 export type InboundRouteWritable = {
   /**
-   * How the route matches recipients. `address` matches one local part; `catch_all` matches every recipient on the domain that nothing else matched.
+   * How the route matches recipients. `address` matches one local part. `catch_all` matches every recipient on the domain that nothing else matched.
    */
   match_type: "address" | "catch_all";
   /**
@@ -8253,7 +8796,7 @@ export type InboundRouteWritable = {
    */
   match_value: string | null;
   /**
-   * What happens to matching mail. `deliver_to_mailbox` delivers it to `target_mailbox_id`; `drop` discards it silently, with nothing stored and no webhook fired.
+   * What happens to matching mail. `deliver_to_mailbox` delivers it to `target_mailbox_id`. `drop` discards it silently, with nothing stored and no webhook fired.
    */
   action: "deliver_to_mailbox" | "drop";
   /**
@@ -8261,7 +8804,7 @@ export type InboundRouteWritable = {
    */
   target_mailbox_id: MailboxId | null;
   /**
-   * Evaluation order — lowest number wins. Explicit routes accept 11–1000 (default 100); the mailbox's own address always matches at priority 10.
+   * The order routes are tried in, lowest number first. Your own routes take a priority from 11 to 1000, and default to 100. A mailbox's own address always matches at priority 10.
    */
   priority: number;
   /**
@@ -8275,7 +8818,7 @@ export type ReceiveRuleListWritable = {
 } & ListEnvelope;
 
 /**
- * A mailbox's sent and received email statistics: a period-wide summary plus a bucketed time series. `period` echoes the range and grain the server computed against; `data` is one row per bucket in chronological order.
+ * A mailbox's sent and received email statistics: a period-wide summary plus a bucketed time series. `period` echoes the range and grain actually used. `data` is one row per bucket in chronological order.
  *
  */
 export type MailboxStatsResponseWritable = {
@@ -8283,7 +8826,7 @@ export type MailboxStatsResponseWritable = {
 };
 
 /**
- * Per-mailbox email activity for one time bucket, bucketed by event time. Sent-mail metrics carry the same delivery, engagement, and latency breakdowns as the email stats endpoints; `received` counts mail that arrived at the mailbox. Buckets with no activity are included with zero counts and null latency percentiles.
+ * Per-mailbox email activity for one time bucket, bucketed by event time. Sent-mail metrics use the same delivery, engagement, and latency breakdowns as the email stats endpoints. `received` counts mail that arrived at the mailbox. Buckets with no activity are included with zero counts and null latency percentiles.
  *
  */
 export type MailboxStatsPointWritable = {
@@ -8293,9 +8836,9 @@ export type MailboxStatsPointWritable = {
 /**
  * Latency percentiles (p50, p95, p99) in milliseconds for the bucket. On the summary endpoint these are computed across the whole period rather than per bucket. Three families are reported:
  *
- * - `processing`: time from accepting the send to handing the message off for delivery, covering internal queue depth and handoff. Measured per processed recipient; null when no recipient in the bucket has reached the processed stage.
- * - `delivery`: time from handoff to the receiving mail server accepting the message, dominated by recipient-side delivery behaviour. Measured per delivered recipient; null when no deliveries occurred in the bucket.
- * - `total`: end-to-end time from accepting the send to delivery, the most useful tile for a customer SLO. Measured per delivered recipient; null when no deliveries occurred in the bucket.
+ * - `processing`: Time from accepting the send to handing the message off for delivery. Measured per processed recipient; null when no recipient in the bucket has reached the processed stage.
+ * - `delivery`: Time from handoff to the receiving mail server accepting the message, dominated by recipient-side delivery behavior. Measured per delivered recipient; null when no deliveries occurred in the bucket.
+ * - `total`: End-to-end time from accepting the send to delivery, and the number most worth watching against your own delivery targets. Measured per delivered recipient; null when no deliveries occurred in the bucket.
  *
  * Each family is reported independently and is omitted entirely when no qualifying event contributed a latency measurement in the bucket (including when latency for that stage has not yet been recorded for the workspace), so `processing` can be present while `delivery` and `total` are absent. A client must handle a missing family, and a null p50/p95/p99 within a present family, by rendering a placeholder rather than assuming a number.
  *
@@ -8305,7 +8848,7 @@ export type EmailLatencyStatsWritable = {
 };
 
 /**
- * Single-row aggregate of the mailbox's email activity across the full requested period. Counts are sums of per-bucket counts across the window; latency percentiles are computed across the whole period rather than summed per bucket. Rates are null when their denominator is zero.
+ * Single-row aggregate of the mailbox's email activity across the full requested period. Counts are sums of per-bucket counts across the window. Latency percentiles are computed across the whole period rather than summed per bucket. Rates are null when their denominator is zero.
  *
  */
 export type MailboxStatsSummaryWritable = {
@@ -8330,15 +8873,24 @@ export type MailboxWritable = {
    */
   default_reply_to: string | null;
   /**
-   * Which inbound mail the mailbox accepts. `open` accepts everything not blocked by a rule; `replies_only` accepts only replies to messages this mailbox has sent (a reply must match a message the mailbox sent, not merely land in an existing thread); `allowlist` accepts only senders matching an allow rule (replies to prior outbound are always admitted unless blocked); `drop` stores nothing.
+   * Which inbound mail the mailbox accepts:
+   *
+   * - `open`: Accepts everything not blocked by a rule.
+   * - `replies_only`: Accepts only replies to messages this mailbox has
+   * sent. A reply must match a message the mailbox sent. Landing in an
+   * existing thread by itself does not count.
+   * - `allowlist`: Accepts only senders matching an allow rule. Replies to
+   * prior outbound mail are always admitted unless blocked.
+   * - `drop`: Stores nothing.
+   *
    */
   receive_policy: "open" | "replies_only" | "allowlist" | "drop";
   /**
-   * How long the mailbox remembers message metadata and extracted text. Original rendered source (HTML, raw message, attachments) is always available for 30 days regardless of tier. `3y` and `10y` are reserved future tiers.
+   * How long the mailbox remembers message metadata and extracted text. Original rendered source (HTML, raw message, attachments) is always available for 30 days regardless of tier.
    */
   retention_tier: "30d" | "90d" | "1y";
   /**
-   * Your own key/value data attached to the mailbox. Up to 2 KB; keys starting with `__bird` are reserved.
+   * Your own key/value data attached to the mailbox. Up to 2 KB. Keys starting with `__bird` are reserved.
    */
   metadata: {
     [key: string]: unknown;
@@ -8346,7 +8898,7 @@ export type MailboxWritable = {
 };
 
 /**
- * The attachments on a received email. Not paginated — a message carries a small, bounded set of attachments, all returned at once.
+ * The attachments on a received email. There is no pagination here, because a message only has a small number of attachments and they all come back at once.
  */
 export type InboundAttachmentListWritable = {
   /**
@@ -8356,7 +8908,7 @@ export type InboundAttachmentListWritable = {
 };
 
 /**
- * Metadata for a file attached to a received email. The raw bytes are fetched separately with `GET /v1/email/inbound-messages/{id}/attachments/{attachment_id}`.
+ * Metadata for a file attached to a received email. The raw bytes are fetched separately with `GET /v1/email/inbound-messages/{inbound_message_id}/attachments/{attachment_id}`.
  *
  */
 export type InboundAttachmentWritable = {
@@ -8382,7 +8934,7 @@ export type InboundEmailMessageListWritable = {
 } & ListEnvelope;
 
 /**
- * An email Bird received on your behalf, parsed from the original message. Fetch the body with `/body`, the original MIME with `/raw`, and attachment bytes with `/attachments/{attachment_id}`.
+ * An email received on your behalf, parsed from the original message. Fetch the body with `/body`, the original MIME with `/raw`, and attachment bytes with `/attachments/{attachment_id}`.
  *
  */
 export type InboundEmailMessageWritable = {
@@ -8407,36 +8959,40 @@ export type InboundEmailMessageWritable = {
    */
   message_id: string | null;
   /**
-   * In-Reply-To header — the Message-ID this message replies to, or null when it is not a reply.
+   * The In-Reply-To header, which holds the Message-ID this message is replying to. Null when the message is not a reply.
    */
   in_reply_to: string | null;
   /**
-   * References header — the chain of Message-IDs in this conversation, oldest first. Absent when the message had no References header.
+   * The References header, which holds every Message-ID in this conversation, oldest first. Left out when the message arrived without one.
    */
   references?: Array<string>;
   /**
-   * Conversation this message belongs to. Always null until threading is available.
+   * Conversation this message belongs to, or null when it is not grouped into one.
    */
   thread_id: string | null;
   /**
-   * Whether the sender of the received message was authenticated. `pass` means the sender's identity was verified; `fail` means it was checked and did not verify; `unknown` means no verdict is available and the sender should not be treated as verified.
+   * Whether the sender of the received message was authenticated:
+   *
+   * - `pass`: The sender's identity was verified.
+   * - `fail`: The sender's identity was checked and did not verify.
+   * - `unknown`: No verdict is available, so the sender should not be treated as verified.
    *
    */
   authentication: "pass" | "fail" | "unknown" | null;
   /**
-   * Whether SPF passed for the sender, parsed from the message's authentication results. Null when the result did not carry an SPF verdict.
+   * Whether SPF passed for the sender, parsed from the message's authentication results. Null when the authentication results did not include an SPF verdict.
    */
   spf_pass: boolean | null;
   /**
-   * Whether DKIM passed for the sender, parsed from the message's authentication results. Null when the result did not carry a DKIM verdict.
+   * Whether DKIM passed for the sender, parsed from the message's authentication results. Null when the authentication results did not include a DKIM verdict.
    */
   dkim_pass: boolean | null;
   /**
-   * Whether DMARC passed for the sender, parsed from the message's authentication results. Null when the result did not carry a DMARC verdict.
+   * Whether DMARC passed for the sender, parsed from the message's authentication results. Null when the authentication results did not include a DMARC verdict.
    */
   dmarc_pass: boolean | null;
   /**
-   * Spam score for the message. Always null at present; reserved for a future content-scoring capability.
+   * Spam score on the received message, or null when there is no score.
    */
   spam_score: number | null;
   /**
@@ -8453,7 +9009,7 @@ export type InboundAddressListWritable = {
 } & ListEnvelope;
 
 /**
- * A Bird-minted email address that receives mail on your behalf. Forward a real mailbox (for example, a support inbox) to this address and Bird parses every message it receives into a received email.
+ * An email address we create for you, which receives mail on your behalf. Forward a real mailbox (for example, a support inbox) to this address, and every message that arrives there is parsed into a received email you can read back.
  *
  */
 export type InboundAddressWritable = {
@@ -8477,17 +9033,35 @@ export type SuppressionWritable = {
   email: string;
   scope: SuppressionScope;
   /**
-   * Why the address is suppressed: `hard_bounce` (a delivery permanently failed), `complaint` (the recipient reported a message as spam), `unsubscribe` (the recipient opted out), or `manual` (added through the API or dashboard). An address can hold one record per reason. This list grows over time; treat unknown values as informational rather than rejecting the record.
+   * Why the address is suppressed:
+   *
+   * - `hard_bounce`: A delivery permanently failed.
+   * - `complaint`: The recipient reported a message as spam.
+   * - `unsubscribe`: The recipient opted out.
+   * - `manual`: Added through the API or dashboard.
+   *
+   * An address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.
    *
    */
   reason: string;
   /**
-   * How the suppression came to exist: `bounce_event` (created automatically from a hard bounce), `complaint_event` (from a spam complaint), `unsubscribe_event` (from an unsubscribe reported for a message, such as the recipient's mail client's unsubscribe action), `unsubscribe_link` (the recipient opted out through the unsubscribe page linked from a message), `api_key` (added through the API with an API key), or `user` (added by a user in the dashboard). This list grows over time; treat unknown values as informational rather than rejecting the record.
+   * How the suppression came to exist:
+   *
+   * - `bounce_event`: Created automatically from a hard bounce.
+   * - `complaint_event`: Created from a spam complaint.
+   * - `unsubscribe_event`: Created from an unsubscribe reported for a
+   * message, such as the recipient's mail client's unsubscribe action.
+   * - `unsubscribe_link`: The recipient opted out through the unsubscribe
+   * page linked from a message.
+   * - `api_key`: Added through the API with an API key.
+   * - `user`: Added by a user in the dashboard.
+   *
+   * This list grows over time. Treat unknown values as informational rather than rejecting the record.
    *
    */
   origin: string;
   /**
-   * Which sends the suppression blocks. `all` blocks every message category, including transactional. `non_transactional` blocks marketing and future non-transactional categories but allows transactional, so a recipient who complained or unsubscribed can still receive mail like password resets. `category` is reserved for category-specific preferences. This list grows over time; treat an unknown value as blocking at least non-transactional mail.
+   * Which sends the suppression blocks. `all` blocks every message category, including transactional. `non_transactional` blocks marketing but allows transactional, so a recipient who complained or unsubscribed can still receive mail like password resets. `category` scopes the block to a preference category and blocks every category until one is set. This list grows over time, and any value other than `non_transactional` blocks every category, so treat an unknown value as blocking the send.
    *
    */
   applies_to: string;
@@ -8609,7 +9183,7 @@ export type EmailStatsByBroadcastResponseWritable = {
 };
 
 /**
- * Aggregate delivery, engagement, and latency stats for the messages of a single broadcast over the requested period.
+ * Delivery, engagement and latency figures for one broadcast's messages over the period you asked for.
  */
 export type EmailBroadcastStatsPointWritable = {
   [key: string]: never;
@@ -8644,14 +9218,15 @@ export type EmailStatsByLocationResponseWritable = {
 };
 
 /**
- * Per-template breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * A breakdown of stats per template for the requested period. Rows are ranked by the `sort` metric (`processed` by default) descending, and capped at the requested `limit` (50 by default, 200 at most).
+ *
  */
 export type EmailStatsByTemplateResponseWritable = {
   [key: string]: never;
 };
 
 /**
- * Aggregate delivery, engagement, and latency stats for the messages sent with a single template over the requested period.
+ * Delivery, engagement, and latency numbers for every message sent with one template over the requested period.
  */
 export type EmailTemplateStatsPointWritable = {
   [key: string]: never;
@@ -8681,10 +9256,10 @@ export type EmailStatsByMailboxProviderRegionResponseWritable = {
 /**
  * Latency percentiles (p50, p95, p99) in milliseconds for the messages in this breakdown row, for breakdowns whose dimension is known only from delivery onward (sending IP, mailbox provider).
  *
- * - `delivery`: time from handing the message off to the receiving mail server accepting it. Null when no deliveries occurred for this row in the period.
- * - `total`: end-to-end time from accepting the send to delivery. Null when no deliveries occurred for this row in the period.
+ * - `delivery`: Time from handing the message off to the receiving mail server accepting it. Null when no deliveries occurred for this row in the period.
+ * - `total`: End-to-end time from accepting the send to delivery. Null when no deliveries occurred for this row in the period.
  *
- * These breakdowns have no `processing` latency family. Bird only learns a row's dimension (the sending IP or recipient mailbox provider) after the upstream mail-transfer system reports delivery, bounce, deferral, or late bounce; the accept-to-processed phase happens before that binding decision, so it cannot be attributed to the dimension. Use `GET /v1/email/stats/daily` for workspace-wide processing-latency percentiles.
+ * These breakdowns have no `processing` latency family. Which row a message belongs to, meaning which sending IP carried it or which mailbox provider received it, is only known once the receiving mail server has reported back with a delivery, a bounce, a deferral or a late bounce. The accept-to-processed phase is over before then, so there is no way to attribute it to a row. Use `GET /v1/email/stats/daily` for processing-latency percentiles across the whole workspace.
  *
  */
 export type EmailDeliveryLatencyStatsWritable = {
@@ -8707,7 +9282,7 @@ export type EmailStatsByMailboxProviderResponseWritable = {
 };
 
 /**
- * Delivery, engagement, and deliverability stats for messages grouped by a single recipient mailbox provider (`gmail`, `microsoft`, `yahoo`, `apple`, ...) over the requested period. A recipient's mailbox provider is reported by the receiving mail system, so per-provider rows cover the delivery stage onward: they omit the `accepted` and `processed` counts and the `processing` latency family, which never appear (they are not returned as null). Engagement (opens, clicks, and their rates) is included because those events are post-delivery and carry the mailbox provider.
+ * Delivery, engagement, and deliverability stats for messages grouped by a single recipient mailbox provider (`gmail`, `microsoft`, `yahoo`, `apple`, ...) over the requested period. We learn a recipient's mailbox provider from the receiving mail server, so per-provider rows cover the delivery stage onward: they omit the `accepted` and `processed` counts and the `processing` latency family, which never appear at all rather than appearing as null. Engagement (opens and clicks, and their rates) is included because those events happen after delivery, once the mailbox provider is already known.
  *
  */
 export type EmailMailboxProviderStatsPointWritable = {
@@ -8750,7 +9325,7 @@ export type EmailStatsBySendingIpResponseWritable = {
 };
 
 /**
- * Delivery and latency stats for messages sent from a single IP address over the requested period. Per-IP attribution begins only after a message is processed: the upstream mail-transfer system reports the IP it used on delivery, bounce, deferral, and late-bounce events, but not at acceptance or processing time. As a result, per-IP rows omit the `accepted` and `processed` counts and the `processing` latency family, which never appear (they are not returned as null).
+ * Delivery and latency stats for messages sent from a single IP address over the requested period. Per-IP attribution begins only after a message is processed: we learn which IP a message used only from its delivery, bounce, deferral, and late-bounce events, not from its acceptance or processing. As a result, per-IP rows omit the `accepted` and `processed` counts and the `processing` latency family. Those fields never appear on a per-IP row. They are not returned as null.
  *
  */
 export type EmailSendingIpStatsPointWritable = {
@@ -8758,9 +9333,21 @@ export type EmailSendingIpStatsPointWritable = {
 };
 
 /**
- * Single-row aggregate across the full requested period, including delivery and engagement counts plus derived rates. Use this endpoint for KPI tiles, campaign reporting, and any metric that needs a meaningful denominator; the daily and hourly endpoints carry the same rates per bucket, dividing each bucket's own counts.
+ * A single row that aggregates delivery and engagement counts, plus derived
+ * rates, across the whole requested period. Use this endpoint for KPI
+ * tiles, campaign reporting, and anywhere you need a rate with a meaningful
+ * denominator. The daily and hourly endpoints report the same rates, but
+ * per bucket, each one dividing that bucket's own counts.
  *
- * Every count is a sum of per-bucket counts across the window (per day for day windows, per hour for hour windows), so a recipient (or message) active in two buckets contributes one to each bucket and two to the period total. This matches common provider reporting and is not double-counting; it does not yield a period-distinct count. Latency percentiles, by contrast, are computed across the whole period rather than summed per bucket. Rates are null when their denominator is zero.
+ * Every count is a sum of per-bucket counts across the window (per day for
+ * day windows, per hour for hour windows). A recipient, or a message, that
+ * is active in two buckets contributes to each of them, so it is counted
+ * twice in the period total. This matches how most mailbox providers report
+ * their own numbers. The effect to plan for is that the total is a sum of
+ * per-bucket activity rather than a count of distinct recipients or messages
+ * across the whole period. Latency percentiles work differently: they are computed
+ * once across the whole period rather than summed from the buckets. A rate
+ * is null when its denominator is zero.
  *
  */
 export type EmailStatsSummaryWritable = {
@@ -8790,7 +9377,7 @@ export type EmailTagStatsPointWritable = {
 };
 
 /**
- * Time-series stats payload. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
+ * Time-series stats payload. `period` echoes the range and bucket grain actually computed against. `data` is one row per bucket in chronological order.
  *
  */
 export type EmailStatsResponseWritable = {
@@ -9009,10 +9596,9 @@ export type AudienceWritable = {
    */
   description?: string | null;
   /**
-   * How the audience's recipients are determined. `static` (the default) is an explicit member list you manage via the API. `dynamic` and `external` are preview values and currently unavailable; creating an audience with either returns a validation error.
-   *
+   * How the audience's recipients are determined. `static` is an explicit member list you manage by adding and removing contacts.
    */
-  type: "static" | "dynamic" | "external";
+  type: "static";
 };
 
 export type ContactListWritable = {
@@ -9031,7 +9617,7 @@ export type EmailEventListWritable = {
 
 export type EmailEventWritable = {
   /**
-   * Event type. `email.processed` means Bird has processed the message and queued it for delivery.
+   * The event's type. `email.processed`, for example, means the message has been processed and queued for delivery.
    *
    */
   type: EmailEventType;
@@ -9049,7 +9635,7 @@ export type EmailEventWritable = {
    */
   bounce_type?: "hard" | "soft" | "undetermined" | "admin" | "block" | null;
   /**
-   * Numeric bounce classification for fine-grained deliverability triage. Lets you distinguish, for example, a DNS failure from a spam block when both would be `bounce_type: soft` or `bounce_type: block`. Present on `email.bounced`, `email.out_of_band_bounce`, and `email.deferred`.
+   * A more detailed numeric bounce code, useful for telling apart failures that share the same `bounce_type`. For example, a DNS failure and a spam block can both come through as `bounce_type: soft` or `bounce_type: block`; this field tells you which one actually happened. Present on `email.bounced`, `email.out_of_band_bounce`, and `email.deferred` events.
    *
    */
   bounce_class?: number | null;
@@ -9059,11 +9645,19 @@ export type EmailEventWritable = {
    */
   bounce_code?: string | null;
   /**
-   * Human-readable bounce reason. Present on `email.bounced` and `email.deferred` events.
+   * The bounce reason, in plain language, as reported by the mail server. Present on `email.bounced` and `email.deferred` events.
    */
   bounce_description?: string | null;
   /**
-   * Specific cause of rejection. Present on `email.rejected` events only. See `EmailRecipient.rejection_reason` for the meaning of each value.
+   * Specific cause of rejection. Present on `email.rejected` events only.
+   *
+   * - `recipient_suppressed`: The recipient is on the workspace suppression list.
+   * - `transmission_failed`: The message could not be transmitted for delivery.
+   * - `generation_failure`: The message could not be built for delivery, because of a template or content issue.
+   * - `policy_rejection`: The message was refused by sending policy.
+   * - `domain_unverified`: The sending domain was not verified.
+   * - `quota_exceeded`: The organization's send quota was reached.
+   * - `recipient_not_allowed`: This recipient was not allowed for this send. For a send from the shared onboarding domain, every recipient has to be a verified member of the workspace.
    *
    */
   rejection_reason?:
@@ -9076,12 +9670,12 @@ export type EmailEventWritable = {
     | "recipient_not_allowed"
     | null;
   /**
-   * The IP address Bird used to send this message. Useful when investigating deliverability issues that correlate with specific IPs. Present on `email.delivered`, `email.bounced`, `email.out_of_band_bounce`, and `email.deferred` events.
+   * The IP address used to send this message. Useful for spotting a deliverability problem that is tied to one specific sending IP rather than affecting all of them. Present on `email.delivered`, `email.bounced`, `email.out_of_band_bounce`, and `email.deferred` events.
    *
    */
   sending_ip?: string | null;
   /**
-   * True when the open was auto-fetched by an inbox privacy feature (Apple Mail Privacy Protection, Gmail image proxy) rather than a real user action. Useful for accurate open-rate calculation. Present on `email.opened` only.
+   * True when the open was auto-fetched by an inbox privacy feature (Apple Mail Privacy Protection, the Gmail image proxy) rather than a person actually opening the message. Use it to calculate open rate accurately. Present on `email.opened` events only.
    *
    */
   is_prefetched?: boolean | null;
@@ -9151,7 +9745,7 @@ export type EmailMessageListWritable = {
 } & ListEnvelope;
 
 /**
- * Attachment metadata returned on API reads. The original content is not echoed back inline — only the metadata needed for display and audit. To download the raw attachment bytes (while content storage is enabled and within the retention window), use `GET /v1/email/messages/{message_id}/attachments/{attachment_id}`, which returns the file with its own content type and a Content-Disposition filename.
+ * Attachment metadata returned on API reads. The original content is not sent back inline, only the metadata you need to display and audit it. To download the raw attachment bytes (while content storage is enabled and within the retention window), use `GET /v1/email/messages/{message_id}/attachments/{attachment_id}`, which returns the file with its own content type and a Content-Disposition filename.
  *
  */
 export type EmailAttachmentRefWritable = {
@@ -9184,7 +9778,7 @@ export type EmailMessageWritable = {
    */
   from: EmailAddress;
   /**
-   * Primary recipients. Length is the recipient count; use the broadcasts endpoint for audience-targeted sends. Each entry's `name` is present when a display name was provided on the send.
+   * Primary recipients. Length is the recipient count. Use the broadcasts endpoint for audience-targeted sends. Each entry's `name` is present when a display name was provided on the send.
    */
   to: Array<EmailAddress>;
   /**
@@ -9206,17 +9800,17 @@ export type EmailMessageWritable = {
    */
   reply_to?: Array<EmailAddress> | null;
   /**
-   * Structured `{name, value}` filter labels applied to this send. See EmailMessageSendRequest for the tags vs metadata distinction.
+   * Labels on this message, each one a `name` and a `value`, that you can filter and search messages by. Use tags for anything you want to find messages by later, and `metadata` for data you only want handed back to you.
    */
   tags?: Array<Tag>;
   /**
-   * Arbitrary JSON metadata stored on the message object and echoed in webhook payloads. See EmailMessageSendRequest for the tags vs metadata distinction.
+   * Any JSON you kept on the message. We store it and hand it back in webhook payloads, and that is all it does. If you want to search or filter by it, use `tags` instead.
    */
   metadata?: {
     [key: string]: unknown;
   };
   /**
-   * Attachment metadata for the send. Empty when no attachments were included. Raw content is not echoed; when content storage is enabled, download an attachment by its `id` via the message's attachment endpoint.
+   * Attachment metadata for the send. Empty when no attachments were included. Raw content is not echoed. When content storage is enabled, download an attachment by its `id` via the message's attachment endpoint.
    */
   attachments?: Array<EmailAttachmentRefWritable>;
   /**
@@ -9367,7 +9961,7 @@ export type EmailStatsTemplateFilter = string;
 export type StatsTimezone = string;
 
 /**
- * Filter by tag. Accepts `name` to match any message carrying that tag name, or `name:value` to match a specific tag pair (e.g. `category:welcome`). Repeat the parameter to AND-combine several tag filters.
+ * Filter by tag. Accepts `name` to match any message carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A message must match every tag listed to be returned.
  *
  */
 export type MessageTagFilter = Array<string>;
@@ -9414,15 +10008,16 @@ export type StartingAfter = string;
 export type PaginationLimit = number;
 
 /**
- * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+ * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+ *
  * Two distinct 409 errors signal misuse:
- * - `request_in_progress` (E01004): the same key is currently being
- * processed by a concurrent request. Wait briefly and retry; the lock
- * expires within 30 seconds.
- * - `idempotency_key_reuse` (E01005): the same key has already completed
+ *
+ * - `request_in_progress` (E01004): The same key is currently being
+ * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+ * - `idempotency_key_reuse` (E01005): The same key has already completed
  * against a different request body or method. Generate a new key.
  *
- * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+ * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
  *
  */
 export type IdempotencyKey = string;
@@ -9435,15 +10030,16 @@ export type PublishRealtimeAppEventData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -9511,15 +10107,16 @@ export type PublishRealtimeAppBatchData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -9783,15 +10380,16 @@ export type DisconnectRealtimeAppMemberData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -9858,15 +10456,16 @@ export type SendRealtimeAppMemberEventData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -9959,7 +10558,7 @@ export type ListEmailMessagesData = {
      */
     status?: EmailMessageStatus;
     /**
-     * Filter by tag. Accepts `name` to match any message carrying that tag name, or `name:value` to match a specific tag pair (e.g. `category:welcome`). Repeat the parameter to AND-combine several tag filters.
+     * Filter by tag. Accepts `name` to match any message carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A message must match every tag listed to be returned.
      *
      */
     tag?: Array<string>;
@@ -9968,12 +10567,12 @@ export type ListEmailMessagesData = {
      */
     category?: EmailMessageCategory;
     /**
-     * Filter by recipient address. Exact match against any `to`/`cc`/`bcc` recipient on the message; normalised to lowercase before comparison.
+     * Filter by recipient address. Exact match against any `to`/`cc`/`bcc` recipient on the message. The address is normalized to lowercase before comparison.
      *
      */
     to?: string;
     /**
-     * Filter by sender address. Exact match against the message `from` field; normalised to lowercase before comparison.
+     * Filter by sender address. Exact match against the message `from` field. The address is normalized to lowercase before comparison.
      *
      */
     from?: string;
@@ -10017,15 +10616,16 @@ export type CreateEmailMessageData = {
   body: EmailMessageSendRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -10088,15 +10688,16 @@ export type CreateEmailMessageBatchData = {
   body: EmailMessageBatchRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -10207,15 +10808,16 @@ export type CancelEmailMessageData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -10354,15 +10956,16 @@ export type CreateContactData = {
   body: ContactCreateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -10420,15 +11023,16 @@ export type CreateContactBatchData = {
   body: ContactUpsertRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -10483,15 +11087,16 @@ export type DeleteContactData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -10591,15 +11196,16 @@ export type UpdateContactData = {
   body: ContactUpdateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -10718,15 +11324,16 @@ export type CreateContactPropertyData = {
   body: ContactPropertyCreateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -10833,15 +11440,16 @@ export type UpdateContactPropertyData = {
   body: ContactPropertyUpdateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -10905,15 +11513,16 @@ export type ArchiveContactPropertyData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -10972,15 +11581,16 @@ export type UnarchiveContactPropertyData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -11094,15 +11704,16 @@ export type CreateAudienceData = {
   body: AudienceCreateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -11157,15 +11768,16 @@ export type DeleteAudienceData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -11271,15 +11883,16 @@ export type UpdateAudienceData = {
   body: AudienceUpdateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -11408,15 +12021,16 @@ export type AssignAudienceContactsData = {
   body: AudienceContactsAddRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -11480,15 +12094,16 @@ export type UnassignAudienceContactsData = {
   body: AudienceContactsRemoveRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -11552,15 +12167,16 @@ export type UnassignAudienceContactData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -11666,7 +12282,7 @@ export type ListSmsMessagesData = {
      */
     from?: string;
     /**
-     * Filter by tag. Accepts `name` to match any message carrying that tag name, or `name:value` to match a specific tag pair (e.g. `category:welcome`). Repeat the parameter to AND-combine several tag filters.
+     * Filter by tag. Accepts `name` to match any message carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A message must match every tag listed to be returned.
      *
      */
     tag?: Array<string>;
@@ -11715,15 +12331,16 @@ export type CreateSmsMessageData = {
   body: SmsMessageSendRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -11782,15 +12399,16 @@ export type CreateSmsMessageBatchData = {
   body: SmsMessageBatchRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -12000,6 +12618,160 @@ export type GetSmsTemplateResponses = {
 export type GetSmsTemplateResponse =
   GetSmsTemplateResponses[keyof GetSmsTemplateResponses];
 
+export type CreatePhoneNumberLookupData = {
+  body: PhoneNumberLookupRequest;
+  headers?: {
+    /**
+     * Workspace context. Required for session auth; derived from API key otherwise.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/lookup/phone-number";
+};
+
+export type CreatePhoneNumberLookupErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Unprocessable request. Either field validation failed (type: validation_error, includes details array) or a business rule was violated (e.g. domain_not_verified). Both use the unified Error envelope; validation errors include the details array.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The data behind this endpoint is temporarily unavailable. The request is safe to retry; responses resume automatically once availability is restored.
+   *
+   */
+  503: Error;
+};
+
+export type CreatePhoneNumberLookupError =
+  CreatePhoneNumberLookupErrors[keyof CreatePhoneNumberLookupErrors];
+
+export type CreatePhoneNumberLookupResponses = {
+  /**
+   * What we can tell you about the number.
+   */
+  200: PhoneNumberLookup;
+};
+
+export type CreatePhoneNumberLookupResponse =
+  CreatePhoneNumberLookupResponses[keyof CreatePhoneNumberLookupResponses];
+
+export type CreateEmailLookupData = {
+  body: EmailLookupRequest;
+  headers?: {
+    /**
+     * Workspace context. Required for session auth; derived from API key otherwise.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/lookup/email";
+};
+
+export type CreateEmailLookupErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Unprocessable request. Either field validation failed (type: validation_error, includes details array) or a business rule was violated (e.g. domain_not_verified). Both use the unified Error envelope; validation errors include the details array.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The data behind this endpoint is temporarily unavailable. The request is safe to retry; responses resume automatically once availability is restored.
+   *
+   */
+  503: Error;
+};
+
+export type CreateEmailLookupError =
+  CreateEmailLookupErrors[keyof CreateEmailLookupErrors];
+
+export type CreateEmailLookupResponses = {
+  /**
+   * What we can tell you about the address.
+   */
+  200: EmailLookup;
+};
+
+export type CreateEmailLookupResponse =
+  CreateEmailLookupResponses[keyof CreateEmailLookupResponses];
+
 export type CreateVerificationData = {
   body: VerificationCreateRequest;
   headers?: {
@@ -12008,15 +12780,16 @@ export type CreateVerificationData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -12080,15 +12853,16 @@ export type CreateVerificationCheckData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -12156,15 +12930,16 @@ export type CreateVerificationNextChannelData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -12270,7 +13045,7 @@ export type ListWhatsAppMessagesData = {
      */
     category?: WhatsAppTemplateCategory;
     /**
-     * Filter by tag. Accepts `name` to match any message carrying that tag name, or `name:value` to match a specific tag pair (e.g. `category:welcome`). Repeat the parameter to AND-combine several tag filters.
+     * Filter by tag. Accepts `name` to match any message carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A message must match every tag listed to be returned.
      *
      */
     tag?: Array<string>;
@@ -12319,15 +13094,16 @@ export type CreateWhatsAppMessageData = {
   body: WhatsAppMessageSendRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -12687,7 +13463,7 @@ export type GetEmailStatsByTagData = {
   path?: never;
   query?: {
     /**
-     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to 29 days before `to`, keeping the defaulted window within the 720-hour trend cap.
+     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
     from?: string;
     /**
@@ -12700,11 +13476,11 @@ export type GetEmailStatsByTagData = {
      */
     timezone?: string;
     /**
-     * Not supported on breakdown endpoints; supplying it returns 422. To compare categories use `GET /v1/email/stats/categories`; the summary, daily, and hourly statistics accept `category` as a filter.
+     * Not supported on breakdown endpoints. Supplying it returns 422. To compare categories, use `GET /v1/email/stats/categories`. The summary, daily, and hourly statistics accept `category` as a filter.
      */
     category?: string;
     /**
-     * Metric to rank rows by, applied descending. Any count or rate in the response may be used; rows whose rate is undefined (zero denominator) sort last. Defaults to `processed`.
+     * Metric to rank rows by, applied descending. Any count or rate in the response can be used. A row whose rate is undefined because its denominator is zero sorts last. It defaults to `processed`.
      *
      */
     sort?: EmailStatsSortMetric;
@@ -12713,7 +13489,7 @@ export type GetEmailStatsByTagData = {
      */
     limit?: number;
     /**
-     * When true, each row also carries a `trend` array: a short per-bucket series of that row's delivery and engagement rates over the window. Returned only when `limit` is 50 or fewer and the window is at most 90 days (trend_grain=daily) or 720 hours (trend_grain=hourly); a larger request returns 422. When `from` is omitted and `trend_grain=hourly`, the default window is 30 days (720 hours), so a request built entirely from defaults always fits the cap.
+     * When true, each row also gets a `trend` array: a short per-bucket series showing that tag's delivery and engagement rates over the window. This only works when `limit` is 50 or fewer and the window is at most 90 days for `trend_grain=daily` or 720 hours for `trend_grain=hourly`. Ask for more and you get a 422. When you leave `from` out and use `trend_grain=hourly`, the default window tightens to 29 days before `to` (720 hours total), so a request built entirely from defaults always fits inside the cap.
      *
      */
     include_trend?: boolean;
@@ -12879,7 +13655,7 @@ export type GetEmailStatsBySendingIpData = {
   path?: never;
   query?: {
     /**
-     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to 29 days before `to`, keeping the defaulted window within the 720-hour trend cap.
+     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
     from?: string;
     /**
@@ -12892,11 +13668,11 @@ export type GetEmailStatsBySendingIpData = {
      */
     timezone?: string;
     /**
-     * Not supported on breakdown endpoints; supplying it returns 422. To compare categories use `GET /v1/email/stats/categories`; the summary, daily, and hourly statistics accept `category` as a filter.
+     * Not supported on breakdown endpoints. Supplying it returns 422. To compare categories, use `GET /v1/email/stats/categories`. The summary, daily, and hourly statistics accept `category` as a filter.
      */
     category?: string;
     /**
-     * Metric to rank IPs by, applied descending. `bounces.block` surfaces the IPs whose reputation is most likely degraded. Rows whose rate is undefined (zero denominator) sort last. Defaults to `delivered`. Engagement metrics (a sending IP carries no engagement), `processed`, `rejected`, and `oob_bounces` are not sortable here.
+     * Metric to rank IPs by, applied descending. Sorting by `bounces.block` puts the IPs whose reputation is most likely degraded at the top. A row whose rate is undefined because its denominator is zero sorts last. It defaults to `delivered`. A sending IP has no engagement, so engagement metrics aren't sortable here, and neither are `processed`, `rejected`, or `oob_bounces`.
      *
      */
     sort?:
@@ -12922,7 +13698,7 @@ export type GetEmailStatsBySendingIpData = {
      */
     limit?: number;
     /**
-     * When true, each row also carries a `trend` array: a short per-bucket series of that IP's delivery rates over the window (per-IP rows have no engagement, so each trend point's open and click rates read 0 in buckets that had deliveries and null in buckets that had none). Returned only when `limit` is 50 or fewer and the window is at most 90 days (trend_grain=daily) or 720 hours (trend_grain=hourly); a larger request returns 422. When `from` is omitted and `trend_grain=hourly`, the default window is 30 days (720 hours), so a request built entirely from defaults always fits the cap.
+     * When true, each row also gets a `trend` array: a short per-bucket series showing that IP's delivery rates over the window. A trend point's open and click rates read `0` in a bucket that had deliveries and `null` in one that had none, because a sending IP has no engagement data. This only works when `limit` is 50 or fewer and the window is at most 90 days for `trend_grain=daily` or 720 hours for `trend_grain=hourly`. Ask for more and you get a 422. When you leave `from` out and use `trend_grain=hourly`, the default window tightens to 29 days before `to` (720 hours total), so a request built entirely from defaults always fits inside the cap.
      *
      */
     include_trend?: boolean;
@@ -12985,7 +13761,7 @@ export type GetEmailStatsBySendingDomainData = {
   path?: never;
   query?: {
     /**
-     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to 29 days before `to`, keeping the defaulted window within the 720-hour trend cap.
+     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
     from?: string;
     /**
@@ -12998,11 +13774,11 @@ export type GetEmailStatsBySendingDomainData = {
      */
     timezone?: string;
     /**
-     * Not supported on breakdown endpoints; supplying it returns 422. To compare categories use `GET /v1/email/stats/categories`; the summary, daily, and hourly statistics accept `category` as a filter.
+     * Not supported on breakdown endpoints. Supplying it returns 422. To compare categories, use `GET /v1/email/stats/categories`. The summary, daily, and hourly statistics accept `category` as a filter.
      */
     category?: string;
     /**
-     * Metric to rank rows by, applied descending. Any count or rate in the response may be used; rows whose rate is undefined (zero denominator) sort last. Defaults to `processed`.
+     * Metric to rank rows by, applied descending. Any count or rate in the response can be used. A row whose rate is undefined because its denominator is zero sorts last. It defaults to `processed`.
      *
      */
     sort?: EmailStatsSortMetric;
@@ -13011,7 +13787,7 @@ export type GetEmailStatsBySendingDomainData = {
      */
     limit?: number;
     /**
-     * When true, each row also carries a `trend` array: a short per-bucket series of that row's delivery and engagement rates over the window. Returned only when `limit` is 50 or fewer and the window is at most 90 days (trend_grain=daily) or 720 hours (trend_grain=hourly); a larger request returns 422. When `from` is omitted and `trend_grain=hourly`, the default window is 30 days (720 hours), so a request built entirely from defaults always fits the cap.
+     * When true, each row also gets a `trend` array: a short per-bucket series showing that domain's delivery and engagement rates over the window. This only works when `limit` is 50 or fewer and the window is at most 90 days for `trend_grain=daily` or 720 hours for `trend_grain=hourly`. Ask for more and you get a 422. When you leave `from` out and use `trend_grain=hourly`, the default window tightens to 29 days before `to` (720 hours total), so a request built entirely from defaults always fits inside the cap.
      *
      */
     include_trend?: boolean;
@@ -13074,7 +13850,7 @@ export type GetEmailStatsByCategoryData = {
   path?: never;
   query?: {
     /**
-     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to 29 days before `to`, keeping the defaulted window within the 720-hour trend cap.
+     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
     from?: string;
     /**
@@ -13087,7 +13863,7 @@ export type GetEmailStatsByCategoryData = {
      */
     timezone?: string;
     /**
-     * Metric to rank rows by, applied descending. Any count or rate in the response may be used; rows whose rate is undefined (zero denominator) sort last. Defaults to `processed`.
+     * Metric to rank rows by, applied descending. Any count or rate in the response can be used. A row whose rate is undefined because its denominator is zero sorts last. It defaults to `processed`.
      *
      */
     sort?: EmailStatsSortMetric;
@@ -13096,7 +13872,7 @@ export type GetEmailStatsByCategoryData = {
      */
     limit?: number;
     /**
-     * When true, each row also carries a `trend` array: a short per-bucket series of that category's delivery and engagement rates over the window. Returned only when `limit` is 50 or fewer and the window is at most 90 days (trend_grain=daily) or 720 hours (trend_grain=hourly); a larger request returns 422. When `from` is omitted and `trend_grain=hourly`, the default window is 30 days (720 hours), so a request built entirely from defaults always fits the cap.
+     * When true, each row also gets a `trend` array: a short per-bucket series showing that category's delivery and engagement rates over the window. This only works when `limit` is 50 or fewer and the window is at most 90 days for `trend_grain=daily` or 720 hours for `trend_grain=hourly`. Ask for more and you get a 422. When you leave `from` out and use `trend_grain=hourly`, the default window tightens to 29 days before `to` (720 hours total), so a request built entirely from defaults always fits inside the cap.
      *
      */
     include_trend?: boolean;
@@ -13159,7 +13935,7 @@ export type GetEmailStatsByMailboxProviderData = {
   path?: never;
   query?: {
     /**
-     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to 29 days before `to`, keeping the defaulted window within the 720-hour trend cap.
+     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
     from?: string;
     /**
@@ -13176,7 +13952,7 @@ export type GetEmailStatsByMailboxProviderData = {
      */
     category?: string;
     /**
-     * Metric to rank rows by, applied descending. Any count or rate in the response may be used; rows whose rate is undefined (zero denominator) sort last. Defaults to `delivered`. `processed`, `rejected`, and `oob_bounces` are not part of this breakdown's rows, so they are not sortable here.
+     * Metric to rank rows by, applied descending. Any count or rate in the response can be used. A row whose rate is undefined because its denominator is zero sorts last. It defaults to `delivered`. `processed`, `rejected`, and `oob_bounces` are not part of this breakdown's rows, so they are not sortable here.
      *
      */
     sort?: EmailMailboxProviderSortMetric;
@@ -13185,7 +13961,7 @@ export type GetEmailStatsByMailboxProviderData = {
      */
     limit?: number;
     /**
-     * When true, each row also carries a `trend` array: a short per-bucket series of that provider's delivery and engagement rates over the window. Returned only when `limit` is 50 or fewer and the window is at most 90 days (trend_grain=daily) or 720 hours (trend_grain=hourly); a larger request returns 422. When `from` is omitted and `trend_grain=hourly`, the default window is 30 days (720 hours), so a request built entirely from defaults always fits the cap.
+     * When true, each row also gets a `trend` array: a short per-bucket series showing that provider's delivery and engagement rates over the window. This only works when `limit` is 50 or fewer and the window is at most 90 days for `trend_grain=daily` or 720 hours for `trend_grain=hourly`. Ask for more and you get a 422. When you leave `from` out and use `trend_grain=hourly`, the default window tightens to 29 days before `to` (720 hours total), so a request built entirely from defaults always fits inside the cap.
      *
      */
     include_trend?: boolean;
@@ -13248,7 +14024,7 @@ export type GetEmailStatsByMailboxProviderRegionData = {
   path?: never;
   query?: {
     /**
-     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to 29 days before `to`, keeping the defaulted window within the 720-hour trend cap.
+     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
     from?: string;
     /**
@@ -13261,11 +14037,11 @@ export type GetEmailStatsByMailboxProviderRegionData = {
      */
     timezone?: string;
     /**
-     * Not supported on breakdown endpoints; supplying it returns 422. To compare categories use `GET /v1/email/stats/categories`; the summary, daily, and hourly statistics accept `category` as a filter.
+     * Not supported on breakdown endpoints. Supplying it returns 422. To compare categories, use `GET /v1/email/stats/categories`. The summary, daily, and hourly statistics accept `category` as a filter.
      */
     category?: string;
     /**
-     * Metric to rank rows by, applied descending. Any count or rate in the response may be used; rows whose rate is undefined (zero denominator) sort last. Defaults to `delivered`. `processed`, `rejected`, and `oob_bounces` are not part of this breakdown's rows, so they are not sortable here.
+     * Metric to rank rows by, applied descending. Any count or rate in the response can be used. A row whose rate is undefined because its denominator is zero sorts last. It defaults to `delivered`. `processed`, `rejected`, and `oob_bounces` are not part of this breakdown's rows, so they are not sortable here.
      *
      */
     sort?: EmailMailboxProviderSortMetric;
@@ -13274,7 +14050,7 @@ export type GetEmailStatsByMailboxProviderRegionData = {
      */
     limit?: number;
     /**
-     * When true, each row also carries a `trend` array: a short per-bucket series of that provider region's delivery and engagement rates over the window. Returned only when `limit` is 50 or fewer and the window is at most 90 days (trend_grain=daily) or 720 hours (trend_grain=hourly); a larger request returns 422. When `from` is omitted and `trend_grain=hourly`, the default window is 30 days (720 hours), so a request built entirely from defaults always fits the cap.
+     * When true, each row also gets a `trend` array: a short per-bucket series showing that provider region's delivery and engagement rates over the window. This only works when `limit` is 50 or fewer and the window is at most 90 days for `trend_grain=daily` or 720 hours for `trend_grain=hourly`. Ask for more and you get a 422. When you leave `from` out and use `trend_grain=hourly`, the default window tightens to 29 days before `to` (720 hours total), so a request built entirely from defaults always fits inside the cap.
      *
      */
     include_trend?: boolean;
@@ -13337,7 +14113,7 @@ export type GetEmailStatsByRecipientDomainData = {
   path?: never;
   query?: {
     /**
-     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to 29 days before `to`, keeping the defaulted window within the 720-hour trend cap.
+     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
     from?: string;
     /**
@@ -13350,11 +14126,11 @@ export type GetEmailStatsByRecipientDomainData = {
      */
     timezone?: string;
     /**
-     * Not supported on breakdown endpoints; supplying it returns 422. To compare categories use `GET /v1/email/stats/categories`; the summary, daily, and hourly statistics accept `category` as a filter.
+     * Not supported on breakdown endpoints. Supplying it returns 422. To compare categories, use `GET /v1/email/stats/categories`. The summary, daily, and hourly statistics accept `category` as a filter.
      */
     category?: string;
     /**
-     * Metric to rank rows by, applied descending. Any count or rate in the response may be used; rows whose rate is undefined (zero denominator) sort last. Defaults to `processed`.
+     * Metric to rank rows by, applied descending. Any count or rate in the response can be used. A row whose rate is undefined because its denominator is zero sorts last. It defaults to `processed`.
      *
      */
     sort?: EmailStatsSortMetric;
@@ -13363,7 +14139,7 @@ export type GetEmailStatsByRecipientDomainData = {
      */
     limit?: number;
     /**
-     * When true, each row also carries a `trend` array: a short per-bucket series of that recipient domain's delivery and engagement rates over the window. Returned only when `limit` is 50 or fewer and the window is at most 90 days (trend_grain=daily) or 720 hours (trend_grain=hourly); a larger request returns 422. When `from` is omitted and `trend_grain=hourly`, the default window is 30 days (720 hours), so a request built entirely from defaults always fits the cap.
+     * When true, each row also gets a `trend` array: a short per-bucket series showing that recipient domain's delivery and engagement rates over the window. This only works when `limit` is 50 or fewer and the window is at most 90 days for `trend_grain=daily` or 720 hours for `trend_grain=hourly`. Ask for more and you get a 422. When you leave `from` out and use `trend_grain=hourly`, the default window tightens to 29 days before `to` (720 hours total), so a request built entirely from defaults always fits inside the cap.
      *
      */
     include_trend?: boolean;
@@ -13452,7 +14228,7 @@ export type GetEmailStatsByTemplateData = {
      */
     limit?: number;
     /**
-     * When true, each row also carries a `trend` array: a short per-bucket series of that template's delivery and engagement rates over the window. Returned only when `limit` is 50 or fewer and the window is at most 90 days (trend_grain=daily) or 720 hours (trend_grain=hourly); a larger request returns 422. When `from` is omitted and `trend_grain=hourly`, the default window is 30 days (720 hours), so a request built entirely from defaults always fits the cap.
+     * When true, each row also has a `trend` array: a short per-bucket series of that template's delivery and engagement rates over the window. Returned only when `limit` is 50 or fewer and the window is at most 90 days (trend_grain=daily) or 720 hours (trend_grain=hourly); a larger request returns 422. When `from` is omitted and `trend_grain=hourly`, the default start tightens to 29 days before `to`, keeping the window inside 720 hours, so a request built entirely from defaults always fits the cap.
      *
      */
     include_trend?: boolean;
@@ -13537,7 +14313,7 @@ export type GetEmailStatsByLocationData = {
      */
     group_by?: "country" | "region" | "city";
     /**
-     * Metric to rank rows by, applied descending. Defaults to `unique_opens`. Only engagement counts are sortable; this breakdown has no rates.
+     * Metric to rank rows by, applied descending. It defaults to `unique_opens`. Only engagement counts are sortable. This breakdown has no rates.
      *
      */
     sort?: EmailEngagementSortMetric;
@@ -13622,7 +14398,7 @@ export type GetEmailStatsByClientData = {
      */
     group_by?: "email_client" | "os" | "device_type";
     /**
-     * Metric to rank rows by, applied descending. Defaults to `unique_opens`. Only engagement counts are sortable; this breakdown has no rates.
+     * Metric to rank rows by, applied descending. It defaults to `unique_opens`. Only engagement counts are sortable. This breakdown has no rates.
      *
      */
     sort?: EmailEngagementSortMetric;
@@ -13698,11 +14474,11 @@ export type GetEmailStatsByBounceCodeData = {
      */
     timezone?: string;
     /**
-     * Not supported on breakdown endpoints; supplying it returns 422. To compare categories use `GET /v1/email/stats/categories`; the summary, daily, and hourly statistics accept `category` as a filter.
+     * Not supported on breakdown endpoints. Supplying it returns 422. To compare categories, use `GET /v1/email/stats/categories`. The summary, daily, and hourly statistics accept `category` as a filter.
      */
     category?: string;
     /**
-     * Metric to rank rows by, applied descending. Defaults to `bounced`. Only bounce counts are sortable; this breakdown has no rates.
+     * Metric to rank rows by, applied descending. It defaults to `bounced`. Only the bounce counts are sortable here, because this breakdown has no rate fields.
      *
      */
     sort?:
@@ -13784,11 +14560,11 @@ export type GetEmailStatsByComplaintTypeData = {
      */
     timezone?: string;
     /**
-     * Not supported on breakdown endpoints; supplying it returns 422. To compare categories use `GET /v1/email/stats/categories`; the summary, daily, and hourly statistics accept `category` as a filter.
+     * Not supported on breakdown endpoints. Supplying it returns 422. To compare categories, use `GET /v1/email/stats/categories`. The summary, daily, and hourly statistics accept `category` as a filter.
      */
     category?: string;
     /**
-     * Metric to rank rows by, applied descending. Defaults to `complained`, the only sortable metric for this breakdown.
+     * Metric to rank rows by, applied descending. It defaults to `complained`, the only sortable metric for this breakdown.
      *
      */
     sort?: "complained";
@@ -13859,7 +14635,7 @@ export type GetEmailStatsByBroadcastData = {
      */
     to?: string;
     /**
-     * Not supported on breakdown endpoints; supplying it returns 422. To compare categories use `GET /v1/email/stats/categories`; the summary, daily, and hourly statistics accept `category` as a filter.
+     * Not supported on breakdown endpoints. Supplying it returns a 422. To compare categories, use `GET /v1/email/stats/categories`. The summary, daily, and hourly statistics accept `category` as a filter.
      */
     category?: string;
     /**
@@ -13998,15 +14774,16 @@ export type CreateDomainData = {
   body: DomainCreate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -14064,15 +14841,16 @@ export type DeleteDomainData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -14176,15 +14954,16 @@ export type UpdateDomainData = {
   body: DomainUpdate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -14251,15 +15030,16 @@ export type VerifyDomainData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -14330,7 +15110,7 @@ export type ListMailboxesData = {
      */
     domain?: string;
     /**
-     * Include mailboxes deleted within their 30-day restore window. Defaults to false, so only active and suspended mailboxes are returned. Deleted mailboxes carry a non-null `deleted_at`.
+     * Include mailboxes deleted within their 30-day restore window. Defaults to false, so only active and suspended mailboxes are returned. A deleted mailbox has a non-null `deleted_at`.
      */
     include_deleted?: boolean;
     /**
@@ -14389,15 +15169,16 @@ export type CreateMailboxData = {
   body: MailboxCreate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -14455,15 +15236,16 @@ export type DeleteMailboxData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -14568,15 +15350,16 @@ export type UpdateMailboxData = {
   body: MailboxUpdate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -14589,7 +15372,7 @@ export type UpdateMailboxData = {
   };
   query?: {
     /**
-     * Required as `true` when lowering `retention_tier`, acknowledging that remembered messages older than the new horizon are deleted.
+     * Set to `true` when lowering `retention_tier` would delete remembered messages older than the new cutoff. The request is rejected without it in that case.
      */
     confirm?: boolean;
   };
@@ -14644,15 +15427,16 @@ export type RestoreMailboxData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -14732,7 +15516,7 @@ export type GetMailboxStatsData = {
      */
     timezone?: string;
     /**
-     * Bucket grain of the series: `day` (default) or `hour`. Echoed back as `period.grain`.
+     * Granularity of the series: `day` (default) or `hour`. Echoed back as `period.grain`.
      *
      */
     granularity?: "day" | "hour";
@@ -14794,15 +15578,16 @@ export type ResumeMailboxData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -14935,15 +15720,16 @@ export type CreateMailboxReceiveRuleData = {
   body: ReceiveRuleCreate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -15011,15 +15797,16 @@ export type DeleteMailboxReceiveRuleData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -15087,15 +15874,17 @@ export type ListEmailThreadsData = {
      */
     contact_id?: ContactId;
     /**
-     * Filter to conversations carrying this label. Repeat the parameter to require several — only conversations carrying every listed label match. A placement label selects a folder (`inbox`, `archive`, `spam`, `blocked`); a custom label matches conversations in any folder. Defaults to `inbox` when omitted.
+     * Filter to conversations that have this label. Repeat the parameter to ask for more than one: only conversations that have every label you list are returned.
+     *
+     * A placement label picks a folder: `inbox`, `archive`, `spam`, or `blocked`. A custom label matches a conversation in any folder. Leave this out and you get the inbox.
      */
     label?: Array<string>;
     /**
-     * When `true`, only conversations with unread messages are returned. This filters on the conversation's unread state, so it combines with `label` — for example, unread conversations in the archive. (The `unread` label itself lives on messages, not conversations.)
+     * When `true`, only conversations with unread messages are returned. This filters on the conversation's unread state, so you can combine it with `label`, for example to get unread conversations in the archive. The `unread` label itself lives on messages, not conversations.
      */
     has_unread?: boolean;
     /**
-     * Conversations involving this address — matches the sender or any recipient, as a case-insensitive contains-match, so a full address or any fragment of one works.
+     * Conversations involving this address, matching the sender or any recipient. The match is case-insensitive and matches on any part of the address, so a fragment works as well as the whole address.
      */
     participant?: string;
     /**
@@ -15167,15 +15956,16 @@ export type DeleteEmailThreadData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -15291,15 +16081,16 @@ export type UpdateEmailThreadData = {
   body: EmailThreadUpdateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -15377,7 +16168,7 @@ export type ListEmailThreadMessagesData = {
      */
     direction?: MessageDirection;
     /**
-     * Filter to messages carrying this label. `trash` lists trashed messages; any other label — `archive`, `spam`, `blocked`, `unread`, or a custom label — lists its non-trashed carriers. When omitted, received messages in the inbox and all sent messages are returned.
+     * Filter to messages that have this label. `trash` lists trashed messages. Any other label, whether that is `archive`, `spam`, `blocked`, `unread` or one of your own, lists the messages that have it and are not in the trash. When omitted, received messages in the inbox and all sent messages are returned.
      *
      */
     label?: string;
@@ -15618,15 +16409,16 @@ export type ReplyEmailThreadMessageData = {
   body: EmailThreadMessageReplyRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;
@@ -15702,15 +16494,16 @@ export type CreateMailboxMessageData = {
   body: EmailMailboxComposeRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the server replays the original response for any duplicate request with the same key within the idempotency TTL window (3 hours by default).
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
      * Two distinct 409 errors signal misuse:
-     * - `request_in_progress` (E01004): the same key is currently being
-     * processed by a concurrent request. Wait briefly and retry; the lock
-     * expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): the same key has already completed
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
      * against a different request body or method. Generate a new key.
      *
-     * Recommended key format is `<event-type>/<entity-id>` (e.g. `welcome-user/usr_abc123`).
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
      */
     "Idempotency-Key"?: string;

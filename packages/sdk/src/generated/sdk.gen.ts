@@ -27,6 +27,9 @@ import type {
   CreateDomainData,
   CreateDomainErrors,
   CreateDomainResponses,
+  CreateEmailLookupData,
+  CreateEmailLookupErrors,
+  CreateEmailLookupResponses,
   CreateEmailMessageBatchData,
   CreateEmailMessageBatchErrors,
   CreateEmailMessageBatchResponses,
@@ -42,6 +45,9 @@ import type {
   CreateMailboxReceiveRuleErrors,
   CreateMailboxReceiveRuleResponses,
   CreateMailboxResponses,
+  CreatePhoneNumberLookupData,
+  CreatePhoneNumberLookupErrors,
+  CreatePhoneNumberLookupResponses,
   CreateSmsMessageBatchData,
   CreateSmsMessageBatchErrors,
   CreateSmsMessageBatchResponses,
@@ -510,7 +516,15 @@ export const sendRealtimeAppMemberEvent = <
 /**
  * List messages
  *
- * Returns the workspace's sent and scheduled messages, newest first, as a cursor page. Each item carries the aggregate delivery `status` and per-state recipient counts, not the message body. Combine filters to narrow the page: `status`, `category`, `tag`, exact `to`/`from` address, and a `created_after`/`created_before` time window.
+ * Returns the workspace's sent and scheduled messages, newest first, as a cursor page. Each item has the aggregate delivery `status` and per-state recipient counts, not the message body.
+ *
+ * Combine filters to narrow the page:
+ *
+ * - Delivery status.
+ * - Category.
+ * - Tag.
+ * - An exact `to` or `from` address.
+ * - A `created_after` or `created_before` time window.
  *
  */
 export const listEmailMessages = <ThrowOnError extends boolean = false>(
@@ -538,7 +552,7 @@ export const listEmailMessages = <ThrowOnError extends boolean = false>(
  *
  * Sends an email to the recipients you list explicitly in `to`/`cc`/`bcc`. Use it for
  * transactional sends (receipts, password resets, alerts) and for marketing sends where
- * you have the recipient addresses on hand; to submit many independent messages in one
+ * you have the recipient addresses on hand. To submit many independent messages in one
  * request, use [Send a batch of messages](/docs/api/reference/create-email-message-batch)
  * instead. The `category` field controls suppression policy independently of content:
  * set it to `marketing` when sending marketing content from this endpoint.
@@ -547,10 +561,10 @@ export const listEmailMessages = <ThrowOnError extends boolean = false>(
  * delivered. Fetch it by `id` or subscribe to webhook events to follow delivery. The
  * request never half-succeeds: an unverified sender domain or any field-level
  * validation failure rejects it immediately with a `422` naming the reason.
- * Suppression is evaluated per recipient after acceptance: suppressed recipients
- * surface as `rejected` on the message's recipient list, never as a synchronous
+ * Suppression is evaluated per recipient after acceptance, so a suppressed recipient
+ * appears as `rejected` on the message's recipient list rather than as a synchronous
  * error. New workspaces can send from the shared onboarding domain before verifying
- * their own; the [quickstart](/docs/get-started/send-your-first-email) covers its
+ * their own. The [quickstart](/docs/get-started/send-your-first-email) covers its
  * recipient and volume limits.
  *
  */
@@ -581,7 +595,7 @@ export const createEmailMessage = <ThrowOnError extends boolean = false>(
 /**
  * Send a batch of messages
  *
- * Accepts up to 100 independent email messages and queues them for delivery. All items are validated before any are queued: if one fails validation, the entire batch is rejected. Field-level validation failures and business-rule failures (such as `domain_not_verified`) both return `422`. Suppression is evaluated per recipient after acceptance, never as a synchronous error. The `202` response returns one entry per message in submission order, each with its own `id` to fetch or correlate webhook events against. Attachments are allowed per message. Each message must stay within the 20 MB estimated generated message-size cap, and the serialized JSON request body for the whole batch has a hard 20 MB cap.
+ * Accepts up to 100 independent email messages and queues them for delivery. All items are validated before any are queued: if one fails validation, the entire batch is rejected. Field-level validation failures and business-rule failures (such as `domain_not_verified`) both return `422`. Suppression is evaluated per recipient after acceptance, never as a synchronous error. The `202` response returns one entry per message in submission order, each with its own `id` you can use to fetch that message or match it against webhook events. Attachments are allowed per message. Each message must stay within the 20 MB estimated generated message-size cap, and the serialized JSON request body for the whole batch has a hard 20 MB cap.
  *
  */
 export const createEmailMessageBatch = <ThrowOnError extends boolean = false>(
@@ -611,7 +625,7 @@ export const createEmailMessageBatch = <ThrowOnError extends boolean = false>(
 /**
  * Get a message
  *
- * Returns a single message with its aggregate delivery `status` and per-state recipient counts. The response never includes the `html`/`text` bodies; when content storage is enabled for the send, fetch the stored bodies with [Get stored message content](/docs/api/reference/get-email-message-content). Per-recipient statuses and the event timeline are separate sub-resources.
+ * Returns a single message with its aggregate delivery `status` and per-state recipient counts. The response never includes the `html`/`text` bodies. When content storage is enabled for the send, fetch the stored bodies with [Get stored message content](/docs/api/reference/get-email-message-content). Per-recipient statuses and the event timeline are separate sub-resources.
  *
  */
 export const getEmailMessage = <ThrowOnError extends boolean = false>(
@@ -637,7 +651,7 @@ export const getEmailMessage = <ThrowOnError extends boolean = false>(
 /**
  * Cancel a scheduled message
  *
- * Cancels a message that was scheduled with `scheduled_at` before it sends. Only a message that is still scheduled can be canceled; a message that already started sending, was delivered, or was previously canceled returns a conflict error. The message's status becomes `canceled` and an `email.canceled` webhook event fires. Canceling does not return consumed scheduled-send quota.
+ * Cancels a message that was scheduled with `scheduled_at` before it sends. Only a message that is still scheduled can be canceled. A message that already started sending, was delivered, or was previously canceled returns a conflict error. The message's status becomes `canceled` and an `email.canceled` webhook event fires. Canceling does not return consumed scheduled-send quota.
  *
  */
 export const cancelEmailMessage = <ThrowOnError extends boolean = false>(
@@ -663,7 +677,7 @@ export const cancelEmailMessage = <ThrowOnError extends boolean = false>(
 /**
  * List contacts
  *
- * Returns a paginated list of contacts in the workspace, newest first. Look up a single contact by its exact `email`, `phone`, or `external_id`, or search by email, first name, last name, or phone substring with `q`. Pass `include_total=true` to add the total number of matching contacts to the response.
+ * Returns a paginated list of contacts in the workspace, newest first. Look up a single contact by its exact `email`, `phone_number`, or `external_id`, or search by email, first name, last name, or phone substring with `q`. Pass `include_total=true` to add the total number of matching contacts to the response.
  *
  */
 export const listContacts = <ThrowOnError extends boolean = false>(
@@ -1443,6 +1457,88 @@ export const getSmsTemplate = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Look up a phone number
+ *
+ * Returns what we know about a phone number: which network serves it, which network issued it, whether it has been ported, its country, and what kind of line it is. That baseline is included with every lookup.
+ *
+ * Use `type` to buy more. Each value adds a block to the answer: how the number is classified, whether it is live on the network right now, whether it is roaming, when its SIM last changed, its porting record, or a credibility score. Omit `type` and the response is the baseline alone, and no intelligence provider is contacted.
+ *
+ * Every block you request comes back carrying a `status`, so a partial answer is visible rather than silent, and **you are billed for exactly the blocks whose status is `ok`**.
+ *
+ * Send the number in the body rather than the URL when you would rather it did not appear in request logs or browser history. [Look up a phone number by URL](/docs/api/reference/get-phone-number-lookup) is the same lookup with the number in the path.
+ *
+ * Send an `Idempotency-Key` and a retried request returns the stored answer instead of looking the number up and charging again. Without one, every attempt is a new lookup and is billed.
+ *
+ */
+export const createPhoneNumberLookup = <ThrowOnError extends boolean = false>(
+  options: Options<CreatePhoneNumberLookupData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    CreatePhoneNumberLookupResponses,
+    CreatePhoneNumberLookupErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/lookup/phone-number",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Look up an email address
+ *
+ * Returns whether an email address is worth sending to:
+ *
+ * - Whether it will accept mail.
+ * - How confident that is.
+ * - Why not, when it will not.
+ * - Whether it is a role, disposable, or free-provider address.
+ * - What it looks like it was meant to be, when it looks misspelled.
+ *
+ * One address per call, and one answer: `result` is the field to decide on. Every answer costs the same, including `undeliverable`, which is usually the most valuable one you can get.
+ *
+ * `result` and `reason` are open vocabularies: the values below are the ones in use today, and further ones may be added. Branch on the values you know and treat anything else as a future value rather than an error. `delivery_confidence` is always present and always comparable, so it is the safe fallback.
+ *
+ * Send the address in the body rather than the URL when you would rather it did not appear in request logs or browser history. [Look up an email address by URL](/docs/api/reference/get-email-lookup) is the same lookup with the address in the path.
+ *
+ * Send an `Idempotency-Key` and a retried request returns the stored answer instead of validating the address and charging again. Without one, every attempt is a new lookup and is billed.
+ *
+ */
+export const createEmailLookup = <ThrowOnError extends boolean = false>(
+  options: Options<CreateEmailLookupData, ThrowOnError>,
+) =>
+  (options.client ?? client).post<
+    CreateEmailLookupResponses,
+    CreateEmailLookupErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/lookup/email",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * Create a verification
  *
  * Creates a verification for a recipient and sends them a one-time passcode. Provide the recipient in `to`: an email address (verified over email), a phone number (verified over the phone channels enabled for its destination country), or both. The passcode is sent over one channel at a time and delivery falls over to the next channel in the plan if one fails; it is never sent over two channels at once.
@@ -1549,9 +1645,18 @@ export const createVerificationNextChannel = <
 /**
  * List WhatsApp messages
  *
- * Returns the workspace's WhatsApp messages as a cursor-paginated list, newest first. Filter by direction, status, contact phone number, business-scoped user ID, template category, tag, or creation time; pass the response's `next_cursor` back as `starting_after` to fetch the next page. To follow a single message's delivery, use [Get a WhatsApp message](/docs/api/reference/get-whats-app-message) instead.
+ * Returns the workspace's WhatsApp messages as a cursor-paginated list,
+ * newest first. Filter by direction, status, contact phone number,
+ * business-scoped user ID, template category, tag, or creation time; pass the response's `next_cursor` back as
+ * `starting_after` to fetch the next page. To follow a single message's
+ * delivery, use
+ * [Get a WhatsApp message](/docs/api/reference/get-whats-app-message)
+ * instead.
  *
- * Messages are retained for **30 days**. A `created_after` earlier than that is accepted and raised to the retention bound rather than rejected, so a wider window returns what is still retained instead of failing. There is no way to read messages older than the window.
+ * Messages are retained for **30 days**. A `created_after` earlier than that
+ * is accepted and raised to the retention bound rather than rejected, so a
+ * wider window returns what is still retained instead of failing. There is no
+ * way to read messages older than the window.
  *
  */
 export const listWhatsAppMessages = <ThrowOnError extends boolean = false>(
@@ -1736,11 +1841,11 @@ export const getEmailStatsHourly = <ThrowOnError extends boolean = false>(
 /**
  * Stats by tag
  *
- * Returns aggregate delivery and engagement counts grouped by tag for the requested period. Rows are ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, hard maximum 200). Use this to compare campaign performance across tags you set at send time.
+ * Returns delivery and engagement counts for the requested period, grouped by tag. Use it to compare performance across the tags you set at send time. Rows are ranked by the `sort` metric, `processed` by default, and capped at the requested `limit` (50 by default, 200 at most).
  *
- * Rows are computed against event time (not send time), so engagement received during the period for messages sent earlier is included.
+ * Rows are computed against event time rather than send time, so engagement received during the period counts even for messages that were sent earlier.
  *
- * The maximum window is 365 days; requesting a longer range returns 422.
+ * The window can span at most 365 days. Ask for more and you get a 422.
  *
  */
 export const getEmailStatsByTag = <ThrowOnError extends boolean = false>(
@@ -1766,7 +1871,7 @@ export const getEmailStatsByTag = <ThrowOnError extends boolean = false>(
 /**
  * Aggregate stats summary
  *
- * Returns a single-row aggregate across the requested period covering delivery, bounce, complaint, open, and click counts plus the derived rates, along with processing, delivery, and total latency percentiles (p50/p95/p99). Suitable for KPI tiles, campaign reports, and email digests; the daily and hourly endpoints carry the same metrics per time bucket.
+ * Returns a single-row aggregate across the requested period covering delivery, bounce, complaint, open, and click counts plus the derived rates, along with processing, delivery, and total latency percentiles (p50/p95/p99). Suitable for KPI tiles, campaign reports, and email digests; the daily and hourly endpoints have the same metrics per time bucket.
  *
  * The aggregate is computed against event time (not send time), so engagement received during the period for messages sent earlier is included. Rate fields are null when their denominator is zero.
  *
@@ -1796,11 +1901,11 @@ export const getEmailStatsSummary = <ThrowOnError extends boolean = false>(
 /**
  * Stats by sending IP
  *
- * Returns delivery and deliverability counts grouped by the specific IP address used to send each message. Use this to identify per-IP reputation issues: block bounces concentrated on a single IP usually indicate a reputation problem on that IP, and `sort=bounces.block` surfaces those IPs first.
+ * Returns delivery and deliverability counts for the requested period, grouped by the specific IP address used to send each message. Use it to spot a reputation problem on one IP. Block bounces concentrated on a single IP usually mean that IP's reputation has taken a hit, and sorting by `bounces.block` puts those IPs first.
  *
- * A sending IP is known only once the upstream mail system reports delivery, bounce, deferral, or a late bounce, so rows cover the delivery stage onward: `accepted` and `processed` counts, processing latency, engagement, and complaint attribution are not available per IP. For workspace-wide figures use `GET /v1/email/stats/daily`. Rows are computed against event time (not send time).
+ * A sending IP is only known once the receiving mail server reports an outcome: a delivery, a bounce, a deferral, or a late bounce. So this breakdown starts from the delivery stage onward. Accepted, processed, and rejected counts aren't included at all, and neither are engagement counts or processing latency. Complaints and out-of-band bounces aren't attributed to a sending IP either, so `complained` and `oob_bounces` are included but always read 0 here. Bounced, deferred, delivery latency, and total latency are the ones that have real numbers. For workspace-wide figures, use `GET /v1/email/stats/daily`. Rows are computed against event time rather than send time.
  *
- * Rows are ranked by the `sort` field (default `delivered`) descending and capped at the requested `limit` (default 50, hard maximum 200). The maximum window is 365 days; requesting a longer range returns 422.
+ * Rows are ranked by the `sort` field, `delivered` by default, and capped at the requested `limit` (50 by default, 200 at most). The window can span at most 365 days. Ask for more and you get a 422.
  *
  */
 export const getEmailStatsBySendingIp = <ThrowOnError extends boolean = false>(
@@ -1826,11 +1931,11 @@ export const getEmailStatsBySendingIp = <ThrowOnError extends boolean = false>(
 /**
  * Stats by sending domain
  *
- * Returns delivery, engagement, and deliverability counts grouped by sending domain (the portion of the `From` address after the `@`). Use this to compare deliverability across multiple verified domains in your workspace, for example transactional versus marketing domains, or sub-domain segregation during IP warming.
+ * Returns delivery, engagement, and deliverability counts for the requested period, grouped by sending domain: the portion of the `From` address after the `@`. Use it to compare deliverability across multiple verified domains in your workspace, for example transactional versus marketing domains, or sub-domain segregation during IP warming.
  *
- * Rows are computed against event time (not send time), so engagement and bounces received during the period for messages sent earlier are included.
+ * Rows are computed against event time rather than send time, so engagement and bounces received during the period count even for messages that were sent earlier.
  *
- * Rows are ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, hard maximum 200). The maximum window is 365 days; requesting a longer range returns 422.
+ * Rows are ranked by the `sort` metric, `processed` by default, and capped at the requested `limit` (50 by default, 200 at most). The window can span at most 365 days. Ask for more and you get a 422.
  *
  */
 export const getEmailStatsBySendingDomain = <
@@ -1858,11 +1963,11 @@ export const getEmailStatsBySendingDomain = <
 /**
  * Stats by category
  *
- * Returns aggregate delivery and engagement counts grouped by category for the requested period. Rows are ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, hard maximum 200). Use this to compare deliverability and engagement between your transactional and marketing traffic.
+ * Returns delivery and engagement counts for the requested period, grouped by category, so you can compare deliverability and engagement between your transactional and marketing traffic. Rows are ranked by the `sort` metric, `processed` by default, and capped at the requested `limit` (50 by default, 200 at most).
  *
- * Rows are computed against event time (not send time), so engagement received during the period for messages sent earlier is included.
+ * Rows are computed against event time rather than send time, so engagement received during the period counts even for messages that were sent earlier.
  *
- * The maximum window is 365 days; requesting a longer range returns 422.
+ * The window can span at most 365 days. Ask for more and you get a 422.
  *
  */
 export const getEmailStatsByCategory = <ThrowOnError extends boolean = false>(
@@ -1888,11 +1993,11 @@ export const getEmailStatsByCategory = <ThrowOnError extends boolean = false>(
 /**
  * Stats by mailbox provider
  *
- * Returns delivery, engagement, and deliverability counts grouped by recipient mailbox provider (for example `gmail`, `yahoo`, `microsoft`, `apple`): the deliverability-by-inbox-provider view. Use this to compare how each major inbox provider treats your mail, for example to spot a delivered-rate dip or complaint spike at one provider before it spreads; for a per-region split within a provider, use the mailbox-provider-region breakdown.
+ * Returns delivery, engagement, and deliverability counts for the requested period, grouped by recipient mailbox provider, for example `gmail`, `yahoo`, `microsoft`, or `apple`. Use it to compare how each major inbox provider treats your mail, for example to spot a delivered-rate dip or a complaint spike at one provider before it spreads. For a per-region split within a provider, use the mailbox-provider-region breakdown.
  *
- * A recipient's mailbox provider is known only once the receiving mail system reports an outcome, so rows cover the delivery stage onward: `accepted`, `processed`, and `rejected` counts and processing latency are not included. Rows are computed against event time (not send time).
+ * A recipient's mailbox provider is only known once the receiving mail system reports an outcome, so this breakdown covers the delivery stage onward. Accepted, processed, and rejected counts and processing latency are not included. Rows are computed against event time rather than send time.
  *
- * Rows are ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, hard maximum 200). The maximum window is 365 days; requesting a longer range returns 422.
+ * Rows are ranked by the `sort` metric, `delivered` by default, and capped at the requested `limit` (50 by default, 200 at most). The window can span at most 365 days. Ask for more and you get a 422.
  *
  */
 export const getEmailStatsByMailboxProvider = <
@@ -1920,11 +2025,11 @@ export const getEmailStatsByMailboxProvider = <
 /**
  * Stats by mailbox provider region
  *
- * Returns delivery, engagement, and deliverability counts grouped by mailbox provider and provider region pair, for example `gmail` in `NA` or `microsoft` in `EU`. The provider region is the regional pod the receiving mail system reports for the recipient's provider; pairing it with the provider disambiguates a region label that several providers share. Use this to spot a deliverability problem isolated to one provider in one region; for a per-provider view without the region split, use the mailbox-provider breakdown.
+ * Returns delivery, engagement, and deliverability counts for the requested period, grouped by mailbox provider and provider region pair, for example `gmail` in `NA` or `microsoft` in `EU`. The provider region is the regional grouping the receiving mail system reports for the recipient's provider. Pairing it with the provider tells apart a region label that several providers share. Use it to spot a deliverability problem isolated to one provider in one region. For a per-provider view without the region split, use the mailbox-provider breakdown.
  *
- * A provider region is known only once the receiving mail system reports an outcome, so rows cover the delivery stage onward: `accepted`, `processed`, and `rejected` counts and processing latency are not included. Rows are computed against event time (not send time).
+ * A provider region is only known once the receiving mail system reports an outcome, so this breakdown covers the delivery stage onward. Accepted, processed, and rejected counts and processing latency are not included. Rows are computed against event time rather than send time.
  *
- * Rows are ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, hard maximum 200). The maximum window is 365 days; requesting a longer range returns 422.
+ * Rows are ranked by the `sort` metric, `delivered` by default, and capped at the requested `limit` (50 by default, 200 at most). The window can span at most 365 days. Ask for more and you get a 422.
  *
  */
 export const getEmailStatsByMailboxProviderRegion = <
@@ -1952,11 +2057,11 @@ export const getEmailStatsByMailboxProviderRegion = <
 /**
  * Stats by recipient domain
  *
- * Returns aggregate delivery and engagement counts grouped by recipient mailbox domain (the part of each recipient address after the `@`, for example `gmail.com`, `yahoo.com`, `outlook.com`) for the requested period. This is the finest-grained deliverability view: where the mailbox-provider breakdown groups recipients into provider buckets such as `gmail` or `microsoft`, this keys on the exact destination domain. Use it to spot a delivery-rate dip or complaint spike at a specific domain.
+ * Returns delivery and engagement counts for the requested period, grouped by recipient mailbox domain: the part of each recipient address after the `@`, for example `gmail.com`, `yahoo.com`, or `outlook.com`. This is the finest-grained deliverability view. Where the mailbox-provider breakdown groups recipients into provider buckets such as `gmail` or `microsoft`, this keys on the exact destination domain. Use it to spot a delivery-rate dip or a complaint spike at a specific domain.
  *
- * Rows are ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, hard maximum 200). Rows are computed against event time (not send time), so engagement received during the period for messages sent earlier is included.
+ * Rows are ranked by the `sort` metric, `processed` by default, and capped at the requested `limit` (50 by default, 200 at most). Rows are computed against event time rather than send time, so engagement received during the period counts even for messages that were sent earlier.
  *
- * The maximum window is 365 days; requesting a longer range returns 422.
+ * The window can span at most 365 days. Ask for more and you get a 422.
  *
  */
 export const getEmailStatsByRecipientDomain = <
@@ -2014,11 +2119,11 @@ export const getEmailStatsByTemplate = <ThrowOnError extends boolean = false>(
 /**
  * Engagement by location
  *
- * Returns engagement counts (opens and clicks) grouped by the location they were recorded from, for the requested period. Use it to see where your audience engages, for example the top countries by unique opens. Location is known from open and click events only, so rows carry engagement counts but no delivery counts or rates.
+ * Returns engagement counts (opens and clicks) for the requested period, grouped by the location they were recorded from. Use it to see where your audience engages, for example the top countries by unique opens. The reading location is only known from open and click events, so rows have engagement counts but no delivery counts or rates.
  *
- * Use `group_by` to choose the granularity: `country` (default), `region`, or `city`. Each row carries the location hierarchy down to the requested level (a `city` grouping also reports the row's region and country). Rows are ranked by the `sort` metric (default `unique_opens`) descending and capped at the requested `limit` (default 50, hard maximum 200).
+ * Use `group_by` to choose the granularity: `country` (the default), `region`, or `city`. Each row has the location hierarchy down to the requested level, so a `city` grouping also reports that row's region and country. Rows are ranked by the `sort` metric, `unique_opens` by default, and capped at the requested `limit` (50 by default, 200 at most).
  *
- * Rows are computed against event time (not send time). The maximum window is 365 days; requesting a longer range returns 422.
+ * Rows are computed against event time rather than send time. The window can span at most 365 days. Ask for more and you get a 422.
  *
  */
 export const getEmailStatsByLocation = <ThrowOnError extends boolean = false>(
@@ -2044,11 +2149,11 @@ export const getEmailStatsByLocation = <ThrowOnError extends boolean = false>(
 /**
  * Engagement by email client
  *
- * Returns engagement counts (opens and clicks) grouped by the email client, operating system, or device type they were recorded from, for the requested period. Use it for the classic "opens by mail client" view, for example the share of opens from Apple Mail versus Gmail versus Outlook. The reading environment is known from open and click events only, so rows carry engagement counts but no delivery counts or rates.
+ * Returns engagement counts (opens and clicks) for the requested period, grouped by the email client, operating system, or device type they were recorded from. Use it for the classic view of opens by mail client, for example the share of opens from Apple Mail compared with Gmail and Outlook. The reading environment is only known from open and click events, so rows have engagement counts but no delivery counts or rates.
  *
- * Use `group_by` to choose the facet: `email_client` (default), `os`, or `device_type`. Each row populates the chosen facet and leaves the other two null. Rows are ranked by the `sort` metric (default `unique_opens`) descending and capped at the requested `limit` (default 50, hard maximum 200).
+ * Use `group_by` to choose the facet: `email_client` (the default), `os`, or `device_type`. Each row fills in the facet you chose and leaves the other two null. Rows are ranked by the `sort` metric, `unique_opens` by default, and capped at the requested `limit` (50 by default, 200 at most).
  *
- * Rows are computed against event time (not send time). The maximum window is 365 days; requesting a longer range returns 422.
+ * Rows are computed against event time rather than send time. The window can span at most 365 days. Ask for more and you get a 422.
  *
  */
 export const getEmailStatsByClient = <ThrowOnError extends boolean = false>(
@@ -2074,11 +2179,11 @@ export const getEmailStatsByClient = <ThrowOnError extends boolean = false>(
 /**
  * Bounces by SMTP error code
  *
- * Returns bounce counts grouped by the SMTP error code the receiving mail server returned, for the requested period: the deliverability-debugging view that answers "which SMTP responses are driving my bounces". Each row reports the bounced recipients for one code plus the hard/soft/admin/block/undetermined split.
+ * Returns bounce counts for the requested period, grouped by the SMTP error code the receiving mail server returned. It answers the question of which SMTP responses are driving your bounces. Each row reports how many recipients bounced with that code, plus the hard, soft, admin, block, and undetermined split for that code.
  *
- * This breakdown reports the failure side only: it has no delivered, open, click, or rate fields, because a bounce code is recorded only on bounce events.
+ * This breakdown only covers the failure side. There are no delivered, open, click, or rate fields, because a bounce code is only ever recorded on a bounce event.
  *
- * Rows are ranked by the `sort` metric (default `bounced`) descending, capped at the requested `limit` (default 50, hard maximum 200), and computed against event time (not send time). The maximum window is 365 days; requesting a longer range returns 422.
+ * Rows are ranked by the `sort` metric, `bounced` by default, and capped at the requested `limit` (50 by default, 200 at most). They are computed against event time rather than send time. The window can span at most 365 days. Ask for more and you get a 422.
  *
  */
 export const getEmailStatsByBounceCode = <ThrowOnError extends boolean = false>(
@@ -2104,11 +2209,11 @@ export const getEmailStatsByBounceCode = <ThrowOnError extends boolean = false>(
 /**
  * Complaints by type
  *
- * Returns spam-complaint counts grouped by the feedback-loop complaint type reported by the mailbox provider (for example `abuse`, `fraud`, `virus`), for the requested period. Use it to understand what kind of complaints your mail attracts.
+ * Returns spam-complaint counts for the requested period, grouped by the feedback-loop complaint type the mailbox provider reported, for example `abuse`, `fraud`, or `virus`. Use it to see what kind of complaints your mail attracts.
  *
- * This breakdown reports the complaint side only: each row carries the complained count for one type and nothing else, because a complaint type is recorded only on spam-complaint events.
+ * This breakdown only covers the complaint side. Each row has the complained count for one type and nothing else, because a complaint type is only ever recorded on a spam-complaint event.
  *
- * Rows are ranked by `complained` descending, capped at the requested `limit` (default 50, hard maximum 200), and computed against event time (not send time). The maximum window is 365 days; requesting a longer range returns 422.
+ * Rows are ranked by `complained` descending, and capped at the requested `limit` (default 50, hard maximum 200). They are computed against event time rather than send time. The window can span at most 365 days. Ask for more and you get a 422.
  *
  */
 export const getEmailStatsByComplaintType = <
@@ -2136,11 +2241,11 @@ export const getEmailStatsByComplaintType = <
 /**
  * Stats by broadcast
  *
- * Returns aggregate delivery and engagement counts grouped by broadcast for the requested period, so each broadcast's deliverability and engagement can be compared side by side. Only messages sent as part of a broadcast appear here; one-off and transactional sends are not included, so a workspace that has not sent broadcasts returns an empty list rather than an error.
+ * Returns aggregate delivery and engagement counts grouped by broadcast for the requested period, so each broadcast's deliverability and engagement can be compared side by side. Only messages sent as part of a broadcast appear here. One-off and transactional sends are not included, so a workspace that has not sent broadcasts returns an empty list rather than an error.
  *
  * Rows are ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, hard maximum 200). Rows are computed against event time (not send time), so engagement received during the period for messages sent earlier is included.
  *
- * The maximum window is 365 days; requesting a longer range returns 422. This breakdown is computed from per-message activity retained for 30 days, so it reflects roughly the last 30 days of activity even when the requested window reaches further back.
+ * The maximum window is 365 days. Requesting a longer range returns a 422. This breakdown is computed from per-message activity retained for 30 days, so it reflects roughly the last 30 days of activity even when the requested window reaches further back.
  *
  */
 export const getEmailStatsByBroadcast = <ThrowOnError extends boolean = false>(
@@ -2194,12 +2299,12 @@ export const listDomains = <ThrowOnError extends boolean = false>(
  *
  * Registers a new sending domain and returns the DNS records to publish
  * for it. The DKIM TXT record proves ownership, and together with the
- * return-path CNAME (which also covers SPF; no separate SPF record is
+ * return-path CNAME (which also covers SPF, so no separate SPF record is
  * needed) and a DMARC policy it gates sending. The tracking CNAME is
  * optional and gates branded link tracking only. Publish the records at
  * your DNS provider, then check progress with
- * [Trigger domain verification](/docs/api/reference/verify-domain); Bird
- * also re-checks published records automatically. Setup walkthrough:
+ * [Trigger domain verification](/docs/api/reference/verify-domain). Published
+ * records are also re-checked for you automatically. Setup walkthrough:
  * [Sending domains](/docs/guides/email/sending-domains).
  *
  * The domain starts in `pending` status. A domain already registered in
@@ -2261,7 +2366,7 @@ export const deleteDomain = <ThrowOnError extends boolean = false>(
 /**
  * Get a sending domain
  *
- * Returns the domain with its capability statuses and every DNS record's current verification state. This read reports the stored result of the last check; to run a fresh DNS check, use [Trigger domain verification](/docs/api/reference/verify-domain).
+ * Returns the domain with its capability statuses and every DNS record's current verification state. This read reports the stored result of the last check. To run a fresh DNS check, use [Trigger domain verification](/docs/api/reference/verify-domain).
  *
  */
 export const getDomain = <ThrowOnError extends boolean = false>(
@@ -2292,12 +2397,12 @@ export const getDomain = <ThrowOnError extends boolean = false>(
  * `dkim` on a verified capability are staged: the current configuration
  * keeps serving until the new one's DNS records verify, then the change
  * is promoted automatically. Staged values are visible under
- * `capabilities.*.pending`; the records to publish appear in
+ * `capabilities.*.pending`. The records to publish appear in
  * `dns_records` with `state: pending`.
  *
- * Invalid combinations are rejected: enabling tracking toggles without a
+ * Invalid combinations are rejected. Enabling tracking toggles without a
  * tracking domain, or removing the tracking domain while a toggle is on,
- * returns `409`; enabling inbound receiving has verification
+ * returns `409`. Enabling inbound receiving has verification
  * prerequisites that return `422`. Each rule is detailed on its field.
  *
  */
@@ -2331,9 +2436,9 @@ export const updateDomain = <ThrowOnError extends boolean = false>(
  * Runs a fresh DNS check across the domain's records (DKIM, return path,
  * DMARC, tracking, inbound MX, and any staged changes) and returns the
  * updated domain. Use it for an immediate result after publishing or
- * correcting records; [Get a sending domain](/docs/api/reference/get-domain)
- * only reports the last stored result, and Bird re-checks published
- * records automatically in the background.
+ * correcting records. [Get a sending domain](/docs/api/reference/get-domain)
+ * only reports the last stored result. Published records are also re-checked
+ * for you automatically in the background.
  *
  * A `200` with records still `pending` is not a failure: the records were
  * not found yet, which is normal while DNS propagates (minutes to hours).
@@ -2390,7 +2495,7 @@ export const listMailboxes = <ThrowOnError extends boolean = false>(
 /**
  * Create a mailbox
  *
- * Creates a mailbox. The address is `local_part@domain`. The domain defaults to `inbox.ai`, Bird's shared mailbox domain, where creating the mailbox claims the address for your organization — first come, first served, and reserved to your organization even after the mailbox is deleted. You may instead name one of your own domains that is enabled for receiving email. An omitted local part is generated. On a custom domain, addresses of deleted mailboxes are quarantined: the same workspace can rebind one 30 days after deletion, other workspaces never can.
+ * Creates a mailbox. The address is `local_part@domain`. The domain defaults to `inbox.ai`, our shared mailbox domain, where creating the mailbox claims the address for your organization. It is first come, first served, and reserved to your organization even after the mailbox is deleted. You may instead name one of your own domains that is enabled for receiving email. An omitted local part is generated. On a custom domain, addresses of deleted mailboxes are quarantined. The same workspace can rebind one 30 days after deletion, but other workspaces never can.
  *
  */
 export const createMailbox = <ThrowOnError extends boolean = false>(
@@ -2420,7 +2525,7 @@ export const createMailbox = <ThrowOnError extends boolean = false>(
 /**
  * Delete a mailbox
  *
- * Deletes a mailbox. The address stops receiving mail immediately and enters quarantine: the same workspace can bind it to a new mailbox after 30 days, other workspaces never can. The mailbox and its remembered messages are kept for a 30-day restore window — restore it with `POST /email/mailboxes/{mailbox_id}/restore` — and are permanently deleted once the window closes.
+ * Deletes a mailbox. The address stops receiving mail immediately and enters quarantine. The same workspace can bind it to a new mailbox after 30 days, but other workspaces never can. The mailbox and its remembered messages are kept for 30 days, so you can bring it back with `POST /email/mailboxes/{mailbox_id}/restore`. Once those 30 days are up they are deleted for good.
  *
  */
 export const deleteMailbox = <ThrowOnError extends boolean = false>(
@@ -2446,7 +2551,7 @@ export const deleteMailbox = <ThrowOnError extends boolean = false>(
 /**
  * Get a mailbox
  *
- * Returns a single mailbox by ID. A mailbox deleted within its 30-day restore window is still returned, with a non-null `deleted_at`; once the window closes it is permanently removed and returns 404.
+ * Returns a single mailbox by ID. A mailbox deleted within its 30-day restore window is still returned, with a non-null `deleted_at`. Once the window closes it is permanently removed and returns 404.
  *
  */
 export const getMailbox = <ThrowOnError extends boolean = false>(
@@ -2472,7 +2577,7 @@ export const getMailbox = <ThrowOnError extends boolean = false>(
 /**
  * Update a mailbox
  *
- * Updates a mailbox. The address and domain are immutable. Lowering the retention tier deletes remembered messages older than the new horizon — pass `confirm=true` to acknowledge.
+ * Updates a mailbox. The address and domain are immutable. Lowering the retention tier deletes any remembered message older than the new cutoff, so that request needs `confirm=true` before it will run.
  *
  */
 export const updateMailbox = <ThrowOnError extends boolean = false>(
@@ -2528,8 +2633,10 @@ export const restoreMailbox = <ThrowOnError extends boolean = false>(
 /**
  * Mailbox email statistics
  *
- * Returns the mailbox's sent and received email statistics over a time window: a period-wide summary plus a bucketed series. Sent-mail metrics carry the same delivery, engagement, and latency breakdowns as the email stats endpoints; `received` counts mail that arrived at the mailbox.
- * Rows are bucketed by event time, not send time — engagement received during the period for messages sent earlier is included. Statistics start when the mailbox starts sending and receiving; the mailbox's all-time `message_count` and `thread_count` live on the mailbox resource itself.
+ * Returns the mailbox's sent and received email statistics over a time window: a period-wide summary plus a bucketed series. Sent-mail metrics have the same delivery, engagement, and latency breakdowns as the email stats endpoints. `received` counts mail that arrived at the mailbox.
+ *
+ * Rows are bucketed by the time the event happened rather than the time the message was sent, so engagement that arrived during the period for a message sent earlier is counted here. Statistics start when the mailbox starts sending and receiving; the mailbox's all-time `message_count` and `thread_count` live on the mailbox resource itself.
+ *
  * `from` and `to` accept either calendar days (YYYY-MM-DD, `day` granularity only) or RFC 3339 instants (`hour` granularity only). Both bounds must use the same form. Window caps depend on `granularity`: 365 days at `day`, 30 days at `hour`. Set `timezone` to report in a local zone instead of UTC.
  *
  */
@@ -2556,7 +2663,7 @@ export const getMailboxStats = <ThrowOnError extends boolean = false>(
 /**
  * Resume a suspended mailbox
  *
- * Reactivates a mailbox that was suspended because the organization dropped below the plan needed to keep it active. The mailbox can send and receive again and its threads and messages become visible. Activation is refused when the organization has no room for another active mailbox, or for another custom inbox.ai handle, on its current plan — free up a slot by deleting an active mailbox, or upgrade the plan. Activating a mailbox that is not suspended returns a conflict.
+ * Resumes a mailbox that was suspended because the organization dropped below the plan needed to keep it active. The mailbox can send and receive again and its conversations and messages become visible. Resuming is refused when the organization has no room for another active mailbox, or for another custom inbox.ai handle, on its current plan. Free up a slot by deleting an active mailbox, or move to a bigger plan. Resuming a mailbox that is not suspended returns a conflict.
  *
  */
 export const resumeMailbox = <ThrowOnError extends boolean = false>(
@@ -2608,7 +2715,7 @@ export const listMailboxReceiveRules = <ThrowOnError extends boolean = false>(
 /**
  * Add a receive rule
  *
- * Adds an allow or block rule to the mailbox. Rules match the message's envelope sender; domain entries also match subdomains. Block rules always win — over allow rules and over the reply admission on allowlist mailboxes. An entry is either allow or block. Rules have no update operation, so a rule that needs the other action is a new rule and the old one is removed. A mailbox holds up to 200 rules.
+ * Adds an allow or block rule to the mailbox. Rules match the message's envelope sender. Domain entries also match subdomains. Block rules always win, both over allow rules and over the reply admission on allowlist mailboxes. An entry is either allow or block. Rules have no update operation, so a rule that needs the other action is a new rule and the old one is removed. A mailbox holds up to 200 rules.
  *
  */
 export const createMailboxReceiveRule = <ThrowOnError extends boolean = false>(
@@ -2664,7 +2771,13 @@ export const deleteMailboxReceiveRule = <ThrowOnError extends boolean = false>(
 /**
  * List threads
  *
- * Returns a paginated list of conversations across the workspace's mailboxes, most recently active first. `label` selects the view: the inbox (the default when omitted), `archive`, `spam`, `blocked`, or any custom label. Filter by mailbox, linked contact, or last-activity time, or pass `q` to full-text search conversations by their messages' subject and text. Conversations whose every message has been trashed are omitted; restoring a message returns its conversation to the list. `before` and `after` filter by time; to page through results pass the response cursors back as `starting_after` or `ending_before`.
+ * Returns a paginated list of conversations across the workspace's mailboxes, most recently active first. `label` selects the view: the inbox (the default when omitted), `archive`, `spam`, `blocked`, or any custom label. You can also filter by mailbox, by linked contact, by participant address, or by a subject substring.
+ *
+ * To search conversations by their messages' subject and text instead of listing them, use `GET /v1/email/threads/search`.
+ *
+ * Conversations whose every message has been trashed are left out of the list, and restoring a message brings the conversation back.
+ *
+ * `before` and `after` filter by time. To page through the results, pass the response cursors back as `starting_after` or `ending_before`.
  *
  */
 export const listEmailThreads = <ThrowOnError extends boolean = false>(
@@ -2716,7 +2829,7 @@ export const deleteEmailThread = <ThrowOnError extends boolean = false>(
 /**
  * Get a thread
  *
- * Returns a single conversation. Fetch the messages in the conversation with `GET /v1/email/threads/{thread_id}/messages`. A thread whose retention period has ended returns `410 Gone`.
+ * Returns a single conversation. Fetch the messages in the conversation with `GET /v1/email/threads/{thread_id}/messages`. A thread whose retention tier has ended returns `410 Gone`.
  *
  */
 export const getEmailThread = <ThrowOnError extends boolean = false>(
@@ -2742,7 +2855,7 @@ export const getEmailThread = <ThrowOnError extends boolean = false>(
 /**
  * Update a thread
  *
- * Applies label changes to a conversation and links or unlinks a contact. System labels move the conversation: adding `spam` files it (and its received messages) as spam, adding `archive` files it away without deleting it, and adding `inbox` — or removing `spam`, `blocked`, or `archive` — returns it to the inbox; unread counts recompute to match. An archived conversation returns to the inbox by itself when a new message arrives. To block a sender going forward, add a receive rule instead. Omitted fields are left unchanged.
+ * Applies label changes to a conversation, and links or unlinks a contact. Adding `spam` files the conversation, and its received messages, as spam. Adding `archive` files it away without deleting it. Adding `inbox`, or removing `spam`, `blocked`, or `archive`, returns it to the inbox, and its unread count recomputes to match. An archived conversation returns to the inbox by itself when a new message arrives. To block a sender going forward, add a receive rule instead. Any field you leave out stays unchanged.
  *
  */
 export const updateEmailThread = <ThrowOnError extends boolean = false>(
@@ -2772,7 +2885,11 @@ export const updateEmailThread = <ThrowOnError extends boolean = false>(
 /**
  * List messages in a thread
  *
- * Returns the messages in a conversation newest first, both received and sent; page older messages with `starting_after` (fixed sort — render conversation order by reversing the page). By default every message that is not in the trash is returned, whichever folder the conversation is in; pass `label` to narrow the view instead — `trash` for trashed messages, or any custom label. Pass `include=extracted_text` to inline each message's extracted plain text. A thread whose retention period has ended returns `410 Gone`.
+ * Returns the messages in a conversation, newest first, both received and sent. To page through older messages, use `starting_after`. The sort order is fixed, so to render the messages in conversation order, reverse the page yourself.
+ *
+ * By default, every message that is not in the trash is returned, whichever folder the conversation is in. Pass `label` to narrow the view instead: use `trash` for trashed messages, or any custom label.
+ *
+ * Pass `include=extracted_text` to inline each message's extracted plain text. A thread whose retention tier has ended returns `410 Gone`.
  *
  */
 export const listEmailThreadMessages = <ThrowOnError extends boolean = false>(
@@ -2798,7 +2915,7 @@ export const listEmailThreadMessages = <ThrowOnError extends boolean = false>(
 /**
  * Get a message in a thread
  *
- * Returns a single message in a conversation, including its extracted plain text. Metadata and extracted text remain readable for the mailbox's retention period; a message that has passed it returns `410 Gone`. A message that exists but does not belong to this thread returns `404`.
+ * Returns a single message in a conversation, including its extracted plain text. Metadata and extracted text stay readable for the mailbox's retention tier. A message that has aged past its retention tier returns `410 Gone`. A message that exists but does not belong to this thread returns `404`.
  *
  */
 export const getEmailThreadMessage = <ThrowOnError extends boolean = false>(
@@ -2824,7 +2941,7 @@ export const getEmailThreadMessage = <ThrowOnError extends boolean = false>(
 /**
  * Get a thread message's original body
  *
- * Returns the original rendered HTML and plain-text body of a message in a conversation. The original body is available for 30 days after the message occurred; after that this endpoint returns `410 Gone` while the message's extracted text remains readable on the message itself.
+ * Returns the original rendered HTML and plain-text body of a message in a conversation. The original body is available for 30 days after the message occurred. After that, this endpoint returns `410 Gone`, but the message's extracted text stays readable on the message itself.
  *
  */
 export const getEmailThreadMessageBody = <ThrowOnError extends boolean = false>(
@@ -2850,7 +2967,7 @@ export const getEmailThreadMessageBody = <ThrowOnError extends boolean = false>(
 /**
  * List a thread message's attachments
  *
- * Returns the attachments on a message in a conversation. Attachment bytes are downloadable for 30 days after the message occurred; after that this endpoint returns `410 Gone` while the attachment metadata remains readable on the message's `attachment_manifest`.
+ * Returns the attachments on a message in a conversation. Attachment bytes are downloadable for 30 days after the message occurred. After that, this endpoint returns `410 Gone`, but the attachment metadata stays readable on the message's `attachment_manifest`.
  *
  */
 export const listEmailThreadMessageAttachments = <
@@ -2878,7 +2995,7 @@ export const listEmailThreadMessageAttachments = <
 /**
  * Reply to a thread message
  *
- * Sends a reply to a specific message in a conversation, from the mailbox's own address. Recipients are derived from the message being replied to — its Reply-To address when present, otherwise its From address; set `reply_all` to also include the original To and Cc recipients. The subject and the threading headers that keep the reply in this conversation are set automatically, and the reply is recorded in the conversation. To reply to a conversation as a whole, target its newest received message.
+ * Sends a reply to a specific message in a conversation, from the mailbox's own address. Recipients are derived from the message being replied to: its Reply-To address when present, otherwise its From address. Set `reply_all` to also include the original To and Cc recipients. The subject and the threading headers that keep the reply in this conversation are set automatically, and the reply is recorded in the conversation. To reply to a conversation as a whole, target its newest received message.
  *
  */
 export const replyEmailThreadMessage = <ThrowOnError extends boolean = false>(
@@ -2908,7 +3025,7 @@ export const replyEmailThreadMessage = <ThrowOnError extends boolean = false>(
 /**
  * Send a message from a mailbox
  *
- * Sends a new message from the mailbox's own address and starts a new conversation with it. The request mirrors the plain send request minus `from` — the mailbox is the sender identity — and Bird mints the RFC 5322 Message-ID, so later replies from the recipients thread back into the conversation automatically. The send is recorded in the mailbox's durable memory and returned as the conversation's first message. Scheduled sends are not accepted on the mailbox surface. A suspended mailbox cannot send and returns `403`.
+ * Sends a new message from the mailbox's own address and starts a new conversation with it. The request mirrors the plain send request minus `from`, because the mailbox is who the message comes from. We set the RFC 5322 Message-ID, so later replies from the recipients thread back into the conversation automatically. The send is added to the mailbox's remembered messages and returned as the conversation's first message. A mailbox always sends immediately, so this endpoint does not accept a scheduled send. A suspended mailbox cannot send and returns `403`.
  *
  */
 export const createMailboxMessage = <ThrowOnError extends boolean = false>(
@@ -2938,7 +3055,18 @@ export const createMailboxMessage = <ThrowOnError extends boolean = false>(
 /**
  * List a mailbox's labels
  *
- * Returns the labels available in a mailbox: the built-in system labels — the placements `inbox`, `archive`, `spam`, `blocked`, and `sent`, plus `trash` and `unread` — followed by every custom label currently in use on its conversations and messages. Apply and remove labels through the conversation and message update endpoints; custom labels exist by being applied, so this list is discovery, not management.
+ * Returns the labels available in a mailbox. First, the built-in system
+ * labels:
+ *
+ * - The placements `inbox`, `archive`, `spam`, `blocked`, and `sent`.
+ * - `trash`.
+ * - `unread`.
+ *
+ * Then, every custom label currently in use on its conversations and
+ * messages. You apply and remove labels through the conversation and
+ * message update endpoints, and that is also what creates or removes a
+ * custom label: it exists for as long as at least one message or
+ * conversation has it applied.
  *
  */
 export const listMailboxLabels = <ThrowOnError extends boolean = false>(

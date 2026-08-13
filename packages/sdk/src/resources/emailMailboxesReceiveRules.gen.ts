@@ -23,7 +23,7 @@ export class EmailMailboxesReceiveRulesResource extends Resource {
   }
 
   /**
-   * Add an allow or block rule for a sender address or domain to a mailbox. Block always wins; up to 200 rules per mailbox.
+   * Add an allow or block rule for a sender address or domain to a mailbox. Block always wins. Up to 200 rules per mailbox.
    *
    * @example Block a domain
    * const rule = await bird.email.mailboxes.receiveRules.create("mbx_01abc", {

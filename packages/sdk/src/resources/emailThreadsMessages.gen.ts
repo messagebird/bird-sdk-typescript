@@ -12,7 +12,7 @@ export type EmailThreadsMessagesReplyParams = NonNullable<ReplyEmailThreadMessag
 
 export class EmailThreadsMessagesResource extends Resource {
   /**
-   * List the messages in a conversation newest first, both directions. Page older messages with starting_after, and pass include=extracted_text to inline each message's durable plain text.
+   * List the messages in a conversation newest first, both directions. Page older messages with starting_after, and pass include=extracted_text to inline each message's extracted plain text.
    *
    * @example List a thread's messages
    * for await (const msg of bird.email.threads.messages.list("thr_01abc")) {
@@ -25,7 +25,7 @@ export class EmailThreadsMessagesResource extends Resource {
   }
 
   /**
-   * Get one conversation message with its extracted plain text, readable for the mailbox's full retention period without MIME parsing.
+   * Get one conversation message with its extracted plain text, readable for the mailbox's full retention tier without MIME parsing.
    *
    * @example Get a message
    * const msg = await bird.email.threads.messages.get("thr_01abc", "rem_01xyz");
@@ -37,7 +37,7 @@ export class EmailThreadsMessagesResource extends Resource {
   }
 
   /**
-   * Get the original rendered HTML and plain-text body of a conversation message. Available 30 days; after that use the message's extracted_text.
+   * Get the original rendered HTML and plain-text body of a conversation message. Available for 30 days. After that, use the message's extracted_text.
    *
    * @example Get a message body
    * const body = await bird.email.threads.messages.body("thr_01abc", "rem_01xyz");
@@ -63,7 +63,7 @@ export class EmailThreadsMessagesResource extends Resource {
   }
 
   /**
-   * List the attachments on a conversation message. Bytes are downloadable for 30 days; the metadata also rides the message's attachment_manifest durably.
+   * List the attachments on a conversation message. Bytes are downloadable for 30 days, and the metadata stays readable afterward on the message's attachment_manifest.
    *
    * @example List a message's attachments
    * const atts = await bird.email.threads.messages.attachments("thr_01abc", "rem_01xyz");

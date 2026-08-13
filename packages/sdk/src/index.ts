@@ -92,6 +92,12 @@ export type {
   SmsTemplateList,
   SmsTemplateListQuery,
 } from "./resources/smsTemplates.gen.js";
+export type {
+  PhoneNumberLookup,
+  EmailLookup,
+  LookupPhoneNumberParams,
+  LookupEmailParams,
+} from "./resources/lookup.gen.js";
 export type { WhatsappSendParams } from "./resources/whatsapp.js";
 export type {
   WhatsAppMessage,
@@ -168,6 +174,11 @@ export { WebhookEventType } from "./event-types.gen.js";
 export type { WebhookEventTypeValue } from "./event-types.gen.js";
 export {
   EmailEventType,
+  EmailLookupFlag,
+  EmailLookupReason,
+  EmailLookupResult,
+  LookupFlag,
+  LookupPropertyStatus,
   SMSErrorCode,
   VerificationAttemptFailureReason,
   VerificationChannel,
@@ -178,6 +189,11 @@ export {
 } from "./open-enums.gen.js";
 export type {
   EmailEventTypeValue,
+  EmailLookupFlagValue,
+  EmailLookupReasonValue,
+  EmailLookupResultValue,
+  LookupFlagValue,
+  LookupPropertyStatusValue,
   SMSErrorCodeValue,
   VerificationAttemptFailureReasonValue,
   VerificationChannelValue,

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.28.0
+
+- Adds the lookup channel: bird.lookup.email() and bird.lookup.phoneNumber().
+- The contacts documentation now names `phone_number`, the identifier the API accepts, where it previously named `phone` — including the batch `match_on` value, which is rejected as `phone`.
+- LookupPropertyStatus is now an open enum, so a future property status will not break a deployed client.
+- The WhatsApp number and stats methods carry corrected documentation: a number's `status` is never null, it reads `failed` when Bird's own setup was refused permanently and otherwise carries what WhatsApp reports, and the stats descriptions no longer collapse into a single paragraph.
+
 ## 0.27.0
 
 - **Breaking:** a contact's phone identifier is now named `phone_number`, matching the rest of the API. It replaces `phone` in create, update, batch-upsert and read bodies; the `GET /v1/contacts` filter becomes `?phone_number=`; the `identifier` filter value and the batch `match_on` / `matched_on` values become `phone_number` — they name the field, so they move with it. On the TCR brand surface, a brand's own `phone` becomes `phone_number` as well. The CLI's `bird contacts create|update` take `--phone-number`, and `bird contacts list` filters on `--phone-number`. Qualified compounds are unchanged: `mobile_phone`, `primary_phone` and `business_contact_phone` keep their names.

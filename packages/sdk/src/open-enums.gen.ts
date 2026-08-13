@@ -26,6 +26,76 @@ export const EmailEventType = {
 export type EmailEventTypeValue = (typeof EmailEventType)[keyof typeof EmailEventType];
 
 /**
+ * Values of EmailLookupFlag known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailLookupFlag = {
+  Disposable: "disposable",
+  FreeProvider: "free_provider",
+  Role: "role",
+} as const;
+
+/** A known EmailLookupFlag value. */
+export type EmailLookupFlagValue = (typeof EmailLookupFlag)[keyof typeof EmailLookupFlag];
+
+/**
+ * Values of EmailLookupReason known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailLookupReason = {
+  InvalidDomain: "invalid_domain",
+  InvalidRecipient: "invalid_recipient",
+  InvalidSyntax: "invalid_syntax",
+} as const;
+
+/** A known EmailLookupReason value. */
+export type EmailLookupReasonValue = (typeof EmailLookupReason)[keyof typeof EmailLookupReason];
+
+/**
+ * Values of EmailLookupResult known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailLookupResult = {
+  Neutral: "neutral",
+  Risky: "risky",
+  Typo: "typo",
+  Undeliverable: "undeliverable",
+  Valid: "valid",
+} as const;
+
+/** A known EmailLookupResult value. */
+export type EmailLookupResultValue = (typeof EmailLookupResult)[keyof typeof EmailLookupResult];
+
+/**
+ * Values of LookupFlag known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const LookupFlag = {
+  Ported: "ported",
+} as const;
+
+/** A known LookupFlag value. */
+export type LookupFlagValue = (typeof LookupFlag)[keyof typeof LookupFlag];
+
+/**
+ * Values of LookupPropertyStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const LookupPropertyStatus = {
+  Inconclusive: "inconclusive",
+  Ok: "ok",
+  Unavailable: "unavailable",
+} as const;
+
+/** A known LookupPropertyStatus value. */
+export type LookupPropertyStatusValue = (typeof LookupPropertyStatus)[keyof typeof LookupPropertyStatus];
+
+/**
  * Values of SMSErrorCode known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
