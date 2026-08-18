@@ -56,14 +56,34 @@ export interface ErrorDetail {
   message: string;
 }
 
-/** One recovery step: an operation to call to resolve the error. */
-export interface ErrorNextAction {
-  /** operationId of the follow-up operation that resolves this error. */
-  operation: string;
-  /** Short human-readable label for the recovery step. */
-  description?: string;
-  /** Permission scope the recovery operation requires, when it is scoped. */
-  scope?: string;
+/**
+ * One recovery step the server suggests. Read `kind` before `operation`: only an
+ * `operation` step carries one.
+ */
+export interface NextAction {
+  /**
+   * What to do about this step: `operation` calls the operation named in
+   * `operation` and reads again, `external` acts somewhere this API does not
+   * reach, `wait` reads again later, `terminal` means nothing resolves this so
+   * stop retrying. A value this SDK version does not know is display-only: show
+   * `description` and offer no action.
+   */
+  kind: string;
+  /** Short human-readable label for the step, suitable for display. */
+  description: string;
+  /** operationId to call. Present only when `kind` is `operation`. */
+  operation?: string;
+  /**
+   * Parameters that address `operation`, by name — every parameter the call
+   * needs, so it can be made from this step alone. A request body, when the
+   * operation takes one, is described by the operation and never appears here.
+   */
+  params?: Record<string, string>;
+  /**
+   * A URL to open. Present only when `kind` is `external`, and only when the step
+   * has one; an external step with nothing to open is normal.
+   */
+  url?: string;
 }
 
 /** One verification requirement blocking the action, with the flow that resolves it. */
@@ -98,8 +118,8 @@ export interface BirdAPIErrorFields {
   vendorCode?: string;
   /** Human recovery line for this error, when a recovery is known. */
   remediation?: string;
-  /** Operations that resolve this error, in the order to try them. */
-  next?: ErrorNextAction[];
+  /** Recovery steps for this error, in the order to take them. */
+  next?: NextAction[];
   /** Verification requirements blocking this action, when it is blocked pending verification. */
   unmetGates?: UnmetGate[];
 }
@@ -115,7 +135,7 @@ export class BirdAPIError extends BirdError {
   readonly param?: string;
   readonly vendorCode?: string;
   readonly remediation?: string;
-  readonly next?: ErrorNextAction[];
+  readonly next?: NextAction[];
   readonly unmetGates?: UnmetGate[];
 
   constructor(fields: BirdAPIErrorFields) {
@@ -282,7 +302,7 @@ interface WireErrorBody {
   vendor_code?: string;
   details?: ErrorDetail[];
   remediation?: string;
-  next?: ErrorNextAction[];
+  next?: NextAction[];
   unmet_gates?: UnmetGate[];
 }
 

@@ -1253,7 +1253,7 @@ export const EventVerifyVerificationVerifiedDataSchema = {
 export const VerificationChannelSchema = {
   type: "string",
   minLength: 1,
-  "x-extensible-enum": ["email", "sms", "whatsapp"],
+  "x-extensible-enum": ["email", "sms", "whatsapp", "telegram"],
   description:
     "The channel a passcode is delivered over. Open enum — new channels may be added over time, so treat any unrecognized value as a future channel rather than an error.",
 } as const;
@@ -1594,13 +1594,13 @@ export const EventVerifyAttemptDeliveredDataSchema = {
         carrier: {
           type: ["string", "null"],
           description:
-            "Carrier that delivered the message, when the carrier network reports it. Always null for email and WhatsApp.",
+            "Carrier that delivered the message, when the carrier network reports it. Always null for email, WhatsApp, and Telegram.",
           example: "Verizon",
         },
         mcc_mnc: {
           type: ["string", "null"],
           description:
-            "Mobile country code and mobile network code of the delivering carrier, when reported. Always null for email and WhatsApp.",
+            "Mobile country code and mobile network code of the delivering carrier, when reported. Always null for email, WhatsApp, and Telegram.",
           example: "311480",
         },
         delivered_at: {
@@ -9591,6 +9591,22 @@ export const WhatsAppEventListSchema = {
   },
 } as const;
 
+export const WhatsAppEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Type of an event in a WhatsApp message's delivery timeline. `whatsapp.accepted`: Bird accepted the request. `whatsapp.sent`: handed to the WhatsApp network. `whatsapp.delivered`: delivery confirmed to the recipient's device. `whatsapp.read`: the recipient opened the message (this does not change the message `status`, which never becomes `read`). `whatsapp.failed`: terminal permanent failure. `whatsapp.rejected`: Bird refused the message before sending it, so it was never charged. `whatsapp.received`: an inbound message arrived from the contact. Open enum, new event types may be added over time, so treat any unrecognized value as a future event rather than an error. The values below are the types known at this version.\n",
+  "x-extensible-enum": [
+    "whatsapp.accepted",
+    "whatsapp.delivered",
+    "whatsapp.failed",
+    "whatsapp.read",
+    "whatsapp.rejected",
+    "whatsapp.sent",
+  ],
+  example: "whatsapp.delivered",
+} as const;
+
 export const WhatsAppEventIDSchema = {
   type: "string",
   minLength: 1,
@@ -9610,20 +9626,8 @@ export const WhatsAppEventSchema = {
         "ID of the event (`ev_`-prefixed), unique within the message's timeline.",
     },
     type: {
-      type: "string",
-      minLength: 1,
+      $ref: "#/components/schemas/WhatsAppEventType",
       readOnly: true,
-      "x-extensible-enum": [
-        "whatsapp.accepted",
-        "whatsapp.sent",
-        "whatsapp.delivered",
-        "whatsapp.read",
-        "whatsapp.failed",
-        "whatsapp.rejected",
-      ],
-      description:
-        "Lifecycle event type. `whatsapp.accepted`: Bird accepted the request. `whatsapp.sent`: handed to the WhatsApp network. `whatsapp.delivered`: delivery confirmed to the recipient's device. `whatsapp.read`: the recipient opened the message (this does not change the message `status`, which never becomes `read`). `whatsapp.failed`: terminal permanent failure. `whatsapp.rejected`: Bird refused the message before sending it, so it was never charged. `whatsapp.received`: an inbound message arrived from the contact. Open enum: new event types may be added over time, so treat any unrecognized value as a future event rather than an error.\n",
-      example: "whatsapp.delivered",
     },
     occurred_at: {
       type: "string",
@@ -9864,7 +9868,7 @@ export const WhatsAppTemplateSendSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A send-by-template reference. Identify the template by its `id` or its `slug` (supply exactly one), optionally pick a language, and pass its placeholder values in `components`.\n",
+    "A send-by-template reference. Identify the template by its `id` or its `slug` (supply exactly one), optionally name a language, and fill its placeholders through `components`.\n",
   oneOf: [
     {
       required: ["id"],
@@ -9885,7 +9889,7 @@ export const WhatsAppTemplateSendSchema = {
         },
       ],
       description:
-        "The template to send, by its slug (for example `bird_otp`).",
+        "The template to send, by its slug handle (for example `bird_otp`).",
       example: "bird_otp",
     },
     language: {
@@ -9895,7 +9899,7 @@ export const WhatsAppTemplateSendSchema = {
         },
       ],
       description:
-        "Which of the template's languages to send, as a BCP-47 tag (for example `en` or `pt-BR`). Meta's underscore form (`pt_BR`) is accepted and normalized; the accepted message echoes the canonical BCP-47 form. May be omitted, in which case the template's default language is sent. A language the template is not stocked in returns a `422` that names the available tags.\n",
+        "Which of the template's languages to send, as a BCP-47 tag (for example `en` or `pt-BR`); Meta's underscore form (`pt_BR`) is accepted and normalized. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not carry the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected. The accepted message echoes the canonical BCP-47 form of the language it resolved to.\n",
       example: "pt-BR",
     },
     components: {
@@ -10316,7 +10320,7 @@ export const VerificationSchema = {
         },
         last_channel: {
           type: ["string", "null"],
-          "x-extensible-enum": ["email", "sms", "whatsapp"],
+          "x-extensible-enum": ["email", "sms", "whatsapp", "telegram"],
           readOnly: true,
           description:
             "The channel the most recent passcode was sent on, or null before the first send. Open enum; new channels may be added over time, so treat any unrecognized value as a future channel rather than an error.",
@@ -11087,7 +11091,7 @@ export const PhoneNumberLookupRequestSchema = {
       type: "string",
       minLength: 1,
       description:
-        "The phone number to look up, in E.164 format, which is a leading `+`, the country calling code, then the national number.",
+        "The phone number to look up, in international format: the country calling code, then the national number. The leading `+` is optional, and `00` works in its place, so `+31612345678`, `31612345678` and `0031612345678` are all the same number. A number written for dialling inside one country, with no country code, is rejected rather than guessed at.",
     },
     type: {
       type: "array",
@@ -11150,11 +11154,47 @@ export const SMSTemplateVersionIDSchema = {
   example: "smv_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const TemplateOnMissingLanguageSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["fallback", "fail"],
+  "x-enum-varnames": [
+    "TemplateOnMissingLanguageFallback",
+    "TemplateOnMissingLanguageFail",
+  ],
+  description:
+    "What a send or a preview does when it asks for a language the template\ncannot serve.\n\n`fallback` serves the closest match instead. It tries a broader form of the\nsame language first, so a request for `pt-BR` can be served by a stocked\n`pt`, and then the template's default language. A send never fails because a\nlanguage is missing.\n\n`fail` rejects the send rather than serving a different language, for content\nwhere sending the wrong language is worse than not sending at all. It matches\nthe requested tag or a broader form of it and refuses a sibling variant, so\n`pt-BR` is never served by `pt-PT`. A send that names no language still uses\nthe default language.\n\nThe default is per channel and stated on each channel's own field, because\nwhat a wrong-language send costs differs: where every language is separately\nreviewed and separately priced, falling back silently would send content the\nrecipient did not expect at a rate the sender did not choose.\n",
+  example: "fallback",
+} as const;
+
+export const TemplateLanguageStatusSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  "x-extensible-enum": ["draft", "live", "superseded"],
+  description:
+    "Where one language of a template stands, on a channel whose content Bird publishes directly. `live` is what sends serve today. `draft` is a language the draft carries that has never been published. `superseded` is a language a later version replaced. Open enum: treat an unrecognised value as not sendable.\n",
+  example: "live",
+} as const;
+
+export const SMSTemplateLanguageStateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One language's state on a template: whether it is live for sends. Content is not here; the template carries the body of its default language, and a send resolves the rest.\n",
+  required: ["status"],
+  properties: {
+    status: {
+      $ref: "#/components/schemas/TemplateLanguageStatus",
+    },
+  },
+} as const;
+
 export const TemplateVariableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "One variable a template's content uses, filled in from the values you give when you send. Templates on every channel report their variables this way, so this reads the same whether you are looking at an SMS template or an email one.\n",
+    "A single variable slot a template fills in from the values supplied when sending. The same shape on email, SMS and WhatsApp, so reading what a template needs works the same way whichever channel you are sending on.\n",
   required: ["key", "type", "required", "constraint"],
   properties: {
     key: {
@@ -11162,7 +11202,7 @@ export const TemplateVariableSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "The variable's name, the key you use for it in `parameters` when you send.",
+        "The key this slot is filled by. On email and SMS it is the key you set in the send's `parameters` object. On WhatsApp it is the `name` you repeat on the matching parameter inside `components`, or, for a template whose placeholders are positional, the position itself as `1`, `2` and so on.\n",
     },
     type: {
       type: "string",
@@ -11180,13 +11220,13 @@ export const TemplateVariableSchema = {
         "text",
       ],
       description:
-        "The value type this variable accepts. We can add new types to this list over time, so treat a value you do not recognize as a new type rather than as an error. SMS templates use the typed values, such as `code` and `amount`. Email templates only use `text`.\n",
+        "The value type this slot accepts. SMS templates use the typed slots (`code`, `amount` and the rest), each of which rejects a value that does not match its `constraint`. Email and WhatsApp templates use `text`, which accepts any value. Open enum: treat an unrecognized value as a future type rather than an error.\n",
     },
     required: {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether a value has to be supplied when sending. A send that leaves a required variable unset is rejected.\n",
+        "Whether the slot must be supplied when sending. On SMS and WhatsApp a missing required value is rejected with a `422`. On email it is advisory: a missing value renders as empty rather than rejecting the send.\n",
     },
     constraint: {
       type: "string",
@@ -11200,7 +11240,7 @@ export const TemplateVariableSchema = {
       readOnly: true,
       default: false,
       description:
-        "Whether this variable's value gets redacted before it is stored. When it does, the rendered value never appears in message content you read back through the API: a placeholder is stored in its place instead.\n",
+        "Whether this slot's value is kept out of durable storage. A sensitive slot's rendered value never appears in message content read back through the API: a stand-in placeholder is stored instead.\n",
     },
   },
 } as const;
@@ -11213,6 +11253,16 @@ export const SMSMessageCategorySchema = {
     "Content classification. Tells Bird and carriers why you're sending; per-country compliance rules (opt-out policy, quiet hours) key on it as they roll out.",
 } as const;
 
+export const TemplateStatusSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  "x-extensible-enum": ["draft", "pending", "active", "rejected", "inactive"],
+  description:
+    "Where the template stands as a whole. The same five states on every channel.\n\n- `draft`: nothing has ever gone live.\n- `pending`: nothing is live and at least one language is in review.\n- `active`: at least one language is live, so something can be sent.\n- `rejected`: it was reviewed and every language was refused.\n- `inactive`: nothing is live and nothing is in review, so content was withdrawn or was blocked before anything went live.\n\nThis is a summary. It answers whether the template is usable at all, not\nwhether every language is: a template with one language live is `active` even\nwhile another is still drafted or refused. Read `languages` for per-language\nstate, which is what says which language is where and why.\n\nWhich of the five a template can reach follows its channel's review model. A\nchannel whose content a third party reviews reaches all five; one whose\ncontent goes live on publish moves between `draft`, `active` and `inactive`.\n\nOpen enum: treat a value you do not recognize as a new one rather than as\nan error.\n",
+  example: "active",
+} as const;
+
 export const TemplateScopeSchema = {
   type: "string",
   minLength: 1,
@@ -11220,16 +11270,6 @@ export const TemplateScopeSchema = {
   enum: ["system", "workspace"],
   description:
     "Whether the template is one of our built-in templates (`system`) or one your workspace created (`workspace`).",
-} as const;
-
-export const TemplateNameSchema = {
-  type: "string",
-  minLength: 1,
-  maxLength: 63,
-  pattern: "^[a-z0-9]([a-z0-9_-]*[a-z0-9])?$",
-  description:
-    "A template's name: the stable handle you send it by, used in place of the template id. It can contain lowercase letters, numbers, hyphens, and underscores, has to start and end with a letter or a number, and can be up to 63 characters long.\n",
-  example: "welcome-email",
 } as const;
 
 export const SMSTemplateIDSchema = {
@@ -11242,18 +11282,28 @@ export const SMSTemplateIDSchema = {
 export const SMSTemplateSchema = {
   type: "object",
   additionalProperties: false,
+  description:
+    "A message template: one identity holding a copy of the message per language, resolved to one at send. It declares the variable slots a send fills in, so the parts that change travel with the request and the wording does not.\n",
   required: [
     "id",
+    "slug",
     "name",
     "description",
     "scope",
+    "status",
     "category",
     "body",
     "variables",
+    "default_language",
     "available_languages",
-    "status",
+    "languages",
+    "on_missing_language",
+    "language_source_required",
     "draft_version_id",
+    "live_version_id",
+    "published_version_id",
     "revision",
+    "last_submitted_at",
     "created_at",
     "updated_at",
   ],
@@ -11263,26 +11313,37 @@ export const SMSTemplateSchema = {
       description: "Unique identifier for the template.",
       $ref: "#/components/schemas/SMSTemplateID",
     },
-    name: {
+    slug: {
       allOf: [
         {
-          $ref: "#/components/schemas/TemplateName",
+          $ref: "#/components/schemas/TemplateSlug",
         },
       ],
       readOnly: true,
       description:
-        "The template's stable handle. Pass it (or the id) as the template reference when sending.",
+        "The template's permanent handle. Pass it (or the id) as the template reference when sending. Handles beginning with `bird_` are reserved for Bird's built-in templates.\n",
+      example: "bird_otp_verification",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      readOnly: true,
+      description:
+        "The template's display name, shown wherever the template is listed. Nothing resolves through it, so it is safe to show wherever a human reads the template.\n",
       example: "bird_otp_verification",
     },
     description: {
-      type: "string",
-      minLength: 1,
+      type: ["string", "null"],
       readOnly: true,
-      description: "Human-readable description of what the template is for.",
+      description: "What the template is for. Null when unset.",
       example: "One-time passcode verification",
     },
     scope: {
       $ref: "#/components/schemas/TemplateScope",
+    },
+    status: {
+      $ref: "#/components/schemas/TemplateStatus",
     },
     category: {
       allOf: [
@@ -11299,7 +11360,7 @@ export const SMSTemplateSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "The template body in its default language, shown for preview. Variable placeholders appear inline (for example `{{ code }}`).\n",
+        "The template body in its default language, shown for preview. Variable placeholders appear inline (for example `{{ code }}`). Name a `language` on the send to have another one served.\n",
       example: "Your verification code is {{ code }}.",
     },
     variables: {
@@ -11309,30 +11370,83 @@ export const SMSTemplateSchema = {
         $ref: "#/components/schemas/TemplateVariable",
       },
       description:
-        "The typed slots this template fills in from the values you supply when sending.",
+        "The typed slots this template fills in from the values you supply in `parameters` when sending. Every language of a template declares the same slots, so this list holds for whichever one a send resolves to.\n",
+    },
+    default_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The language a send uses when it names none, and the last resort when `on_missing_language` is `fallback` and the language asked for is not available.\n",
     },
     available_languages: {
       type: "array",
       readOnly: true,
       items: {
-        type: "string",
+        $ref: "#/components/schemas/LanguageTag",
       },
       description:
-        "The languages this template is available in, as BCP-47 tags.",
+        "The languages a send can resolve right now, as BCP-47 tags. The set may shrink for reasons other than editing, so read it rather than assuming it matches what you last saw.\n",
       example: ["en"],
     },
-    status: {
-      type: "string",
-      minLength: 1,
+    languages: {
+      type: "object",
       readOnly: true,
-      enum: ["active", "draft", "pending", "approved", "rejected"],
+      propertyNames: {
+        type: "string",
+        minLength: 2,
+        maxLength: 35,
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/SMSTemplateLanguageState",
+      },
       description:
-        "The template's lifecycle state. `active` means the template can be sent; every built-in Bird template is `active`. `draft` (being edited), `pending` (submitted for review), `approved` (passed review), and `rejected` (failed review) describe a workspace-authored template's authoring lifecycle; workspace-authored SMS templates are not available yet, so today every template is `active`.\n",
+        "Where each of the template's languages stands, keyed by BCP-47 language tag. Content is not here: `body` previews the default language, and a send resolves the one it needs.\n",
+      example: {
+        en: {
+          status: "live",
+        },
+        nl: {
+          status: "live",
+        },
+      },
+    },
+    on_missing_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateOnMissingLanguage",
+        },
+      ],
+      readOnly: true,
+      description:
+        "What a send does when it asks for a language this template does not carry. Defaults to `fallback` on SMS.\n",
+    },
+    language_source_required: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether a send has to name a language. When true, a send that names none is rejected instead of being served the default language.\n",
     },
     draft_version_id: {
       readOnly: true,
       description:
-        "The current editable draft version. Always null today: SMS templates are not yet versioned; present for parity with email templates.",
+        "The current editable draft version, or null for a built-in `system` template, which has no draft.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    live_version_id: {
+      readOnly: true,
+      description:
+        "The version a send resolves to, or null for a built-in `system` template, which Bird ships ready to send rather than versioning.\n",
       oneOf: [
         {
           $ref: "#/components/schemas/SMSTemplateVersionID",
@@ -11344,8 +11458,9 @@ export const SMSTemplateSchema = {
     },
     published_version_id: {
       readOnly: true,
+      deprecated: true,
       description:
-        "The currently published version, or null if the template has never been published. Always null today: SMS templates are not yet versioned; present for parity with email templates.",
+        "Deprecated: use `live_version_id` instead, which carries the same value.\n",
       oneOf: [
         {
           $ref: "#/components/schemas/SMSTemplateVersionID",
@@ -11360,21 +11475,28 @@ export const SMSTemplateSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "The draft's revision counter. Always null today: SMS templates are not yet versioned; present for parity with email templates.",
+        "The draft's revision counter. Null for a built-in `system` template, which is unversioned.\n",
+    },
+    last_submitted_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this template was last submitted. Null for a built-in `system` template: Bird ships it ready to send, so there is nothing submitted to date.\n",
     },
     created_at: {
       type: ["string", "null"],
       format: "date-time",
       readOnly: true,
       description:
-        "When the template was created. Null for built-in templates.",
+        "When the template was created. Null for a built-in `system` template, which Bird ships rather than stores.\n",
     },
     updated_at: {
       type: ["string", "null"],
       format: "date-time",
       readOnly: true,
       description:
-        "When the template was last updated. Null for built-in templates.",
+        "When the template was last modified. Null for a built-in `system` template, which Bird ships rather than stores.\n",
     },
   },
 } as const;
@@ -11616,10 +11738,13 @@ export const SMSTemplateSendSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A send-by-template reference. Identify the template by its `id` or its `name` (supply exactly one), optionally pick a language, and pass its variable values in `parameters`.\n",
+    "A send-by-template reference. Identify the template by its `id` or its `slug` (supply exactly one), optionally name a language, and pass its variable values in `parameters`.\n",
   oneOf: [
     {
       required: ["id"],
+    },
+    {
+      required: ["slug"],
     },
     {
       required: ["name"],
@@ -11630,15 +11755,22 @@ export const SMSTemplateSendSchema = {
       description: "The template to send, by its id.",
       $ref: "#/components/schemas/SMSTemplateID",
     },
-    name: {
+    slug: {
       allOf: [
         {
-          $ref: "#/components/schemas/TemplateName",
+          $ref: "#/components/schemas/TemplateSlug",
         },
       ],
       description:
-        "The template to send, by its name handle (for example `bird_otp_verification`). Browse the available templates and their variables with the templates endpoint.\n",
+        "The template to send, by its slug handle (for example `bird_otp_verification`). Browse the available templates and their variables with the templates endpoint.\n",
       example: "bird_otp_verification_ttl",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      deprecated: true,
+      description:
+        "Deprecated: use `slug` instead. Resolved as a slug first, and only if that finds nothing, matched against the template's display name.\n",
     },
     language: {
       allOf: [
@@ -11647,7 +11779,7 @@ export const SMSTemplateSendSchema = {
         },
       ],
       description:
-        "Which of the template's localized bodies to send, as a BCP-47 tag. Falls back to the closest available language, then English, when the exact tag is not stocked. Omit for English.\n",
+        "Which of the template's languages to send. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not carry the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected.\n",
       example: "fr",
     },
     parameters: {
@@ -11713,8 +11845,8 @@ export const SMSMessageSendRequestSchema = {
       type: "string",
       minLength: 1,
       description:
-        "Recipient phone number in E.164 format (for example `+15551234567`). One recipient per message.",
-      example: "+15551234567",
+        "Recipient phone number in E.164 format (for example `+14155550100`). One recipient per message. The number is stored and returned in canonical E.164; a recipient that cannot be routed returns a `422` `SMSInvalidRecipient`.\n",
+      example: "+14155550100",
     },
     from: {
       type: "string",
@@ -11831,7 +11963,7 @@ export const SMSMessageSendRequestSchema = {
     },
   },
   example: {
-    to: "+15551234567",
+    to: "+14155550100",
     from: "+15557654321",
     text: "Your verification code is 123456.",
     category: "authentication",
@@ -14551,22 +14683,44 @@ export const UnmetGateSchema = {
   },
 } as const;
 
-export const ErrorNextActionSchema = {
+export const NextActionSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["operation"],
+  required: ["kind", "description"],
   properties: {
-    operation: {
+    kind: {
       type: "string",
       minLength: 1,
+      "x-extensible-enum": ["operation", "external", "wait", "terminal"],
       description:
-        "The operationId of a follow-up operation that resolves this error. Call it, then retry the original request.",
+        "What you do about this step. `operation` means call the operation named in `operation`, then read again. `external` means act somewhere this API does not reach, then read again. `wait` means nothing is asked of you, so read again later. `terminal` means nothing you do resolves this, so stop retrying. Tolerate a value you do not recognize: show the `description` and offer no action.\n",
     },
     description: {
       type: "string",
       minLength: 1,
       description:
-        "A short, human-readable label for the recovery step, suitable for display.",
+        "A short, human-readable label for the step, suitable for display.",
+    },
+    operation: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The operationId to call. Present only when `kind` is `operation`. The operation's own schema says how to call it; this says only which one, and what to address it with.\n",
+    },
+    params: {
+      type: "object",
+      additionalProperties: {
+        type: "string",
+        minLength: 1,
+      },
+      description:
+        'The parameters that address the operation, by name: `{"sender_id": "…"}` for an operation on `/v1/sms/senders/{sender_id}/requirements`. A parameter the operation takes in its query string is given the same way, so an operation addressed as `?subject_id=` carries `{"subject_id": "…"}`. Every parameter the call needs is here, whether its value came from the thing you were acting on or is fixed for this step, so you can make the call from this object alone. Present only when `kind` is `operation` and the operation names a subject. A request body, when the operation takes one, is described by the operation\'s own schema and never appears here.\n',
+    },
+    url: {
+      type: "string",
+      format: "uri",
+      description:
+        "A URL to open. Present only when `kind` is `external`, and only when the step has one. An external step whose `description` says to go and do something with no URL to open is normal.\n",
     },
   },
 } as const;
@@ -14676,9 +14830,9 @@ export const ErrorBodySchema = {
     next: {
       type: "array",
       description:
-        "Operations that resolve this error, in the order to try them. Present for errors with a well-defined recovery, such as unmet preconditions and conflicts.",
+        "The steps that resolve this error. Perform them in order, re-reading after each; a `wait` or `terminal` step is always last. Present for errors with a well-defined recovery, such as unmet preconditions and conflicts.\n",
       items: {
-        $ref: "#/components/schemas/ErrorNextAction",
+        $ref: "#/components/schemas/NextAction",
       },
     },
     unmet_gates: {
@@ -16927,9 +17081,18 @@ export const SMSTemplateListWritableSchema = {
   },
 } as const;
 
+export const SMSTemplateLanguageStateWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One language's state on a template: whether it is live for sends. Content is not here; the template carries the body of its default language, and a send resolves the rest.\n",
+} as const;
+
 export const SMSTemplateWritableSchema = {
   type: "object",
   additionalProperties: false,
+  description:
+    "A message template: one identity holding a copy of the message per language, resolved to one at send. It declares the variable slots a send fills in, so the parts that change travel with the request and the wording does not.\n",
 } as const;
 
 export const SMSMessageBatchResponseWritableSchema = {
@@ -17803,9 +17966,9 @@ export const ErrorBodyWritableSchema = {
     next: {
       type: "array",
       description:
-        "Operations that resolve this error, in the order to try them. Present for errors with a well-defined recovery, such as unmet preconditions and conflicts.",
+        "The steps that resolve this error. Perform them in order, re-reading after each; a `wait` or `terminal` step is always last. Present for errors with a well-defined recovery, such as unmet preconditions and conflicts.\n",
       items: {
-        $ref: "#/components/schemas/ErrorNextAction",
+        $ref: "#/components/schemas/NextAction",
       },
     },
     unmet_gates: {

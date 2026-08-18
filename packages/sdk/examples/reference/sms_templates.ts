@@ -11,7 +11,7 @@ const bird = new BirdClient({ apiKey: process.env.BIRD_API_KEY! });
 
 export async function smsTemplatesList() {
   const { data } = await bird.smsTemplates.list({ scope: "system" });
-  for (const tpl of data) console.log(tpl.id, tpl.name);
+  for (const tpl of data) console.log(tpl.id, tpl.slug);
 }
 
 export async function smsTemplatesGet() {

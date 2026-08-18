@@ -9,8 +9,12 @@ import {
   BirdPreconditionError,
   BirdRateLimitError,
   BirdValidationError,
+  type NextAction,
 } from "../src/errors.js";
-import { ErrorBodySchema } from "../src/generated/schemas.gen.js";
+import {
+  ErrorBodySchema,
+  NextActionSchema,
+} from "../src/generated/schemas.gen.js";
 
 function headers(init?: Record<string, string>): Headers {
   return new Headers(init);
@@ -96,13 +100,20 @@ describe("mapResponseToError", () => {
     expect(err.constructor.name).toBe("BirdAPIError");
   });
 
-  it("surfaces remediation and next from the wire (ADR-0073)", () => {
-    const next = [
+  it("surfaces remediation and next from the wire (ADR-0073/0124)", () => {
+    const next: NextAction[] = [
       {
-        operation: "assignDedicatedIp",
+        kind: "operation",
         description: "Assign a dedicated IP",
-        scope: "email:write",
+        operation: "assignDedicatedIp",
+        params: { pool_id: "pool_123" },
       },
+      {
+        kind: "external",
+        description: "Publish the DKIM record at your DNS provider",
+        url: "https://example.test/dns",
+      },
+      { kind: "wait", description: "Verification is in progress" },
     ];
     const err = mapResponseToError(422, {
       type: "validation_error",
@@ -116,6 +127,9 @@ describe("mapResponseToError", () => {
       "Assign a dedicated IP to the pool, then retry.",
     );
     expect(err.next).toEqual(next);
+    // A step that is not an operation carries none: the facade must not invent one.
+    expect(err.next?.[1].operation).toBeUndefined();
+    expect(err.next?.[2].operation).toBeUndefined();
   });
 });
 
@@ -143,6 +157,27 @@ describe("ErrorBody wire → facade coverage (drift guard)", () => {
       expect(
         wireToFacade,
         `wire field '${key}' is unmapped in errors.ts`,
+      ).toHaveProperty(key);
+    }
+  });
+
+  // The same guard one level down. The ErrorBody guard above sees `next` only as a
+  // whole, so a field added inside a step passes it unnoticed — which is how `kind`,
+  // `params` and `url` were dropped for a release. The sample is typed
+  // `Required<NextAction>` so it cannot drift from the interface silently, though
+  // `tsc` excludes `tests/`, so it is the runtime key check that gates CI.
+  it("maps every NextAction wire property to a facade field", () => {
+    const sample: Required<NextAction> = {
+      kind: "operation",
+      description: "Assign a dedicated IP",
+      operation: "assignDedicatedIp",
+      params: { pool_id: "pool_123" },
+      url: "https://example.test/dns",
+    };
+    for (const key of Object.keys(NextActionSchema.properties)) {
+      expect(
+        sample,
+        `NextAction wire field '${key}' is unmapped in errors.ts`,
       ).toHaveProperty(key);
     }
   });

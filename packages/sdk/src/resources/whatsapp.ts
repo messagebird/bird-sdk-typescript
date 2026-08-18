@@ -24,9 +24,7 @@ export class WhatsappResource extends WhatsappResourceBase {
    *   to: "+15551234567",
    *   template: {
    *     slug: "bird_otp",
-   *     components: [
-   *       { type: "body", parameters: [{ type: "text", text: "123456" }] },
-   *     ],
+   *     components: [{ type: "body", parameters: [{ type: "text", text: "123456" }] }],
    *   },
    * });
    * console.log(msg.id, msg.status);

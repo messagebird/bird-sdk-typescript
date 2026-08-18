@@ -104,6 +104,29 @@ export class EmailResource<
    * });
    * console.log(msg.id, msg.status); // "em_…", "accepted"
    *
+   * @example Send a published template instead of inline content
+   * const msg = await bird.email.send({
+   *   from: { email: "onboarding@messagebird.dev", name: "Bird" },
+   *   to: ["delivered@messagebird.dev"],
+   *   category: "transactional",
+   *   template: {
+   *     slug: "welcome-email",
+   *     parameters: { first_name: "Jane" },
+   *   },
+   * });
+   * console.log(msg.id, msg.status);
+   *
+   * @example Sending to the sandbox bounce address, which hard-bounces every time
+   * const msg = await bird.email.send({
+   *   from: { email: "onboarding@messagebird.dev", name: "Bird" },
+   *   to: ["bounce+signup-flow@messagebird.dev"],
+   *   subject: "Sandbox bounce test",
+   *   html: "<p>This message will hard-bounce.</p>",
+   *   tags: [{ name: "flow", value: "signup" }],
+   *   metadata: { test_run: "docs-capture-1" },
+   * });
+   * console.log(msg.id, msg.status); // "em_…", "accepted"
+   *
    * @example A richer send — cc/bcc, reply-to, tags, metadata, click-tracking off, and an idempotency key (safe to retry; the server dedupes)
    * await bird.email.send(
    *   {

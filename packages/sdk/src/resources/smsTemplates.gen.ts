@@ -14,7 +14,7 @@ export class SmsTemplatesResource extends Resource {
    *
    * @example List the built-in templates
    * const { data } = await bird.smsTemplates.list({ scope: "system" });
-   * for (const tpl of data) console.log(tpl.id, tpl.name);
+   * for (const tpl of data) console.log(tpl.id, tpl.slug);
    */
   list(query?: SmsTemplateListQuery, options?: RequestOptions): APIPromise<SmsTemplateList> {
     return this.call<SmsTemplateList>("GET", options, ({ signal, headers }) =>
@@ -22,9 +22,9 @@ export class SmsTemplatesResource extends Resource {
   }
 
   /**
-   * Get one SMS template by its name or id, including its body and the variables it expects. Fetch it before sms_send to see which parameter keys a template send requires.
+   * Get one SMS template by its slug or id, including its body and the variables it expects. Fetch it before sms_send to see which parameter keys a template send requires.
    *
-   * @example Read one template by name or id
+   * @example Read one template by slug or id
    * const tpl = await bird.smsTemplates.get("bird_otp_verification");
    * console.log(tpl.body, tpl.variables);
    */

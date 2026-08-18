@@ -26,7 +26,7 @@ export {
   BirdRateLimitError,
   BirdWebhookVerificationError,
   type ErrorDetail,
-  type ErrorNextAction,
+  type NextAction,
   type UnmetGate,
 } from "./errors.js";
 export { regionFromApiKey, baseUrlForRegion } from "./region.js";
@@ -180,10 +180,13 @@ export {
   LookupFlag,
   LookupPropertyStatus,
   SMSErrorCode,
+  TemplateLanguageStatus,
+  TemplateStatus,
   VerificationAttemptFailureReason,
   VerificationChannel,
   VerificationTerminalReason,
   WhatsAppErrorCode,
+  WhatsAppEventType,
   WhatsAppTemplateCategory,
   WhatsAppTemplateParameterType,
 } from "./open-enums.gen.js";
@@ -195,10 +198,13 @@ export type {
   LookupFlagValue,
   LookupPropertyStatusValue,
   SMSErrorCodeValue,
+  TemplateLanguageStatusValue,
+  TemplateStatusValue,
   VerificationAttemptFailureReasonValue,
   VerificationChannelValue,
   VerificationTerminalReasonValue,
   WhatsAppErrorCodeValue,
+  WhatsAppEventTypeValue,
   WhatsAppTemplateCategoryValue,
   WhatsAppTemplateParameterTypeValue,
 } from "./open-enums.gen.js";

@@ -733,7 +733,8 @@ export type EventVerifyVerificationVerifiedData = EventVerifyBase & {
 /**
  * The channel a passcode is delivered over. Open enum — new channels may be added over time, so treat any unrecognized value as a future channel rather than an error.
  */
-export type VerificationChannel = "email" | "sms" | "whatsapp" | (string & {});
+export type VerificationChannel =
+  "email" | "sms" | "whatsapp" | "telegram" | (string & {});
 
 /**
  * The recipient to verify. Provide an `email`, a `phone_number`, or both; at least one is required. The addresses also identify the verification: a check must supply exactly the set used on the create call, so a verification created with both addresses is not found by either one alone.
@@ -929,11 +930,11 @@ export type EventVerifyAttemptDeliveredData = EventVerifyBase & {
    */
   address: string;
   /**
-   * Carrier that delivered the message, when the carrier network reports it. Always null for email and WhatsApp.
+   * Carrier that delivered the message, when the carrier network reports it. Always null for email, WhatsApp, and Telegram.
    */
   carrier: string | null;
   /**
-   * Mobile country code and mobile network code of the delivering carrier, when reported. Always null for email and WhatsApp.
+   * Mobile country code and mobile network code of the delivering carrier, when reported. Always null for email, WhatsApp, and Telegram.
    */
   mcc_mnc: string | null;
   /**
@@ -5386,6 +5387,19 @@ export type WhatsAppEventList = {
   data: Array<WhatsAppEvent>;
 };
 
+/**
+ * Type of an event in a WhatsApp message's delivery timeline. `whatsapp.accepted`: Bird accepted the request. `whatsapp.sent`: handed to the WhatsApp network. `whatsapp.delivered`: delivery confirmed to the recipient's device. `whatsapp.read`: the recipient opened the message (this does not change the message `status`, which never becomes `read`). `whatsapp.failed`: terminal permanent failure. `whatsapp.rejected`: Bird refused the message before sending it, so it was never charged. `whatsapp.received`: an inbound message arrived from the contact. Open enum, new event types may be added over time, so treat any unrecognized value as a future event rather than an error. The values below are the types known at this version.
+ *
+ */
+export type WhatsAppEventType =
+  | "whatsapp.accepted"
+  | "whatsapp.delivered"
+  | "whatsapp.failed"
+  | "whatsapp.read"
+  | "whatsapp.rejected"
+  | "whatsapp.sent"
+  | (string & {});
+
 export type WhatsAppEventId = string;
 
 export type WhatsAppEvent = {
@@ -5393,11 +5407,7 @@ export type WhatsAppEvent = {
    * ID of the event (`ev_`-prefixed), unique within the message's timeline.
    */
   readonly id: WhatsAppEventId;
-  /**
-   * Lifecycle event type. `whatsapp.accepted`: Bird accepted the request. `whatsapp.sent`: handed to the WhatsApp network. `whatsapp.delivered`: delivery confirmed to the recipient's device. `whatsapp.read`: the recipient opened the message (this does not change the message `status`, which never becomes `read`). `whatsapp.failed`: terminal permanent failure. `whatsapp.rejected`: Bird refused the message before sending it, so it was never charged. `whatsapp.received`: an inbound message arrived from the contact. Open enum: new event types may be added over time, so treat any unrecognized value as a future event rather than an error.
-   *
-   */
-  readonly type: string;
+  readonly type: WhatsAppEventType;
   /**
    * When this event occurred.
    */
@@ -5528,11 +5538,11 @@ export type WhatsAppTemplateSend = unknown & {
    */
   id?: WhatsAppTemplateId;
   /**
-   * The template to send, by its slug (for example `bird_otp`).
+   * The template to send, by its slug handle (for example `bird_otp`).
    */
   slug?: TemplateSlug;
   /**
-   * Which of the template's languages to send, as a BCP-47 tag (for example `en` or `pt-BR`). Meta's underscore form (`pt_BR`) is accepted and normalized; the accepted message echoes the canonical BCP-47 form. May be omitted, in which case the template's default language is sent. A language the template is not stocked in returns a `422` that names the available tags.
+   * Which of the template's languages to send, as a BCP-47 tag (for example `en` or `pt-BR`); Meta's underscore form (`pt_BR`) is accepted and normalized. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not carry the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected. The accepted message echoes the canonical BCP-47 form of the language it resolved to.
    *
    */
   language?: LanguageTag;
@@ -6100,7 +6110,7 @@ export type CountryCode = string;
 
 export type PhoneNumberLookupRequest = {
   /**
-   * The phone number to look up, in E.164 format, which is a leading `+`, the country calling code, then the national number.
+   * The phone number to look up, in international format: the country calling code, then the national number. The leading `+` is optional, and `00` works in its place, so `+31612345678`, `31612345678` and `0031612345678` are all the same number. A number written for dialling inside one country, with no country code, is rejected rather than guessed at.
    */
   phone_number: string;
   /**
@@ -6138,21 +6148,60 @@ export type SmsTemplateList = {
 export type SmsTemplateVersionId = string;
 
 /**
- * One variable a template's content uses, filled in from the values you give when you send. Templates on every channel report their variables this way, so this reads the same whether you are looking at an SMS template or an email one.
+ * What a send or a preview does when it asks for a language the template
+ * cannot serve.
+ *
+ * `fallback` serves the closest match instead. It tries a broader form of the
+ * same language first, so a request for `pt-BR` can be served by a stocked
+ * `pt`, and then the template's default language. A send never fails because a
+ * language is missing.
+ *
+ * `fail` rejects the send rather than serving a different language, for content
+ * where sending the wrong language is worse than not sending at all. It matches
+ * the requested tag or a broader form of it and refuses a sibling variant, so
+ * `pt-BR` is never served by `pt-PT`. A send that names no language still uses
+ * the default language.
+ *
+ * The default is per channel and stated on each channel's own field, because
+ * what a wrong-language send costs differs: where every language is separately
+ * reviewed and separately priced, falling back silently would send content the
+ * recipient did not expect at a rate the sender did not choose.
+ *
+ */
+export type TemplateOnMissingLanguage = "fallback" | "fail";
+
+/**
+ * Where one language of a template stands, on a channel whose content Bird publishes directly. `live` is what sends serve today. `draft` is a language the draft carries that has never been published. `superseded` is a language a later version replaced. Open enum: treat an unrecognised value as not sendable.
+ *
+ */
+export type TemplateLanguageStatus =
+  "draft" | "live" | "superseded" | (string & {});
+
+/**
+ * One language's state on a template: whether it is live for sends. Content is not here; the template carries the body of its default language, and a send resolves the rest.
+ *
+ */
+export type SmsTemplateLanguageState = {
+  status: TemplateLanguageStatus;
+};
+
+/**
+ * A single variable slot a template fills in from the values supplied when sending. The same shape on email, SMS and WhatsApp, so reading what a template needs works the same way whichever channel you are sending on.
  *
  */
 export type TemplateVariable = {
   /**
-   * The variable's name, the key you use for it in `parameters` when you send.
+   * The key this slot is filled by. On email and SMS it is the key you set in the send's `parameters` object. On WhatsApp it is the `name` you repeat on the matching parameter inside `components`, or, for a template whose placeholders are positional, the position itself as `1`, `2` and so on.
+   *
    */
   readonly key: string;
   /**
-   * The value type this variable accepts. We can add new types to this list over time, so treat a value you do not recognize as a new type rather than as an error. SMS templates use the typed values, such as `code` and `amount`. Email templates only use `text`.
+   * The value type this slot accepts. SMS templates use the typed slots (`code`, `amount` and the rest), each of which rejects a value that does not match its `constraint`. Email and WhatsApp templates use `text`, which accepts any value. Open enum: treat an unrecognized value as a future type rather than an error.
    *
    */
   readonly type: string;
   /**
-   * Whether a value has to be supplied when sending. A send that leaves a required variable unset is rejected.
+   * Whether the slot must be supplied when sending. On SMS and WhatsApp a missing required value is rejected with a `422`. On email it is advisory: a missing value renders as empty rather than rejecting the send.
    *
    */
   readonly required: boolean;
@@ -6161,7 +6210,7 @@ export type TemplateVariable = {
    */
   readonly constraint: string;
   /**
-   * Whether this variable's value gets redacted before it is stored. When it does, the rendered value never appears in message content you read back through the API: a placeholder is stored in its place instead.
+   * Whether this slot's value is kept out of durable storage. A sensitive slot's rendered value never appears in message content read back through the API: a stand-in placeholder is stored instead.
    *
    */
   readonly sensitive?: boolean;
@@ -6174,72 +6223,138 @@ export type SmsMessageCategory =
   "transactional" | "marketing" | "authentication" | "service";
 
 /**
+ * Where the template stands as a whole. The same five states on every channel.
+ *
+ * - `draft`: nothing has ever gone live.
+ * - `pending`: nothing is live and at least one language is in review.
+ * - `active`: at least one language is live, so something can be sent.
+ * - `rejected`: it was reviewed and every language was refused.
+ * - `inactive`: nothing is live and nothing is in review, so content was withdrawn or was blocked before anything went live.
+ *
+ * This is a summary. It answers whether the template is usable at all, not
+ * whether every language is: a template with one language live is `active` even
+ * while another is still drafted or refused. Read `languages` for per-language
+ * state, which is what says which language is where and why.
+ *
+ * Which of the five a template can reach follows its channel's review model. A
+ * channel whose content a third party reviews reaches all five; one whose
+ * content goes live on publish moves between `draft`, `active` and `inactive`.
+ *
+ * Open enum: treat a value you do not recognize as a new one rather than as
+ * an error.
+ *
+ */
+export type TemplateStatus =
+  "draft" | "pending" | "active" | "rejected" | "inactive" | (string & {});
+
+/**
  * Whether the template is one of our built-in templates (`system`) or one your workspace created (`workspace`).
  */
 export type TemplateScope = "system" | "workspace";
 
-/**
- * A template's name: the stable handle you send it by, used in place of the template id. It can contain lowercase letters, numbers, hyphens, and underscores, has to start and end with a letter or a number, and can be up to 63 characters long.
- *
- */
-export type TemplateName = string;
-
 export type SmsTemplateId = string;
 
+/**
+ * A message template: one identity holding a copy of the message per language, resolved to one at send. It declares the variable slots a send fills in, so the parts that change travel with the request and the wording does not.
+ *
+ */
 export type SmsTemplate = {
   /**
    * Unique identifier for the template.
    */
   readonly id: SmsTemplateId;
   /**
-   * The template's stable handle. Pass it (or the id) as the template reference when sending.
+   * The template's permanent handle. Pass it (or the id) as the template reference when sending. Handles beginning with `bird_` are reserved for Bird's built-in templates.
+   *
    */
-  readonly name: TemplateName;
+  readonly slug: TemplateSlug;
   /**
-   * Human-readable description of what the template is for.
+   * The template's display name, shown wherever the template is listed. Nothing resolves through it, so it is safe to show wherever a human reads the template.
+   *
    */
-  readonly description: string;
+  readonly name: string;
+  /**
+   * What the template is for. Null when unset.
+   */
+  readonly description: string | null;
   scope: TemplateScope;
+  status: TemplateStatus;
   /**
    * Content classification applied to messages sent from this template.
    */
   readonly category: SmsMessageCategory;
   /**
-   * The template body in its default language, shown for preview. Variable placeholders appear inline (for example `{{ code }}`).
+   * The template body in its default language, shown for preview. Variable placeholders appear inline (for example `{{ code }}`). Name a `language` on the send to have another one served.
    *
    */
   readonly body: string;
   /**
-   * The typed slots this template fills in from the values you supply when sending.
+   * The typed slots this template fills in from the values you supply in `parameters` when sending. Every language of a template declares the same slots, so this list holds for whichever one a send resolves to.
+   *
    */
   readonly variables: Array<TemplateVariable>;
   /**
-   * The languages this template is available in, as BCP-47 tags.
-   */
-  readonly available_languages: Array<string>;
-  /**
-   * The template's lifecycle state. `active` means the template can be sent; every built-in Bird template is `active`. `draft` (being edited), `pending` (submitted for review), `approved` (passed review), and `rejected` (failed review) describe a workspace-authored template's authoring lifecycle; workspace-authored SMS templates are not available yet, so today every template is `active`.
+   * The language a send uses when it names none, and the last resort when `on_missing_language` is `fallback` and the language asked for is not available.
    *
    */
-  readonly status: "active" | "draft" | "pending" | "approved" | "rejected";
+  readonly default_language: LanguageTag;
   /**
-   * The current editable draft version. Always null today: SMS templates are not yet versioned; present for parity with email templates.
+   * The languages a send can resolve right now, as BCP-47 tags. The set may shrink for reasons other than editing, so read it rather than assuming it matches what you last saw.
+   *
+   */
+  readonly available_languages: Array<LanguageTag>;
+  /**
+   * Where each of the template's languages stands, keyed by BCP-47 language tag. Content is not here: `body` previews the default language, and a send resolves the one it needs.
+   *
+   */
+  readonly languages: {
+    [key: string]: SmsTemplateLanguageState;
+  };
+  /**
+   * What a send does when it asks for a language this template does not carry. Defaults to `fallback` on SMS.
+   *
+   */
+  readonly on_missing_language: TemplateOnMissingLanguage;
+  /**
+   * Whether a send has to name a language. When true, a send that names none is rejected instead of being served the default language.
+   *
+   */
+  readonly language_source_required: boolean;
+  /**
+   * The current editable draft version, or null for a built-in `system` template, which has no draft.
+   *
    */
   readonly draft_version_id: SmsTemplateVersionId | null;
   /**
-   * The currently published version, or null if the template has never been published. Always null today: SMS templates are not yet versioned; present for parity with email templates.
+   * The version a send resolves to, or null for a built-in `system` template, which Bird ships ready to send rather than versioning.
+   *
    */
-  readonly published_version_id?: SmsTemplateVersionId | null;
+  readonly live_version_id: SmsTemplateVersionId | null;
   /**
-   * The draft's revision counter. Always null today: SMS templates are not yet versioned; present for parity with email templates.
+   * Deprecated: use `live_version_id` instead, which carries the same value.
+   *
+   *
+   * @deprecated
+   */
+  readonly published_version_id: SmsTemplateVersionId | null;
+  /**
+   * The draft's revision counter. Null for a built-in `system` template, which is unversioned.
+   *
    */
   readonly revision: number | null;
   /**
-   * When the template was created. Null for built-in templates.
+   * When this template was last submitted. Null for a built-in `system` template: Bird ships it ready to send, so there is nothing submitted to date.
+   *
+   */
+  readonly last_submitted_at: string | null;
+  /**
+   * When the template was created. Null for a built-in `system` template, which Bird ships rather than stores.
+   *
    */
   readonly created_at: string | null;
   /**
-   * When the template was last updated. Null for built-in templates.
+   * When the template was last modified. Null for a built-in `system` template, which Bird ships rather than stores.
+   *
    */
   readonly updated_at: string | null;
 };
@@ -6388,12 +6503,19 @@ export type SmsTemplateSend = unknown & {
    */
   id?: SmsTemplateId;
   /**
-   * The template to send, by its name handle (for example `bird_otp_verification`). Browse the available templates and their variables with the templates endpoint.
+   * The template to send, by its slug handle (for example `bird_otp_verification`). Browse the available templates and their variables with the templates endpoint.
    *
    */
-  name?: TemplateName;
+  slug?: TemplateSlug;
   /**
-   * Which of the template's localized bodies to send, as a BCP-47 tag. Falls back to the closest available language, then English, when the exact tag is not stocked. Omit for English.
+   * Deprecated: use `slug` instead. Resolved as a slug first, and only if that finds nothing, matched against the template's display name.
+   *
+   *
+   * @deprecated
+   */
+  name?: string;
+  /**
+   * Which of the template's languages to send. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not carry the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected.
    *
    */
   language?: LanguageTag;
@@ -6432,7 +6554,8 @@ export type SmsSendOptions = {
 
 export type SmsMessageSendRequest = unknown & {
   /**
-   * Recipient phone number in E.164 format (for example `+15551234567`). One recipient per message.
+   * Recipient phone number in E.164 format (for example `+14155550100`). One recipient per message. The number is stored and returned in canonical E.164; a recipient that cannot be routed returns a `422` `SMSInvalidRecipient`.
+   *
    */
   to: string;
   /**
@@ -7982,15 +8105,33 @@ export type UnmetGate = {
   readonly remediation_kind: string;
 };
 
-export type ErrorNextAction = {
+export type NextAction = {
   /**
-   * The operationId of a follow-up operation that resolves this error. Call it, then retry the original request.
+   * What you do about this step. `operation` means call the operation named in `operation`, then read again. `external` means act somewhere this API does not reach, then read again. `wait` means nothing is asked of you, so read again later. `terminal` means nothing you do resolves this, so stop retrying. Tolerate a value you do not recognize: show the `description` and offer no action.
+   *
    */
-  operation: string;
+  kind: string;
   /**
-   * A short, human-readable label for the recovery step, suitable for display.
+   * A short, human-readable label for the step, suitable for display.
    */
-  description?: string;
+  description: string;
+  /**
+   * The operationId to call. Present only when `kind` is `operation`. The operation's own schema says how to call it; this says only which one, and what to address it with.
+   *
+   */
+  operation?: string;
+  /**
+   * The parameters that address the operation, by name: `{"sender_id": "…"}` for an operation on `/v1/sms/senders/{sender_id}/requirements`. A parameter the operation takes in its query string is given the same way, so an operation addressed as `?subject_id=` carries `{"subject_id": "…"}`. Every parameter the call needs is here, whether its value came from the thing you were acting on or is fixed for this step, so you can make the call from this object alone. Present only when `kind` is `operation` and the operation names a subject. A request body, when the operation takes one, is described by the operation's own schema and never appears here.
+   *
+   */
+  params?: {
+    [key: string]: string;
+  };
+  /**
+   * A URL to open. Present only when `kind` is `external`, and only when the step has one. An external step whose `description` says to go and do something with no URL to open is normal.
+   *
+   */
+  url?: string;
 };
 
 export type ErrorDetail = {
@@ -8063,9 +8204,10 @@ export type ErrorBody = {
    */
   remediation?: string;
   /**
-   * Operations that resolve this error, in the order to try them. Present for errors with a well-defined recovery, such as unmet preconditions and conflicts.
+   * The steps that resolve this error. Perform them in order, re-reading after each; a `wait` or `terminal` step is always last. Present for errors with a well-defined recovery, such as unmet preconditions and conflicts.
+   *
    */
-  next?: Array<ErrorNextAction>;
+  next?: Array<NextAction>;
   /**
    * The verification requirements blocking this action, each with the flow that resolves it. Present only when an action is blocked pending verification.
    */
@@ -9451,6 +9593,18 @@ export type SmsTemplateListWritable = {
   data: Array<SmsTemplateWritable>;
 };
 
+/**
+ * One language's state on a template: whether it is live for sends. Content is not here; the template carries the body of its default language, and a send resolves the rest.
+ *
+ */
+export type SmsTemplateLanguageStateWritable = {
+  [key: string]: never;
+};
+
+/**
+ * A message template: one identity holding a copy of the message per language, resolved to one at send. It declares the variable slots a send fills in, so the parts that change travel with the request and the wording does not.
+ *
+ */
 export type SmsTemplateWritable = {
   [key: string]: never;
 };
@@ -9939,9 +10093,10 @@ export type ErrorBodyWritable = {
    */
   remediation?: string;
   /**
-   * Operations that resolve this error, in the order to try them. Present for errors with a well-defined recovery, such as unmet preconditions and conflicts.
+   * The steps that resolve this error. Perform them in order, re-reading after each; a `wait` or `terminal` step is always last. Present for errors with a well-defined recovery, such as unmet preconditions and conflicts.
+   *
    */
-  next?: Array<ErrorNextAction>;
+  next?: Array<NextAction>;
   /**
    * The verification requirements blocking this action, each with the flow that resolves it. Present only when an action is blocked pending verification.
    */
@@ -10881,9 +11036,9 @@ export type ListContactsData = {
      */
     email?: string;
     /**
-     * Return the contact with exactly this phone number in international E.164 form. Encode the leading plus sign as `%2B` (an unencoded `+` arrives as a space and is rejected). Phone numbers are unique within a workspace, so this matches at most one contact. Non-canonical forms of the same number match the contact they canonicalize to; a value that is not a phone number shape, or an empty value, is a validation error, never an unfiltered page.
+     * Return the contacts with exactly this phone number in international E.164 form. Repeat the parameter to match any of up to 50 numbers, and set `limit` to at least the number of values you pass: `limit` defaults to 25, and a page cut short by it looks exactly like numbers that matched nothing. Different identifier parameters still combine with AND, so `phone_number=a&phone_number=b&email=c` asks for a contact whose phone number is `a` or `b` and whose email is `c`. Encode the leading plus sign as `%2B` (an unencoded `+` arrives as a space and is rejected). Phone numbers are unique within a workspace, so each value matches at most one contact. Non-canonical forms of the same number match the contact they canonicalize to; a value that is not a phone number shape, or an empty value, is a validation error, never an unfiltered page.
      */
-    phone_number?: string;
+    phone_number?: Array<string>;
     /**
      * Return the contact with exactly this external_id (your own identifier for the contact). Unique within a workspace, so this matches at most one contact. An empty value is a validation error, never an unfiltered page.
      */
@@ -12520,7 +12675,7 @@ export type ListSmsTemplatesData = {
   path?: never;
   query?: {
     /**
-     * Keep only templates of this scope: `system` for Bird's built-in templates, `workspace` for templates authored in your workspace. Omit for all. Workspace-authored SMS templates are not available yet, so `workspace` currently matches nothing.
+     * Keep only templates of this scope: `system` for Bird's built-in templates, `workspace` for templates authored in your workspace. Omit for all.
      *
      */
     scope?: TemplateScope;
@@ -12532,7 +12687,7 @@ export type ListSmsTemplatesData = {
      * Keep only templates available in this language, as a BCP-47 tag. Matches the template's `available_languages` entries exactly, with no fallback.
      *
      */
-    language?: string;
+    language?: LanguageTag;
   };
   url: "/v1/sms/templates";
 };
@@ -12573,7 +12728,7 @@ export type GetSmsTemplateData = {
   body?: never;
   path: {
     /**
-     * The template's `name` (for example `bird_otp_verification`) or its `smt_`-prefixed id. A reference starting with `smt_` resolves by id; anything else resolves by name.
+     * The template's `slug` (for example `bird_otp_verification`) or its `smt_`-prefixed id. A reference starting with `smt_` resolves by id; anything else resolves by slug.
      *
      */
     template_ref: string;
@@ -13220,7 +13375,7 @@ export type ListWhatsAppMessageEventsData = {
      * Keep only events of this exact type (for example `whatsapp.delivered` or `whatsapp.failed`). Omit for the full timeline.
      *
      */
-    type?: string;
+    type?: WhatsAppEventType;
   };
   url: "/v1/whatsapp/messages/{message_id}/events";
 };
@@ -16637,12 +16792,12 @@ export type ListVoiceCallsData = {
      */
     sip_trunk_id?: SipTrunkId;
     /**
-     * Return only calls placed from this calling party number, matched as a whole number rather than as a fragment. Give it in international form: `+14155551234`, `14155551234`, and `0014155551234` all select the same calls, because a call record keeps the number exactly as the calling equipment presented it. A number given without a country code matches only calls recorded in that same form, since it names a different number in every country. Use `number` instead to match part of a number, or either side of the call.
+     * Return only calls placed from this calling party number, matched as a whole number rather than as a fragment. Give it in international form: `+14155551234`, `14155551234`, and `0014155551234` all select the same calls. A number given without a country code is read as an international one, so give the country code to be sure of what you are matching. Use `number` instead to match part of a number, or either side of the call.
      *
      */
     from?: string;
     /**
-     * Return only calls placed to this called party number, matched as a whole number rather than as a fragment. Give it in international form: `+16505559876`, `16505559876`, and `0016505559876` all select the same calls, because a call record keeps the number exactly as the calling equipment presented it. A number given without a country code matches only calls recorded in that same form, since it names a different number in every country. Use `number` instead to match part of a number, or either side of the call.
+     * Return only calls placed to this called party number, matched as a whole number rather than as a fragment. Give it in international form: `+16505559876`, `16505559876`, and `0016505559876` all select the same calls. A number given without a country code is read as an international one, so give the country code to be sure of what you are matching. Use `number` instead to match part of a number, or either side of the call.
      *
      */
     to?: string;

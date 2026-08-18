@@ -24,7 +24,7 @@ export type SmsSendBatchResult = SmsMessageBatchResponse;
 export class SmsResource extends SmsResourceBase {
   /**
    * Send one SMS to a single recipient. Supply either `text` (with a `category`)
-   * or a stored `template` (by `id` or `name`, with its `parameters`). The
+   * or a stored `template` (by `id` or `slug`, with its `parameters`). The
    * result is `accepted`, not yet delivered — read it back with `get` to confirm.
    *
    * @example Send free text
@@ -39,7 +39,7 @@ export class SmsResource extends SmsResourceBase {
    * @example Send by template
    * await bird.sms.send({
    *   to: "+14155550100",
-   *   template: { name: "bird_otp_verification", parameters: { code: "123456" } },
+   *   template: { slug: "bird_otp_verification", parameters: { code: "123456" } },
    * });
    */
   send(

@@ -677,7 +677,7 @@ export const cancelEmailMessage = <ThrowOnError extends boolean = false>(
 /**
  * List contacts
  *
- * Returns a paginated list of contacts in the workspace, newest first. Look up a single contact by its exact `email`, `phone_number`, or `external_id`, or search by email, first name, last name, or phone substring with `q`. Pass `include_total=true` to add the total number of matching contacts to the response.
+ * Returns a paginated list of contacts in the workspace, newest first. Look up a single contact by its exact `email`, `phone_number`, or `external_id`, or search by email, first name, last name, or phone substring with `q`. Repeat `phone_number` to resolve up to 50 numbers to their contacts in one request, raising `limit` to at least the number of values you pass. Pass `include_total=true` to add the total number of matching contacts to the response.
  *
  */
 export const listContacts = <ThrowOnError extends boolean = false>(
