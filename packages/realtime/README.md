@@ -58,6 +58,27 @@ room.bind<Member>("bird:member_added", (member) => console.log("joined", member.
 
 Server subscription rejections (bad signature, capacity) arrive on the connection, not the channel — the wire carries no channel attribution — so bind `bird.connection.bind("error", …)` to observe them; an authorizer failure does emit `bird:subscription_error` on the channel.
 
+### Encrypted channels
+
+`private-encrypted-…` channels carry end-to-end encrypted payloads: your server seals them with a master key only it holds, and this client unseals them with the `shared_secret` your auth endpoint returns (the server SDK's `authorizeChannel` adds it automatically). The cipher ships as a separate entry point so the default bundle stays free of it:
+
+```ts
+import { BirdRealtime } from "@messagebird/realtime";
+import { encryption } from "@messagebird/realtime/encrypted";
+
+const bird = new BirdRealtime({
+  appKey: "your-app-key",
+  region: "us1",
+  authEndpoint: "/bird/auth",
+  encryption,
+});
+
+const orders = bird.subscribe("private-encrypted-orders");
+orders.bind("order.updated", (data) => console.log(data)); // decrypted
+```
+
+Bindings receive plaintext. Subscribing without the `encryption` option throws rather than delivering ciphertext; an event that cannot be decrypted (even after re-authorizing once to pick up a rotated key) is dropped and reported as `bird:decryption_error` on the channel. `trigger()` throws on encrypted channels — client events are not supported there.
+
 ### Signing in a member
 
 `signin()` tells the edge who this connection belongs to, which is what lets the events API address a member and the disconnect API terminate them. The client POSTs `{ connection_id }` to `memberAuthEndpoint`; your server returns `{ auth, member_data }`, where `member_data` is the JSON string it signed.
@@ -96,6 +117,19 @@ bird.member.bind("order.shipped", (data) => {
 ```
 
 Delivery is tied to the identity, not to the page: after a reconnect the client signs in again and resubscribes, and while a connection has no identity nothing arrives. Publish with [`bird.realtime.members.send(...)`](https://bird.com/docs/api/reference/send-realtime-app-member-event) from the server SDK.
+
+### Watchlist events
+
+On apps with the `watchlist_events` setting, a signed-in identity whose `member_data` carries a `watchlist` array of member ids is told when those members come online (their first connection signs in) or go offline (their last one leaves). The current status of the whole list arrives right after signin; bind on `bird.member.watchlist`:
+
+```ts
+await bird.signin(); // member_data included: {"member_id":"u_1","watchlist":["u_2","u_3"]}
+
+bird.member.watchlist.bind("online", (memberIds) => console.log("online:", memberIds));
+bird.member.watchlist.bind("offline", (memberIds) => console.log("offline:", memberIds));
+```
+
+The watchlist is part of the signed identity, so your member auth endpoint decides who a member may watch, and re-signing in with a different list is how it changes.
 
 ### Client events
 

@@ -149,7 +149,6 @@ describe("ErrorBody wire → facade coverage (drift guard)", () => {
     details: "details",
     remediation: "remediation",
     next: "next",
-    unmet_gates: "unmetGates",
   };
 
   it("maps every ErrorBody wire property to a facade field", () => {

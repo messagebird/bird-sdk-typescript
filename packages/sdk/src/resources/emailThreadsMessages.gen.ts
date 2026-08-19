@@ -12,7 +12,7 @@ export type EmailThreadsMessagesReplyParams = NonNullable<ReplyEmailThreadMessag
 
 export class EmailThreadsMessagesResource extends Resource {
   /**
-   * List the messages in a conversation newest first, both directions. Page older messages with starting_after, and pass include=extracted_text to inline each message's extracted plain text.
+   * List the messages in a conversation newest first, both directions. Page older messages with `starting_after`, and pass `include=extracted_text` to inline each message's extracted plain text.
    *
    * @example List a thread's messages
    * for await (const msg of bird.email.threads.messages.list("thr_01abc")) {

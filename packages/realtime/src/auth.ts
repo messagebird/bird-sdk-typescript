@@ -66,6 +66,10 @@ export function defaultAuthorizer(
     const memberData = (body as { member_data?: unknown }).member_data;
     const out: ChannelAuthResponse = { auth };
     if (typeof memberData === "string") out.member_data = memberData;
+    // Encrypted channels: the decryption key rides the auth response. Carried
+    // verbatim; the channel decides whether it is required.
+    const sharedSecret = (body as { shared_secret?: unknown }).shared_secret;
+    if (typeof sharedSecret === "string") out.shared_secret = sharedSecret;
     return out;
   };
 }

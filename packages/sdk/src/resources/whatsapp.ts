@@ -9,15 +9,16 @@ import type {
 import { WhatsappResourceBase } from "./whatsapp.gen.js";
 import type { APIPromise, RequestOptions } from "../core/result.js";
 
-/** Body for `bird.whatsapp.send` — a template send; Bird picks the sender from the template's category. */
+/** Body for `bird.whatsapp.send` — a template send, or one free-form content arm. */
 export type WhatsappSendParams = WhatsAppMessageSendRequest;
 
 export class WhatsappResource extends WhatsappResourceBase {
   /**
-   * Send a template message. Bird selects the sender number from the
-   * template's category, so there is no sender field on the request. The
-   * result is `accepted`, not yet delivered — read it back with `get` to
-   * confirm.
+   * Send one message, carrying exactly one kind of content: a template, or
+   * free-form `text`, `image`, `video`, `audio`, `sticker`, `document` or
+   * `location`. Every send but a Bird-managed template needs `from`, a number
+   * this workspace owns. The result is `accepted`, not yet delivered — read it
+   * back with `get` to confirm.
    *
    * @example
    * const msg = await bird.whatsapp.send({

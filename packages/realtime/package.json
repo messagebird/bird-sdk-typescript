@@ -1,6 +1,6 @@
 {
   "name": "@messagebird/realtime",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "The official Bird Realtime browser client: subscribe to channels and receive events over WebSocket.",
   "license": "MIT",
   "author": "Bird",
@@ -32,6 +32,11 @@
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
     },
+    "./encrypted": {
+      "types": "./dist/encrypted.d.mts",
+      "import": "./dist/encrypted.mjs",
+      "default": "./dist/encrypted.mjs"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -50,8 +55,8 @@
   },
   "//unrun": "tsdown's TypeScript-config loader, declared by tsdown as an optional peer. Keep it an explicit devDependency: clean installs omit optional peers, and the mirror build then fails to load tsdown.config.ts. Do not prune.",
   "devDependencies": {
-    "tsdown": "0.22.3",
-    "typescript": "npm:@typescript/typescript6@^6",
+    "tsdown": "0.22.14",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-7": "npm:typescript@7.0.2",
     "unrun": "0.3.1",
     "vitest": "4.1.10"

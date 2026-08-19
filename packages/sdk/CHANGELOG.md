@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.30.0
+
+- Add bird.sms.stats and bird.smsSuppressions: SMS statistics (outbound, inbound breakdowns) and the suppression list, plus sms.listEvents for a message's timeline.
+- Add bird.smsKeywordRules: read Bird's SMS keyword catalogue and manage a workspace's own overrides of it.
+- Add end-to-end encrypted channels: `realtime.publish` and `realtime.publishBatch` seal `private-encrypted-` payloads under the `realtime.encryptionMasterKey` client option, and the new `realtime.authorizeChannel` signs channel subscriptions, adding the channel's `shared_secret` on encrypted channels.
+- Add the `watchlist_events` app setting to the Realtime app types.
+- A sending domain read now says what to do next. `next` carries the steps that get the domain verified, in the order to take them: an `external` step for a DNS record only you can publish, then the operation that re-checks it. An empty list means nothing is asked of you on that axis, and `capabilities` still reports what each capability needs before the domain can send or receive.
+- Email defaults now cover `ip_pool_id`, applied to every send that does not name a pool.
+- A field set as an email default may now be omitted from every `sendBatch` item, not only from `send`.
+- An email field passed as `undefined` or `null` now falls back to its configured default instead of being dropped from the request.
+- `email.mailboxes.messages.create` now honors the email defaults for the fields a compose accepts: `reply_to`, `category`, `tags`, and `metadata`.
+- Optional fields on a WhatsApp message's content — a media caption, a location's name and address — are omitted when unset rather than returned as null.
+- Getting or listing a WhatsApp message now returns the free-form `text`, `image`, `video`, `audio`, `sticker`, `document` or `location` content it carried.
+- The `whatsapp.received` webhook event is now available, delivering an inbound WhatsApp message's content as it arrives.
+- Sending a WhatsApp message accepts free-form `text`, `image`, `video`, `audio`, `sticker`, `document` and `location` content alongside templates.
+- Method, parameter and field documentation now states what each call does and what each value accepts, including its default, its units, and the fields it depends on.
+- `whatsapp.send`'s reference documentation describes the free-form content fields and the `from` sender it accepts, in place of the template-only rule it stated before.
+
 ## 0.29.0
 
 - **Breaking:** an SMS template is referenced by its `slug`, not its `name`. On a send, `template.name` becomes `template.slug` (unchanged if you pass an id). On a template read, `slug` is the handle you send by and `name` is now the display label the old `description` carried, so `description` reads null for Bird's built-in templates.

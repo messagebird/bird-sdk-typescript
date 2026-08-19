@@ -16,6 +16,12 @@ import type {
 } from "../generated/types.gen.js";
 import { Resource } from "./base.js";
 import { EmailResourceBase } from "./email.gen.js";
+import { withDefaults } from "./emailDefaults.js";
+import type {
+  EmailChannelDefaults,
+  EmailSend,
+  EmailSendBatch,
+} from "./emailDefaults.js";
 import { EmailStatsResource } from "./emailStats.gen.js";
 import { EmailMailboxesResource } from "./emailMailboxes.js";
 import { EmailThreadsResource } from "./emailThreads.js";
@@ -29,39 +35,17 @@ import type {
 export type { EmailMessage };
 /** Body for `bird.email.send`. */
 export type EmailSendParams = EmailMessageSendRequest;
-/** Body for `bird.email.sendBatch` — an array of send params, validated as a unit. */
+/** Body for `bird.email.sendBatch`. Contains send params validated as a unit. */
 export type EmailSendBatchParams = EmailMessageBatchRequest;
-/** Result of `bird.email.sendBatch` — one accepted item per submitted message. */
+/** Result of `bird.email.sendBatch`. Contains one accepted item per submitted message. */
 export type EmailSendBatchResult = EmailMessageBatchResponse;
 /** Filters and cursor params for `bird.email.list`. */
 export type EmailListQuery = NonNullable<ListEmailMessagesData["query"]>;
-
-/**
- * Channel-level defaults set at client construction. Field names mirror the
- * send params (so they read as pre-filled fields). Any field set here becomes
- * optional in `send` and is filled when omitted (per-send value wins).
- */
-export type EmailChannelDefaults = Partial<
-  Pick<
-    EmailSendParams,
-    | "from"
-    | "reply_to"
-    | "category"
-    | "track_opens"
-    | "track_clicks"
-    | "headers"
-    | "tags"
-    | "metadata"
-  >
->;
-
-type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
-/** Keys that carry a configured default — made optional in `send`. */
-type DefaultedKeys<D> = D extends object
-  ? Extract<keyof D, keyof EmailSendParams>
-  : never;
-/** `send` params with defaulted fields made optional. */
-export type EmailSend<D> = PartialBy<EmailSendParams, DefaultedKeys<D>>;
+export type {
+  EmailChannelDefaults,
+  EmailSend,
+  EmailSendBatch,
+} from "./emailDefaults.js";
 
 export class EmailResource<
   D extends EmailChannelDefaults | undefined = undefined,
@@ -85,7 +69,7 @@ export class EmailResource<
     super(core, client);
     this.#defaults = defaults;
     this.stats = new EmailStatsResource(core, client);
-    this.mailboxes = new EmailMailboxesResource(core, client);
+    this.mailboxes = new EmailMailboxesResource(core, client, defaults);
     this.threads = new EmailThreadsResource(core, client);
   }
 
@@ -154,7 +138,7 @@ export class EmailResource<
    *     html: "<p>My first Bird email.</p>",
    *   });
    * } catch (err) {
-   *   if (err instanceof BirdRateLimitError) console.log(`rate limited — retry in ${err.retryAfter}s`);
+   *   if (err instanceof BirdRateLimitError) console.log(`rate limited; retry in ${err.retryAfter}s`);
    *   else if (err instanceof BirdValidationError) console.error(err.details);
    *   else if (err instanceof BirdAPIError) console.error(err.code, err.requestId);
    *   else throw err;
@@ -178,8 +162,8 @@ export class EmailResource<
   ): APIPromise<EmailMessage> {
     // EmailSend<D> guarantees the caller supplied every field not covered by a
     // default, so the merge is a complete EmailSendParams. TS can't reprove that
-    // across a spread, so the assertion is necessary here (and only here).
-    const body = { ...this.#defaults, ...params } as EmailSendParams;
+    // through withDefaults, so the assertion is necessary here.
+    const body = withDefaults(this.#defaults, params) as EmailSendParams;
     return this.call<EmailMessage>("POST", options, ({ signal, headers }) =>
       createEmailMessage({ client: this.client, body, headers, signal }),
     );
@@ -191,7 +175,8 @@ export class EmailResource<
    * sender, all recipients suppressed, field-level errors) the whole batch is
    * rejected with a `BirdValidationError` and nothing is queued. Resolves with
    * one accepted item per submitted message, in submission order, once the batch
-   * is accepted (the API's 202). Channel defaults are applied per item.
+   * is accepted (the API's 202). Channel defaults are applied per item, so a
+   * field set as a default may be omitted from every item (per-item value wins).
    *
    * @example Send a batch of messages
    * const batch = await bird.email.sendBatch([
@@ -211,13 +196,12 @@ export class EmailResource<
    * for (const item of batch.data) console.log(item.id, item.status);
    */
   sendBatch(
-    params: EmailSendBatchParams,
+    params: EmailSendBatch<D>,
     options?: RequestOptions,
   ): APIPromise<EmailSendBatchResult> {
-    const body = params.map((item) => ({
-      ...this.#defaults,
-      ...item,
-    })) as EmailSendBatchParams;
+    const body = params.map((item) =>
+      withDefaults(this.#defaults, item),
+    ) as EmailSendBatchParams;
     return this.call<EmailSendBatchResult>(
       "POST",
       options,

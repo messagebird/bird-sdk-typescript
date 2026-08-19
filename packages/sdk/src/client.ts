@@ -21,6 +21,8 @@ import { DomainsResource } from "./resources/domains.gen.js";
 import { ContactPropertiesResource } from "./resources/contactProperties.gen.js";
 import { ContactsResource } from "./resources/contacts.gen.js";
 import { SmsResource } from "./resources/sms.js";
+import { SmsKeywordRulesResource } from "./resources/smsKeywordRules.gen.js";
+import { SmsSuppressionsResource } from "./resources/smsSuppressions.gen.js";
 import { SmsTemplatesResource } from "./resources/smsTemplates.gen.js";
 import { WhatsappResource } from "./resources/whatsapp.js";
 import { VoiceResource } from "./resources/voice.gen.js";
@@ -31,8 +33,8 @@ import { LookupResource } from "./resources/lookup.gen.js";
 
 // The SDK's own version, sent as User-Agent. Injected at build time from
 // package.json (tsdown/vitest `define`) so it never drifts from the published
-// version. Distinct from the Bird API version (X-Bird-API-Version)
-// which is deferred — see sdk-build-ledger #3.
+// version. The Bird API version (X-Bird-API-Version) is deferred; see
+// sdk-build-ledger #3.
 declare const __SDK_VERSION__: string;
 const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_RETRIES = 2;
@@ -47,7 +49,7 @@ export interface BirdClientOptions {
   timeout?: number;
   /** Max retry attempts on retryable failures (429, 5xx, network). Default 2. */
   maxRetries?: number;
-  /** Custom fetch — testing, proxying, edge-runtime adapters. Default global fetch. */
+  /** Custom fetch for testing, proxying, or edge-runtime adapters. Default global fetch. */
   fetch?: typeof fetch;
   /** Headers added to every request. SDK-internal headers win on conflict. */
   defaultHeaders?: Record<string, string>;
@@ -56,7 +58,7 @@ export interface BirdClientOptions {
    * `bird.email.send` (the type enforces this); the per-send value wins.
    */
   email?: EmailChannelDefaults;
-  /** Webhooks config — `secret` is the default used by `bird.webhooks.unwrap`. */
+  /** Webhook config. `secret` is the default used by `bird.webhooks.unwrap`. */
   webhooks?: WebhookOptions;
   /**
    * Realtime app credentials. Every `bird.realtime.*` call authenticates to the
@@ -79,8 +81,8 @@ export interface BirdRequest {
   headers?: Record<string, string>;
 }
 
-// Extract the email-channel defaults from the (literal) options type, or
-// `undefined` when none were set — drives whether `send` requires `from` etc.
+// Extract the email-channel defaults from the literal options type. The result
+// is `undefined` when none were set and controls whether `send` requires `from`.
 type EmailDefaultsOf<O> = O extends {
   email: infer E extends EmailChannelDefaults;
 }
@@ -121,8 +123,8 @@ function resolveRawRequestUrl(baseUrl: string, path: string): URL {
 }
 
 /**
- * The Bird API client. Construct it with an API key; the region is taken from
- * the key's prefix (`bk_{region}_…`) — pass `baseUrl` or `region` to override.
+ * The Bird API client. Construct it with an API key. The region comes from the
+ * key's prefix (`bk_{region}_…`). Pass `baseUrl` or `region` to override it.
  *
  * @example Construct and send
  * const bird = new BirdClient({ apiKey: process.env.BIRD_API_KEY! });
@@ -134,7 +136,7 @@ function resolveRawRequestUrl(baseUrl: string, path: string): URL {
  * });
  * console.log(msg.id);
  *
- * @example Channel defaults — set common send fields once; a per-send value always wins
+ * @example Set channel defaults once; a per-send value always wins
  * const bird = new BirdClient({
  *   apiKey: process.env.BIRD_API_KEY!,
  *   email: { from: "hello@acme.com", category: "transactional" },
@@ -145,8 +147,8 @@ function resolveRawRequestUrl(baseUrl: string, path: string): URL {
  * @example All client options
  * const bird = new BirdClient({
  *   apiKey: process.env.BIRD_API_KEY!,
- *   region: "eu1", // optional — override the region from the key prefix
- *   baseUrl: "http://localhost:8080", // optional — overrides region entirely (local/self-hosted)
+ *   region: "eu1", // optional; overrides the region from the key prefix
+ *   baseUrl: "http://localhost:8080", // optional; overrides region (local or self-hosted)
  *   timeout: 60_000, // per-attempt timeout in ms (default 60_000)
  *   maxRetries: 2, // retry budget for transient failures (default 2)
  * });
@@ -161,47 +163,54 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
   readonly #fetch: typeof fetch;
   readonly #headers: Record<string, string>;
 
-  /** The email channel — `bird.email.send(...)`, `.get(...)`, `.list(...)`. */
+  /** Email channel: `bird.email.send(...)`, `.get(...)`, `.list(...)`. */
   readonly email: EmailResource<EmailDefaultsOf<O>>;
 
 
-  /** The SMS channel — `bird.sms.send(...)`, `.get(...)`, `.list(...)`. */
+  /** SMS channel: `bird.sms.send(...)`, `.get(...)`, `.list(...)`. */
   readonly sms: SmsResource;
 
-  /** SMS templates — `bird.smsTemplates.list(...)`, `.get(...)`. */
+  /** SMS templates: `bird.smsTemplates.list(...)`, `.get(...)`. */
   readonly smsTemplates: SmsTemplatesResource;
 
-  /** The WhatsApp channel — `bird.whatsapp.send(...)`, `.get(...)`, `.list(...)`, `.listEvents(...)`. */
+  /** SMS suppressions: `bird.smsSuppressions.list(...)`, `.add(...)`, `.remove(...)`. */
+  readonly smsSuppressions: SmsSuppressionsResource;
+
+  /** SMS keyword rules: `bird.smsKeywordRules.list(...)`, `.create(...)`, … */
+  readonly smsKeywordRules: SmsKeywordRulesResource;
+
+
+  /** WhatsApp channel: `bird.whatsapp.send(...)`, `.get(...)`, `.list(...)`, `.listEvents(...)`. */
   readonly whatsapp: WhatsappResource;
 
-  /** The Voice call log — `bird.voice.list(...)`, `.get(...)`. Calls are placed by your own SIP equipment, so this is a read surface. */
+  /** Voice call log: `bird.voice.list(...)`, `.get(...)`. Your SIP equipment places calls, so this is a read surface. */
   readonly voice: VoiceResource;
 
-  /** The Verify product — `bird.verify.verifications.create(...)`, `.check(...)`. */
+  /** Verify: `bird.verify.verifications.create(...)`, `.check(...)`. */
   readonly verify: VerifyResource;
 
-  /** Contacts — `bird.contacts.create(...)`, `.list(...)`, `.get(...)`, `.batch(...)`, … */
+  /** Contacts: `bird.contacts.create(...)`, `.list(...)`, `.get(...)`, `.batch(...)`, … */
   readonly contacts: ContactsResource;
 
-  /** Audiences — `bird.audiences.create(...)`, `.list(...)`, `.addContacts(...)`, … */
+  /** Audiences: `bird.audiences.create(...)`, `.list(...)`, `.addContacts(...)`, … */
   readonly audiences: AudiencesResource;
 
-  /** Contact properties — `bird.contactProperties.create(...)`, `.list(...)`, `.archive(...)`, … */
+  /** Contact properties: `bird.contactProperties.create(...)`, `.list(...)`, `.archive(...)`, … */
   readonly contactProperties: ContactPropertiesResource;
 
-  /** Sending domains — `bird.domains.create(...)`, `.list(...)`, `.verify(...)`, … */
+  /** Sending domains: `bird.domains.create(...)`, `.list(...)`, `.verify(...)`, … */
   readonly domains: DomainsResource;
 
-  /** Recipient intelligence — `bird.lookup.email(...)`, `.phoneNumber(...)`. Every answer is billed. */
+  /** Recipient intelligence: `bird.lookup.email(...)`, `.phoneNumber(...)`. Every answer is billed. */
   readonly lookup: LookupResource;
 
-  /** Webhooks — `bird.webhooks.unwrap(payload, headers)` verifies an inbound delivery. */
+  /** Webhooks: `bird.webhooks.unwrap(payload, headers)` verifies an inbound delivery. */
   readonly webhooks: WebhooksResource;
 
 
 
 
-  /** Realtime — `bird.realtime.publish(...)`, `.channels.list(...)`, `.members.disconnect(...)`, … */
+  /** Realtime: `bird.realtime.publish(...)`, `.channels.list(...)`, `.members.disconnect(...)`, … */
   readonly realtime: RealtimeResource;
 
   constructor(options: O) {
@@ -212,14 +221,14 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
       ...opts.defaultHeaders,
       Authorization: `Bearer ${opts.apiKey}`,
       "User-Agent": `bird-sdk-js/${__SDK_VERSION__}`,
-      // Bird-* client-identity headers: the API attributes the SDK
-      // surface from these, not the User-Agent. Edge-safe, so no os/arch/runtime
-      // (those need Node globals this SDK must not touch); surface + version only.
+      // Bird-* client-identity headers attribute the SDK surface. The User-Agent
+      // does not. These headers are edge-safe, so they omit OS, architecture, and
+      // runtime values that require Node globals; they include only surface and version.
       "Bird-Surface": "sdk-js",
       "Bird-Version": __SDK_VERSION__,
     };
-    // Bird-Caller (the driving agent harness) — empty on a browser / when no
-    // agent env is present, in which case the header is omitted.
+    // Bird-Caller identifies the driving agent harness. It is empty in a browser
+    // or when no agent environment is present, so the header is omitted.
     const caller = detectCaller();
     if (caller) this.#headers["Bird-Caller"] = caller;
     this.#client = createClient(
@@ -254,6 +263,8 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
     );
     this.sms = new SmsResource(this.core, this.#client);
     this.smsTemplates = new SmsTemplatesResource(this.core, this.#client);
+    this.smsSuppressions = new SmsSuppressionsResource(this.core, this.#client);
+    this.smsKeywordRules = new SmsKeywordRulesResource(this.core, this.#client);
     this.whatsapp = new WhatsappResource(this.core, this.#client);
     this.voice = new VoiceResource(this.core, this.#client);
     this.verify = new VerifyResource(this.core, this.#client);
@@ -266,7 +277,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
     this.domains = new DomainsResource(this.core, this.#client);
     this.lookup = new LookupResource(this.core, this.#client);
     this.webhooks = new WebhooksResource(opts.webhooks);
-    this.realtime = new RealtimeResource(this.core, this.#client);
+    this.realtime = new RealtimeResource(this.core, this.#client, opts.realtime);
   }
 
   /**
@@ -277,7 +288,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
    * @throws {TypeError} if `req.path` does not start with exactly one `/` or
    *   resolves to a different origin than the configured Bird API base URL.
    *
-   * @example Reach an endpoint outside the curated surface — you supply the response type
+   * @example Reach an endpoint outside the curated surface. Supply the response type
    * type Suppressions = { data: Array<{ recipient: string }> };
    * const suppressions = await bird.request<Suppressions>({ method: "GET", path: "/v1/email/suppressions" });
    * console.log(suppressions.data.length);
@@ -333,7 +344,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
         response.status === 204
           ? undefined
           : await response.json().catch(() => undefined);
-      // Caller supplies T; the raw JSON is asserted to it (escape hatch — untyped path).
+      // The caller supplies T, so the escape hatch asserts the raw JSON to that type.
       return { data: data as T, response };
     }
     const error = await response

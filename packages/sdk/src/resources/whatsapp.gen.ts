@@ -11,7 +11,7 @@ export type WhatsappListEventsQuery = NonNullable<ListWhatsAppMessageEventsData[
 
 export class WhatsappResourceBase extends Resource {
   /**
-   * Get one WhatsApp message by id: current delivery status, sent/delivered/read timestamps, the template it was sent from, and failure detail if it failed. For the per-event timeline use whatsapp_list_events.
+   * Get one WhatsApp message by id: current delivery status, sent/delivered/read timestamps, the one content it was built from (a template, or free-form text, image, video, audio, sticker, document or location), and failure detail if it failed. For the per-event timeline use whatsapp_list_events.
    *
    * @example Read a message back
    * const msg = await bird.whatsapp.get("wa_abc123");
@@ -23,7 +23,7 @@ export class WhatsappResourceBase extends Resource {
   }
 
   /**
-   * List WhatsApp messages, newest first, as a cursor page ({data, next_cursor, …}). Pass next_cursor back as starting_after to fetch the next page. Filter by direction, status, contact phone number, bsuid, template category, or tag. Use whatsapp_get for one message's current state.
+   * List WhatsApp messages, newest first, as a cursor page ({data, next_cursor, …}). Each message carries the one content it was built from: a template, or free-form text, image, video, audio, sticker, document or location. Pass next_cursor back as starting_after to fetch the next page. Filter by direction, status, contact phone number, bsuid, template category, or tag. Use whatsapp_get for one message's current state.
    *
    * @example Iterate delivered messages
    * for await (const msg of bird.whatsapp.list({ status: ["delivered"] })) {
@@ -36,7 +36,7 @@ export class WhatsappResourceBase extends Resource {
   }
 
   /**
-   * Get one WhatsApp message's delivery timeline, oldest first: whatsapp.accepted, whatsapp.sent, whatsapp.delivered, whatsapp.read, and whatsapp.failed events, with failure detail on failed events. Not paginated; an unknown message id is a 404. Use whatsapp_get for the condensed current status.
+   * Get one WhatsApp message's delivery timeline, oldest first: whatsapp.accepted, whatsapp.sent, whatsapp.delivered, whatsapp.read, and whatsapp.failed events, with failure detail on failed events. Not paginated; an unknown message ID returns `404`. Use `whatsapp.get` for the condensed current status.
    *
    * @example Read one message's delivery timeline
    * const { data } = await bird.whatsapp.listEvents("wa_abc123");

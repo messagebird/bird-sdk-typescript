@@ -74,7 +74,7 @@ export class DomainsResource extends Resource {
   }
 
   /**
-   * Delete a sending domain by id. Revokes its sender authorization: new sends from the domain are rejected afterward, while historical statistics and events for past sends are preserved. Destructive.
+   * Delete a sending domain by ID. Revokes its sender authorization: new sends from the domain are rejected afterward, while historical statistics and events for past sends are preserved. Destructive.
    *
    * @example Delete a sending domain by id
    * await bird.domains.delete("dom_01krdgeqcxet5s7t44vh8rt9mg");

@@ -4,6 +4,6 @@
   "version": "0.0.0",
   "devDependencies": {
     "@messagebird/realtime": "workspace:*",
-    "typescript": "npm:@typescript/typescript6@^6"
+    "typescript": "npm:@typescript/typescript6@^6.0.2"
   }
 }

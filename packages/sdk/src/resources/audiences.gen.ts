@@ -52,7 +52,7 @@ export class AudiencesResource extends Resource {
   }
 
   /**
-   * Update an audience's name or description. Omitted fields are unchanged; a null description clears it.
+   * Update an audience's name or description. Omitted fields are unchanged; a `null` description clears it.
    *
    * @example Rename an audience
    * await bird.audiences.update("adn_01krdgeqcxet5s7t44vh8rt9mg", { name: "Renamed" });

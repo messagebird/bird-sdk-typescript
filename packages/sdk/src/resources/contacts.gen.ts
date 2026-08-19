@@ -27,7 +27,7 @@ export class ContactsResource extends Resource {
   }
 
   /**
-   * Get a single contact by ID (`con_`-prefixed). Look up an ID by exact email, phone_number, or external_id with `contacts.list`.
+   * Get a single contact by ID. Look up an ID by exact email, phone_number, or external_id with `contacts.list`.
    *
    * @example Fetch a contact by id
    * const contact = await bird.contacts.get("con_01krdgeqcxet5s7t44vh8rt9mg");
@@ -54,7 +54,7 @@ export class ContactsResource extends Resource {
   }
 
   /**
-   * Update a contact's name, external_id, email, phone_number, or custom data. Only supplied fields change; custom data keys are merged, with null removing a key. A contact keeps at least one identifier: clearing both email and phone_number is rejected.
+   * Update a contact's name, `external_id`, email, `phone_number`, or custom data. Only supplied fields change; custom data keys are merged, with `null` removing a key. A contact keeps at least one identifier: clearing both email and `phone_number` is rejected.
    *
    * @example Change a contact's fields
    * const contact = await bird.contacts.update("con_01krdgeqcxet5s7t44vh8rt9mg", {
@@ -79,7 +79,7 @@ export class ContactsResource extends Resource {
   }
 
   /**
-   * Create or update up to 1,000 contacts in one request, each entry matched automatically against every identifier it supplies (email, phone_number, external_id) or, with match_on, by that one field only, and optionally add them all to one or more audiences. Per-contact results are returned in submission order.
+   * Create or update up to 1,000 contacts in one request. Match each entry against every supplied identifier (`email`, `phone_number`, and `external_id`), or set `match_on` to use one identifier. Optionally add all successful contacts to up to 10 audiences. Results follow submission order.
    *
    * @example Create or update many contacts at once, matched by the identifiers each entry carries
    * const result = await bird.contacts.batch({

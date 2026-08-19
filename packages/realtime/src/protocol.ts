@@ -32,6 +32,7 @@ export const Inbound = {
   ConnectionCount: `${INTERNAL}connection_count`,
   MemberAdded: `${INTERNAL}member_added`,
   MemberRemoved: `${INTERNAL}member_removed`,
+  WatchlistEvents: `${INTERNAL}watchlist_events`,
 } as const;
 
 /** User-facing lifecycle events, re-emitted from their `bird_internal:` origin. */
@@ -41,6 +42,9 @@ export const UserFacing = {
   ConnectionCount: `${SYSTEM}connection_count`,
   MemberAdded: `${SYSTEM}member_added`,
   MemberRemoved: `${SYSTEM}member_removed`,
+  // SDK-originated (never on the wire): an encrypted channel dropped an event
+  // it could not decrypt, even after refreshing its key.
+  DecryptionError: `${SYSTEM}decryption_error`,
 } as const;
 
 /** Prefix reserved for client-originated events (`channel.trigger`). */

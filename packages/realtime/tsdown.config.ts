@@ -17,7 +17,9 @@ const { version } = JSON.parse(
 // Single ESM bundle for the browser. Native WebSocket + fetch, no polyfills, no
 // Node built-ins — the whole client is browser-first and tree-shakeable.
 export default defineConfig({
-  entry: ["src/index.ts"],
+  // The `encrypted` entry is the opt-in cipher for encrypted channels; a
+  // separate entry point keeps it out of the default bundle.
+  entry: ["src/index.ts", "src/encrypted.ts"],
   format: ["esm"],
   dts: {
     // TS 7's tsc is the Go binary. Pointing tsgo here makes rolldown-plugin-dts

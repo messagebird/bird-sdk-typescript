@@ -200,6 +200,58 @@ describe("BirdRealtime", () => {
   });
 });
 
+describe("watchlist events", () => {
+  it("fans watchlist frames out as online/offline with member ids", async () => {
+    const { bird, socket } = connectedClient();
+    const online: unknown[] = [];
+    const offline: unknown[] = [];
+    bird.member.watchlist.bind("online", (ids) => online.push(ids));
+    bird.member.watchlist.bind("offline", (ids) => offline.push(ids));
+
+    // Connection-level: no channel on the frame, mirroring the wire.
+    socket.deliver("bird_internal:watchlist_events", {
+      events: [
+        { name: "online", member_ids: ["u_1", "u_2"] },
+        { name: "offline", member_ids: ["u_3"] },
+      ],
+    });
+    await tick();
+
+    expect(online).toEqual([["u_1", "u_2"]]);
+    expect(offline).toEqual([["u_3"]]);
+  });
+
+  it("drops a malformed entry without dropping its siblings", async () => {
+    const { bird, socket } = connectedClient();
+    const online: unknown[] = [];
+    bird.member.watchlist.bind("online", (ids) => online.push(ids));
+
+    socket.deliver("bird_internal:watchlist_events", {
+      events: [
+        { name: 42, member_ids: ["nope"] },
+        { name: "online", member_ids: ["u_9"] },
+        "garbage",
+      ],
+    });
+    await tick();
+
+    expect(online).toEqual([["u_9"]]);
+  });
+
+  it("never surfaces watchlist frames as member application events", async () => {
+    const { bird, socket } = connectedClient();
+    const seen: unknown[] = [];
+    bird.member.bindGlobal((data, event) => seen.push(event));
+
+    socket.deliver("bird_internal:watchlist_events", {
+      events: [{ name: "online", member_ids: ["u_1"] }],
+    });
+    await tick();
+
+    expect(seen).toEqual([]);
+  });
+});
+
 describe("reconnect lifecycle", () => {
   it("re-subscribes every channel with fresh auth on a real reconnect", async () => {
     const authCalls: string[] = [];

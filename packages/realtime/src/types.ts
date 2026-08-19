@@ -53,6 +53,25 @@ export interface ChannelAuthResponse {
   auth: string;
   /** Presence channels only: JSON string with `member_id` and `member_info`. */
   member_data?: string;
+  /**
+   * Encrypted channels only: the channel's decryption key, base64. Derived by
+   * the customer's backend from the encryption master key; it rides the auth
+   * response and never reaches the Bird edge.
+   */
+  shared_secret?: string;
+}
+
+/**
+ * The cipher for end-to-end encrypted channels. Import the implementation from
+ * `@messagebird/realtime/encrypted` and pass it as the `encryption` option —
+ * it lives in its own entry point so the default bundle carries no cipher.
+ */
+export interface EncryptionProvider {
+  /**
+   * XSalsa20-Poly1305 secretbox open. Returns the plaintext, or null when the
+   * box does not authenticate under this key and nonce.
+   */
+  open(box: Uint8Array, nonce: Uint8Array, key: Uint8Array): Uint8Array | null;
 }
 
 export interface Options {
@@ -92,6 +111,13 @@ export interface Options {
   allowCrossOriginAuth?: boolean;
   /** Fully replace the private/presence authorization strategy. */
   authorizer?: Authorizer;
+  /**
+   * The cipher for `private-encrypted-` channels:
+   * `import { encryption } from "@messagebird/realtime/encrypted"`. Without it,
+   * subscribing to an encrypted channel throws rather than delivering
+   * ciphertext.
+   */
+  encryption?: EncryptionProvider;
   /**
    * Endpoint the default member authorizer POSTs to for `signin()`. Receives
    * `connection_id`; returns `auth` and `member_data`. Defaults to

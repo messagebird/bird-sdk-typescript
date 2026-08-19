@@ -2,6 +2,7 @@ import { defaultAuthorizer, defaultMemberAuthorizer } from "./auth.js";
 import {
   Channel,
   channelFor,
+  EncryptedChannel,
   PresenceChannel,
   PrivateChannel,
 } from "./channel.js";
@@ -17,6 +18,7 @@ import {
 } from "./protocol.js";
 import type {
   Authorizer,
+  EncryptionProvider,
   MemberAuthorizer,
   Options,
   SignedInMember,
@@ -28,6 +30,22 @@ declare const __SDK_VERSION__: string;
 export const VERSION = __SDK_VERSION__;
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+/**
+ * The signed-in member's event surface: application events addressed to the
+ * member bind directly on it, and `watchlist` carries the online/offline
+ * events for the member ids the identity's `member_data` listed under
+ * `watchlist`, on apps with the `watchlist_events` setting:
+ *
+ *   bird.member.watchlist.bind("online", (memberIds) => {});
+ *   bird.member.watchlist.bind("offline", (memberIds) => {});
+ *
+ * The current status of the whole watchlist is delivered right after signin.
+ */
+export class MemberFacade extends Emitter {
+  /** Online/offline events for the watched members. */
+  readonly watchlist = new Emitter();
+}
 
 /** Resolve the WebSocket URL from the region (or an explicit host). */
 function resolveUrl(options: Options): string {
@@ -71,11 +89,15 @@ export class BirdRealtime {
    *
    * Delivery starts when signin() succeeds and resumes after a reconnect once
    * the connection has signed in again. Protocol frames never surface.
+   *
+   * `member.watchlist` carries the online/offline events for the identity's
+   * watchlist — see {@link MemberFacade}.
    */
-  readonly member = new Emitter();
+  readonly member = new MemberFacade();
   private readonly channels = new Map<string, Channel>();
   private readonly authorizer: Authorizer;
   private readonly memberAuthorizer: MemberAuthorizer;
+  private readonly encryption?: EncryptionProvider;
   // Signin is per connection, so `member` is dropped whenever the connection
   // is, while `signinArmed` survives to re-sign in on the next one.
   private signinArmed = false;
@@ -92,6 +114,7 @@ export class BirdRealtime {
 
   constructor(options: Options) {
     this.appKey = options.appKey;
+    this.encryption = options.encryption;
     this.authorizer =
       options.authorizer ??
       defaultAuthorizer(
@@ -156,6 +179,7 @@ export class BirdRealtime {
    * channel is returned as-is). The type follows the name prefix.
    */
   subscribe(name: `presence-${string}`): PresenceChannel;
+  subscribe(name: `private-encrypted-${string}`): EncryptedChannel;
   subscribe(name: `private-${string}`): PrivateChannel;
   subscribe(name: string): Channel;
   subscribe(name: string): Channel {
@@ -165,6 +189,7 @@ export class BirdRealtime {
         name,
         (f) => this.connection.send(f),
         this.authorizer,
+        this.encryption,
       );
       this.channels.set(name, channel);
     }
@@ -219,6 +244,7 @@ export class BirdRealtime {
 
   /** The channel for `name`, if subscribed. */
   channel(name: `presence-${string}`): PresenceChannel | undefined;
+  channel(name: `private-encrypted-${string}`): EncryptedChannel | undefined;
   channel(name: `private-${string}`): PrivateChannel | undefined;
   channel(name: string): Channel | undefined;
   channel(name: string): Channel | undefined {
@@ -352,6 +378,29 @@ export class BirdRealtime {
     );
   }
 
+  // Fans a watchlist frame's entries out as online/offline events carrying the
+  // member ids. Entries are validated individually: one malformed entry must
+  // not drop its siblings, and a malformed id is dropped rather than coerced
+  // (member ids are strings or numbers, as in presence frames). The emit is
+  // deferred one microtask: the initial snapshot arrives right after
+  // signin_success, and a transport that delivers both frames in one task
+  // would otherwise beat the awaited signin() continuation to its bind.
+  private handleWatchlistEvents(frame: Frame): void {
+    const events = (frame.data as { events?: unknown })?.events;
+    if (!Array.isArray(events)) return;
+    for (const entry of events) {
+      const { name, member_ids: memberIds } = (entry ?? {}) as {
+        name?: unknown;
+        member_ids?: unknown;
+      };
+      if (typeof name !== "string" || !Array.isArray(memberIds)) continue;
+      const ids = memberIds
+        .filter((id) => typeof id === "string" || typeof id === "number")
+        .map(String);
+      queueMicrotask(() => this.member.watchlist.emit(name, ids));
+    }
+  }
+
   // Drops the member subscription. The socket is gone, so there is nothing to
   // unsubscribe: forgetting it is what stops a stale channel from receiving a
   // later connection's frames.
@@ -364,6 +413,12 @@ export class BirdRealtime {
   private route(frame: Frame): void {
     if (frame.event === Inbound.SigninSuccess) {
       this.handleSigninSuccess(frame);
+      return;
+    }
+    // Watchlist frames are connection-level (no channel): the edge addresses
+    // them to the signed-in identity, not to a subscription.
+    if (frame.event === Inbound.WatchlistEvents) {
+      this.handleWatchlistEvents(frame);
       return;
     }
     if (!frame.channel) return;

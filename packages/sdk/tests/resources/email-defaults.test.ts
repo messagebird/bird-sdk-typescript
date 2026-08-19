@@ -13,24 +13,11 @@ function capture() {
   return { fn, calls };
 }
 
-// Compile-time assertions — validated by `tsc` (the @ts-expect-error must fire).
-// Never executed at runtime.
-function _typeChecks() {
-  const noDefault = new BirdClient({ apiKey: "bk_eu1_x" });
-  // @ts-expect-error `from` is required when no email.from default is configured
-  void noDefault.email.send({ to: ["a@b.com"], subject: "s", html: "<p>h</p>" });
-
-  const withFrom = new BirdClient({ apiKey: "bk_eu1_x", email: { from: "noreply@acme.com" } });
-  void withFrom.email.send({ to: ["a@b.com"], subject: "s", html: "<p>h</p>" }); // default fills `from`
-  void withFrom.email.send({ from: "x@acme.com", to: ["a@b.com"], subject: "s", html: "h" }); // override
-}
-void _typeChecks;
+// The compile-time half of this contract is asserted in
+// tests/types/email-defaults.types.ts — the main tsconfig excludes this tree, so
+// a `@ts-expect-error` written here would never be checked.
 
 describe("email channel defaults", () => {
-  it("the compile-time type assertions hold (see @ts-expect-error)", () => {
-    expect(typeof _typeChecks).toBe("function");
-  });
-
   it("fills the channel default `from` when omitted", async () => {
     const { fn, calls } = capture();
     const bird = new BirdClient({ apiKey: "bk_eu1_x", fetch: fn, email: { from: "noreply@acme.com" } });
@@ -43,6 +30,41 @@ describe("email channel defaults", () => {
     const bird = new BirdClient({ apiKey: "bk_eu1_x", fetch: fn, email: { from: "noreply@acme.com" } });
     await bird.email.send({ from: "sales@acme.com", to: ["a@b.com"], subject: "s", html: "<p>h</p>" });
     expect((await calls[0].clone().json()).from).toBe("sales@acme.com");
+  });
+
+  // The conformance corpus pins the same rule for an explicit null
+  // (send_explicit_null_from_falls_back_to_config); JSON cannot express
+  // `undefined`, which is the form a TypeScript caller actually writes.
+  it("treats an explicit `undefined` as unset, so the default still fills", async () => {
+    const { fn, calls } = capture();
+    const bird = new BirdClient({ apiKey: "bk_eu1_x", fetch: fn, email: { from: "noreply@acme.com" } });
+    await bird.email.send({ from: undefined, to: ["a@b.com"], subject: "s", html: "<p>h</p>" });
+    expect((await calls[0].clone().json()).from).toBe("noreply@acme.com");
+  });
+
+  it("fills the channel default `ip_pool_id` when omitted", async () => {
+    const { fn, calls } = capture();
+    const bird = new BirdClient({
+      apiKey: "bk_eu1_x",
+      fetch: fn,
+      email: { from: "n@acme.com", ip_pool_id: "ipp_shared" },
+    });
+    await bird.email.send({ to: ["a@b.com"], subject: "s", html: "<p>h</p>" });
+    expect((await calls[0].clone().json()).ip_pool_id).toBe("ipp_shared");
+  });
+
+  it("applies defaults to every batch item", async () => {
+    const { fn, calls } = capture();
+    const bird = new BirdClient({ apiKey: "bk_eu1_x", fetch: fn, email: { from: "noreply@acme.com" } });
+    await bird.email.sendBatch([
+      { to: ["a@b.com"], subject: "s", html: "<p>h</p>" },
+      { from: "sales@acme.com", to: ["c@d.com"], subject: "s", html: "<p>h</p>" },
+    ]);
+    const body = await calls[0].clone().json();
+    expect(body.map((m: { from: string }) => m.from)).toEqual([
+      "noreply@acme.com",
+      "sales@acme.com",
+    ]);
   });
 
   it("merges multiple defaults (reply_to, category)", async () => {

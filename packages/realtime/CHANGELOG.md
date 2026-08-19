@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- Add end-to-end encrypted channels: subscribe to `private-encrypted-` channels by passing the cipher from the new `@messagebird/realtime/encrypted` entry point as the `encryption` option; an event that cannot be decrypted is dropped and reported as `bird:decryption_error`.
+- Add `member.watchlist`: bind `online` and `offline` to hear when the members on the signed-in identity's watchlist connect or disconnect, on apps with the `watchlist_events` setting.
+
 ## 0.3.0
 
 - Deliver events addressed to a member. Once `signin()` succeeds the client subscribes to the member's reserved channel and surfaces those events on `bird.member`, so an event sent with `realtime.members.send` reaches every connection that member holds. The subscription follows the identity: it is established on each signin, including the automatic one after a reconnect, and dropped with the connection. Protocol frames never reach the emitter, and a different member's events never do either.

@@ -6,8 +6,12 @@ import type { BirdClient } from "./client.js";
 
 export type _Email = Pick<BirdClient["email"], "send" | "sendBatch" | "get" | "list" | "cancel">;
 export type _EmailStats = Pick<BirdClient["email"]["stats"], "summary" | "daily" | "hourly" | "byTag" | "byCategory" | "bySendingIp" | "bySendingDomain" | "byRecipientDomain" | "byMailboxProvider" | "byMailboxProviderRegion" | "byTemplate" | "byLocation" | "byClient" | "byBounceCode" | "byComplaintType" | "byBroadcast">;
-export type _Sms = Pick<BirdClient["sms"], "send" | "sendBatch" | "get" | "list">;
+export type _Sms = Pick<BirdClient["sms"], "send" | "sendBatch" | "get" | "list" | "listEvents">;
 export type _SmsTemplates = Pick<BirdClient["smsTemplates"], "list" | "get">;
+export type _SmsStats = Pick<BirdClient["sms"]["stats"], "summary" | "daily" | "hourly" | "byCountry" | "byCarrier" | "byCategory" | "byOriginator" | "byStatus" | "byErrorCode" | "byTag">;
+export type _SmsStatsInbound = Pick<BirdClient["sms"]["stats"]["inbound"], "summary" | "daily" | "hourly" | "byCountry" | "byOperator" | "byNumber">;
+export type _SmsSuppressions = Pick<BirdClient["smsSuppressions"], "list" | "get" | "add" | "remove">;
+export type _SmsKeywordRules = Pick<BirdClient["smsKeywordRules"], "list" | "get" | "create" | "update" | "delete">;
 export type _Whatsapp = Pick<BirdClient["whatsapp"], "send" | "get" | "list" | "listEvents">;
 export type _Voice = Pick<BirdClient["voice"], "list" | "get">;
 export type _VerifyVerifications = Pick<BirdClient["verify"]["verifications"], "create" | "check" | "nextChannel">;

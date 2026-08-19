@@ -50,7 +50,7 @@ export class EmailThreadsResourceBase extends Resource {
   }
 
   /**
-   * Move a conversation and all its messages to trash (purged after 30 days), or delete permanently with ?permanent=true.
+   * Move a conversation and all its messages to trash (purged after 30 days), or delete permanently with `?permanent=true`.
    *
    * @example Delete a thread
    * await bird.email.threads.delete("thr_01abc", { permanent: true });

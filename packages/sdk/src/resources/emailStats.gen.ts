@@ -38,7 +38,7 @@ export type EmailStatsByBroadcastQuery = NonNullable<GetEmailStatsByBroadcastDat
 
 export class EmailStatsResource extends Resource {
   /**
-   * Aggregate email KPIs for one period: sends, delivered, bounces, complaints, opens, clicks, their rates, and latency percentiles. `from`/`to` are both YYYY-MM-DD days or both RFC 3339 instants (hour grain); add `compare=previous_period` for deltas versus the prior window. For a per-day or per-hour series use `email.stats.daily` or `email.stats.hourly`.
+   * Aggregate email KPIs for one period: sends, delivered, bounces, complaints, opens, clicks, their rates, and latency percentiles. The `from` and `to` values are both `YYYY-MM-DD` days or both RFC 3339 instants (hour grain). Add `compare=previous_period` for deltas versus the prior window. For a per-day or per-hour series use `email.stats.daily` or `email.stats.hourly`.
    *
    * @example Summary for a month
    * const s = await bird.email.stats.summary({ from: "2026-05-01", to: "2026-05-31" });
@@ -103,7 +103,7 @@ export class EmailStatsResource extends Resource {
   }
 
   /**
-   * Delivery and bounce stats grouped by sending IP, with deferral counts alongside them. `sort=bounces.block` surfaces reputation-damaged IPs first. Engagement, accepted, and processed counts aren't available per IP, and complaint and out-of-band bounce counts always read 0 here. For workspace-wide figures, use `email.stats.daily`.
+   * Delivery and bounce stats grouped by sending IP, with deferral counts alongside them. `sort=bounces.block` surfaces reputation-damaged IPs first. Engagement, accepted, and processed counts aren't available per IP, and complaint and out-of-band bounce counts always read `0` here. For workspace-wide figures, use `email.stats.daily`.
    *
    * @example 
    * const { data } = await bird.email.stats.bySendingIp({
@@ -154,7 +154,7 @@ export class EmailStatsResource extends Resource {
   }
 
   /**
-   * Email delivery and engagement stats grouped by recipient mailbox provider, for example `gmail`, `microsoft`, or `yahoo`. It covers the delivery stage onward, so there are no accepted or processed counts. For a per-region split within a provider, use `email.stats.by_mailbox_provider_region`; for exact destination domains instead, use `email.stats.by_recipient_domain`.
+   * Email delivery and engagement stats grouped by recipient mailbox provider, for example `gmail`, `microsoft`, or `yahoo`. It covers the delivery stage onward and omits accepted or processed counts. For a per-region split within a provider, use `email.stats.by_mailbox_provider_region`; for exact destination domains instead, use `email.stats.by_recipient_domain`.
    *
    * @example 
    * const { data } = await bird.email.stats.byMailboxProvider({
@@ -170,7 +170,7 @@ export class EmailStatsResource extends Resource {
   }
 
   /**
-   * Email delivery and engagement stats grouped by a mailbox provider and provider region pair, for example `gmail` in `NA`. It covers the delivery stage onward, so there are no accepted or processed counts. For the provider-level view without the region split, use `email.stats.by_mailbox_provider`.
+   * Email delivery and engagement stats grouped by a mailbox provider and provider region pair, for example `gmail` in `NA`. It covers the delivery stage onward and omits accepted or processed counts. For the provider-level view without the region split, use `email.stats.by_mailbox_provider`.
    *
    * @example 
    * const { data } = await bird.email.stats.byMailboxProviderRegion({
@@ -235,7 +235,7 @@ export class EmailStatsResource extends Resource {
   }
 
   /**
-   * Bounce counts grouped by the SMTP error code the receiving mail server returned. Each row also breaks the bounce down into its hard, soft, admin, block, and undetermined split. There are no delivered, open, or click counts here, because a bounce code only appears on a bounce event. For bounces broken down by destination instead, use `email.stats.by_recipient_domain` or `email.stats.by_mailbox_provider`.
+   * Bounce counts grouped by the SMTP error code the receiving mail server returned. Each row also breaks the bounce down into its hard, soft, admin, block, and undetermined split. It omits delivered, open, and click counts because a bounce code only appears on a bounce event. For bounces broken down by destination instead, use `email.stats.by_recipient_domain` or `email.stats.by_mailbox_provider`.
    *
    * @example 
    * const { data } = await bird.email.stats.byBounceCode({
@@ -252,7 +252,7 @@ export class EmailStatsResource extends Resource {
   }
 
   /**
-   * Spam-complaint counts grouped by the feedback-loop complaint type, for example `abuse`, `fraud`, or `virus`. Complaint side only, so there are no delivery or engagement counts. For complaints broken down by destination instead, use `email.stats.by_mailbox_provider` or `email.stats.by_recipient_domain`.
+   * Spam-complaint counts grouped by the feedback-loop complaint type, for example `abuse`, `fraud`, or `virus`. This complaint-only breakdown omits delivery and engagement counts. For complaints broken down by destination instead, use `email.stats.by_mailbox_provider` or `email.stats.by_recipient_domain`.
    *
    * @example 
    * const { data } = await bird.email.stats.byComplaintType({ from: "2026-05-01", to: "2026-05-31" });

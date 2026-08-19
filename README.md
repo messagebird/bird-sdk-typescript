@@ -67,7 +67,7 @@ for await (const message of bird.email.list()) {
 ## WhatsApp
 
 ```ts
-await bird.whatsapp.send({ to, template }); // resolves when accepted (202); Bird picks the sender from the template's category
+await bird.whatsapp.send({ to, template }); // resolves when accepted (202); `from` is required except for a Bird-managed template
 await bird.whatsapp.get(messageId); // delivery status + failure detail
 
 // `await` yields the first page; `for await` walks every message across pages.
@@ -111,7 +111,7 @@ try {
     html: "<p>My first Bird email.</p>",
   });
 } catch (err) {
-  if (err instanceof BirdRateLimitError) console.log(`rate limited — retry in ${err.retryAfter}s`);
+  if (err instanceof BirdRateLimitError) console.log(`rate limited; retry in ${err.retryAfter}s`);
   else if (err instanceof BirdValidationError) console.error(err.details);
   else if (err instanceof BirdAPIError) console.error(err.code, err.requestId);
   else throw err;

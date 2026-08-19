@@ -50,6 +50,7 @@ export const WebhookEventType = {
   WhatsappDelivered: "whatsapp.delivered",
   WhatsappFailed: "whatsapp.failed",
   WhatsappRead: "whatsapp.read",
+  WhatsappReceived: "whatsapp.received",
   WhatsappRejected: "whatsapp.rejected",
   WhatsappSent: "whatsapp.sent",
 } as const;

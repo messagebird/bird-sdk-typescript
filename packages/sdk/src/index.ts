@@ -27,7 +27,6 @@ export {
   BirdWebhookVerificationError,
   type ErrorDetail,
   type NextAction,
-  type UnmetGate,
 } from "./errors.js";
 export { regionFromApiKey, baseUrlForRegion } from "./region.js";
 export type {
@@ -92,6 +91,51 @@ export type {
   SmsTemplateList,
   SmsTemplateListQuery,
 } from "./resources/smsTemplates.gen.js";
+export type {
+  SmsStatsSummary,
+  SmsStatsResponse,
+  SmsStatsByCountryResponse,
+  SmsStatsByCarrierResponse,
+  SmsStatsByCategoryResponse,
+  SmsStatsByOriginatorResponse,
+  SmsStatsByStatusResponse,
+  SmsStatsByErrorCodeResponse,
+  SmsStatsSummaryQuery,
+  SmsStatsDailyQuery,
+  SmsStatsHourlyQuery,
+  SmsStatsByCountryQuery,
+  SmsStatsByCarrierQuery,
+  SmsStatsByCategoryQuery,
+  SmsStatsByOriginatorQuery,
+  SmsStatsByStatusQuery,
+  SmsStatsByErrorCodeQuery,
+} from "./resources/smsStats.gen.js";
+export type {
+  SmsInboundStatsSummaryResponse,
+  SmsInboundStatsResponse,
+  SmsInboundStatsByCountryResponse,
+  SmsInboundStatsByOperatorResponse,
+  SmsInboundStatsByNumberResponse,
+  SmsStatsInboundSummaryQuery,
+  SmsStatsInboundDailyQuery,
+  SmsStatsInboundHourlyQuery,
+  SmsStatsInboundByCountryQuery,
+  SmsStatsInboundByOperatorQuery,
+  SmsStatsInboundByNumberQuery,
+} from "./resources/smsStatsInbound.gen.js";
+export type {
+  SmsSuppression,
+  SmsSuppressionsListQuery,
+  SmsSuppressionsAddParams,
+} from "./resources/smsSuppressions.gen.js";
+export type {
+  SmsKeywordRule,
+  SmsKeywordRuleList,
+  SmsKeywordRulesListQuery,
+  SmsKeywordRulesCreateParams,
+  SmsKeywordRulesUpdateParams,
+} from "./resources/smsKeywordRules.gen.js";
+export type { SmsEventList, SmsListEventsQuery } from "./resources/sms.gen.js";
 export type {
   PhoneNumberLookup,
   EmailLookup,
@@ -169,6 +213,8 @@ export type {
   RealtimeChannelGetQuery,
   // credentials: client config
   RealtimeOptions,
+  // channel authorization (authorizeChannel's return shape)
+  ChannelAuthorization,
 } from "./resources/realtime.js";
 export { WebhookEventType } from "./event-types.gen.js";
 export type { WebhookEventTypeValue } from "./event-types.gen.js";
@@ -180,6 +226,11 @@ export {
   LookupFlag,
   LookupPropertyStatus,
   SMSErrorCode,
+  SMSKeywordOperation,
+  SMSSuppressionCoverage,
+  SMSSuppressionEndReason,
+  SMSSuppressionOrigin,
+  SMSSuppressionReason,
   TemplateLanguageStatus,
   TemplateStatus,
   VerificationAttemptFailureReason,
@@ -198,6 +249,11 @@ export type {
   LookupFlagValue,
   LookupPropertyStatusValue,
   SMSErrorCodeValue,
+  SMSKeywordOperationValue,
+  SMSSuppressionCoverageValue,
+  SMSSuppressionEndReasonValue,
+  SMSSuppressionOriginValue,
+  SMSSuppressionReasonValue,
   TemplateLanguageStatusValue,
   TemplateStatusValue,
   VerificationAttemptFailureReasonValue,

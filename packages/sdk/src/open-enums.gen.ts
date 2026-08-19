@@ -118,6 +118,78 @@ export const SMSErrorCode = {
 export type SMSErrorCodeValue = (typeof SMSErrorCode)[keyof typeof SMSErrorCode];
 
 /**
+ * Values of SMSKeywordOperation known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const SMSKeywordOperation = {
+  Custom: "custom",
+  Help: "help",
+  Start: "start",
+  Stop: "stop",
+} as const;
+
+/** A known SMSKeywordOperation value. */
+export type SMSKeywordOperationValue = (typeof SMSKeywordOperation)[keyof typeof SMSKeywordOperation];
+
+/**
+ * Values of SMSSuppressionCoverage known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const SMSSuppressionCoverage = {
+  All: "all",
+  NonTransactional: "non_transactional",
+} as const;
+
+/** A known SMSSuppressionCoverage value. */
+export type SMSSuppressionCoverageValue = (typeof SMSSuppressionCoverage)[keyof typeof SMSSuppressionCoverage];
+
+/**
+ * Values of SMSSuppressionEndReason known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const SMSSuppressionEndReason = {
+  ApiKey: "api_key",
+  CarrierCleared: "carrier_cleared",
+  KeywordStart: "keyword_start",
+  User: "user",
+} as const;
+
+/** A known SMSSuppressionEndReason value. */
+export type SMSSuppressionEndReasonValue = (typeof SMSSuppressionEndReason)[keyof typeof SMSSuppressionEndReason];
+
+/**
+ * Values of SMSSuppressionOrigin known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const SMSSuppressionOrigin = {
+  ApiKey: "api_key",
+  DlrEvent: "dlr_event",
+  Keyword: "keyword",
+  User: "user",
+} as const;
+
+/** A known SMSSuppressionOrigin value. */
+export type SMSSuppressionOriginValue = (typeof SMSSuppressionOrigin)[keyof typeof SMSSuppressionOrigin];
+
+/**
+ * Values of SMSSuppressionReason known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const SMSSuppressionReason = {
+  CarrierOptedOut: "carrier_opted_out",
+  KeywordStop: "keyword_stop",
+  Manual: "manual",
+} as const;
+
+/** A known SMSSuppressionReason value. */
+export type SMSSuppressionReasonValue = (typeof SMSSuppressionReason)[keyof typeof SMSSuppressionReason];
+
+/**
  * Values of TemplateLanguageStatus known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -221,6 +293,7 @@ export const WhatsAppEventType = {
   WhatsappDelivered: "whatsapp.delivered",
   WhatsappFailed: "whatsapp.failed",
   WhatsappRead: "whatsapp.read",
+  WhatsappReceived: "whatsapp.received",
   WhatsappRejected: "whatsapp.rejected",
   WhatsappSent: "whatsapp.sent",
 } as const;
