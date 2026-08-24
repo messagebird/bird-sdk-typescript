@@ -6655,6 +6655,22 @@ export type SuppressionCreate = {
   email: string;
 };
 
+export type Actor = {
+  /**
+   * Actor identifier.
+   */
+  id: string;
+  /**
+   * Who or what performed the action: `user` for a member's own session, `oauth_token` for a token issued to a caller on a member's behalf, `api_key` for a workspace API key, `system` for our own automation, `sso` for an organization's SSO connection, and `service_account` for a workspace's connected Integration acting with no member behind it. Open enum: new actor types may be added over time, so treat any unrecognized value as a future type rather than an error.
+   */
+  type: string;
+  /**
+   * The label the actor is shown under: typically a member's name or email address, or the API key's name. Null when it could not be resolved.
+   *
+   */
+  readonly display_name?: string | null;
+};
+
 export type InboundAddressId = string;
 
 /**
@@ -9875,22 +9891,6 @@ export type WebhookAttemptList = {
   data: Array<WebhookAttempt>;
 };
 
-export type AuditLogActor = {
-  /**
-   * ID of the user, API key, integration, or system process that performed the action.
-   */
-  id: string;
-  /**
-   * Type of actor, such as `user`, `api_key`, `service_account`, or `system`.
-   */
-  type: string;
-  /**
-   * Display name of the actor. This is the user's email address for a `user` actor, or the name of the API key or integration that acted. Absent when it could not be resolved.
-   *
-   */
-  readonly display_name?: string | null;
-};
-
 /**
  * Physical type of a phone number. New number types may be added over time, so treat unrecognized values as supported types rather than errors.
  */
@@ -10192,7 +10192,7 @@ export type VoiceCall = {
   /**
    * Who placed the call: the API key whose credentials it used, the integration acting for the workspace, or the user who placed it from a browser or the CLI. Absent when the call was admitted only by its source IP address, or when no actor was recorded.
    */
-  readonly actor?: AuditLogActor;
+  readonly actor?: Actor;
   /**
    * Identifier of the SIP trunk that originated this call. `null` when no trunk is associated.
    */
@@ -11694,6 +11694,17 @@ export type SuppressionListWritable = {
   data: Array<SuppressionWritable>;
 } & ListEnvelope;
 
+export type ActorWritable = {
+  /**
+   * Actor identifier.
+   */
+  id: string;
+  /**
+   * Who or what performed the action: `user` for a member's own session, `oauth_token` for a token issued to a caller on a member's behalf, `api_key` for a workspace API key, `system` for our own automation, `sso` for an organization's SSO connection, and `service_account` for a workspace's connected Integration acting with no member behind it. Open enum: new actor types may be added over time, so treat any unrecognized value as a future type rather than an error.
+   */
+  type: string;
+};
+
 /**
  * An email address we create for you, which receives mail on your behalf. Forward a real mailbox (for example, a support inbox) to this address. Every message sent to it becomes a received email you can retrieve.
  *
@@ -12481,17 +12492,6 @@ export type WebhookAttemptListWritable = {
    * Delivery attempts, newest first.
    */
   data: Array<WebhookAttemptWritable>;
-};
-
-export type AuditLogActorWritable = {
-  /**
-   * ID of the user, API key, integration, or system process that performed the action.
-   */
-  id: string;
-  /**
-   * Type of actor, such as `user`, `api_key`, `service_account`, or `system`.
-   */
-  type: string;
 };
 
 /**

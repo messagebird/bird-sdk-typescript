@@ -132,6 +132,8 @@ export {
   verifyDomain,
 } from "./sdk.gen";
 export type {
+  Actor,
+  ActorWritable,
   AllocatedNumberId,
   ApiKeyId,
   ArchiveContactPropertyData,
@@ -159,8 +161,6 @@ export type {
   AudienceRefWritable,
   AudienceUpdateRequest,
   AudienceWritable,
-  AuditLogActor,
-  AuditLogActorWritable,
   AvailableNumber,
   AvailableNumberList,
   CancelEmailMessageData,

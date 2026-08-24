@@ -11722,6 +11722,41 @@ export const SuppressionCreateSchema = {
   },
 } as const;
 
+export const ActorSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "type"],
+  properties: {
+    id: {
+      type: "string",
+      minLength: 1,
+      description: "Actor identifier.",
+      example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    type: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": [
+        "user",
+        "api_key",
+        "oauth_token",
+        "system",
+        "sso",
+        "service_account",
+      ],
+      description:
+        "Who or what performed the action: `user` for a member's own session, `oauth_token` for a token issued to a caller on a member's behalf, `api_key` for a workspace API key, `system` for our own automation, `sso` for an organization's SSO connection, and `service_account` for a workspace's connected Integration acting with no member behind it. Open enum: new actor types may be added over time, so treat any unrecognized value as a future type rather than an error.",
+      example: "user",
+    },
+    display_name: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "The label the actor is shown under: typically a member's name or email address, or the API key's name. Null when it could not be resolved.\n",
+    },
+  },
+} as const;
+
 export const InboundAddressIDSchema = {
   type: "string",
   minLength: 1,
@@ -17330,34 +17365,6 @@ export const WebhookAttemptListSchema = {
   },
 } as const;
 
-export const AuditLogActorSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["id", "type"],
-  properties: {
-    id: {
-      type: "string",
-      minLength: 1,
-      description:
-        "ID of the user, API key, integration, or system process that performed the action.",
-      example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
-    },
-    type: {
-      type: "string",
-      minLength: 1,
-      description:
-        "Type of actor, such as `user`, `api_key`, `service_account`, or `system`.",
-      example: "user",
-    },
-    display_name: {
-      type: ["string", "null"],
-      readOnly: true,
-      description:
-        "Display name of the actor. This is the user's email address for a `user` actor, or the name of the API key or integration that acted. Absent when it could not be resolved.\n",
-    },
-  },
-} as const;
-
 export const NumberTypeSchema = {
   type: "string",
   minLength: 1,
@@ -17937,7 +17944,7 @@ export const VoiceCallSchema = {
       readOnly: true,
       allOf: [
         {
-          $ref: "#/components/schemas/AuditLogActor",
+          $ref: "#/components/schemas/Actor",
         },
       ],
       description:
@@ -20160,6 +20167,35 @@ export const SuppressionListWritableSchema = {
   ],
 } as const;
 
+export const ActorWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "type"],
+  properties: {
+    id: {
+      type: "string",
+      minLength: 1,
+      description: "Actor identifier.",
+      example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    type: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": [
+        "user",
+        "api_key",
+        "oauth_token",
+        "system",
+        "sso",
+        "service_account",
+      ],
+      description:
+        "Who or what performed the action: `user` for a member's own session, `oauth_token` for a token issued to a caller on a member's behalf, `api_key` for a workspace API key, `system` for our own automation, `sso` for an organization's SSO connection, and `service_account` for a workspace's connected Integration acting with no member behind it. Open enum: new actor types may be added over time, so treat any unrecognized value as a future type rather than an error.",
+      example: "user",
+    },
+  },
+} as const;
+
 export const InboundAddressWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -21605,28 +21641,6 @@ export const WebhookAttemptListWritableSchema = {
       items: {
         $ref: "#/components/schemas/WebhookAttemptWritable",
       },
-    },
-  },
-} as const;
-
-export const AuditLogActorWritableSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["id", "type"],
-  properties: {
-    id: {
-      type: "string",
-      minLength: 1,
-      description:
-        "ID of the user, API key, integration, or system process that performed the action.",
-      example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
-    },
-    type: {
-      type: "string",
-      minLength: 1,
-      description:
-        "Type of actor, such as `user`, `api_key`, `service_account`, or `system`.",
-      example: "user",
     },
   },
 } as const;
