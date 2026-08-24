@@ -113,6 +113,9 @@ export const WebhookEventSchema = {
       $ref: "#/components/schemas/EventVerifyVerificationCreated",
     },
     {
+      $ref: "#/components/schemas/EventVerifyVerificationFailed",
+    },
+    {
       $ref: "#/components/schemas/EventVerifyVerificationVerified",
     },
     {
@@ -197,6 +200,8 @@ export const WebhookEventSchema = {
         "#/components/schemas/EventVerifyAttemptUndelivered",
       "verify.verification.created":
         "#/components/schemas/EventVerifyVerificationCreated",
+      "verify.verification.failed":
+        "#/components/schemas/EventVerifyVerificationFailed",
       "verify.verification.verified":
         "#/components/schemas/EventVerifyVerificationVerified",
       "voice_call.answered": "#/components/schemas/EventVoiceCallAnswered",
@@ -2392,6 +2397,15 @@ export const EmailRecipientListSchema = {
             $ref: "#/components/schemas/EmailRecipient",
           },
         },
+        next: {
+          type: "array",
+          readOnly: true,
+          description:
+            "What to do next, given what this page reports. Present only where the read computes it: an\nempty list means the answer you were looking for is here and there is nothing further to\ndo. Absent entirely on reads that do not report next actions.\n",
+          items: {
+            $ref: "#/components/schemas/NextAction",
+          },
+        },
       },
     },
     {
@@ -2555,6 +2569,15 @@ export const EmailEventListSchema = {
             "Page of timeline events for this email send, in chronological order.",
           items: {
             $ref: "#/components/schemas/EmailEvent",
+          },
+        },
+        next: {
+          type: "array",
+          readOnly: true,
+          description:
+            "What to do next, given what this page reports. Present only where the read computes it: an\nempty list means the answer you were looking for is here and there is nothing further to\ndo. Absent entirely on reads that do not report next actions.\n",
+          items: {
+            $ref: "#/components/schemas/NextAction",
           },
         },
       },
@@ -6981,9 +7004,9 @@ export const VerificationIDSchema = {
 export const VerificationTerminalReasonSchema = {
   type: "string",
   minLength: 1,
-  "x-extensible-enum": ["attempts_exhausted", "ttl_elapsed"],
+  "x-extensible-enum": ["attempts_exhausted", "ttl_elapsed", "undeliverable"],
   description:
-    "Why a verification session reached its final state without succeeding: `attempts_exhausted` (too many incorrect passcodes) or `ttl_elapsed` (the time window elapsed before a correct passcode). Open enum: new reasons may be added over time, so treat any unrecognized value as a future reason rather than an error.",
+    "Why a verification session reached its final state without succeeding: `attempts_exhausted` (too many incorrect passcodes), `ttl_elapsed` (the time window elapsed before a correct passcode), or `undeliverable` (no planned channel could deliver a passcode, so the recipient never had one to submit). Open enum: new reasons may be added over time, so treat any unrecognized value as a future reason rather than an error.",
 } as const;
 
 export const VerificationToSchema = {
@@ -7041,9 +7064,10 @@ export const VerificationAttemptFailureReasonSchema = {
     "channel_unavailable",
     "channel_disabled",
     "delivery_timeout",
+    "not_billable",
   ],
   description:
-    "Why a passcode send did not deliver:\n\n- `carrier_rejected`: The SMS carrier rejected the send.\n- `hard_bounce`: The email permanently bounced.\n- `soft_bounce`: The email temporarily bounced, such as when a mailbox is full.\n- `undelivered`: The channel reported a generic delivery failure.\n- `channel_unavailable`: The channel could not be used, so the verification\n  moved to the next channel.\n- `channel_disabled`: Sending on the channel is temporarily disabled, so the\n  verification moved to the next channel.\n- `delivery_timeout`: No delivery confirmation arrived before the channel's\n  timeout, so the verification moved to the next channel.\n\nNew reasons may be added over time. Treat unrecognized values as reasons added\nlater rather than errors.",
+    "Why a passcode send did not deliver:\n\n- `carrier_rejected`: The SMS carrier rejected the send.\n- `hard_bounce`: The email permanently bounced.\n- `soft_bounce`: The email temporarily bounced, such as when a mailbox is full.\n- `undelivered`: The channel reported a generic delivery failure.\n- `channel_unavailable`: The channel could not be used, so the verification\n  moved to the next channel.\n- `channel_disabled`: Sending on the channel is temporarily disabled, so the\n  verification moved to the next channel.\n- `delivery_timeout`: No delivery confirmation arrived before the channel's\n  timeout, so the verification moved to the next channel.\n- `not_billable`: The send could not be charged, so it was never handed to the\n  channel. Usually the workspace balance is too low to cover it. Topping up\n  the balance is what clears this.\n\nNew reasons may be added over time. Treat unrecognized values as reasons added\nlater rather than errors.",
 } as const;
 
 export const WhatsAppTemplateCategorySchema = {
@@ -7085,7 +7109,7 @@ export const VerificationSchema = {
           ],
           readOnly: true,
           description:
-            "The verification's current state:\n\n- `pending`: Awaiting a correct passcode.\n- `verified`: A correct passcode was submitted.\n- `failed`: Too many incorrect attempts were submitted.\n- `expired`: The validity window elapsed before a correct passcode.\n- `canceled`: The verification was canceled before completion.\n- `blocked`: A fraud or abuse control stopped the verification.",
+            "The verification's current state:\n\n- `pending`: Awaiting a correct passcode.\n- `verified`: A correct passcode was submitted.\n- `failed`: The verification cannot be completed. Either too many\n  incorrect passcodes were submitted, or no planned channel could\n  deliver one. Read `reason` to tell those apart.\n- `expired`: The validity window elapsed before a correct passcode.\n- `canceled`: The verification was canceled before completion.\n- `blocked`: A fraud or abuse control stopped the verification.",
         },
         reason: {
           readOnly: true,
@@ -13837,6 +13861,7 @@ export const WebhookEventTypeSchema = {
     "verify.attempt.sent",
     "verify.attempt.undelivered",
     "verify.verification.created",
+    "verify.verification.failed",
     "verify.verification.verified",
     "voice_call.answered",
     "voice_call.ended",
@@ -16337,6 +16362,99 @@ export const EventVerifyVerificationCreatedSchema = {
   },
 } as const;
 
+export const VerifyVerificationFailedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["verify.verification.failed"],
+  description: "Always `verify.verification.failed` for this event.",
+  example: "verify.verification.failed",
+} as const;
+
+export const EventVerifyVerificationFailedDataSchema = {
+  type: "object",
+  description: "Payload of the verify.verification.failed event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventVerifyBase",
+    },
+    {
+      type: "object",
+      required: [
+        "status",
+        "reason",
+        "channel",
+        "last_attempt_reason",
+        "failed_at",
+      ],
+      properties: {
+        status: {
+          type: "string",
+          minLength: 1,
+          "x-extensible-enum": ["failed"],
+          description:
+            "The verification's state, always `failed`. Open enum for forward compatibility.",
+          example: "failed",
+        },
+        reason: {
+          $ref: "#/components/schemas/VerificationTerminalReason",
+          description:
+            "Why the verification ended. Always `undeliverable` on this event: no planned channel delivered a passcode.",
+          example: "undeliverable",
+        },
+        channel: {
+          oneOf: [
+            {
+              $ref: "#/components/schemas/VerificationChannel",
+            },
+            {
+              type: "null",
+            },
+          ],
+          description:
+            "The last channel the verification tried, the one whose failure left it with nowhere else to go. Null when no channel was attributed.",
+          example: "sms",
+        },
+        last_attempt_reason: {
+          $ref: "#/components/schemas/VerificationAttemptFailureReason",
+          description:
+            "Why that last send did not deliver. This is the actionable half of the event: `not_billable` means the workspace balance could not cover the send, while the delivery reasons point at the recipient or the channel.",
+          example: "not_billable",
+        },
+        failed_at: {
+          type: "string",
+          minLength: 1,
+          format: "date-time",
+          description: "Time the verification was resolved.",
+          example: {},
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EventVerifyVerificationFailedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The verification ended without the recipient receiving a passcode: every planned channel reported that its send would not arrive.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VerifyVerificationFailedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the verification was resolved.",
+      example: {},
+    },
+    data: {
+      $ref: "#/components/schemas/EventVerifyVerificationFailedData",
+    },
+  },
+} as const;
+
 export const EventVerifyVerificationVerifiedDataSchema = {
   type: "object",
   description: "Payload of the verify.verification.verified event.",
@@ -18055,6 +18173,9 @@ export const WebhookEventWritableSchema = {
       $ref: "#/components/schemas/EventVerifyVerificationCreated",
     },
     {
+      $ref: "#/components/schemas/EventVerifyVerificationFailed",
+    },
+    {
       $ref: "#/components/schemas/EventVerifyVerificationVerified",
     },
     {
@@ -18139,6 +18260,8 @@ export const WebhookEventWritableSchema = {
         "#/components/schemas/EventVerifyAttemptUndelivered",
       "verify.verification.created":
         "#/components/schemas/EventVerifyVerificationCreated",
+      "verify.verification.failed":
+        "#/components/schemas/EventVerifyVerificationFailed",
       "verify.verification.verified":
         "#/components/schemas/EventVerifyVerificationVerified",
       "voice_call.answered": "#/components/schemas/EventVoiceCallAnswered",

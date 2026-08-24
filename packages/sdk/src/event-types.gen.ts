@@ -42,6 +42,7 @@ export const WebhookEventType = {
   VerifyAttemptSent: "verify.attempt.sent",
   VerifyAttemptUndelivered: "verify.attempt.undelivered",
   VerifyVerificationCreated: "verify.verification.created",
+  VerifyVerificationFailed: "verify.verification.failed",
   VerifyVerificationVerified: "verify.verification.verified",
   VoiceCallAnswered: "voice_call.answered",
   VoiceCallEnded: "voice_call.ended",

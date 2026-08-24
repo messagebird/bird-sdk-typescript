@@ -277,6 +277,7 @@ export const VerificationAttemptFailureReason = {
   ChannelUnavailable: "channel_unavailable",
   DeliveryTimeout: "delivery_timeout",
   HardBounce: "hard_bounce",
+  NotBillable: "not_billable",
   SoftBounce: "soft_bounce",
   Undelivered: "undelivered",
 } as const;
@@ -307,6 +308,7 @@ export type VerificationChannelValue = (typeof VerificationChannel)[keyof typeof
 export const VerificationTerminalReason = {
   AttemptsExhausted: "attempts_exhausted",
   TtlElapsed: "ttl_elapsed",
+  Undeliverable: "undeliverable",
 } as const;
 
 /** A known VerificationTerminalReason value. */

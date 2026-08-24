@@ -122,6 +122,9 @@ export type WebhookEvent =
       type: "verify.verification.created";
     } & EventVerifyVerificationCreated)
   | ({
+      type: "verify.verification.failed";
+    } & EventVerifyVerificationFailed)
+  | ({
       type: "verify.verification.verified";
     } & EventVerifyVerificationVerified)
   | ({
@@ -1373,6 +1376,13 @@ export type EmailRecipientList = {
    * Page of recipient objects for this email send.
    */
   data: Array<EmailRecipient>;
+  /**
+   * What to do next, given what this page reports. Present only where the read computes it: an
+   * empty list means the answer you were looking for is here and there is nothing further to
+   * do. Absent entirely on reads that do not report next actions.
+   *
+   */
+  readonly next?: Array<NextAction>;
 } & ListEnvelope;
 
 /**
@@ -1525,6 +1535,13 @@ export type EmailEventList = {
    * Page of timeline events for this email send, in chronological order.
    */
   data: Array<EmailEvent>;
+  /**
+   * What to do next, given what this page reports. Present only where the read computes it: an
+   * empty list means the answer you were looking for is here and there is nothing further to
+   * do. Absent entirely on reads that do not report next actions.
+   *
+   */
+  readonly next?: Array<NextAction>;
 } & ListEnvelope;
 
 /**
@@ -4034,10 +4051,10 @@ export type EmailLookup = {
 export type VerificationId = string;
 
 /**
- * Why a verification session reached its final state without succeeding: `attempts_exhausted` (too many incorrect passcodes) or `ttl_elapsed` (the time window elapsed before a correct passcode). Open enum: new reasons may be added over time, so treat any unrecognized value as a future reason rather than an error.
+ * Why a verification session reached its final state without succeeding: `attempts_exhausted` (too many incorrect passcodes), `ttl_elapsed` (the time window elapsed before a correct passcode), or `undeliverable` (no planned channel could deliver a passcode, so the recipient never had one to submit). Open enum: new reasons may be added over time, so treat any unrecognized value as a future reason rather than an error.
  */
 export type VerificationTerminalReason =
-  "attempts_exhausted" | "ttl_elapsed" | (string & {});
+  "attempts_exhausted" | "ttl_elapsed" | "undeliverable" | (string & {});
 
 /**
  * The recipient to verify. Provide an `email`, a `phone_number`, or both; at least one is required. The addresses also identify the verification: a check must supply exactly the set used on the create call, so a verification created with both addresses is not found by either one alone.
@@ -4077,6 +4094,9 @@ export type VerificationChannelEntry = {
  * verification moved to the next channel.
  * - `delivery_timeout`: No delivery confirmation arrived before the channel's
  * timeout, so the verification moved to the next channel.
+ * - `not_billable`: The send could not be charged, so it was never handed to the
+ * channel. Usually the workspace balance is too low to cover it. Topping up
+ * the balance is what clears this.
  *
  * New reasons may be added over time. Treat unrecognized values as reasons added
  * later rather than errors.
@@ -4089,6 +4109,7 @@ export type VerificationAttemptFailureReason =
   | "channel_unavailable"
   | "channel_disabled"
   | "delivery_timeout"
+  | "not_billable"
   | (string & {});
 
 /**
@@ -4112,7 +4133,9 @@ export type Verification = {
    *
    * - `pending`: Awaiting a correct passcode.
    * - `verified`: A correct passcode was submitted.
-   * - `failed`: Too many incorrect attempts were submitted.
+   * - `failed`: The verification cannot be completed. Either too many
+   * incorrect passcodes were submitted, or no planned channel could
+   * deliver one. Read `reason` to tell those apart.
    * - `expired`: The validity window elapsed before a correct passcode.
    * - `canceled`: The verification was canceled before completion.
    * - `blocked`: A fraud or abuse control stopped the verification.
@@ -7834,6 +7857,7 @@ export type WebhookEventType =
   | "verify.attempt.sent"
   | "verify.attempt.undelivered"
   | "verify.verification.created"
+  | "verify.verification.failed"
   | "verify.verification.verified"
   | "voice_call.answered"
   | "voice_call.ended"
@@ -9307,6 +9331,49 @@ export type EventVerifyVerificationCreated = {
 };
 
 /**
+ * Always `verify.verification.failed` for this event.
+ */
+export type VerifyVerificationFailedEventType = "verify.verification.failed";
+
+/**
+ * Payload of the verify.verification.failed event.
+ */
+export type EventVerifyVerificationFailedData = EventVerifyBase & {
+  /**
+   * The verification's state, always `failed`. Open enum for forward compatibility.
+   */
+  status: string;
+  /**
+   * Why the verification ended. Always `undeliverable` on this event: no planned channel delivered a passcode.
+   */
+  reason: VerificationTerminalReason;
+  /**
+   * The last channel the verification tried, the one whose failure left it with nowhere else to go. Null when no channel was attributed.
+   */
+  channel: VerificationChannel | null;
+  /**
+   * Why that last send did not deliver. This is the actionable half of the event: `not_billable` means the workspace balance could not cover the send, while the delivery reasons point at the recipient or the channel.
+   */
+  last_attempt_reason: VerificationAttemptFailureReason;
+  /**
+   * Time the verification was resolved.
+   */
+  failed_at: string;
+};
+
+/**
+ * The verification ended without the recipient receiving a passcode: every planned channel reported that its send would not arrive.
+ */
+export type EventVerifyVerificationFailed = {
+  type: VerifyVerificationFailedEventType;
+  /**
+   * Time the verification was resolved.
+   */
+  timestamp: string;
+  data: EventVerifyVerificationFailedData;
+};
+
+/**
  * Payload of the verify.verification.verified event.
  */
 export type EventVerifyVerificationVerifiedData = EventVerifyBase & {
@@ -10291,6 +10358,9 @@ export type WebhookEventWritable =
   | ({
       type: "verify.verification.created";
     } & EventVerifyVerificationCreated)
+  | ({
+      type: "verify.verification.failed";
+    } & EventVerifyVerificationFailed)
   | ({
       type: "verify.verification.verified";
     } & EventVerifyVerificationVerified)
@@ -17249,6 +17319,10 @@ export type CreateVerificationErrors = {
    */
   401: Error;
   /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
    * Insufficient permissions
    */
   403: Error;
@@ -17398,6 +17472,10 @@ export type CreateVerificationNextChannelErrors = {
    * Authentication required
    */
   401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
   /**
    * Insufficient permissions
    */
