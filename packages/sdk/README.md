@@ -78,6 +78,22 @@ for await (const message of bird.whatsapp.list()) {
 const { data } = await bird.whatsapp.listEvents(messageId); // full lifecycle timeline, not paginated
 ```
 
+## Lookup
+
+Every answer is billed. A phone number lookup bills once for the base answer plus once per **delivered** property; an email lookup bills once per answered address. Nothing is billed for a failed lookup, and nothing is billed for a property that came back unanswered, so read `status` before you read a value.
+
+```ts
+const number = await bird.lookup.phoneNumber({ phone_number, type: ["score"] });
+number.country_code; // base answer: always present, always billed
+if (number.score?.status === "ok") number.score.value; // only `ok` carries a value, and only `ok` is billed
+
+const address = await bird.lookup.email({ email });
+address.result; // valid | neutral | risky | undeliverable | typo: an open vocabulary
+address.delivery_confidence; // 0-100, always present: the safe fallback for a verdict you don't know
+```
+
+Pass an `Idempotency-Key` so a retry replays the stored answer instead of buying a second one.
+
 ## Webhooks
 
 `unwrap` verifies a delivery's Standard Webhooks signature and returns a typed, discriminated event. **Pass the raw request body** — never the parsed JSON. Set the signing secret once via `webhooks: { secret }` on the client (or pass `{ secret }` per call).

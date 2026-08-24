@@ -403,16 +403,21 @@ export const _ListEnvelopeSchema = {
       type: ["string", "null"],
       description:
         "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
     },
     prev_cursor: {
       type: ["string", "null"],
       description:
         "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
     },
     refresh_cursor: {
       type: ["string", "null"],
       description:
         "Refresh anchor. Pass back as `ending_before` later to fetch items that have appeared since this response. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -601,12 +606,14 @@ export const TimestampsSchema = {
       format: "date-time",
       minLength: 1,
       readOnly: true,
+      example: {},
     },
     updated_at: {
       type: "string",
       format: "date-time",
       minLength: 1,
       readOnly: true,
+      example: {},
     },
   },
 } as const;
@@ -2489,6 +2496,16 @@ export const EmailEventSchema = {
       description:
         "The IP address used to send this message. Useful for spotting a deliverability problem that is tied to one specific sending IP rather than affecting all of them. Present on `email.delivered`, `email.bounced`, `email.out_of_band_bounce`, and `email.deferred` events.\n",
     },
+    mailbox_provider: {
+      type: ["string", "null"],
+      description:
+        "The recipient mailbox provider, as a lowercased classifier bucket (e.g. `gmail`, `yahoo`, `microsoft`, `apple`). Present on `email.processed`, `email.delivered`, `email.complained`, `email.bounced`, `email.out_of_band_bounce`, `email.deferred`, `email.rejected`, `email.unsubscribed`, `email.list_unsubscribed`, `email.opened`, and `email.clicked` events when the receiving mail system could be classified; null when it could not.\n",
+    },
+    mailbox_provider_region: {
+      type: ["string", "null"],
+      description:
+        "The provider region, as reported by the receiving mail system (for example `NA`, `EU`, `APAC`). The set is open and provider-specific. Present on `email.processed`, `email.delivered`, `email.complained`, `email.bounced`, `email.out_of_band_bounce`, `email.deferred`, `email.rejected`, `email.unsubscribed`, `email.list_unsubscribed`, `email.opened`, and `email.clicked` events when reported; null otherwise.\n",
+    },
     is_prefetched: {
       type: ["boolean", "null"],
       description:
@@ -2496,7 +2513,14 @@ export const EmailEventSchema = {
     },
     url: {
       type: ["string", "null"],
-      description: "The clicked URL. Present on `email.clicked` events.",
+      description:
+        "The clicked URL. Present on `email.clicked` events, and on `email.unsubscribed` events when the recipient unsubscribed through a link in the message.",
+    },
+    link_name: {
+      type: ["string", "null"],
+      description:
+        "The clicked link's own name, when the link in the message carried one, so a click can be reported by what the link said rather than where it pointed. Absent when the link had no name. Appears alongside `url` on `email.clicked` events, and on `email.unsubscribed` events when the recipient unsubscribed through a link.",
+      example: "Faster exports, docs",
     },
     country: {
       type: ["string", "null"],
@@ -6253,6 +6277,15 @@ export const SMSInboundStatsByNumberResponseSchema = {
   },
 } as const;
 
+export const AllocatedNumberIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^(nda|nal)_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "nda_01krdgeqcxet5s7t44vh8rt9mg",
+  description:
+    "Identifier of a number allocated to your workspace, as returned in the id field of `GET /v1/numbers`.",
+} as const;
+
 export const LookupPropertySchema = {
   type: "string",
   minLength: 1,
@@ -6362,7 +6395,7 @@ export const LookupPropertyStatusSchema = {
   minLength: 1,
   "x-extensible-enum": ["ok", "unavailable", "inconclusive"],
   description:
-    'How a requested property resolved.\n\n- `ok`: the property was answered and its value is in the response.\n- `unavailable`: no answer arrived, so the property adds nothing: its\n  block is `null`, or for `classification`, `line_type` retains the value\n  from the base lookup. The property is not billed.\n- `inconclusive`: an answer arrived but does not resolve the\n  property, either because the number is outside the coverage of the data\n  behind it or because the answer is one we cannot yet place. It is a real\n  answer rather than a missing one, and it is not billed either.\n\nOpen enum: further statuses may be added over time, so treat an unrecognized\nvalue as a future one rather than an error. Only `ok` carries a value and only\n`ok` is billed, so branching on `ok` and treating everything else as "not\nanswered" stays correct however the vocabulary grows.\n',
+    'How a requested property resolved.\n\n- `ok`: the property was answered and its value is in the response.\n- `unavailable`: no answer arrived, so the property adds nothing: its\n  block is `null`, or for `classification`, `line_type` retains the value\n  from the base lookup. The property is not billed.\n- `inconclusive`: an answer arrived but does not resolve the\n  property, either because the number is outside the coverage of the data\n  behind it or because the source returned a value this property does not\n  report. It is a real answer rather than a missing one, and it is not\n  billed either.\n\nOpen enum: further statuses may be added over time, so treat an unrecognized\nvalue as a future one rather than an error. Only `ok` carries a value and only\n`ok` is billed, so branching on `ok` and treating everything else as "not\nanswered" stays correct however the vocabulary grows.\n',
   example: "ok",
 } as const;
 
@@ -6993,25 +7026,6 @@ export const VerificationChannelEntrySchema = {
   properties: {
     channel: {
       $ref: "#/components/schemas/VerificationChannel",
-    },
-  },
-} as const;
-
-export const MoneySchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["amount", "currency_code"],
-  properties: {
-    amount: {
-      type: "string",
-      minLength: 1,
-      description: "Decimal amount as a string, in major currency units.",
-      example: "0.00995",
-    },
-    currency_code: {
-      $ref: "#/components/schemas/CurrencyCode",
-      description: "ISO 4217 currency code.",
-      example: "USD",
     },
   },
 } as const;
@@ -7792,9 +7806,10 @@ export const WhatsAppErrorCodeSchema = {
     "service_window_expired",
     "rate_limited",
     "recipient_suppressed",
+    "media_rejected",
   ],
   description:
-    "Standardized failure reason:\n\n- `insufficient_balance`: The workspace wallet could not fund the send.\n- `price_not_found`: No price was configured for the destination and template.\n- `internal_error`: An unexpected service failure occurred.\n- `undeliverable`: The recipient could not be reached.\n- `service_window_expired`: The 24-hour service window closed; send a template.\n- `rate_limited`: The send was throttled.\n- `recipient_suppressed`: The recipient is on the workspace suppression list.\n\nThis is an open enum. Accept unrecognized values.\n",
+    "Standardized failure reason:\n\n- `insufficient_balance`: The workspace wallet could not fund the send.\n- `price_not_found`: No price was configured for the destination and template.\n- `internal_error`: An unexpected service failure occurred.\n- `undeliverable`: The recipient could not be reached.\n- `service_window_expired`: The 24-hour service window closed; send a template.\n- `rate_limited`: The send was throttled.\n- `recipient_suppressed`: The recipient is on the workspace suppression list.\n- `media_rejected`: WhatsApp could not fetch the media URL, or refused the file it found there; `description` carries its reason.\n\nThis is an open enum. Accept unrecognized values.\n",
 } as const;
 
 export const WhatsAppErrorSchema = {
@@ -8352,7 +8367,7 @@ export const WhatsAppMessageSendRequestSchema = {
       type: "string",
       minLength: 1,
       description:
-        "The business phone number to send from, in E.164 format. Omit it for a Bird-managed template, which selects its own number from its category: setting it there returns a `422` `WhatsAppSenderNotAllowed`. Every other send, whether free-form content of any kind or a template your workspace authored, requires it, and the number must be one this workspace owns. Omitting it returns a `422` `WhatsAppSenderRequired`, and naming a number this workspace cannot send from returns a `422` `WhatsAppSenderNotFound`. Naming a number this workspace owns but that sits on a different WhatsApp Business Account than an authored template returns a `422` `WhatsAppSenderWABAMismatch`.\n",
+        "The business phone number to send from, in E.164 format. Omit it for a Bird-managed template, which selects its own number from its category: setting it there returns a `422` `WhatsAppSenderNotAllowed`. Every other send, whether free-form content of any kind or a template your workspace authored, requires it, and the number must be one this workspace owns. Omitting it returns a `422` `WhatsAppSenderRequired`, and naming a number this workspace cannot send from returns a `422` `WhatsAppSenderNotFound`. Naming a number this workspace owns but that sits on a different WhatsApp Business Account than an authored template returns a `422` `WhatsAppSenderWABAMismatch`. A number this workspace holds but has not finished connecting returns a `422` `WhatsAppSenderNotConnected`.\n",
       example: "+13124495648",
     },
     template: {
@@ -9965,7 +9980,7 @@ export const EmailMailboxProviderSortMetricSchema = {
   type: "string",
   default: "delivered",
   description:
-    "Metric to rank rows by, applied descending. Shared by the breakdowns whose attribution begins at delivery (mailbox providers, mailbox provider regions): `processed`, `rejected`, and `oob_bounces` are not part of those rows, so they are not sortable. Any count or rate on the row can be used; rows whose rate is undefined (zero denominator) sort last. Bounce sub-types use their nested location in each row, for example `bounces.hard` and `bounces.hard_rate`.\n",
+    "Metric to rank rows by, applied descending. Shared by every breakdown whose attribution begins at delivery, so `processed`, `rejected`, and `oob_bounces` are not part of those rows and are not sortable. Any count or rate on the row can be used; rows whose rate is undefined (zero denominator) sort last. Bounce sub-types use their nested location in each row, for example `bounces.hard` and `bounces.hard_rate`.\n",
   enum: [
     "delivered",
     "bounced",
@@ -11097,7 +11112,7 @@ export const DNSRecordSchema = {
       type: "string",
       minLength: 1,
       description:
-        "What this record is for.\n\n- `dkim`: signs outbound mail and proves domain ownership.\n- `return_path`: identifies the return-path (bounce) CNAME for sending.\n- `tracking`: identifies the optional branded open/click tracking CNAME.\n- `inbound_mx`: identifies the MX record routing mail to us for receiving.\n  Always present wherever inbound is available, as a regional reference,\n  regardless of whether receiving is enabled; publishing it does not\n  enable receiving on its own: see `DomainUpdate.inbound`.\n- `dmarc`: identifies the advisory DMARC policy record.\n",
+        "What this record is for.\n\n- `dkim`: signs outbound mail and proves domain ownership.\n- `return_path`: identifies the return-path (bounce) CNAME for sending.\n- `tracking`: identifies the optional branded open/click tracking CNAME.\n- `inbound_mx`: identifies the MX record routing mail to us for receiving.\n  Always present wherever inbound is available, as a regional reference,\n  regardless of whether receiving is enabled; publishing it does not\n  enable receiving on its own: see `DomainUpdate.inbound`. It is\n  `optional` until receiving is enabled, and publishing it before then\n  is destructive: on a domain at the zone apex it replaces the MX\n  records that carry the domain's existing mail.\n- `dmarc`: identifies the advisory DMARC policy record.\n",
       enum: ["dkim", "return_path", "tracking", "inbound_mx", "dmarc"],
     },
     state: {
@@ -11112,7 +11127,7 @@ export const DNSRecordSchema = {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether this record can be skipped. Optional records enable extra functionality (for example, tracking) but are not required for sending.\n",
+        "Whether this record can be skipped. An optional record enables extra functionality (branded tracking, or receiving) rather than sending, so publish one only when you want what it enables. The `inbound_mx` records are optional until you enable receiving on the domain, and publishing one before then changes where mail to the domain is delivered.\n",
     },
     status: {
       type: "string",
@@ -16139,13 +16154,13 @@ export const EventVerifyAttemptSentDataSchema = {
           minLength: 1,
           description:
             "The single address this attempt was dispatched to, an E.164 phone number or an email address.",
-          example: "+15551234567",
+          example: "+14155550100",
         },
         from: {
           type: ["string", "null"],
           description:
             "The sender the passcode was sent from: a phone number, alphanumeric sender ID, short code, or email address. Null when the channel exposes no sender.",
-          example: "Authifly",
+          example: "29999",
         },
         sent_at: {
           type: "string",
@@ -16511,7 +16526,7 @@ export const VoiceCallStatusSchema = {
     "in_progress",
   ],
   description:
-    "Call status.\n\nA call that has ended carries `answered`, `no_answer`, `failed`, `rejected`, or\n`unknown`. An active call carries `ringing` before it is picked up and\n`in_progress` afterward. The call list's `status` filter uses both values to\nselect calls happening now.\n\n`busy` and `canceled` are reserved and are not currently emitted. Both\noutcomes are currently reported as `failed`.\n",
+    "Call status.\n\nA call that has ended carries one of:\n\n- `answered` means it connected and the far end picked up.\n- `no_answer` means nobody picked up before the call timed out.\n- `rejected` means it was refused rather than attempted. Either we turned it\n  away before dialing a carrier, in which case `rejection_reason` names the\n  check it failed where there was one, or the far end declined it.\n- `failed` means it was attempted and did not work, and `sip_response_code`\n  is what came back.\n- `unknown` means the outcome could not be determined. Contact support with\n  the call `id` if you see one.\n\nAn active call carries `ringing` before it is picked up and `in_progress`\nafterward. The call list's `status` filter takes any mix of the two sets.\n\n`busy` and `canceled` are reserved for incoming calls delivered to your own\nnumbers: `busy` for a called party that rejected the call as busy, `canceled`\nfor a caller who hung up before it was picked up. Neither is emitted yet and\nboth outcomes are reported as `failed` today.\n",
   example: "answered",
 } as const;
 
@@ -17206,20 +17221,405 @@ export const AuditLogActorSchema = {
       type: "string",
       minLength: 1,
       description:
-        "ID of the user, API key, or system process that performed the action.",
+        "ID of the user, API key, integration, or system process that performed the action.",
       example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
     },
     type: {
       type: "string",
       minLength: 1,
-      description: "Type of actor, such as `user`, `api_key`, or `system`.",
+      description:
+        "Type of actor, such as `user`, `api_key`, `service_account`, or `system`.",
       example: "user",
     },
     display_name: {
       type: ["string", "null"],
       readOnly: true,
       description:
-        "Display name of the actor. This is the user's email address for a `user` actor or the API key name for an `api_key` actor. Absent when it could not be resolved.\n",
+        "Display name of the actor. This is the user's email address for a `user` actor, or the name of the API key or integration that acted. Absent when it could not be resolved.\n",
+    },
+  },
+} as const;
+
+export const NumberTypeSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "mobile",
+    "local",
+    "national",
+    "short_code",
+    "short_code_fteu",
+    "toll_free",
+  ],
+  description:
+    "Physical type of a phone number. New number types may be added over time, so treat unrecognized values as supported types rather than errors.",
+} as const;
+
+export const NumberCapabilitySchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["sms", "mms", "voice"],
+  description:
+    "Channel capability supported by a phone number. New capabilities may be added over time, so treat unrecognized values as supported capabilities rather than errors.",
+} as const;
+
+export const NumberOwnershipSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["satisfied", "next"],
+  description:
+    "Where this number stands with the ownership paperwork its country requires before it may carry traffic. Present only for a number whose country requires any, so its absence means no paperwork was ever asked for and this number is unconditionally usable. Absent as well when the requirement cannot be established right now, since reporting either answer would state something about your paperwork that has not been checked.\n",
+  properties: {
+    satisfied: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether the paperwork is accepted. Read `next` for what advances it while this is false. Whether sending is currently refused is reported by `blocked_at` instead: a number bought before its country asked for anything is unsatisfied and still usable until a review says otherwise.\n",
+    },
+    blocked_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the number stopped being able to carry traffic, and null while it can. Always null when `satisfied` is true, but null does not imply it: a number whose country began asking after you bought it is usable with its paperwork still outstanding. A number can also arrive blocked, and one that was usable can be blocked again if its approval is withdrawn.\n",
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What you do about it, in the order to do it. Empty only when `satisfied` is true, so while anything is outstanding there is always at least one step. When what you already sent is being reviewed and nothing is needed from you, that step has kind `wait` and says so. Re-read it after each call rather than caching the first list you saw.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+  },
+} as const;
+
+export const NumberSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "kind",
+    "number",
+    "country_code",
+    "number_type",
+    "capabilities",
+    "status",
+    "allocated_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/AllocatedNumberID",
+        },
+      ],
+      description:
+        "Identifier of this allocated number. Pass it as `number_id` to read this number, or to release it when kind is dedicated.",
+    },
+    kind: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      enum: ["dedicated", "shared"],
+      description:
+        "How this number is allocated. `dedicated` is allocated to this workspace alone and billed as a subscription. `shared` is a shortcode allocated to several workspaces at once and managed by us.",
+    },
+    number: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "Phone number in E.164 format.",
+    },
+    country_code: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/CountryCode",
+        },
+      ],
+      readOnly: true,
+    },
+    number_type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/NumberType",
+        },
+      ],
+      readOnly: true,
+      description: "Physical type of this phone number.",
+    },
+    capabilities: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/NumberCapability",
+      },
+      description: "Channel capabilities supported by this number.",
+    },
+    status: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      enum: ["active", "pending_compliance", "released"],
+      description:
+        "Whether this number can carry traffic.\n\n- `active` means this number is allocated to your workspace and usable.\n- `pending_compliance` means this number is allocated to your workspace and billed,\n  but it cannot carry traffic until the ownership paperwork its country requires is\n  accepted. Read `ownership.next` for what advances it, and re-read later if\n  `ownership` is momentarily `null`.\n- `released` means this number is no longer allocated to your workspace.\n\nAn allocated number is not always enough to send from it: some destination\ncountries also require an approved registration for the sender.\n",
+    },
+    allocated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When this number was allocated to your workspace.",
+    },
+    released_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this number was released. `null` while it is still allocated to your workspace.",
+    },
+    ownership: {
+      readOnly: true,
+      description:
+        "Where this number stands with the ownership paperwork its country requires. `null` when the country requires none, which is the usual case: a number with no `ownership` object is usable as soon as it is allocated. Also `null` when that standing cannot be established right now; `status` still reads `pending_compliance` while the number is blocked, so re-read this field rather than caching its absence. We manage the paperwork for shared short codes, so this field is always `null` for them.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/NumberOwnership",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+  },
+} as const;
+
+export const NumberListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/Number",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const AvailableNumberSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["number", "country_code", "number_type", "capabilities"],
+  properties: {
+    number: {
+      type: "string",
+      minLength: 1,
+      description: "Phone number in E.164 format.",
+    },
+    country_code: {
+      $ref: "#/components/schemas/CountryCode",
+    },
+    number_type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/NumberType",
+        },
+      ],
+      description: "Physical type of this phone number.",
+    },
+    capabilities: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/NumberCapability",
+      },
+      description: "Channel capabilities supported by this number.",
+    },
+  },
+} as const;
+
+export const AvailableNumberListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/AvailableNumber",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const NumbersOrderStatusSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "charging",
+    "ordering",
+    "pending",
+    "completed",
+    "failed",
+  ],
+  description:
+    "Lifecycle state of a number purchase order:\n\n- `charging`: Securing funds.\n- `ordering`: Placing the order with the carrier.\n- `pending`: The carrier accepted the order and is provisioning the number.\n- `completed`: Your workspace owns the number.\n- `failed`: The purchase did not complete.\n\nA setup fee already charged is non-refundable. Contact support about a failed\norder.",
+} as const;
+
+export const NumbersOrderIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^nor_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "nor_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const NumbersDedicatedAllocationIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^nda_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "nda_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const NumbersOrderSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "number",
+    "country_code",
+    "number_type",
+    "status",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/NumbersOrderID",
+        },
+      ],
+      description: "Identifier of this purchase order.",
+    },
+    number: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The number being acquired, in E.164 format.",
+    },
+    country_code: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/CountryCode",
+        },
+      ],
+      readOnly: true,
+    },
+    number_type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/NumberType",
+        },
+      ],
+      readOnly: true,
+      description: "Physical type of the number being acquired.",
+    },
+    status: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/NumbersOrderStatus",
+        },
+      ],
+    },
+    number_id: {
+      readOnly: true,
+      description:
+        "Identifier of the number this order produced, set when `status` is `completed`. Pass it as `number_id` to `GET /v1/numbers/{number_id}` or `DELETE /v1/numbers/{number_id}`. `null` until the order completes.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/NumbersDedicatedAllocationID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    failure_reason: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "Human-readable reason the purchase failed. `null` unless status is failed. An order can fail some time after it was created, so `updated_at` tells you when the failure was recorded rather than when the order was placed.\n",
+    },
+    completed_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the purchase completed and the number became owned (status completed). `null` for orders still in progress or failed.\n",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const NumbersOrderListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/NumbersOrder",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const NumbersOrderCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["number"],
+  properties: {
+    number: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The number to acquire, in E.164 format, as returned by `GET /v1/numbers/available`.",
+      example: "+18005550100",
     },
   },
 } as const;
@@ -17306,6 +17706,58 @@ export const VoiceMediaQualitySchema = {
   },
 } as const;
 
+export const VoiceCallCostSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "amount",
+    "currency_code",
+    "outbound_amount",
+    "inbound_amount",
+    "call_handling_amount",
+  ],
+  description:
+    "What was charged for a call, split into the components that make it up.\n",
+  properties: {
+    amount: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Total charged, as a decimal string: the sum of the components below. Net of tax, which applies to your wallet balance rather than to an individual charge.\n",
+      example: "0.013000",
+    },
+    currency_code: {
+      readOnly: true,
+      $ref: "#/components/schemas/CurrencyCode",
+      description:
+        "ISO 4217 currency code. Every component is denominated in this currency.",
+      example: "USD",
+    },
+    outbound_amount: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What we charged to carry the call to the destination network, as a decimal string. `null` until this component is priced.\n",
+      example: "0.013000",
+    },
+    inbound_amount: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What we charged to receive the call from the originating network, as a decimal string. Only a call that arrived at your number can carry it. `null` until this component is priced.\n",
+      example: null,
+    },
+    call_handling_amount: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What we charged for handling the call itself, as a decimal string. A call is charged for handling once, however many legs it has, so only one leg's record carries it. `null` until this component is priced.\n",
+      example: null,
+    },
+  },
+} as const;
+
 export const VoiceCallSchema = {
   type: "object",
   additionalProperties: false,
@@ -17371,7 +17823,7 @@ export const VoiceCallSchema = {
         },
       ],
       description:
-        "Who placed the call: either the API key whose credentials it used or the user who placed it from a browser or the CLI. Absent when the call was admitted only by its source IP address, or when no actor was recorded.",
+        "Who placed the call: the API key whose credentials it used, the integration acting for the workspace, or the user who placed it from a browser or the CLI. Absent when the call was admitted only by its source IP address, or when no actor was recorded.",
     },
     sip_trunk_id: {
       readOnly: true,
@@ -17463,9 +17915,9 @@ export const VoiceCallSchema = {
         "How the audio sounded, as opposed to whether the call connected. Absent when the call carried no audio, or when the far end reported nothing to measure from.",
     },
     cost: {
-      $ref: "#/components/schemas/Money",
+      $ref: "#/components/schemas/VoiceCallCost",
       description:
-        "Amount billed for this call, net of tax, at full precision. Absent until the call has been rated; unanswered or unpriced calls have no cost.",
+        "What the call cost, net of tax, at full precision, split into the components that make it up. Absent until the call has been rated; unanswered or unpriced calls have no cost.",
     },
   },
 } as const;
@@ -18112,6 +18564,16 @@ export const EmailEventWritableSchema = {
       description:
         "The IP address used to send this message. Useful for spotting a deliverability problem that is tied to one specific sending IP rather than affecting all of them. Present on `email.delivered`, `email.bounced`, `email.out_of_band_bounce`, and `email.deferred` events.\n",
     },
+    mailbox_provider: {
+      type: ["string", "null"],
+      description:
+        "The recipient mailbox provider, as a lowercased classifier bucket (e.g. `gmail`, `yahoo`, `microsoft`, `apple`). Present on `email.processed`, `email.delivered`, `email.complained`, `email.bounced`, `email.out_of_band_bounce`, `email.deferred`, `email.rejected`, `email.unsubscribed`, `email.list_unsubscribed`, `email.opened`, and `email.clicked` events when the receiving mail system could be classified; null when it could not.\n",
+    },
+    mailbox_provider_region: {
+      type: ["string", "null"],
+      description:
+        "The provider region, as reported by the receiving mail system (for example `NA`, `EU`, `APAC`). The set is open and provider-specific. Present on `email.processed`, `email.delivered`, `email.complained`, `email.bounced`, `email.out_of_band_bounce`, `email.deferred`, `email.rejected`, `email.unsubscribed`, `email.list_unsubscribed`, `email.opened`, and `email.clicked` events when reported; null otherwise.\n",
+    },
     is_prefetched: {
       type: ["boolean", "null"],
       description:
@@ -18119,7 +18581,14 @@ export const EmailEventWritableSchema = {
     },
     url: {
       type: ["string", "null"],
-      description: "The clicked URL. Present on `email.clicked` events.",
+      description:
+        "The clicked URL. Present on `email.clicked` events, and on `email.unsubscribed` events when the recipient unsubscribed through a link in the message.",
+    },
+    link_name: {
+      type: ["string", "null"],
+      description:
+        "The clicked link's own name, when the link in the message carried one, so a click can be reported by what the link said rather than where it pointed. Absent when the link had no name. Appears alongside `url` on `email.clicked` events, and on `email.unsubscribed` events when the recipient unsubscribed through a link.",
+      example: "Faster exports, docs",
     },
     country: {
       type: ["string", "null"],
@@ -19364,7 +19833,7 @@ export const DNSRecordWritableSchema = {
       type: "string",
       minLength: 1,
       description:
-        "What this record is for.\n\n- `dkim`: signs outbound mail and proves domain ownership.\n- `return_path`: identifies the return-path (bounce) CNAME for sending.\n- `tracking`: identifies the optional branded open/click tracking CNAME.\n- `inbound_mx`: identifies the MX record routing mail to us for receiving.\n  Always present wherever inbound is available, as a regional reference,\n  regardless of whether receiving is enabled; publishing it does not\n  enable receiving on its own: see `DomainUpdate.inbound`.\n- `dmarc`: identifies the advisory DMARC policy record.\n",
+        "What this record is for.\n\n- `dkim`: signs outbound mail and proves domain ownership.\n- `return_path`: identifies the return-path (bounce) CNAME for sending.\n- `tracking`: identifies the optional branded open/click tracking CNAME.\n- `inbound_mx`: identifies the MX record routing mail to us for receiving.\n  Always present wherever inbound is available, as a regional reference,\n  regardless of whether receiving is enabled; publishing it does not\n  enable receiving on its own: see `DomainUpdate.inbound`. It is\n  `optional` until receiving is enabled, and publishing it before then\n  is destructive: on a domain at the zone apex it replaces the MX\n  records that carry the domain's existing mail.\n- `dmarc`: identifies the advisory DMARC policy record.\n",
       enum: ["dkim", "return_path", "tracking", "inbound_mx", "dmarc"],
     },
   },
@@ -21026,28 +21495,71 @@ export const AuditLogActorWritableSchema = {
       type: "string",
       minLength: 1,
       description:
-        "ID of the user, API key, or system process that performed the action.",
+        "ID of the user, API key, integration, or system process that performed the action.",
       example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
     },
     type: {
       type: "string",
       minLength: 1,
-      description: "Type of actor, such as `user`, `api_key`, or `system`.",
+      description:
+        "Type of actor, such as `user`, `api_key`, `service_account`, or `system`.",
       example: "user",
     },
   },
 } as const;
 
+export const NumberOwnershipWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Where this number stands with the ownership paperwork its country requires before it may carry traffic. Present only for a number whose country requires any, so its absence means no paperwork was ever asked for and this number is unconditionally usable. Absent as well when the requirement cannot be established right now, since reporting either answer would state something about your paperwork that has not been checked.\n",
+} as const;
+
+export const NumberWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
+export const NumberListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/NumberWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const NumbersOrderListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
 export const VoiceCallWritableSchema = {
   type: "object",
   additionalProperties: false,
-  properties: {
-    cost: {
-      $ref: "#/components/schemas/Money",
-      description:
-        "Amount billed for this call, net of tax, at full precision. Absent until the call has been rated; unanswered or unpriced calls have no cost.",
-    },
-  },
 } as const;
 
 export const VoiceCallListWritableSchema = {

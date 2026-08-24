@@ -30,6 +30,7 @@ import { VerifyResource } from "./resources/verify.js";
 import { WebhooksResource, type WebhookOptions } from "./resources/webhooks.js";
 import { RealtimeResource, type RealtimeOptions } from "./resources/realtime.js";
 import { LookupResource } from "./resources/lookup.gen.js";
+import { NumbersResource } from "./resources/numbers.js";
 
 // The SDK's own version, sent as User-Agent. Injected at build time from
 // package.json (tsdown/vitest `define`) so it never drifts from the published
@@ -204,6 +205,9 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
   /** Recipient intelligence: `bird.lookup.email(...)`, `.phoneNumber(...)`. Every answer is billed. */
   readonly lookup: LookupResource;
 
+  /** Numbers: `bird.numbers.available.list(...)`, `.orders.create(...)`, `.list(...)`, `.release(...)`. */
+  readonly numbers: NumbersResource;
+
   /** Webhooks: `bird.webhooks.unwrap(payload, headers)` verifies an inbound delivery. */
   readonly webhooks: WebhooksResource;
 
@@ -276,6 +280,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
     );
     this.domains = new DomainsResource(this.core, this.#client);
     this.lookup = new LookupResource(this.core, this.#client);
+    this.numbers = new NumbersResource(this.core, this.#client);
     this.webhooks = new WebhooksResource(opts.webhooks);
     this.realtime = new RealtimeResource(this.core, this.#client, opts.realtime);
   }

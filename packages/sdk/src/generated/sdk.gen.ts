@@ -51,6 +51,9 @@ import type {
   CreateMailboxReceiveRuleErrors,
   CreateMailboxReceiveRuleResponses,
   CreateMailboxResponses,
+  CreateNumbersOrderData,
+  CreateNumbersOrderErrors,
+  CreateNumbersOrderResponses,
   CreatePhoneNumberLookupData,
   CreatePhoneNumberLookupErrors,
   CreatePhoneNumberLookupResponses,
@@ -108,6 +111,9 @@ import type {
   GetAudienceData,
   GetAudienceErrors,
   GetAudienceResponses,
+  GetAvailableNumberData,
+  GetAvailableNumberErrors,
+  GetAvailableNumberResponses,
   GetContactData,
   GetContactErrors,
   GetContactPropertyData,
@@ -183,6 +189,9 @@ import type {
   GetMailboxStatsData,
   GetMailboxStatsErrors,
   GetMailboxStatsResponses,
+  GetNumbersOrderData,
+  GetNumbersOrderErrors,
+  GetNumbersOrderResponses,
   GetRealtimeAppChannelData,
   GetRealtimeAppChannelErrors,
   GetRealtimeAppChannelResponses,
@@ -252,12 +261,18 @@ import type {
   GetWhatsAppMessageData,
   GetWhatsAppMessageErrors,
   GetWhatsAppMessageResponses,
+  GetWorkspaceNumberData,
+  GetWorkspaceNumberErrors,
+  GetWorkspaceNumberResponses,
   ListAudienceContactsData,
   ListAudienceContactsErrors,
   ListAudienceContactsResponses,
   ListAudiencesData,
   ListAudiencesErrors,
   ListAudiencesResponses,
+  ListAvailableNumbersData,
+  ListAvailableNumbersErrors,
+  ListAvailableNumbersResponses,
   ListContactPropertiesData,
   ListContactPropertiesErrors,
   ListContactPropertiesResponses,
@@ -288,6 +303,9 @@ import type {
   ListMailboxReceiveRulesData,
   ListMailboxReceiveRulesErrors,
   ListMailboxReceiveRulesResponses,
+  ListNumbersOrdersData,
+  ListNumbersOrdersErrors,
+  ListNumbersOrdersResponses,
   ListRealtimeAppChannelMembersData,
   ListRealtimeAppChannelMembersErrors,
   ListRealtimeAppChannelMembersResponses,
@@ -318,12 +336,18 @@ import type {
   ListWhatsAppMessagesData,
   ListWhatsAppMessagesErrors,
   ListWhatsAppMessagesResponses,
+  ListWorkspaceNumbersData,
+  ListWorkspaceNumbersErrors,
+  ListWorkspaceNumbersResponses,
   PublishRealtimeAppBatchData,
   PublishRealtimeAppBatchErrors,
   PublishRealtimeAppBatchResponses,
   PublishRealtimeAppEventData,
   PublishRealtimeAppEventErrors,
   PublishRealtimeAppEventResponses,
+  ReleaseWorkspaceNumberData,
+  ReleaseWorkspaceNumberErrors,
+  ReleaseWorkspaceNumberResponses,
   ReplyEmailThreadMessageData,
   ReplyEmailThreadMessageErrors,
   ReplyEmailThreadMessageResponses,
@@ -1995,7 +2019,7 @@ export const updateSmsKeywordRule = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get aggregate SMS statistics
+ * Get aggregate outbound SMS statistics
  *
  * Returns one aggregate row for the requested period. It includes SMS lifecycle counts, delivery and failure rates, and processing, delivery, and total latency percentiles (`p50`, `p95`, and `p99`). Rows use send-time attribution, so recent periods can under-report `delivered` while delivery reports arrive.
  *
@@ -2029,7 +2053,7 @@ export const getSmsStatsSummary = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get daily SMS statistics
+ * Get daily outbound SMS statistics
  *
  * Returns one row of SMS lifecycle counts per calendar day. Rows use send-time attribution, so a delivery confirmation is counted on the day when its message was accepted. Recent rows can under-report `delivered` while delivery reports arrive. Days without activity contain zero counts.
  *
@@ -2063,7 +2087,7 @@ export const getSmsStatsDaily = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get hourly SMS statistics
+ * Get hourly outbound SMS statistics
  *
  * Returns one row of SMS lifecycle counts per hour. Rows use send-time attribution, so a delivery confirmation is counted in the hour when its message was accepted. Recent rows can under-report `delivered` while delivery reports arrive.
  *
@@ -2097,7 +2121,7 @@ export const getSmsStatsHourly = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get SMS statistics by originator
+ * Get outbound SMS statistics by originator
  *
  * Returns aggregate delivery and latency stats grouped by originator (the sender address messages were sent from) for the requested period. Rows are ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, hard maximum 200). Use this to compare sending performance across the senders you dispatch from.
  *
@@ -2131,7 +2155,7 @@ export const getSmsStatsByOriginator = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get SMS statistics by country
+ * Get outbound SMS statistics by country
  *
  * Returns aggregate delivery and latency stats grouped by destination country for the requested period. Rows are ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, hard maximum 200). Use this to compare sending performance across the countries you send to.
  *
@@ -2165,7 +2189,7 @@ export const getSmsStatsByCountry = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get SMS statistics by category
+ * Get outbound SMS statistics by category
  *
  * Returns aggregate delivery and latency stats grouped by message category for the requested period. Rows are ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, hard maximum 200). Use this to compare sending performance across the categories you send under.
  *
@@ -2199,7 +2223,7 @@ export const getSmsStatsByCategory = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get SMS statistics by error code
+ * Get outbound SMS statistics by error code
  *
  * Returns aggregate delivery and latency statistics grouped by normalized failure reason for the requested period. The grouping key matches the `error_code` filter on the message list, so each row maps directly to the affected messages rather than a raw carrier code. Rows are ranked by the `sort` metric (default `failed`) descending and capped at the requested `limit` (default 50, hard maximum 200).
  *
@@ -2231,7 +2255,7 @@ export const getSmsStatsByErrorCode = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get SMS statistics by carrier
+ * Get outbound SMS statistics by carrier
  *
  * Returns aggregate delivery and latency stats grouped by delivery carrier for the requested period. Rows are ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, hard maximum 200). Use this to compare delivery performance across the carriers that handled your messages.
  *
@@ -2265,7 +2289,7 @@ export const getSmsStatsByCarrier = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get SMS statistics by tag
+ * Get outbound SMS statistics by tag
  *
  * Returns delivery and latency statistics grouped by tag (`name:value`). Rows sort by the selected metric in descending order and are capped by `limit`. The default sort is `accepted`; the default limit is 50 and the maximum is 200.
  *
@@ -2299,7 +2323,7 @@ export const getSmsStatsByTag = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get SMS statistics by status
+ * Get outbound SMS statistics by status
  *
  * Returns one row per lifecycle status with activity in the requested period, ordered by count descending. The statuses are `accepted`, `sent`, `delivered`, `undelivered`, `failed`, `rejected`, and `expired`.
  *
@@ -2333,11 +2357,11 @@ export const getSmsStatsByStatus = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get a received-message summary
+ * Get aggregate inbound SMS statistics
  *
  * Returns the total number of messages your numbers received over the period, using the time the carrier received each message.
  *
- * The response contains only a count because a received message has one state. Use the send statistics endpoints for delivery rates and latency data about messages you send.
+ * The response contains only a count because a received message has one state. Use the outbound statistics endpoints for delivery rates and latency data about messages you send.
  *
  * The maximum window is 365 days; a longer range returns 422. Set `timezone` to resolve the period against your local calendar instead of UTC.
  *
@@ -2367,11 +2391,11 @@ export const getSmsInboundStatsSummary = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get daily received-message counts
+ * Get daily inbound SMS statistics
  *
  * Returns the number of messages your numbers received, one row per calendar day. Rows use the time the carrier received each message, and days with no messages contain a zero count.
  *
- * Each row contains only a count because a received message has one state. Use the send statistics endpoints for lifecycle and delivery-latency data about messages you send.
+ * Each row contains only a count because a received message has one state. Use the outbound statistics endpoints for lifecycle and delivery-latency data about messages you send.
  *
  * The maximum window is 365 days; a longer range returns 422. Set `timezone` to bucket rows by your local calendar day instead of UTC.
  *
@@ -2401,11 +2425,11 @@ export const getSmsInboundStatsDaily = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get hourly received-message counts
+ * Get hourly inbound SMS statistics
  *
  * Returns the number of messages your numbers received, one row per hour. Rows use the time the carrier received each message, and hours with no messages contain a zero count.
  *
- * Each row contains only a count because a received message has one state. Use the send statistics endpoints for lifecycle and delivery-latency data about messages you send.
+ * Each row contains only a count because a received message has one state. Use the outbound statistics endpoints for lifecycle and delivery-latency data about messages you send.
  *
  * The maximum window is 720 hours; a longer range returns 422. Set `timezone` to bucket rows by your local hour instead of UTC.
  *
@@ -2435,7 +2459,7 @@ export const getSmsInboundStatsHourly = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get received messages by country
+ * Get inbound SMS statistics by country
  *
  * Returns the number of messages your numbers received, grouped by the receiving number's country. Rows are ranked by volume, highest first, and use the time the carrier received each message.
  *
@@ -2469,7 +2493,7 @@ export const getSmsInboundStatsByCountry = <
   });
 
 /**
- * Get received messages by operator
+ * Get inbound SMS statistics by operator
  *
  * Returns the number of messages your numbers received, grouped by the sender's mobile operator. Rows are ranked by volume, highest first, and use the time the carrier received each message. Operators are identified by MCC-MNC when the carrier reports it.
  *
@@ -2505,7 +2529,7 @@ export const getSmsInboundStatsByOperator = <
   });
 
 /**
- * Get received messages by number
+ * Get inbound SMS statistics by number
  *
  * Returns how many messages each of your numbers received. Rows are ranked by volume, highest first, and use the time the carrier received each message.
  *
@@ -2810,6 +2834,8 @@ export const listWhatsAppMessages = <ThrowOnError extends boolean = false>(
  * - Parameter values that do not match the template's declared placeholders.
  * - A `from` this workspace cannot send from.
  * - A recipient that is neither a valid phone number nor a business-scoped user ID.
+ *
+ * A send from a workspace with no wallet balance fails with a `402`.
  *
  */
 export const createWhatsAppMessage = <ThrowOnError extends boolean = false>(
@@ -4327,6 +4353,255 @@ export const listMailboxLabels = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/email/mailboxes/{mailbox_id}/labels",
+    ...options,
+  });
+
+/**
+ * List your allocated numbers
+ *
+ * Returns a paginated list of the phone numbers currently allocated to your workspace, newest first. Each entry is either a dedicated number you bought or a shared number managed for you, as its `kind` field indicates. Pass `number` to look one up, or narrow the list with `country_code`, `number_type`, `prefix`, and `capabilities`. An allocated number is not always enough to send from it: some countries also require an approved registration for the sender.
+ */
+export const listWorkspaceNumbers = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWorkspaceNumbersData, ThrowOnError>,
+): RequestResult<
+  ListWorkspaceNumbersResponses,
+  ListWorkspaceNumbersErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListWorkspaceNumbersResponses,
+    ListWorkspaceNumbersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/numbers",
+    ...options,
+  });
+
+/**
+ * List available phone numbers
+ *
+ * Returns phone numbers available for purchase in a country, newest first. Narrow the search with `number_type`, `capabilities`, and `prefix`. Inventory numbers are returned first and support pagination. The final page can include a live snapshot of numbers available from suppliers.
+ */
+export const listAvailableNumbers = <ThrowOnError extends boolean = false>(
+  options: Options<ListAvailableNumbersData, ThrowOnError>,
+): RequestResult<
+  ListAvailableNumbersResponses,
+  ListAvailableNumbersErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListAvailableNumbersResponses,
+    ListAvailableNumbersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/numbers/available",
+    ...options,
+  });
+
+/**
+ * Get an available phone number
+ *
+ * Returns a single phone number available for purchase, whether it is already in inventory or can be acquired for you. Numbers supplied through a carrier remain available only while the carrier has them, so a number listed a moment ago may already be gone. A `404` means the number is currently unavailable for sale.
+ */
+export const getAvailableNumber = <ThrowOnError extends boolean = false>(
+  options: Options<GetAvailableNumberData, ThrowOnError>,
+): RequestResult<
+  GetAvailableNumberResponses,
+  GetAvailableNumberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAvailableNumberResponses,
+    GetAvailableNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/numbers/available/{number}",
+    ...options,
+  });
+
+/**
+ * List your number orders
+ *
+ * Returns your workspace's number orders, newest first. Filter by status to find in-progress or failed orders.
+ */
+export const listNumbersOrders = <ThrowOnError extends boolean = false>(
+  options?: Options<ListNumbersOrdersData, ThrowOnError>,
+): RequestResult<
+  ListNumbersOrdersResponses,
+  ListNumbersOrdersErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListNumbersOrdersResponses,
+    ListNumbersOrdersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/numbers/orders",
+    ...options,
+  });
+
+/**
+ * Create a number order
+ *
+ * Orders a number for your workspace and starts its monthly charge. Pass a
+ * number from `GET /v1/numbers/available`. Whether the number is already in
+ * inventory or acquired from a supplier, the response contains an order.
+ *
+ * Most orders complete immediately and return `201` with `status` of
+ * `completed` and `number_id` populated. Read the number with
+ * `GET /v1/numbers/{number_id}`. An order that cannot complete in the request
+ * returns `202`; poll `GET /v1/numbers/orders/{order_id}` until it is
+ * `completed` or `failed`.
+ *
+ * A `412` means the workspace has not
+ * completed the identity verification required to acquire a sender. Complete
+ * it, then retry.
+ *
+ */
+export const createNumbersOrder = <ThrowOnError extends boolean = false>(
+  options: Options<CreateNumbersOrderData, ThrowOnError>,
+): RequestResult<
+  CreateNumbersOrderResponses,
+  CreateNumbersOrderErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateNumbersOrderResponses,
+    CreateNumbersOrderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/numbers/orders",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get a number order
+ *
+ * Returns a single number order by id, including its current lifecycle state and, once completed, the number it produced.
+ */
+export const getNumbersOrder = <ThrowOnError extends boolean = false>(
+  options: Options<GetNumbersOrderData, ThrowOnError>,
+): RequestResult<
+  GetNumbersOrderResponses,
+  GetNumbersOrderErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetNumbersOrderResponses,
+    GetNumbersOrderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/numbers/orders/{order_id}",
+    ...options,
+  });
+
+/**
+ * Release a dedicated number
+ *
+ * Releases one of your workspace's dedicated numbers and stops its monthly charge. Your workspace can no longer use the number after release. Shared numbers cannot be released because they serve multiple workspaces.
+ */
+export const releaseWorkspaceNumber = <ThrowOnError extends boolean = false>(
+  options: Options<ReleaseWorkspaceNumberData, ThrowOnError>,
+): RequestResult<
+  ReleaseWorkspaceNumberResponses,
+  ReleaseWorkspaceNumberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    ReleaseWorkspaceNumberResponses,
+    ReleaseWorkspaceNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/numbers/{number_id}",
+    ...options,
+  });
+
+/**
+ * Get an allocated number
+ *
+ * Returns a single phone number allocated to your workspace, whether it is a dedicated number you bought or a shared number managed for you. Numbers you have released are no longer returned. An allocated number is not always enough to send from it: some countries also require an approved registration for the sender.
+ */
+export const getWorkspaceNumber = <ThrowOnError extends boolean = false>(
+  options: Options<GetWorkspaceNumberData, ThrowOnError>,
+): RequestResult<
+  GetWorkspaceNumberResponses,
+  GetWorkspaceNumberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWorkspaceNumberResponses,
+    GetWorkspaceNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/numbers/{number_id}",
     ...options,
   });
 

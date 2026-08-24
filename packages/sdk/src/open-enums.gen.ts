@@ -96,6 +96,53 @@ export const LookupPropertyStatus = {
 export type LookupPropertyStatusValue = (typeof LookupPropertyStatus)[keyof typeof LookupPropertyStatus];
 
 /**
+ * Values of NumberCapability known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const NumberCapability = {
+  Mms: "mms",
+  Sms: "sms",
+  Voice: "voice",
+} as const;
+
+/** A known NumberCapability value. */
+export type NumberCapabilityValue = (typeof NumberCapability)[keyof typeof NumberCapability];
+
+/**
+ * Values of NumberType known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const NumberType = {
+  Local: "local",
+  Mobile: "mobile",
+  National: "national",
+  ShortCode: "short_code",
+  ShortCodeFteu: "short_code_fteu",
+  TollFree: "toll_free",
+} as const;
+
+/** A known NumberType value. */
+export type NumberTypeValue = (typeof NumberType)[keyof typeof NumberType];
+
+/**
+ * Values of NumbersOrderStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const NumbersOrderStatus = {
+  Charging: "charging",
+  Completed: "completed",
+  Failed: "failed",
+  Ordering: "ordering",
+  Pending: "pending",
+} as const;
+
+/** A known NumbersOrderStatus value. */
+export type NumbersOrderStatusValue = (typeof NumbersOrderStatus)[keyof typeof NumbersOrderStatus];
+
+/**
  * Values of SMSErrorCode known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -273,6 +320,7 @@ export type VerificationTerminalReasonValue = (typeof VerificationTerminalReason
 export const WhatsAppErrorCode = {
   InsufficientBalance: "insufficient_balance",
   InternalError: "internal_error",
+  MediaRejected: "media_rejected",
   PriceNotFound: "price_not_found",
   RateLimited: "rate_limited",
   RecipientSuppressed: "recipient_suppressed",
