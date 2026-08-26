@@ -1110,6 +1110,7 @@ export type {
   NumberType,
   NumberWritable,
   OrderDesc,
+  OrganizationId,
   PaginationLimit,
   PhoneNumberLookup,
   PhoneNumberLookupRequest,
@@ -1484,6 +1485,9 @@ export type {
   WhatsAppVideo,
   WhatsAppVideoSend,
   WhatsAppVideoWritable,
+  Workspace,
   WorkspaceId,
+  WorkspaceNotificationEmails,
+  WorkspaceWritable,
   XWorkspaceId,
 } from "./types.gen";

@@ -23,7 +23,7 @@ export class WhatsappResourceBase extends Resource {
   }
 
   /**
-   * List WhatsApp messages, newest first, as a cursor page ({data, next_cursor, …}). Each message carries the one content it was built from: a template, or free-form text, image, video, audio, sticker, document or location. Pass next_cursor back as starting_after to fetch the next page. Filter by direction, status, contact phone number, bsuid, template category, or tag. Use whatsapp_get for one message's current state.
+   * List WhatsApp messages, newest first, as a cursor page ({data, next_cursor, …}). Each message carries the one content it was built from: a template, or free-form text, image, video, audio, sticker, document or location. Pass next_cursor back as starting_after to fetch the next page. Filter by direction, status, recipient (to), sender (from), business-scoped user ID (bsuid), template category, or tag. to and from each accept a phone number or a business-scoped user ID; pair either with direction to search a single side of the message. Use whatsapp_get for one message's current state.
    *
    * @example Iterate delivered messages
    * for await (const msg of bird.whatsapp.list({ status: ["delivered"] })) {

@@ -2762,8 +2762,12 @@ export const createVerificationNextChannel = <
  * `image`, `video`, `audio`, `sticker`, `document` or `location`. An inbound
  * message whose content WhatsApp models and we do not carries `unsupported`
  * instead, naming the type rather than reading back empty.
- * Filter by direction, status, contact phone number,
- * business-scoped user ID, template category, tag, or creation time; pass the response's `next_cursor` back as
+ * Filter by direction, status, recipient (`to`), sender (`from`),
+ * business-scoped user ID (`bsuid`), template category, tag, or creation
+ * time. `to` and `from` name the same ends of the message the response
+ * does, and each accepts an E.164 phone number or a business-scoped user
+ * ID. Pair either with `direction` to search a single side of the message.
+ * Pass the response's `next_cursor` back as
  * `starting_after` to fetch the next page. To follow a single message's
  * delivery, use
  * [Get a WhatsApp message](/docs/api/reference/get-whatsapp-message)

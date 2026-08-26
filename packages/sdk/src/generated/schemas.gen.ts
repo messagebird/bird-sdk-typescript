@@ -227,7 +227,7 @@ export const ErrorDetailSchema = {
       type: "string",
       minLength: 1,
       description:
-        "Dotted field path, such as `to[0].email`, `subject`, or `.`.",
+        "Dotted field path, such as `to[0].email`, `subject`, or `.`. When the request was rejected for a query parameter the endpoint does not declare, this carries that parameter's name instead of a field path.\n",
     },
     message: {
       type: "string",
@@ -391,6 +391,13 @@ export const RegionSchema = {
   enum: ["us1", "eu1"],
   description: "Deployment region identifier.",
   example: "us1",
+} as const;
+
+export const OrganizationIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^org_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "org_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const WorkspaceIDSchema = {
@@ -602,6 +609,23 @@ export const CountryCodeSchema = {
   example: "US",
 } as const;
 
+export const WorkspaceNotificationEmailsSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    operational: {
+      type: "array",
+      items: {
+        type: "string",
+        format: "email",
+      },
+      example: ["alerts@example.com"],
+      description:
+        "Addresses for operational notifications about this workspace (sending domain authentication failures, webhook endpoint degradation). When empty, these notifications go to the organization owners. Maximum 10 addresses.",
+    },
+  },
+} as const;
+
 export const TimestampsSchema = {
   type: "object",
   required: ["created_at", "updated_at"],
@@ -621,6 +645,49 @@ export const TimestampsSchema = {
       example: {},
     },
   },
+} as const;
+
+export const WorkspaceSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "id",
+        "organization_id",
+        "name",
+        "notification_emails",
+        "created_at",
+        "updated_at",
+      ],
+      properties: {
+        id: {
+          readOnly: true,
+          $ref: "#/components/schemas/WorkspaceID",
+        },
+        organization_id: {
+          $ref: "#/components/schemas/OrganizationID",
+        },
+        name: {
+          type: "string",
+          minLength: 1,
+          example: "Production",
+        },
+        notification_emails: {
+          $ref: "#/components/schemas/WorkspaceNotificationEmails",
+        },
+        logo_url: {
+          type: ["string", "null"],
+          format: "uri",
+          readOnly: true,
+          description:
+            "HTTPS URL to the current workspace logo. `null` when unset.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
 } as const;
 
 export const APIKeyIDSchema = {
@@ -8580,6 +8647,13 @@ export const WhatsAppEventListSchema = {
   },
 } as const;
 
+export const NumbersDedicatedAllocationIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^nda_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "nda_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const EmailStatsSeriesPeriodSchema = {
   type: "object",
   additionalProperties: false,
@@ -16140,7 +16214,7 @@ export const EventVerifyAttemptDeliveredDataSchema = {
           minLength: 1,
           description:
             "The single address this attempt was dispatched to, an E.164 phone number or an email address.",
-          example: "+15551234567",
+          example: "+14155550100",
         },
         carrier: {
           type: ["string", "null"],
@@ -16282,7 +16356,7 @@ export const EventVerifyAttemptUndeliveredDataSchema = {
           minLength: 1,
           description:
             "The single address this attempt was dispatched to, an E.164 phone number or an email address.",
-          example: "+15551234567",
+          example: "+14155550100",
         },
         reason: {
           $ref: "#/components/schemas/VerificationAttemptFailureReason",
@@ -16293,7 +16367,7 @@ export const EventVerifyAttemptUndeliveredDataSchema = {
           type: ["string", "null"],
           description:
             "Diagnostic text describing the failure, for display only. Null when none was reported.",
-          example: "550: mailbox unavailable",
+          example: "Carrier rejected the message before delivery",
         },
         failed_at: {
           type: "string",
@@ -17613,13 +17687,6 @@ export const NumbersOrderIDSchema = {
   example: "nor_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
-export const NumbersDedicatedAllocationIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^nda_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "nda_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
 export const NumbersOrderSchema = {
   type: "object",
   additionalProperties: false,
@@ -18283,6 +18350,34 @@ export const WebhookEventWritableSchema = {
       "whatsapp.sent": "#/components/schemas/EventWhatsAppSent",
     },
   },
+} as const;
+
+export const WorkspaceWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "organization_id",
+        "name",
+        "notification_emails",
+        "created_at",
+        "updated_at",
+      ],
+      properties: {
+        organization_id: {
+          $ref: "#/components/schemas/OrganizationID",
+        },
+        name: {
+          type: "string",
+          minLength: 1,
+          example: "Production",
+        },
+        notification_emails: {
+          $ref: "#/components/schemas/WorkspaceNotificationEmails",
+        },
+      },
+    },
+  ],
 } as const;
 
 export const RealtimeAppWritableSchema = {

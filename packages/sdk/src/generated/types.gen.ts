@@ -160,7 +160,8 @@ export type WebhookEvent =
 
 export type ErrorDetail = {
   /**
-   * Dotted field path, such as `to[0].email`, `subject`, or `.`.
+   * Dotted field path, such as `to[0].email`, `subject`, or `.`. When the request was rejected for a query parameter the endpoint does not declare, this carries that parameter's name instead of a field path.
+   *
    */
   param: string;
   /**
@@ -282,6 +283,8 @@ export type Error = {
  */
 export type Region = "us1" | "eu1";
 
+export type OrganizationId = string;
+
 export type WorkspaceId = string;
 
 export type ListEnvelope = {
@@ -388,10 +391,28 @@ export type DocsPage = {
  */
 export type CountryCode = string;
 
+export type WorkspaceNotificationEmails = {
+  /**
+   * Addresses for operational notifications about this workspace (sending domain authentication failures, webhook endpoint degradation). When empty, these notifications go to the organization owners. Maximum 10 addresses.
+   */
+  operational?: Array<string>;
+};
+
 export type Timestamps = {
   readonly created_at: string;
   readonly updated_at: string;
 };
+
+export type Workspace = {
+  readonly id: WorkspaceId;
+  organization_id: OrganizationId;
+  name: string;
+  notification_emails: WorkspaceNotificationEmails;
+  /**
+   * HTTPS URL to the current workspace logo. `null` when unset.
+   */
+  readonly logo_url?: string | null;
+} & Timestamps;
 
 export type ApiKeyId = string;
 
@@ -4924,6 +4945,8 @@ export type WhatsAppEventList = {
    */
   data: Array<WhatsAppEvent>;
 };
+
+export type NumbersDedicatedAllocationId = string;
 
 /**
  * The window and bucket grain the response covers, echoed from the request, plus the freshness boundary the data is current to.
@@ -10023,8 +10046,6 @@ export type NumbersOrderStatus =
 
 export type NumbersOrderId = string;
 
-export type NumbersDedicatedAllocationId = string;
-
 export type NumbersOrder = {
   /**
    * Identifier of this purchase order.
@@ -10394,6 +10415,12 @@ export type WebhookEventWritable =
   | ({
       type: "whatsapp.sent";
     } & EventWhatsAppSent);
+
+export type WorkspaceWritable = {
+  organization_id: OrganizationId;
+  name: string;
+  notification_emails: WorkspaceNotificationEmails;
+};
 
 export type RealtimeAppWritable = {
   /**
@@ -12646,7 +12673,7 @@ export type PublishRealtimeAppEventErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -12723,7 +12750,7 @@ export type PublishRealtimeAppBatchErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -12795,6 +12822,11 @@ export type ListRealtimeAppChannelsErrors = {
    */
   404: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -12862,6 +12894,11 @@ export type GetRealtimeAppChannelErrors = {
    */
   404: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -12923,6 +12960,11 @@ export type ListRealtimeAppChannelMembersErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -13000,6 +13042,11 @@ export type DisconnectRealtimeAppMemberErrors = {
    */
   404: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -13076,7 +13123,7 @@ export type SendRealtimeAppMemberEventErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -13164,6 +13211,11 @@ export type ListEmailMessagesErrors = {
    */
   403: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -13231,7 +13283,7 @@ export type CreateEmailMessageErrors = {
    */
   413: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -13303,7 +13355,7 @@ export type CreateEmailMessageBatchErrors = {
    */
   413: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -13355,6 +13407,11 @@ export type GetEmailMessageErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -13423,6 +13480,11 @@ export type CancelEmailMessageErrors = {
    * Resource conflict
    */
   409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -13500,7 +13562,7 @@ export type ListContactsErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -13567,7 +13629,7 @@ export type CreateContactErrors = {
    */
   409: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -13630,7 +13692,7 @@ export type CreateContactBatchErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -13699,6 +13761,11 @@ export type DeleteContactErrors = {
    */
   404: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -13745,6 +13812,11 @@ export type GetContactErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -13816,7 +13888,7 @@ export type UpdateContactErrors = {
    */
   409: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -13871,6 +13943,11 @@ export type ListContactPropertiesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -13935,7 +14012,7 @@ export type CreateContactPropertyErrors = {
    */
   409: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -13987,6 +14064,11 @@ export type GetContactPropertyErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -14056,7 +14138,7 @@ export type UpdateContactPropertyErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -14129,6 +14211,11 @@ export type ArchiveContactPropertyErrors = {
    */
   409: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -14197,6 +14284,11 @@ export type UnarchiveContactPropertyErrors = {
    */
   409: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -14252,6 +14344,11 @@ export type ListAudiencesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -14311,7 +14408,7 @@ export type CreateAudienceErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -14384,6 +14481,11 @@ export type DeleteAudienceErrors = {
    */
   409: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -14431,6 +14533,11 @@ export type GetAudienceErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -14499,7 +14606,7 @@ export type UpdateAudienceErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -14569,6 +14676,11 @@ export type ListAudienceContactsErrors = {
    */
   404: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -14637,7 +14749,7 @@ export type AssignAudienceContactsErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -14710,7 +14822,7 @@ export type UnassignAudienceContactsErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -14782,6 +14894,11 @@ export type UnassignAudienceContactErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -14874,6 +14991,11 @@ export type ListSmsMessagesErrors = {
    */
   403: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -14942,7 +15064,7 @@ export type CreateSmsMessageErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -15010,7 +15132,7 @@ export type CreateSmsMessageBatchErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -15062,6 +15184,11 @@ export type GetSmsMessageErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -15119,6 +15246,11 @@ export type ListSmsMessageEventsErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -15179,6 +15311,11 @@ export type ListSmsTemplatesErrors = {
    */
   403: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -15227,6 +15364,11 @@ export type GetSmsTemplateErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -15298,7 +15440,7 @@ export type ListSmsSuppressionsErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -15362,7 +15504,7 @@ export type CreateSmsSuppressionErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -15436,7 +15578,7 @@ export type DeleteSmsSuppressionErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -15489,6 +15631,11 @@ export type GetSmsSuppressionErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -15560,6 +15707,11 @@ export type ListSmsKeywordRulesErrors = {
    */
   403: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -15627,7 +15779,7 @@ export type CreateSmsKeywordRuleErrors = {
    */
   409: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -15700,7 +15852,7 @@ export type DeleteSmsKeywordRuleErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -15758,6 +15910,11 @@ export type GetSmsKeywordRuleErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -15835,7 +15992,7 @@ export type UpdateSmsKeywordRuleErrors = {
    */
   409: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -15924,7 +16081,7 @@ export type GetSmsStatsSummaryErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -16011,7 +16168,7 @@ export type GetSmsStatsDailyErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -16098,7 +16255,7 @@ export type GetSmsStatsHourlyErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -16183,7 +16340,7 @@ export type GetSmsStatsByOriginatorErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -16268,7 +16425,7 @@ export type GetSmsStatsByCountryErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -16353,7 +16510,7 @@ export type GetSmsStatsByCategoryErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -16438,7 +16595,7 @@ export type GetSmsStatsByErrorCodeErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -16523,7 +16680,7 @@ export type GetSmsStatsByCarrierErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -16608,7 +16765,7 @@ export type GetSmsStatsByTagErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -16675,7 +16832,7 @@ export type GetSmsStatsByStatusErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -16749,7 +16906,7 @@ export type GetSmsInboundStatsSummaryErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -16816,7 +16973,7 @@ export type GetSmsInboundStatsDailyErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -16883,7 +17040,7 @@ export type GetSmsInboundStatsHourlyErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -16954,7 +17111,7 @@ export type GetSmsInboundStatsByCountryErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -17025,7 +17182,7 @@ export type GetSmsInboundStatsByOperatorErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -17096,7 +17253,7 @@ export type GetSmsInboundStatsByNumberErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -17173,7 +17330,7 @@ export type CreatePhoneNumberLookupErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -17250,7 +17407,7 @@ export type CreateEmailLookupErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -17327,7 +17484,7 @@ export type CreateVerificationErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -17404,7 +17561,7 @@ export type CreateVerificationCheckErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -17485,7 +17642,7 @@ export type CreateVerificationNextChannelErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -17551,11 +17708,25 @@ export type ListWhatsAppMessagesData = {
      */
     direction?: MessageDirection;
     /**
-     * Filter by contact phone number (E.164 exact match).
+     * Filter by recipient, exact match. The recipient is the contact on an outbound message and your business number on an inbound one, matching the `to` each message returns. Accepts an E.164 phone number, or a business-scoped user ID to name the contact. Only a contact is ever identified by a business-scoped user ID, so `to=<business-scoped user ID>` matches outbound messages only.
+     *
+     */
+    to?: string;
+    /**
+     * Filter by sender, exact match. The sender is your business number on an outbound message and the contact on an inbound one, matching the `from` each message returns. Accepts an E.164 phone number, or a business-scoped user ID to name the contact. Only a contact is ever identified by a business-scoped user ID, so `from=<business-scoped user ID>` matches inbound messages only.
+     *
+     */
+    from?: string;
+    /**
+     * Deprecated: use `to` or `from` instead, which also match a business-scoped user ID. Filters by contact phone number (E.164 exact match), in either direction.
+     *
+     *
+     * @deprecated
      */
     phone_number?: string;
     /**
-     * Filter by business-scoped user ID (Meta identifier).
+     * Filter by business-scoped user ID (Meta identifier), matching the contact in either direction. `to` and `from` also accept one, but each matches a single end of the message.
+     *
      */
     bsuid?: string;
     /**
@@ -17580,6 +17751,11 @@ export type ListWhatsAppMessagesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -17649,7 +17825,7 @@ export type CreateWhatsAppMessageErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -17701,6 +17877,11 @@ export type GetWhatsAppMessageErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -17760,6 +17941,11 @@ export type ListWhatsAppMessageEventsErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -17852,7 +18038,7 @@ export type GetEmailStatsDailyErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -17948,7 +18134,7 @@ export type GetEmailStatsHourlyErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -18037,7 +18223,7 @@ export type GetEmailStatsByTagErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -18140,7 +18326,7 @@ export type GetEmailStatsSummaryErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -18246,7 +18432,7 @@ export type GetEmailStatsBySendingIpErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -18335,7 +18521,7 @@ export type GetEmailStatsBySendingDomainErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -18420,7 +18606,7 @@ export type GetEmailStatsByCategoryErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -18509,7 +18695,7 @@ export type GetEmailStatsByMailboxProviderErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -18598,7 +18784,7 @@ export type GetEmailStatsByMailboxProviderRegionErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -18687,7 +18873,7 @@ export type GetEmailStatsByRecipientDomainErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -18776,7 +18962,7 @@ export type GetEmailStatsByTemplateErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -18861,7 +19047,7 @@ export type GetEmailStatsByLocationErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -18946,7 +19132,7 @@ export type GetEmailStatsByClientErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -19032,7 +19218,7 @@ export type GetEmailStatsByBounceCodeErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -19112,7 +19298,7 @@ export type GetEmailStatsByComplaintTypeErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -19187,7 +19373,7 @@ export type GetEmailStatsByBroadcastErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -19266,7 +19452,7 @@ export type ListDomainsErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -19333,7 +19519,7 @@ export type CreateDomainErrors = {
    */
   409: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -19405,6 +19591,11 @@ export type DeleteDomainErrors = {
    */
   409: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -19451,6 +19642,11 @@ export type GetDomainErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -19522,7 +19718,7 @@ export type UpdateDomainErrors = {
    */
   409: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -19589,6 +19785,11 @@ export type VerifyDomainErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -19661,7 +19862,7 @@ export type ListMailboxesErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -19728,7 +19929,7 @@ export type CreateMailboxErrors = {
    */
   409: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -19796,7 +19997,7 @@ export type DeleteMailboxErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -19847,6 +20048,11 @@ export type GetMailboxErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -19919,7 +20125,7 @@ export type UpdateMailboxErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -19990,6 +20196,11 @@ export type RestoreMailboxErrors = {
    * Resource conflict
    */
   409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -20064,7 +20275,7 @@ export type GetMailboxStatsErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -20142,7 +20353,7 @@ export type ResumeMailboxErrors = {
    */
   409: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -20211,7 +20422,7 @@ export type ListMailboxReceiveRulesErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -20288,7 +20499,7 @@ export type CreateMailboxReceiveRuleErrors = {
    */
   409: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -20360,6 +20571,11 @@ export type DeleteMailboxReceiveRuleErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -20447,7 +20663,7 @@ export type ListEmailThreadsErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -20525,6 +20741,11 @@ export type DeleteEmailThreadErrors = {
    */
   410: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -20576,6 +20797,11 @@ export type GetEmailThreadErrors = {
    * The resource existed but is no longer available.
    */
   410: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -20649,7 +20875,7 @@ export type UpdateEmailThreadErrors = {
    */
   410: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -20732,7 +20958,7 @@ export type ListEmailThreadMessagesErrors = {
    */
   410: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -20793,6 +21019,11 @@ export type GetEmailThreadMessageErrors = {
    */
   410: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -20849,6 +21080,11 @@ export type GetEmailThreadMessageBodyErrors = {
    */
   410: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -20904,6 +21140,11 @@ export type ListEmailThreadMessageAttachmentsErrors = {
    * The resource existed but is no longer available.
    */
   410: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -20985,7 +21226,7 @@ export type ReplyEmailThreadMessageErrors = {
    */
   410: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -21062,7 +21303,7 @@ export type CreateMailboxMessageErrors = {
    */
   404: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -21114,6 +21355,11 @@ export type ListMailboxLabelsErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -21193,7 +21439,7 @@ export type ListWorkspaceNumbersErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -21272,6 +21518,11 @@ export type ListAvailableNumbersErrors = {
    */
   403: Error;
   /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
    * Rate limit exceeded
    */
   429: Error;
@@ -21325,6 +21576,11 @@ export type GetAvailableNumberErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -21387,6 +21643,11 @@ export type ListNumbersOrdersErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -21463,7 +21724,7 @@ export type CreateNumbersOrderErrors = {
    */
   412: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -21525,6 +21786,11 @@ export type GetNumbersOrderErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -21598,7 +21864,7 @@ export type ReleaseWorkspaceNumberErrors = {
    */
   409: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -21656,6 +21922,11 @@ export type GetWorkspaceNumberErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
@@ -21749,7 +22020,7 @@ export type ListVoiceCallsErrors = {
    */
   403: Error;
   /**
-   * The request has invalid field values or violates a business rule. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
   422: Error;
@@ -21798,6 +22069,11 @@ export type GetVoiceCallErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
   /**
    * Rate limit exceeded
    */
