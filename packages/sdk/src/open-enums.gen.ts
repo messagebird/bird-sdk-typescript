@@ -170,8 +170,10 @@ export type SMSErrorCodeValue = (typeof SMSErrorCode)[keyof typeof SMSErrorCode]
  * these with a `default` branch rather than treating the set as closed.
  */
 export const SMSKeywordOperation = {
+  Confirm: "confirm",
   Custom: "custom",
   Help: "help",
+  Info: "info",
   Start: "start",
   Stop: "stop",
 } as const;

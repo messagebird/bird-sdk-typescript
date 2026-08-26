@@ -2757,11 +2757,26 @@ export type SmsSuppressionCreate = {
 };
 
 /**
- * Action taken when an inbound message matches the rule. `stop` unsubscribes the sender, `start` resubscribes them, `help` sends your support information, and `custom` sends the reply you configured. Built-in compliance rules fix the operation for `stop`, `start`, and `help`. This is an open enum. Accept unrecognized values.
+ * What Bird does when an inbound message matches the rule.
+ *
+ * - `stop` unsubscribes the sender from further messages.
+ * - `start` resubscribes them.
+ * - `help` replies with your support information.
+ * - `info` replies with your program information. It behaves exactly as `help` does and is
+ * separate so a country whose INFO answer must differ from its HELP answer can carry both.
+ * Where Bird ships no `info` rule for a country, INFO is one of that country's `help`
+ * keywords and answers with the `help` reply.
+ * - `confirm` marks a double opt-in reply. It sends nothing today, so answer it from your own
+ * handler.
+ * - `custom` replies with the text you configured and has no other effect.
+ *
+ * Bird's built-in rules fix the operation for `stop`, `start` and `help`; you can change their
+ * reply but not what they do. The same holds for `info` in any country where Bird ships an
+ * `info` rule. This is an open enum. Accept unrecognized values.
  *
  */
 export type SmsKeywordOperation =
-  "stop" | "start" | "help" | "custom" | (string & {});
+  "stop" | "start" | "help" | "info" | "confirm" | "custom" | (string & {});
 
 /**
  * Whether the rule is one of Bird's defaults (`system`) or one your workspace created (`workspace`). A `workspace` rule takes precedence over Bird's default for the same country, so it is how you replace a reply without losing the keywords Bird ships.

@@ -4742,9 +4742,9 @@ export const SMSSuppressionCreateSchema = {
 export const SMSKeywordOperationSchema = {
   type: "string",
   minLength: 1,
-  "x-extensible-enum": ["stop", "start", "help", "custom"],
+  "x-extensible-enum": ["stop", "start", "help", "info", "confirm", "custom"],
   description:
-    "Action taken when an inbound message matches the rule. `stop` unsubscribes the sender, `start` resubscribes them, `help` sends your support information, and `custom` sends the reply you configured. Built-in compliance rules fix the operation for `stop`, `start`, and `help`. This is an open enum. Accept unrecognized values.\n",
+    "What Bird does when an inbound message matches the rule.\n\n- `stop` unsubscribes the sender from further messages.\n- `start` resubscribes them.\n- `help` replies with your support information.\n- `info` replies with your program information. It behaves exactly as `help` does and is\n  separate so a country whose INFO answer must differ from its HELP answer can carry both.\n  Where Bird ships no `info` rule for a country, INFO is one of that country's `help`\n  keywords and answers with the `help` reply.\n- `confirm` marks a double opt-in reply. It sends nothing today, so answer it from your own\n  handler.\n- `custom` replies with the text you configured and has no other effect.\n\nBird's built-in rules fix the operation for `stop`, `start` and `help`; you can change their\nreply but not what they do. The same holds for `info` in any country where Bird ships an\n`info` rule. This is an open enum. Accept unrecognized values.\n",
   example: "stop",
 } as const;
 
