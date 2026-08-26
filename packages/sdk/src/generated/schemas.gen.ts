@@ -101,6 +101,9 @@ export const WebhookEventSchema = {
       $ref: "#/components/schemas/EventSMSUndelivered",
     },
     {
+      $ref: "#/components/schemas/EventSMSSuppressionCreated",
+    },
+    {
       $ref: "#/components/schemas/EventVerifyAttemptDelivered",
     },
     {
@@ -193,6 +196,8 @@ export const WebhookEventSchema = {
       "sms.rejected": "#/components/schemas/EventSMSRejected",
       "sms.sent": "#/components/schemas/EventSMSSent",
       "sms.undelivered": "#/components/schemas/EventSMSUndelivered",
+      "sms_suppression.created":
+        "#/components/schemas/EventSMSSuppressionCreated",
       "verify.attempt.delivered":
         "#/components/schemas/EventVerifyAttemptDelivered",
       "verify.attempt.sent": "#/components/schemas/EventVerifyAttemptSent",
@@ -11696,14 +11701,9 @@ export const SuppressionSchema = {
     reason: {
       type: "string",
       minLength: 1,
-      "x-extensible-enum": [
-        "hard_bounce",
-        "complaint",
-        "unsubscribe",
-        "manual",
-      ],
+      "x-extensible-enum": ["hard_bounce", "complaint", "manual"],
       description:
-        "Why the address is suppressed:\n\n- `hard_bounce`: A delivery permanently failed.\n- `complaint`: The recipient reported a message as spam.\n- `unsubscribe`: The recipient opted out.\n- `manual`: Added through the API or dashboard.\n\nAn address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
+        "Why the address is suppressed:\n\n- `hard_bounce`: A delivery permanently failed.\n- `complaint`: The recipient reported a message as spam.\n- `manual`: Added through the API or dashboard.\n\nAn address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
     },
     origin: {
       type: "string",
@@ -11711,20 +11711,18 @@ export const SuppressionSchema = {
       "x-extensible-enum": [
         "bounce_event",
         "complaint_event",
-        "unsubscribe_event",
-        "unsubscribe_link",
         "api_key",
         "user",
       ],
       description:
-        "How the suppression came to exist:\n\n- `bounce_event`: Created automatically from a hard bounce.\n- `complaint_event`: Created from a spam complaint.\n- `unsubscribe_event`: Created from an unsubscribe reported for a\n  message, such as the recipient's mail client's unsubscribe action.\n- `unsubscribe_link`: The recipient opted out through the unsubscribe\n  page linked from a message.\n- `api_key`: Added through the API with an API key.\n- `user`: Added by a user in the dashboard.\n\nThis list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
+        "How the suppression came to exist:\n\n- `bounce_event`: Created automatically from a hard bounce.\n- `complaint_event`: Created from a spam complaint.\n- `api_key`: Added through the API with an API key.\n- `user`: Added by a user in the dashboard.\n\nThis list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
     },
     applies_to: {
       type: "string",
       minLength: 1,
       "x-extensible-enum": ["all", "non_transactional", "category"],
       description:
-        "Which sends the suppression blocks.\n\n- `all`: blocks every message category, including transactional.\n- `non_transactional`: blocks marketing but allows transactional messages.\n  A recipient who complained or unsubscribed can therefore still receive\n  mail such as password resets.\n- `category`: scopes the block to a preference category and blocks every\n  category until one is set.\n\nThis list grows over time, and any value other than `non_transactional`\nblocks every category, so treat an unknown value as blocking the send.\n",
+        "Which sends the suppression blocks.\n\n- `all`: blocks every message category, including transactional.\n- `non_transactional`: blocks marketing but allows transactional messages.\n  A recipient who complained can therefore still receive\n  mail such as password resets.\n- `category`: scopes the block to a preference category and blocks every\n  category until one is set.\n\nThis list grows over time, and any value other than `non_transactional`\nblocks every category, so treat an unknown value as blocking the send.\n",
     },
     source_email_id: {
       description:
@@ -13966,6 +13964,7 @@ export const WebhookEventTypeSchema = {
     "sms.rejected",
     "sms.sent",
     "sms.undelivered",
+    "sms_suppression.created",
     "verify.attempt.delivered",
     "verify.attempt.sent",
     "verify.attempt.undelivered",
@@ -16162,6 +16161,85 @@ export const EventSMSUndeliveredSchema = {
   },
 } as const;
 
+export const SMSSuppressionCreatedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["sms_suppression.created"],
+  description: "Always `sms_suppression.created` for this event.",
+  example: "sms_suppression.created",
+} as const;
+
+export const EventSMSSuppressionCreatedDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Payload of the sms_suppression.created event.",
+  required: [
+    "suppression_id",
+    "destination",
+    "originator",
+    "reason",
+    "workspace_id",
+  ],
+  properties: {
+    suppression_id: {
+      $ref: "#/components/schemas/SMSSuppressionID",
+      description: "The suppression episode that was opened.",
+      example: "ssu_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    destination: {
+      type: "string",
+      minLength: 2,
+      maxLength: 20,
+      description: "The subscriber, in E.164 format.",
+      example: "+15550001234",
+    },
+    originator: {
+      type: "string",
+      minLength: 1,
+      maxLength: 20,
+      description:
+        "The sender this stops. An SMS suppression is the exact (sender, recipient) pair, so your other senders still reach this subscriber.",
+      example: "+15557654321",
+    },
+    reason: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSSuppressionReason",
+        },
+      ],
+    },
+    workspace_id: {
+      $ref: "#/components/schemas/WorkspaceID",
+      description: "The workspace the suppression belongs to.",
+      example: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+  },
+} as const;
+
+export const EventSMSSuppressionCreatedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A destination was added to the workspace's SMS suppression ledger: a subscriber's STOP, a carrier opt-out, or a manual add.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/SMSSuppressionCreatedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When the episode's opening statement took effect (`effective_at`).",
+      example: {},
+    },
+    data: {
+      $ref: "#/components/schemas/EventSMSSuppressionCreatedData",
+    },
+  },
+} as const;
+
 export const EventVerifyBaseSchema = {
   type: "object",
   description:
@@ -18235,6 +18313,9 @@ export const WebhookEventWritableSchema = {
       $ref: "#/components/schemas/EventSMSUndeliveredWritable",
     },
     {
+      $ref: "#/components/schemas/EventSMSSuppressionCreated",
+    },
+    {
       $ref: "#/components/schemas/EventVerifyAttemptDelivered",
     },
     {
@@ -18327,6 +18408,8 @@ export const WebhookEventWritableSchema = {
       "sms.rejected": "#/components/schemas/EventSMSRejectedWritable",
       "sms.sent": "#/components/schemas/EventSMSSentWritable",
       "sms.undelivered": "#/components/schemas/EventSMSUndeliveredWritable",
+      "sms_suppression.created":
+        "#/components/schemas/EventSMSSuppressionCreated",
       "verify.attempt.delivered":
         "#/components/schemas/EventVerifyAttemptDelivered",
       "verify.attempt.sent": "#/components/schemas/EventVerifyAttemptSent",
@@ -20184,14 +20267,9 @@ export const SuppressionWritableSchema = {
     reason: {
       type: "string",
       minLength: 1,
-      "x-extensible-enum": [
-        "hard_bounce",
-        "complaint",
-        "unsubscribe",
-        "manual",
-      ],
+      "x-extensible-enum": ["hard_bounce", "complaint", "manual"],
       description:
-        "Why the address is suppressed:\n\n- `hard_bounce`: A delivery permanently failed.\n- `complaint`: The recipient reported a message as spam.\n- `unsubscribe`: The recipient opted out.\n- `manual`: Added through the API or dashboard.\n\nAn address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
+        "Why the address is suppressed:\n\n- `hard_bounce`: A delivery permanently failed.\n- `complaint`: The recipient reported a message as spam.\n- `manual`: Added through the API or dashboard.\n\nAn address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
     },
     origin: {
       type: "string",
@@ -20199,20 +20277,18 @@ export const SuppressionWritableSchema = {
       "x-extensible-enum": [
         "bounce_event",
         "complaint_event",
-        "unsubscribe_event",
-        "unsubscribe_link",
         "api_key",
         "user",
       ],
       description:
-        "How the suppression came to exist:\n\n- `bounce_event`: Created automatically from a hard bounce.\n- `complaint_event`: Created from a spam complaint.\n- `unsubscribe_event`: Created from an unsubscribe reported for a\n  message, such as the recipient's mail client's unsubscribe action.\n- `unsubscribe_link`: The recipient opted out through the unsubscribe\n  page linked from a message.\n- `api_key`: Added through the API with an API key.\n- `user`: Added by a user in the dashboard.\n\nThis list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
+        "How the suppression came to exist:\n\n- `bounce_event`: Created automatically from a hard bounce.\n- `complaint_event`: Created from a spam complaint.\n- `api_key`: Added through the API with an API key.\n- `user`: Added by a user in the dashboard.\n\nThis list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
     },
     applies_to: {
       type: "string",
       minLength: 1,
       "x-extensible-enum": ["all", "non_transactional", "category"],
       description:
-        "Which sends the suppression blocks.\n\n- `all`: blocks every message category, including transactional.\n- `non_transactional`: blocks marketing but allows transactional messages.\n  A recipient who complained or unsubscribed can therefore still receive\n  mail such as password resets.\n- `category`: scopes the block to a preference category and blocks every\n  category until one is set.\n\nThis list grows over time, and any value other than `non_transactional`\nblocks every category, so treat an unknown value as blocking the send.\n",
+        "Which sends the suppression blocks.\n\n- `all`: blocks every message category, including transactional.\n- `non_transactional`: blocks marketing but allows transactional messages.\n  A recipient who complained can therefore still receive\n  mail such as password resets.\n- `category`: scopes the block to a preference category and blocks every\n  category until one is set.\n\nThis list grows over time, and any value other than `non_transactional`\nblocks every category, so treat an unknown value as blocking the send.\n",
     },
     source_email_id: {
       description:

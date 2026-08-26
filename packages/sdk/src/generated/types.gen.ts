@@ -110,6 +110,9 @@ export type WebhookEvent =
       type: "sms.undelivered";
     } & EventSmsUndelivered)
   | ({
+      type: "sms_suppression.created";
+    } & EventSmsSuppressionCreated)
+  | ({
       type: "verify.attempt.delivered";
     } & EventVerifyAttemptDelivered)
   | ({
@@ -6611,7 +6614,6 @@ export type Suppression = {
    *
    * - `hard_bounce`: A delivery permanently failed.
    * - `complaint`: The recipient reported a message as spam.
-   * - `unsubscribe`: The recipient opted out.
    * - `manual`: Added through the API or dashboard.
    *
    * An address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.
@@ -6623,10 +6625,6 @@ export type Suppression = {
    *
    * - `bounce_event`: Created automatically from a hard bounce.
    * - `complaint_event`: Created from a spam complaint.
-   * - `unsubscribe_event`: Created from an unsubscribe reported for a
-   * message, such as the recipient's mail client's unsubscribe action.
-   * - `unsubscribe_link`: The recipient opted out through the unsubscribe
-   * page linked from a message.
    * - `api_key`: Added through the API with an API key.
    * - `user`: Added by a user in the dashboard.
    *
@@ -6639,7 +6637,7 @@ export type Suppression = {
    *
    * - `all`: blocks every message category, including transactional.
    * - `non_transactional`: blocks marketing but allows transactional messages.
-   * A recipient who complained or unsubscribed can therefore still receive
+   * A recipient who complained can therefore still receive
    * mail such as password resets.
    * - `category`: scopes the block to a preference category and blocks every
    * category until one is set.
@@ -7892,6 +7890,7 @@ export type WebhookEventType =
   | "sms.rejected"
   | "sms.sent"
   | "sms.undelivered"
+  | "sms_suppression.created"
   | "verify.attempt.delivered"
   | "verify.attempt.sent"
   | "verify.attempt.undelivered"
@@ -9193,6 +9192,46 @@ export type EventSmsUndelivered = {
 };
 
 /**
+ * Always `sms_suppression.created` for this event.
+ */
+export type SmsSuppressionCreatedEventType = "sms_suppression.created";
+
+/**
+ * Payload of the sms_suppression.created event.
+ */
+export type EventSmsSuppressionCreatedData = {
+  /**
+   * The suppression episode that was opened.
+   */
+  suppression_id: SmsSuppressionId;
+  /**
+   * The subscriber, in E.164 format.
+   */
+  destination: string;
+  /**
+   * The sender this stops. An SMS suppression is the exact (sender, recipient) pair, so your other senders still reach this subscriber.
+   */
+  originator: string;
+  reason: SmsSuppressionReason;
+  /**
+   * The workspace the suppression belongs to.
+   */
+  workspace_id: WorkspaceId;
+};
+
+/**
+ * A destination was added to the workspace's SMS suppression ledger: a subscriber's STOP, a carrier opt-out, or a manual add.
+ */
+export type EventSmsSuppressionCreated = {
+  type: SmsSuppressionCreatedEventType;
+  /**
+   * When the episode's opening statement took effect (`effective_at`).
+   */
+  timestamp: string;
+  data: EventSmsSuppressionCreatedData;
+};
+
+/**
  * Identity fields shared by every Verify lifecycle event payload.
  */
 export type EventVerifyBase = {
@@ -10367,6 +10406,9 @@ export type WebhookEventWritable =
   | ({
       type: "sms.undelivered";
     } & EventSmsUndeliveredWritable)
+  | ({
+      type: "sms_suppression.created";
+    } & EventSmsSuppressionCreated)
   | ({
       type: "verify.attempt.delivered";
     } & EventVerifyAttemptDelivered)
@@ -11666,7 +11708,6 @@ export type SuppressionWritable = {
    *
    * - `hard_bounce`: A delivery permanently failed.
    * - `complaint`: The recipient reported a message as spam.
-   * - `unsubscribe`: The recipient opted out.
    * - `manual`: Added through the API or dashboard.
    *
    * An address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.
@@ -11678,10 +11719,6 @@ export type SuppressionWritable = {
    *
    * - `bounce_event`: Created automatically from a hard bounce.
    * - `complaint_event`: Created from a spam complaint.
-   * - `unsubscribe_event`: Created from an unsubscribe reported for a
-   * message, such as the recipient's mail client's unsubscribe action.
-   * - `unsubscribe_link`: The recipient opted out through the unsubscribe
-   * page linked from a message.
    * - `api_key`: Added through the API with an API key.
    * - `user`: Added by a user in the dashboard.
    *
@@ -11694,7 +11731,7 @@ export type SuppressionWritable = {
    *
    * - `all`: blocks every message category, including transactional.
    * - `non_transactional`: blocks marketing but allows transactional messages.
-   * A recipient who complained or unsubscribed can therefore still receive
+   * A recipient who complained can therefore still receive
    * mail such as password resets.
    * - `category`: scopes the block to a preference category and blocks every
    * category until one is set.
