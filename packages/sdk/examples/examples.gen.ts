@@ -571,7 +571,7 @@ console.log(allocated.status, allocated.ownership ?? "no paperwork required");
 
 export async function _ex_81() {
 for await (const allocated of bird.numbers.list({ country_code: "GB" })) {
-  // kind tells a number you bought from one Bird manages for several workspaces.
+  // kind distinguishes a number you bought from one Bird manages.
   console.log(allocated.number, allocated.kind, allocated.status);
 }
 }

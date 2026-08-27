@@ -13,7 +13,7 @@ export class NumbersResourceBase extends Resource {
    *
    * @example List the numbers allocated to you
    * for await (const allocated of bird.numbers.list({ country_code: "GB" })) {
-   *   // kind tells a number you bought from one Bird manages for several workspaces.
+   *   // kind distinguishes a number you bought from one Bird manages.
    *   console.log(allocated.number, allocated.kind, allocated.status);
    * }
    */

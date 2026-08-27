@@ -3711,7 +3711,7 @@ export const listMailboxes = <ThrowOnError extends boolean = false>(
 /**
  * Create a mailbox
  *
- * Creates a mailbox. The address is `local_part@domain`. The domain defaults to `inbox.ai`, Bird's shared mailbox domain, where creating the mailbox claims the address for your organization. It is first come, first served, and reserved to your organization even after the mailbox is deleted. You may instead name one of your own domains that is enabled for receiving email. An omitted local part is generated. On a custom domain, addresses of deleted mailboxes are quarantined. The same workspace can rebind one 30 days after deletion, but other workspaces never can.
+ * Creates a mailbox. The address is `local_part@domain`. The domain defaults to `inbox.ai`, Bird's shared mailbox domain, where creating the mailbox claims the address for your organization. It is first come, first served, and reserved to your organization even after the mailbox is deleted. You may instead name one of your own domains that is enabled for receiving email. An omitted local part is generated. On a custom domain, addresses of deleted mailboxes are quarantined for 30 days and remain reserved for your workspace.
  *
  */
 export const createMailbox = <ThrowOnError extends boolean = false>(
@@ -3741,7 +3741,7 @@ export const createMailbox = <ThrowOnError extends boolean = false>(
 /**
  * Delete a mailbox
  *
- * Deletes a mailbox. The address stops receiving mail immediately and enters quarantine. The same workspace can bind it to a new mailbox after 30 days, but other workspaces never can. The mailbox and its remembered messages are kept for 30 days, so you can bring it back with `POST /email/mailboxes/{mailbox_id}/restore`. Once those 30 days are up they are deleted for good.
+ * Deletes a mailbox. The address stops receiving mail immediately and enters quarantine. After 30 days, your workspace can bind the address to a new mailbox; the address remains reserved to your workspace. The mailbox and its remembered messages are kept for 30 days, so you can bring it back with `POST /email/mailboxes/{mailbox_id}/restore`. Once those 30 days are up they are deleted for good.
  *
  */
 export const deleteMailbox = <ThrowOnError extends boolean = false>(
@@ -4554,7 +4554,7 @@ export const getNumbersOrder = <ThrowOnError extends boolean = false>(
 /**
  * Release a dedicated number
  *
- * Releases one of your workspace's dedicated numbers and stops its monthly charge. Your workspace can no longer use the number after release. Shared numbers cannot be released because they serve multiple workspaces.
+ * Releases one of your workspace's dedicated numbers and stops its monthly charge. Your workspace can no longer use the number after release. Shared numbers belong to Bird-managed shared infrastructure and cannot be released from your workspace.
  */
 export const releaseWorkspaceNumber = <ThrowOnError extends boolean = false>(
   options: Options<ReleaseWorkspaceNumberData, ThrowOnError>,
