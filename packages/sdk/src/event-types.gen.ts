@@ -30,6 +30,9 @@ export const WebhookEventType = {
   EmailScheduled: "email.scheduled",
   EmailSuppressionCreated: "email_suppression.created",
   EmailUnsubscribed: "email.unsubscribed",
+  PreferenceDeleted: "preference.deleted",
+  PreferenceGranted: "preference.granted",
+  PreferenceRevoked: "preference.revoked",
   SmsAccepted: "sms.accepted",
   SmsDelivered: "sms.delivered",
   SmsExpired: "sms.expired",
@@ -55,6 +58,7 @@ export const WebhookEventType = {
   WhatsappReceived: "whatsapp.received",
   WhatsappRejected: "whatsapp.rejected",
   WhatsappSent: "whatsapp.sent",
+  WhatsappSuppressionCreated: "whatsapp_suppression.created",
 } as const;
 
 /** A known webhook event type value. */

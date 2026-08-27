@@ -48,3 +48,11 @@ export async function contactsList() {
   }
   const page = await bird.contacts.list({ limit: 50 }); // page.data, page.next_cursor
 }
+
+export async function contactsPreferencesList() {
+  for await (const preference of bird.contacts.preferences.list(
+    "con_01krdgeqcxet5s7t44vh8rt9mg",
+  )) {
+    console.log(preference.channel, preference.status);
+  }
+}

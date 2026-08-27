@@ -86,6 +86,15 @@ export type WebhookEvent =
       type: "email_suppression.created";
     } & EventEmailSuppressionCreated)
   | ({
+      type: "preference.deleted";
+    } & EventPreferenceDeleted)
+  | ({
+      type: "preference.granted";
+    } & EventPreferenceGranted)
+  | ({
+      type: "preference.revoked";
+    } & EventPreferenceRevoked)
+  | ({
       type: "sms.accepted";
     } & EventSmsAccepted)
   | ({
@@ -159,7 +168,10 @@ export type WebhookEvent =
     } & EventWhatsAppRejected)
   | ({
       type: "whatsapp.sent";
-    } & EventWhatsAppSent);
+    } & EventWhatsAppSent)
+  | ({
+      type: "whatsapp_suppression.created";
+    } & EventWhatsAppSuppressionCreated);
 
 export type ErrorDetail = {
   /**
@@ -1832,6 +1844,136 @@ export type AudienceList = {
    */
   data: Array<Audience>;
 } & ListEnvelope;
+
+export type PreferenceId = string;
+
+/**
+ * The channel a preference statement applies to. A preference addresses one channel: the handle that identifies the person differs per channel, so opting out of one channel says nothing about the others. New channels can be added over time, so a value outside this list can be returned.
+ */
+export type PreferenceChannel = "email" | "sms" | "whatsapp" | (string & {});
+
+/**
+ * What the statement says: `granted` records consent to receive messages, `revoked` records an opt-out. There is no third state: a person who never stated anything simply has no preference on record.
+ */
+export type PreferenceStatus = "granted" | "revoked";
+
+/**
+ * How much traffic the statement covers. `non_transactional` covers marketing and other non-essential messages while transactional messages such as receipts and verification codes keep flowing; `all` covers every message including transactional ones.
+ */
+export type PreferenceCoverage = "all" | "non_transactional";
+
+/**
+ * How the statement was made. Statements the person made themselves (`unsubscribe_link`, `unsubscribe_event`, `keyword`, `preference_page`) carry more weight than ones asserted on their behalf (`api_key`, `user`, `import`): a person's own opt-out cannot be overridden or deleted through this API. New origins can be added over time, so a value outside this list can be returned.
+ */
+export type PreferenceOrigin =
+  | "unsubscribe_link"
+  | "unsubscribe_event"
+  | "keyword"
+  | "preference_page"
+  | "api_key"
+  | "user"
+  | "import"
+  | (string & {});
+
+/**
+ * One person's current stated preference for one channel: whether they have consented to or opted out of receiving messages at a handle, and how much traffic the statement covers. A key holds one current statement (a newer statement replaces it, an older one is refused), and the full history behind the current state is kept internally. `sender_scope` and `topic_id` are part of the key: a preference with both null applies channel-wide.
+ *
+ */
+export type Preference = {
+  readonly id: PreferenceId;
+  readonly channel: PreferenceChannel;
+  /**
+   * Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS and WhatsApp.
+   */
+  readonly handle: string;
+  /**
+   * The sender the statement is limited to, or null when it covers the whole channel. On SMS this is the originator the person replied to; on WhatsApp it identifies the business account that messaged them. Email preferences are always channel-wide, so it is always null there.
+   */
+  readonly sender_scope: string | null;
+  /**
+   * The topic the statement is limited to, or null when it covers every topic. Part of the key that identifies a statement, alongside `sender_scope`.
+   */
+  readonly topic_id: string | null;
+  readonly status: PreferenceStatus;
+  readonly coverage: PreferenceCoverage;
+  /**
+   * When the statement was made, as reported by whoever made it. This is what orders one key's statements: a write dated before this moment is refused rather than applied.
+   */
+  readonly effective_at: string;
+  readonly origin: PreferenceOrigin;
+  /**
+   * Free-form note on where the statement came from, as supplied when it was recorded: a form name, an import batch, a campaign. Null when none was given.
+   */
+  readonly source?: string | null;
+  /**
+   * When the person consented, as evidenced by whoever asserted the grant. Null on statements that carry no consent evidence, including every opt-out.
+   */
+  readonly consented_at?: string | null;
+  /**
+   * The contact whose handle matched when the statement was recorded. Null when no contact matched at that moment; it is not updated when contacts change later.
+   */
+  readonly contact_id?: ContactId | null;
+} & Timestamps;
+
+export type PreferenceList = {
+  /**
+   * Page of preferences, most recently created first.
+   */
+  data: Array<Preference>;
+} & ListEnvelope;
+
+export type PreferenceStatement = {
+  channel: PreferenceChannel;
+  status: PreferenceStatus;
+  /**
+   * How much traffic the statement covers. Defaults to `non_transactional`, which keeps transactional messages such as receipts and verification codes flowing.
+   */
+  coverage?: PreferenceCoverage;
+  /**
+   * Limit the statement to one sender instead of the whole channel. On SMS this is the originator; on WhatsApp it identifies the business account. Not supported on email, where preferences are always channel-wide.
+   */
+  sender_scope?: string;
+  /**
+   * Free-form note on where the statement came from: a form name, an import batch, a campaign. Stored verbatim and returned on the preference.
+   */
+  source?: string;
+  /**
+   * When the person consented, on a `granted` statement. Required evidence when granting over a stored opt-out: the grant applies only if this is later than the opt-out it reverses. May not be in the future.
+   */
+  consented_at?: string;
+};
+
+/**
+ * Records one preference statement for a handle. Writing is an upsert by key (channel, handle, sender scope, and topic), and statements are causally ordered: a statement dated older than the key's current one is refused and returned with `applied: false` rather than applied out of order.
+ *
+ */
+export type PreferenceCreate = {
+  /**
+   * Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS and WhatsApp.
+   */
+  handle: string;
+} & PreferenceStatement;
+
+export type PreferenceTransitionId = string;
+
+/**
+ * The outcome of one preference write or delete. `applied: true` means the request took effect: either it changed the record, or an identical statement already had. `applied: false` means it was refused as older than the key's current statement; `preference` then carries the statement that survived, and `transition_id` identifies the refusal on the key's record.
+ *
+ */
+export type PreferenceWriteResult = {
+  /**
+   * Whether the request took effect. False only when it was refused as out of order; the surviving, newer statement is returned in `preference`.
+   */
+  readonly applied: boolean;
+  /**
+   * Identifies this write on the key's record, for applied and refused requests alike. Null when the write was a repeat of the current statement and recorded nothing new.
+   */
+  readonly transition_id: PreferenceTransitionId | null;
+  /**
+   * The key's surviving statement. Null after an applied delete, when the key is back to having no record.
+   */
+  readonly preference: Preference | null;
+};
 
 export type ContactPropertyId = string;
 
@@ -4968,6 +5110,8 @@ export type WhatsAppEventList = {
 
 export type NumbersDedicatedAllocationId = string;
 
+export type WhatsAppSuppressionId = string;
+
 /**
  * The window and bucket grain the response covers, echoed from the request, plus the freshness boundary the data is current to.
  *
@@ -7899,6 +8043,9 @@ export type WebhookEventType =
   | "email_mailbox.suspended"
   | "email_mailbox.thread_created"
   | "email_suppression.created"
+  | "preference.deleted"
+  | "preference.granted"
+  | "preference.revoked"
   | "sms.accepted"
   | "sms.delivered"
   | "sms.expired"
@@ -7924,6 +8071,7 @@ export type WebhookEventType =
   | "whatsapp.received"
   | "whatsapp.rejected"
   | "whatsapp.sent"
+  | "whatsapp_suppression.created"
   | (string & {});
 
 export type WebhookEndpoint = {
@@ -8933,6 +9081,104 @@ export type EventEmailSuppressionCreated = {
 };
 
 /**
+ * Always `preference.deleted` for this event.
+ */
+export type PreferenceDeletedEventType = "preference.deleted";
+
+/**
+ * Identity fields shared by every preference lifecycle event: the key plus the ledger entry the write appended. `effective_at` is not repeated here: it is the envelope `timestamp`.
+ */
+export type EventPreferenceBase = {
+  /**
+   * The preference key this write applied to.
+   */
+  preference_id: PreferenceId;
+  /**
+   * The ledger entry this write appended.
+   */
+  transition_id: PreferenceTransitionId;
+  channel: PreferenceChannel;
+  /**
+   * Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS and WhatsApp.
+   */
+  handle: string;
+  /**
+   * The sender the statement is limited to, or null when it covers the whole channel. Present-with-null on every payload of this type: it is part of the key alongside `topic_id`, and pinning its presence keeps a subscriber from ever learning `(handle, channel)` as the unique key.
+   */
+  sender_scope: string | null;
+  /**
+   * The topic the statement is limited to, or null when it covers every topic. Reserved: always null in v1. Present-with-null for the same reason as `sender_scope`.
+   */
+  topic_id: string | null;
+  coverage: PreferenceCoverage;
+  /**
+   * The contact whose handle matched when the statement was recorded. Null when no contact matched at that moment.
+   */
+  contact_id: ContactId | null;
+};
+
+/**
+ * Payload of the preference.deleted event.
+ */
+export type EventPreferenceDeletedData = EventPreferenceBase;
+
+/**
+ * A stated preference was deleted, superseding it in the ledger without erasing its history.
+ */
+export type EventPreferenceDeleted = {
+  type: PreferenceDeletedEventType;
+  /**
+   * When the delete took effect (`effective_at`), not when it was recorded.
+   */
+  timestamp: string;
+  data: EventPreferenceDeletedData;
+};
+
+/**
+ * Always `preference.granted` for this event.
+ */
+export type PreferenceGrantedEventType = "preference.granted";
+
+/**
+ * Payload of the preference.granted event.
+ */
+export type EventPreferenceGrantedData = EventPreferenceBase;
+
+/**
+ * A stated preference was granted (a person consented, or a customer wrote a grant) and became the key's live statement.
+ */
+export type EventPreferenceGranted = {
+  type: PreferenceGrantedEventType;
+  /**
+   * When the statement took effect (`effective_at`), not when it was recorded.
+   */
+  timestamp: string;
+  data: EventPreferenceGrantedData;
+};
+
+/**
+ * Always `preference.revoked` for this event.
+ */
+export type PreferenceRevokedEventType = "preference.revoked";
+
+/**
+ * Payload of the preference.revoked event.
+ */
+export type EventPreferenceRevokedData = EventPreferenceBase;
+
+/**
+ * A stated preference was revoked (a person opted out, or a customer wrote a revoke) and became the key's live statement.
+ */
+export type EventPreferenceRevoked = {
+  type: PreferenceRevokedEventType;
+  /**
+   * When the statement took effect (`effective_at`), not when it was recorded.
+   */
+  timestamp: string;
+  data: EventPreferenceRevokedData;
+};
+
+/**
  * Identity fields shared by every SMS lifecycle event payload.
  */
 export type EventSmsBase = {
@@ -9871,6 +10117,50 @@ export type EventWhatsAppSent = {
   data: EventWhatsAppSentData;
 };
 
+/**
+ * Always `whatsapp_suppression.created` for this event.
+ */
+export type WhatsAppSuppressionCreatedEventType =
+  "whatsapp_suppression.created";
+
+/**
+ * Payload of the whatsapp_suppression.created event.
+ */
+export type EventWhatsAppSuppressionCreatedData = {
+  /**
+   * The suppression episode that was opened.
+   */
+  suppression_id: WhatsAppSuppressionId;
+  /**
+   * The suppressed WhatsApp address. For a phone number this is canonical E.164 with a leading plus sign, such as `+5511977670804`.
+   */
+  address: string;
+  /**
+   * The WhatsApp Business Account the suppression is limited to, identified by its WhatsApp-issued account ID, or null when it covers the whole workspace.
+   */
+  waba: string | null;
+  /**
+   * Why the address is suppressed. `manual` means it was added directly rather than created automatically from a delivery outcome. This list grows over time, so treat an unknown value as informational rather than rejecting the record.
+   */
+  reason: string;
+  /**
+   * The workspace the suppression belongs to.
+   */
+  workspace_id: WorkspaceId;
+};
+
+/**
+ * An address was added to the workspace's WhatsApp suppression ledger.
+ */
+export type EventWhatsAppSuppressionCreated = {
+  type: WhatsAppSuppressionCreatedEventType;
+  /**
+   * When the episode's opening statement took effect (`effective_at`).
+   */
+  timestamp: string;
+  data: EventWhatsAppSuppressionCreatedData;
+};
+
 export type WebhookTestResponse = {
   /**
    * Whether your endpoint accepted the test event. `delivered` means it returned a `2xx` status; `failed` means it returned a non-`2xx` status or could not be reached (see `error` for the latter).
@@ -10404,6 +10694,15 @@ export type WebhookEventWritable =
       type: "email_suppression.created";
     } & EventEmailSuppressionCreated)
   | ({
+      type: "preference.deleted";
+    } & EventPreferenceDeleted)
+  | ({
+      type: "preference.granted";
+    } & EventPreferenceGranted)
+  | ({
+      type: "preference.revoked";
+    } & EventPreferenceRevoked)
+  | ({
       type: "sms.accepted";
     } & EventSmsAcceptedWritable)
   | ({
@@ -10477,7 +10776,10 @@ export type WebhookEventWritable =
     } & EventWhatsAppRejectedWritable)
   | ({
       type: "whatsapp.sent";
-    } & EventWhatsAppSent);
+    } & EventWhatsAppSent)
+  | ({
+      type: "whatsapp_suppression.created";
+    } & EventWhatsAppSuppressionCreated);
 
 export type WorkspaceWritable = {
   organization_id: OrganizationId;
@@ -10848,6 +11150,13 @@ export type AudienceListWritable = {
    * Page of audience objects.
    */
   data: Array<AudienceWritable>;
+} & ListEnvelope;
+
+export type PreferenceListWritable = {
+  /**
+   * Page of preferences, most recently created first.
+   */
+  data: Array<unknown>;
 } & ListEnvelope;
 
 export type ContactPropertyWritable = {
@@ -13971,6 +14280,329 @@ export type UpdateContactResponses = {
 
 export type UpdateContactResponse =
   UpdateContactResponses[keyof UpdateContactResponses];
+
+export type ListContactPreferencesData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the contact.
+     */
+    contact_id: ContactId;
+  };
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/contacts/{contact_id}/preferences";
+};
+
+export type ListContactPreferencesErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListContactPreferencesError =
+  ListContactPreferencesErrors[keyof ListContactPreferencesErrors];
+
+export type ListContactPreferencesResponses = {
+  /**
+   * Paginated list of the contact's preferences.
+   */
+  200: PreferenceList;
+};
+
+export type ListContactPreferencesResponse =
+  ListContactPreferencesResponses[keyof ListContactPreferencesResponses];
+
+export type ListPreferencesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Return only preferences on this channel.
+     */
+    channel?: PreferenceChannel;
+    /**
+     * Return only preferences for this exact handle: an email address or an E.164 phone number. Requires `channel`, since a handle only means something on its channel.
+     *
+     */
+    handle?: string;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/preferences";
+};
+
+export type ListPreferencesErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListPreferencesError =
+  ListPreferencesErrors[keyof ListPreferencesErrors];
+
+export type ListPreferencesResponses = {
+  /**
+   * Paginated list of preferences.
+   */
+  200: PreferenceList;
+};
+
+export type ListPreferencesResponse =
+  ListPreferencesResponses[keyof ListPreferencesResponses];
+
+export type CreatePreferenceData = {
+  body: PreferenceCreate;
+  headers?: {
+    /**
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/preferences";
+};
+
+export type CreatePreferenceErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type CreatePreferenceError =
+  CreatePreferenceErrors[keyof CreatePreferenceErrors];
+
+export type CreatePreferenceResponses = {
+  /**
+   * The key already had a record. The result says whether this statement replaced it, repeated it, or was refused as out of order.
+   */
+  200: PreferenceWriteResult;
+  /**
+   * The key had no record; this statement created one.
+   */
+  201: PreferenceWriteResult;
+};
+
+export type CreatePreferenceResponse =
+  CreatePreferenceResponses[keyof CreatePreferenceResponses];
+
+export type DeletePreferenceData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the preference, as returned when it was recorded or listed. The ID stays stable while the key holds a record; deleting and re-recording the same key mints a new one.
+     *
+     */
+    preference_id: PreferenceId;
+  };
+  query?: never;
+  url: "/v1/preferences/{preference_id}";
+};
+
+export type DeletePreferenceErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type DeletePreferenceError =
+  DeletePreferenceErrors[keyof DeletePreferenceErrors];
+
+export type DeletePreferenceResponses = {
+  /**
+   * The outcome. `applied: true` with a null `preference` means the record is gone; `applied: false` means a newer statement survived the delete and is returned.
+   */
+  200: PreferenceWriteResult;
+};
+
+export type DeletePreferenceResponse =
+  DeletePreferenceResponses[keyof DeletePreferenceResponses];
+
+export type GetPreferenceData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the preference, as returned when it was recorded or listed. The ID stays stable while the key holds a record; deleting and re-recording the same key mints a new one.
+     *
+     */
+    preference_id: PreferenceId;
+  };
+  query?: never;
+  url: "/v1/preferences/{preference_id}";
+};
+
+export type GetPreferenceErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetPreferenceError = GetPreferenceErrors[keyof GetPreferenceErrors];
+
+export type GetPreferenceResponses = {
+  /**
+   * Preference.
+   */
+  200: Preference;
+};
+
+export type GetPreferenceResponse =
+  GetPreferenceResponses[keyof GetPreferenceResponses];
 
 export type ListContactPropertiesData = {
   body?: never;

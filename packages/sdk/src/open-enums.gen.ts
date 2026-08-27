@@ -143,6 +143,38 @@ export const NumbersOrderStatus = {
 export type NumbersOrderStatusValue = (typeof NumbersOrderStatus)[keyof typeof NumbersOrderStatus];
 
 /**
+ * Values of PreferenceChannel known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const PreferenceChannel = {
+  Email: "email",
+  Sms: "sms",
+  Whatsapp: "whatsapp",
+} as const;
+
+/** A known PreferenceChannel value. */
+export type PreferenceChannelValue = (typeof PreferenceChannel)[keyof typeof PreferenceChannel];
+
+/**
+ * Values of PreferenceOrigin known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const PreferenceOrigin = {
+  ApiKey: "api_key",
+  Import: "import",
+  Keyword: "keyword",
+  PreferencePage: "preference_page",
+  UnsubscribeEvent: "unsubscribe_event",
+  UnsubscribeLink: "unsubscribe_link",
+  User: "user",
+} as const;
+
+/** A known PreferenceOrigin value. */
+export type PreferenceOriginValue = (typeof PreferenceOrigin)[keyof typeof PreferenceOrigin];
+
+/**
  * Values of SMSErrorCode known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.

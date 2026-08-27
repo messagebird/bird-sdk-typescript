@@ -77,6 +77,15 @@ export const WebhookEventSchema = {
       $ref: "#/components/schemas/EventEmailSuppressionCreated",
     },
     {
+      $ref: "#/components/schemas/EventPreferenceDeleted",
+    },
+    {
+      $ref: "#/components/schemas/EventPreferenceGranted",
+    },
+    {
+      $ref: "#/components/schemas/EventPreferenceRevoked",
+    },
+    {
       $ref: "#/components/schemas/EventSMSAccepted",
     },
     {
@@ -151,6 +160,9 @@ export const WebhookEventSchema = {
     {
       $ref: "#/components/schemas/EventWhatsAppSent",
     },
+    {
+      $ref: "#/components/schemas/EventWhatsAppSuppressionCreated",
+    },
   ],
   discriminator: {
     propertyName: "type",
@@ -188,6 +200,9 @@ export const WebhookEventSchema = {
         "#/components/schemas/EventEmailMailboxThreadCreated",
       "email_suppression.created":
         "#/components/schemas/EventEmailSuppressionCreated",
+      "preference.deleted": "#/components/schemas/EventPreferenceDeleted",
+      "preference.granted": "#/components/schemas/EventPreferenceGranted",
+      "preference.revoked": "#/components/schemas/EventPreferenceRevoked",
       "sms.accepted": "#/components/schemas/EventSMSAccepted",
       "sms.delivered": "#/components/schemas/EventSMSDelivered",
       "sms.expired": "#/components/schemas/EventSMSExpired",
@@ -219,6 +234,8 @@ export const WebhookEventSchema = {
       "whatsapp.received": "#/components/schemas/EventWhatsAppReceived",
       "whatsapp.rejected": "#/components/schemas/EventWhatsAppRejected",
       "whatsapp.sent": "#/components/schemas/EventWhatsAppSent",
+      "whatsapp_suppression.created":
+        "#/components/schemas/EventWhatsAppSuppressionCreated",
     },
   },
 } as const;
@@ -3131,6 +3148,317 @@ export const AudienceListSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
+} as const;
+
+export const PreferenceIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^prf_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "prf_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const PreferenceChannelSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "The channel a preference statement applies to. A preference addresses one channel: the handle that identifies the person differs per channel, so opting out of one channel says nothing about the others. New channels can be added over time, so a value outside this list can be returned.",
+  "x-extensible-enum": ["email", "sms", "whatsapp"],
+  example: "sms",
+} as const;
+
+export const PreferenceStatusSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "What the statement says: `granted` records consent to receive messages, `revoked` records an opt-out. There is no third state: a person who never stated anything simply has no preference on record.",
+  enum: ["granted", "revoked"],
+  example: "revoked",
+} as const;
+
+export const PreferenceCoverageSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "How much traffic the statement covers. `non_transactional` covers marketing and other non-essential messages while transactional messages such as receipts and verification codes keep flowing; `all` covers every message including transactional ones.",
+  enum: ["all", "non_transactional"],
+  example: "non_transactional",
+} as const;
+
+export const PreferenceOriginSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "How the statement was made. Statements the person made themselves (`unsubscribe_link`, `unsubscribe_event`, `keyword`, `preference_page`) carry more weight than ones asserted on their behalf (`api_key`, `user`, `import`): a person's own opt-out cannot be overridden or deleted through this API. New origins can be added over time, so a value outside this list can be returned.",
+  "x-extensible-enum": [
+    "unsubscribe_link",
+    "unsubscribe_event",
+    "keyword",
+    "preference_page",
+    "api_key",
+    "user",
+    "import",
+  ],
+  example: "api_key",
+} as const;
+
+export const PreferenceSchema = {
+  description:
+    "One person's current stated preference for one channel: whether they have consented to or opted out of receiving messages at a handle, and how much traffic the statement covers. A key holds one current statement (a newer statement replaces it, an older one is refused), and the full history behind the current state is kept internally. `sender_scope` and `topic_id` are part of the key: a preference with both null applies channel-wide.\n",
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "id",
+        "channel",
+        "handle",
+        "sender_scope",
+        "topic_id",
+        "status",
+        "coverage",
+        "effective_at",
+        "origin",
+      ],
+      properties: {
+        id: {
+          readOnly: true,
+          $ref: "#/components/schemas/PreferenceID",
+        },
+        channel: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/PreferenceChannel",
+            },
+          ],
+          readOnly: true,
+        },
+        handle: {
+          type: "string",
+          minLength: 1,
+          maxLength: 320,
+          readOnly: true,
+          description:
+            "Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS and WhatsApp.",
+          example: "+15550001234",
+        },
+        sender_scope: {
+          type: ["string", "null"],
+          readOnly: true,
+          description:
+            "The sender the statement is limited to, or null when it covers the whole channel. On SMS this is the originator the person replied to; on WhatsApp it identifies the business account that messaged them. Email preferences are always channel-wide, so it is always null there.",
+          example: "+15557654321",
+        },
+        topic_id: {
+          type: ["string", "null"],
+          readOnly: true,
+          description:
+            "The topic the statement is limited to, or null when it covers every topic. Part of the key that identifies a statement, alongside `sender_scope`.",
+          example: null,
+        },
+        status: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/PreferenceStatus",
+            },
+          ],
+          readOnly: true,
+        },
+        coverage: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/PreferenceCoverage",
+            },
+          ],
+          readOnly: true,
+        },
+        effective_at: {
+          type: "string",
+          format: "date-time",
+          minLength: 1,
+          readOnly: true,
+          description:
+            "When the statement was made, as reported by whoever made it. This is what orders one key's statements: a write dated before this moment is refused rather than applied.",
+        },
+        origin: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/PreferenceOrigin",
+            },
+          ],
+          readOnly: true,
+        },
+        source: {
+          type: ["string", "null"],
+          maxLength: 255,
+          readOnly: true,
+          description:
+            "Free-form note on where the statement came from, as supplied when it was recorded: a form name, an import batch, a campaign. Null when none was given.",
+          example: "signup-form-v2",
+        },
+        consented_at: {
+          type: ["string", "null"],
+          format: "date-time",
+          readOnly: true,
+          description:
+            "When the person consented, as evidenced by whoever asserted the grant. Null on statements that carry no consent evidence, including every opt-out.",
+        },
+        contact_id: {
+          oneOf: [
+            {
+              $ref: "#/components/schemas/ContactID",
+            },
+            {
+              type: "null",
+            },
+          ],
+          readOnly: true,
+          description:
+            "The contact whose handle matched when the statement was recorded. Null when no contact matched at that moment; it is not updated when contacts change later.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+} as const;
+
+export const PreferenceListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of preferences, most recently created first.",
+          items: {
+            $ref: "#/components/schemas/Preference",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const PreferenceStatementSchema = {
+  type: "object",
+  required: ["channel", "status"],
+  properties: {
+    channel: {
+      $ref: "#/components/schemas/PreferenceChannel",
+    },
+    status: {
+      $ref: "#/components/schemas/PreferenceStatus",
+    },
+    coverage: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/PreferenceCoverage",
+        },
+      ],
+      default: "non_transactional",
+      description:
+        "How much traffic the statement covers. Defaults to `non_transactional`, which keeps transactional messages such as receipts and verification codes flowing.",
+    },
+    sender_scope: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "Limit the statement to one sender instead of the whole channel. On SMS this is the originator; on WhatsApp it identifies the business account. Not supported on email, where preferences are always channel-wide.",
+      example: "+15557654321",
+    },
+    source: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "Free-form note on where the statement came from: a form name, an import batch, a campaign. Stored verbatim and returned on the preference.",
+      example: "signup-form-v2",
+    },
+    consented_at: {
+      type: "string",
+      format: "date-time",
+      description:
+        "When the person consented, on a `granted` statement. Required evidence when granting over a stored opt-out: the grant applies only if this is later than the opt-out it reverses. May not be in the future.",
+    },
+  },
+} as const;
+
+export const PreferenceCreateSchema = {
+  description:
+    "Records one preference statement for a handle. Writing is an upsert by key (channel, handle, sender scope, and topic), and statements are causally ordered: a statement dated older than the key's current one is refused and returned with `applied: false` rather than applied out of order.\n",
+  allOf: [
+    {
+      type: "object",
+      required: ["handle"],
+      properties: {
+        handle: {
+          type: "string",
+          minLength: 1,
+          maxLength: 320,
+          description:
+            "Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS and WhatsApp.",
+          example: "+15550001234",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/PreferenceStatement",
+    },
+  ],
+} as const;
+
+export const PreferenceTransitionIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^prt_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "prt_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const PreferenceWriteResultSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The outcome of one preference write or delete. `applied: true` means the request took effect: either it changed the record, or an identical statement already had. `applied: false` means it was refused as older than the key's current statement; `preference` then carries the statement that survived, and `transition_id` identifies the refusal on the key's record.\n",
+  required: ["applied", "transition_id", "preference"],
+  properties: {
+    applied: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether the request took effect. False only when it was refused as out of order; the surviving, newer statement is returned in `preference`.",
+    },
+    transition_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/PreferenceTransitionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Identifies this write on the key's record, for applied and refused requests alike. Null when the write was a repeat of the current statement and recorded nothing new.",
+    },
+    preference: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Preference",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The key's surviving statement. Null after an applied delete, when the key is back to having no record.",
+    },
+  },
 } as const;
 
 export const ContactPropertyIDSchema = {
@@ -8659,6 +8987,13 @@ export const NumbersDedicatedAllocationIDSchema = {
   example: "nda_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const WhatsAppSuppressionIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^was_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "was_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const EmailStatsSeriesPeriodSchema = {
   type: "object",
   additionalProperties: false,
@@ -13956,6 +14291,9 @@ export const WebhookEventTypeSchema = {
     "email_mailbox.suspended",
     "email_mailbox.thread_created",
     "email_suppression.created",
+    "preference.deleted",
+    "preference.granted",
+    "preference.revoked",
     "sms.accepted",
     "sms.delivered",
     "sms.expired",
@@ -13981,6 +14319,7 @@ export const WebhookEventTypeSchema = {
     "whatsapp.received",
     "whatsapp.rejected",
     "whatsapp.sent",
+    "whatsapp_suppression.created",
   ],
 } as const;
 
@@ -15684,6 +16023,206 @@ export const EventEmailSuppressionCreatedSchema = {
   },
 } as const;
 
+export const PreferenceDeletedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["preference.deleted"],
+  description: "Always `preference.deleted` for this event.",
+  example: "preference.deleted",
+} as const;
+
+export const EventPreferenceBaseSchema = {
+  type: "object",
+  description:
+    "Identity fields shared by every preference lifecycle event: the key plus the ledger entry the write appended. `effective_at` is not repeated here: it is the envelope `timestamp`.",
+  required: [
+    "preference_id",
+    "transition_id",
+    "channel",
+    "handle",
+    "sender_scope",
+    "topic_id",
+    "coverage",
+    "contact_id",
+  ],
+  properties: {
+    preference_id: {
+      $ref: "#/components/schemas/PreferenceID",
+      description: "The preference key this write applied to.",
+      example: "prf_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    transition_id: {
+      $ref: "#/components/schemas/PreferenceTransitionID",
+      description: "The ledger entry this write appended.",
+      example: "prt_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    channel: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/PreferenceChannel",
+        },
+      ],
+    },
+    handle: {
+      type: "string",
+      minLength: 1,
+      maxLength: 320,
+      description:
+        "Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS and WhatsApp.",
+      example: "+15550001234",
+    },
+    sender_scope: {
+      type: ["string", "null"],
+      description:
+        "The sender the statement is limited to, or null when it covers the whole channel. Present-with-null on every payload of this type: it is part of the key alongside `topic_id`, and pinning its presence keeps a subscriber from ever learning `(handle, channel)` as the unique key.",
+      example: "+15557654321",
+    },
+    topic_id: {
+      type: ["string", "null"],
+      description:
+        "The topic the statement is limited to, or null when it covers every topic. Reserved: always null in v1. Present-with-null for the same reason as `sender_scope`.",
+      example: null,
+    },
+    coverage: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/PreferenceCoverage",
+        },
+      ],
+    },
+    contact_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/ContactID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The contact whose handle matched when the statement was recorded. Null when no contact matched at that moment.",
+    },
+  },
+} as const;
+
+export const EventPreferenceDeletedDataSchema = {
+  type: "object",
+  description: "Payload of the preference.deleted event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventPreferenceBase",
+    },
+  ],
+} as const;
+
+export const EventPreferenceDeletedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A stated preference was deleted, superseding it in the ledger without erasing its history.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/PreferenceDeletedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When the delete took effect (`effective_at`), not when it was recorded.",
+      example: {},
+    },
+    data: {
+      $ref: "#/components/schemas/EventPreferenceDeletedData",
+    },
+  },
+} as const;
+
+export const PreferenceGrantedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["preference.granted"],
+  description: "Always `preference.granted` for this event.",
+  example: "preference.granted",
+} as const;
+
+export const EventPreferenceGrantedDataSchema = {
+  type: "object",
+  description: "Payload of the preference.granted event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventPreferenceBase",
+    },
+  ],
+} as const;
+
+export const EventPreferenceGrantedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A stated preference was granted (a person consented, or a customer wrote a grant) and became the key's live statement.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/PreferenceGrantedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When the statement took effect (`effective_at`), not when it was recorded.",
+      example: {},
+    },
+    data: {
+      $ref: "#/components/schemas/EventPreferenceGrantedData",
+    },
+  },
+} as const;
+
+export const PreferenceRevokedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["preference.revoked"],
+  description: "Always `preference.revoked` for this event.",
+  example: "preference.revoked",
+} as const;
+
+export const EventPreferenceRevokedDataSchema = {
+  type: "object",
+  description: "Payload of the preference.revoked event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventPreferenceBase",
+    },
+  ],
+} as const;
+
+export const EventPreferenceRevokedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A stated preference was revoked (a person opted out, or a customer wrote a revoke) and became the key's live statement.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/PreferenceRevokedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When the statement took effect (`effective_at`), not when it was recorded.",
+      example: {},
+    },
+    data: {
+      $ref: "#/components/schemas/EventPreferenceRevokedData",
+    },
+  },
+} as const;
+
 export const EventSMSBaseSchema = {
   type: "object",
   description: "Identity fields shared by every SMS lifecycle event payload.",
@@ -17346,6 +17885,77 @@ export const EventWhatsAppSentSchema = {
   },
 } as const;
 
+export const WhatsAppSuppressionCreatedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["whatsapp_suppression.created"],
+  description: "Always `whatsapp_suppression.created` for this event.",
+  example: "whatsapp_suppression.created",
+} as const;
+
+export const EventWhatsAppSuppressionCreatedDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Payload of the whatsapp_suppression.created event.",
+  required: ["suppression_id", "address", "waba", "reason", "workspace_id"],
+  properties: {
+    suppression_id: {
+      $ref: "#/components/schemas/WhatsAppSuppressionID",
+      description: "The suppression episode that was opened.",
+      example: "was_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    address: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The suppressed WhatsApp address. For a phone number this is canonical E.164 with a leading plus sign, such as `+5511977670804`.",
+      example: "+5511977670804",
+    },
+    waba: {
+      type: ["string", "null"],
+      description:
+        "The WhatsApp Business Account the suppression is limited to, identified by its WhatsApp-issued account ID, or null when it covers the whole workspace.",
+      example: null,
+    },
+    reason: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": ["manual"],
+      description:
+        "Why the address is suppressed. `manual` means it was added directly rather than created automatically from a delivery outcome. This list grows over time, so treat an unknown value as informational rather than rejecting the record.",
+    },
+    workspace_id: {
+      $ref: "#/components/schemas/WorkspaceID",
+      description: "The workspace the suppression belongs to.",
+      example: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+  },
+} as const;
+
+export const EventWhatsAppSuppressionCreatedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An address was added to the workspace's WhatsApp suppression ledger.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/WhatsAppSuppressionCreatedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When the episode's opening statement took effect (`effective_at`).",
+      example: {},
+    },
+    data: {
+      $ref: "#/components/schemas/EventWhatsAppSuppressionCreatedData",
+    },
+  },
+} as const;
+
 export const WebhookTestResponseSchema = {
   type: "object",
   additionalProperties: false,
@@ -18299,6 +18909,15 @@ export const WebhookEventWritableSchema = {
       $ref: "#/components/schemas/EventEmailSuppressionCreated",
     },
     {
+      $ref: "#/components/schemas/EventPreferenceDeleted",
+    },
+    {
+      $ref: "#/components/schemas/EventPreferenceGranted",
+    },
+    {
+      $ref: "#/components/schemas/EventPreferenceRevoked",
+    },
+    {
       $ref: "#/components/schemas/EventSMSAcceptedWritable",
     },
     {
@@ -18373,6 +18992,9 @@ export const WebhookEventWritableSchema = {
     {
       $ref: "#/components/schemas/EventWhatsAppSent",
     },
+    {
+      $ref: "#/components/schemas/EventWhatsAppSuppressionCreated",
+    },
   ],
   discriminator: {
     propertyName: "type",
@@ -18410,6 +19032,9 @@ export const WebhookEventWritableSchema = {
         "#/components/schemas/EventEmailMailboxThreadCreated",
       "email_suppression.created":
         "#/components/schemas/EventEmailSuppressionCreated",
+      "preference.deleted": "#/components/schemas/EventPreferenceDeleted",
+      "preference.granted": "#/components/schemas/EventPreferenceGranted",
+      "preference.revoked": "#/components/schemas/EventPreferenceRevoked",
       "sms.accepted": "#/components/schemas/EventSMSAcceptedWritable",
       "sms.delivered": "#/components/schemas/EventSMSDeliveredWritable",
       "sms.expired": "#/components/schemas/EventSMSExpiredWritable",
@@ -18441,6 +19066,8 @@ export const WebhookEventWritableSchema = {
       "whatsapp.received": "#/components/schemas/EventWhatsAppReceivedWritable",
       "whatsapp.rejected": "#/components/schemas/EventWhatsAppRejectedWritable",
       "whatsapp.sent": "#/components/schemas/EventWhatsAppSent",
+      "whatsapp_suppression.created":
+        "#/components/schemas/EventWhatsAppSuppressionCreated",
     },
   },
 } as const;
@@ -19080,6 +19707,24 @@ export const AudienceListWritableSchema = {
           items: {
             $ref: "#/components/schemas/AudienceWritable",
           },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const PreferenceListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of preferences, most recently created first.",
         },
       },
     },

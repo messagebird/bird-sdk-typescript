@@ -57,6 +57,9 @@ import type {
   CreatePhoneNumberLookupData,
   CreatePhoneNumberLookupErrors,
   CreatePhoneNumberLookupResponses,
+  CreatePreferenceData,
+  CreatePreferenceErrors,
+  CreatePreferenceResponses,
   CreateSmsKeywordRuleData,
   CreateSmsKeywordRuleErrors,
   CreateSmsKeywordRuleResponses,
@@ -99,6 +102,9 @@ import type {
   DeleteMailboxReceiveRuleErrors,
   DeleteMailboxReceiveRuleResponses,
   DeleteMailboxResponses,
+  DeletePreferenceData,
+  DeletePreferenceErrors,
+  DeletePreferenceResponses,
   DeleteSmsKeywordRuleData,
   DeleteSmsKeywordRuleErrors,
   DeleteSmsKeywordRuleResponses,
@@ -192,6 +198,9 @@ import type {
   GetNumbersOrderData,
   GetNumbersOrderErrors,
   GetNumbersOrderResponses,
+  GetPreferenceData,
+  GetPreferenceErrors,
+  GetPreferenceResponses,
   GetRealtimeAppChannelData,
   GetRealtimeAppChannelErrors,
   GetRealtimeAppChannelResponses,
@@ -273,6 +282,9 @@ import type {
   ListAvailableNumbersData,
   ListAvailableNumbersErrors,
   ListAvailableNumbersResponses,
+  ListContactPreferencesData,
+  ListContactPreferencesErrors,
+  ListContactPreferencesResponses,
   ListContactPropertiesData,
   ListContactPropertiesErrors,
   ListContactPropertiesResponses,
@@ -306,6 +318,9 @@ import type {
   ListNumbersOrdersData,
   ListNumbersOrdersErrors,
   ListNumbersOrdersResponses,
+  ListPreferencesData,
+  ListPreferencesErrors,
+  ListPreferencesResponses,
   ListRealtimeAppChannelMembersData,
   ListRealtimeAppChannelMembersErrors,
   ListRealtimeAppChannelMembersResponses,
@@ -1011,6 +1026,168 @@ export const updateContact = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * List a contact's preferences
+ *
+ * Returns the preferences on record for the contact's current handles: rows keyed to their email address on the email channel, and to their phone number on SMS and WhatsApp. A contact with no handles, or with no statements on record, returns an empty page.
+ *
+ * Rows are keyed by handle, not by contact: changing a contact's email address or phone number changes which rows this returns, and the old handle's rows remain in force for anything still sent to it.
+ *
+ */
+export const listContactPreferences = <ThrowOnError extends boolean = false>(
+  options: Options<ListContactPreferencesData, ThrowOnError>,
+): RequestResult<
+  ListContactPreferencesResponses,
+  ListContactPreferencesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListContactPreferencesResponses,
+    ListContactPreferencesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/contacts/{contact_id}/preferences",
+    ...options,
+  });
+
+/**
+ * List preferences
+ *
+ * Returns the workspace's recorded preferences, most recently created first. Pass `channel` to narrow to one channel, and `handle` with it to look up everything on record for one address or number.
+ *
+ * Each row is a key's current statement. A person can hold several rows on one channel (a channel-wide opt-out next to sender-scoped ones), and the most restrictive statement is what decides whether a message goes out.
+ *
+ */
+export const listPreferences = <ThrowOnError extends boolean = false>(
+  options?: Options<ListPreferencesData, ThrowOnError>,
+): RequestResult<
+  ListPreferencesResponses,
+  ListPreferencesErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListPreferencesResponses,
+    ListPreferencesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/preferences",
+    ...options,
+  });
+
+/**
+ * Record a preference
+ *
+ * Records one statement, a grant or an opt-out, for a handle on one channel. Writing is an upsert: the key is the channel, handle, and optional sender scope, and a new statement replaces the key's current one.
+ *
+ * Statements are ordered by when they were made, not when they arrive. A statement older than the key's current one is refused and returned with `applied: false` alongside the statement that survived; refusals are recorded on the key's history. Granting over a stored opt-out needs `consented_at` later than the opt-out, and a person's own opt-out (an unsubscribe, a stop keyword) cannot be overridden by a grant asserted on their behalf.
+ *
+ * A `201` means this key had no record and one was created; a `200` returns the key's surviving record, whether this statement replaced it, repeated it, or was refused.
+ *
+ */
+export const createPreference = <ThrowOnError extends boolean = false>(
+  options: Options<CreatePreferenceData, ThrowOnError>,
+): RequestResult<
+  CreatePreferenceResponses,
+  CreatePreferenceErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreatePreferenceResponses,
+    CreatePreferenceErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/preferences",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a preference
+ *
+ * Deletes a preference, returning its key to having no record, as if nothing had ever been stated. The deletion itself is kept on the key's history, so a later statement is still ordered against what was deleted.
+ *
+ * **A statement the person made themselves cannot be deleted.** An unsubscribe or a stop keyword is their statement to reverse: it ends when they opt back in, and attempts to delete it return `422`. To restore messaging with the person's consent, record a `granted` statement with `consented_at` evidence instead; that records the change of mind rather than erasing the opt-out.
+ *
+ * A delete is ordered like any statement, using the time it is received: if the record carries a statement made after that moment, the delete is refused and returned with `applied: false` alongside the surviving record. An ID that does not exist in the workspace returns `404`.
+ *
+ */
+export const deletePreference = <ThrowOnError extends boolean = false>(
+  options: Options<DeletePreferenceData, ThrowOnError>,
+): RequestResult<
+  DeletePreferenceResponses,
+  DeletePreferenceErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeletePreferenceResponses,
+    DeletePreferenceErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/preferences/{preference_id}",
+    ...options,
+  });
+
+/**
+ * Get a preference
+ *
+ * Returns one preference: the key it is about, the current statement on it, and the statement's provenance. An ID that does not exist in the workspace returns `404`, including after a delete, which removes the record its ID pointed at.
+ *
+ */
+export const getPreference = <ThrowOnError extends boolean = false>(
+  options: Options<GetPreferenceData, ThrowOnError>,
+): RequestResult<GetPreferenceResponses, GetPreferenceErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetPreferenceResponses,
+    GetPreferenceErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/preferences/{preference_id}",
+    ...options,
   });
 
 /**

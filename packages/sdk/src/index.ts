@@ -157,6 +157,18 @@ export type {
   VerifyVerificationsNextChannelParams,
 } from "./resources/verifyVerifications.gen.js";
 export type {
+  Preference,
+  PreferencesListQuery,
+} from "./resources/preferences.gen.js";
+export type {
+  PreferenceCreateParams,
+  PreferenceWriteResult,
+} from "./resources/preferences.js";
+export type {
+  PreferenceStatus,
+  PreferenceCoverage,
+} from "./generated/types.gen.js";
+export type {
   Contact,
   ContactCreateParams,
   ContactUpdateParams,
@@ -164,6 +176,9 @@ export type {
   ContactUpsertResult,
   ContactListQuery,
 } from "./resources/contacts.gen.js";
+export type {
+  ContactsPreferencesListQuery,
+} from "./resources/contactsPreferences.gen.js";
 export type {
   Audience,
   AudienceMember,
@@ -228,6 +243,8 @@ export {
   NumberCapability,
   NumberType,
   NumbersOrderStatus,
+  PreferenceChannel,
+  PreferenceOrigin,
   SMSErrorCode,
   SMSKeywordOperation,
   SMSSuppressionCoverage,
@@ -254,6 +271,8 @@ export type {
   NumberCapabilityValue,
   NumberTypeValue,
   NumbersOrderStatusValue,
+  PreferenceChannelValue,
+  PreferenceOriginValue,
   SMSErrorCodeValue,
   SMSKeywordOperationValue,
   SMSSuppressionCoverageValue,
