@@ -1,6 +1,6 @@
 {
   "name": "@messagebird/sdk",
-  "version": "0.38.0",
+  "version": "0.38.1",
   "description": "The official TypeScript SDK for the Bird API: email, SMS, WhatsApp, verification, and Realtime on one typed client.",
   "license": "MIT",
   "author": "Bird",

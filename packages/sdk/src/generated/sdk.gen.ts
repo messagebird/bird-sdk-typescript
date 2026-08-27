@@ -2998,9 +2998,13 @@ export const listWhatsAppMessages = <ThrowOnError extends boolean = false>(
  *
  * **Free-form content** is deliverable only inside an open 24-hour customer
  * service window, which the contact opens by messaging or calling you and
- * resets each time they do it again. We do not track the window, so a send
- * outside one is accepted and then fails, carrying `service_window_expired` on
- * the message's `last_error`. Every free-form send requires `from`.
+ * resets each time they do it again. Bird tracks that window, so a send into a
+ * closed one is refused with a `422` `WhatsAppServiceWindowClosed` before
+ * anything is created or charged;
+ * send a template instead, which reopens the window once the contact replies.
+ * A window that closes between accept and dispatch still fails
+ * asynchronously, carrying `service_window_expired` on the message's
+ * `last_error`. Every free-form send requires `from`.
  *
  * The `202` response is the accepted message, echoing the resolved content; it
  * is not a delivery confirmation. Follow delivery with
@@ -3015,6 +3019,8 @@ export const listWhatsAppMessages = <ThrowOnError extends boolean = false>(
  * - Parameter values that do not match the template's declared placeholders.
  * - A `from` this workspace cannot send from.
  * - A recipient that is neither a valid phone number nor a business-scoped user ID.
+ * - Free-form content sent into a closed customer service window
+ * (`WhatsAppServiceWindowClosed`).
  *
  * A send from a workspace with no wallet balance fails with a `402`.
  *

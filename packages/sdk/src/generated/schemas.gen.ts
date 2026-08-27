@@ -657,14 +657,14 @@ export const TimestampsSchema = {
       format: "date-time",
       minLength: 1,
       readOnly: true,
-      example: {},
+      example: "2026-05-20T09:14:52Z",
     },
     updated_at: {
       type: "string",
       format: "date-time",
       minLength: 1,
       readOnly: true,
-      example: {},
+      example: "2026-05-25T16:42:01Z",
     },
   },
 } as const;
@@ -5182,7 +5182,7 @@ export const SMSKeywordRuleSchema = {
       readOnly: true,
       description:
         "When the auto-reply for this rule was switched off, or null if it is on. Switching it off records that you send this reply from your own system, which is what Bird points to if a carrier asks why no reply went out.\n",
-      example: "2026-08-12T09:00:00.000Z",
+      example: "2026-08-12T09:00:00Z",
     },
     mandatory: {
       type: "boolean",
@@ -5197,7 +5197,7 @@ export const SMSKeywordRuleSchema = {
       minLength: 1,
       readOnly: true,
       description: "When the rule was created.",
-      example: "2026-08-12T09:00:00.000Z",
+      example: "2026-08-12T09:00:00Z",
     },
     updated_at: {
       type: "string",
@@ -5206,7 +5206,7 @@ export const SMSKeywordRuleSchema = {
       readOnly: true,
       description:
         "When the rule was last changed. On one of Bird's defaults this is when Bird last changed the keywords or the reply for that country.",
-      example: "2026-08-12T09:00:00.000Z",
+      example: "2026-08-12T09:00:00Z",
     },
   },
 } as const;
@@ -5339,7 +5339,7 @@ export const SMSStatsSummaryPeriodSchema = {
       readOnly: true,
       description:
         "Inclusive start of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.",
-      example: {},
+      example: "2026-05-01",
     },
     to: {
       type: "string",
@@ -5349,7 +5349,7 @@ export const SMSStatsSummaryPeriodSchema = {
       readOnly: true,
       description:
         "Inclusive end of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.",
-      example: {},
+      example: "2026-05-25",
     },
     data_as_of: {
       type: ["string", "null"],
@@ -5357,7 +5357,7 @@ export const SMSStatsSummaryPeriodSchema = {
       readOnly: true,
       description:
         "Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.\n",
-      example: {},
+      example: "2026-05-25T14:03:10Z",
     },
   },
 } as const;
@@ -5696,7 +5696,7 @@ export const SMSStatsSeriesPeriodSchema = {
       readOnly: true,
       description:
         "Inclusive start of the window. A calendar day (YYYY-MM-DD) on the day grain, an RFC 3339 instant rounded to the hour on the hour grain.",
-      example: {},
+      example: "2026-05-01",
     },
     to: {
       type: "string",
@@ -5706,7 +5706,7 @@ export const SMSStatsSeriesPeriodSchema = {
       readOnly: true,
       description:
         "Inclusive end of the window. A calendar day (YYYY-MM-DD) on the day grain, an RFC 3339 instant rounded to the hour on the hour grain.",
-      example: {},
+      example: "2026-05-31",
     },
     grain: {
       $ref: "#/components/schemas/StatsGrain",
@@ -5718,7 +5718,7 @@ export const SMSStatsSeriesPeriodSchema = {
       readOnly: true,
       description:
         "Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.\n",
-      example: {},
+      example: "2026-05-25T14:03:10Z",
     },
   },
 } as const;
@@ -5809,7 +5809,7 @@ export const SMSStatsPointSchema = {
       readOnly: true,
       description:
         "The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.",
-      example: {},
+      example: "2026-05-25",
     },
     delivery: {
       readOnly: true,
@@ -6497,7 +6497,7 @@ export const SMSInboundStatsPointSchema = {
       readOnly: true,
       description:
         "Start of the bucket this row covers, as a calendar day (YYYY-MM-DD) for the daily series or an hour boundary (RFC 3339) for the hourly one.",
-      example: {},
+      example: "2026-05-01",
     },
     received: {
       type: "integer",
@@ -6993,7 +6993,7 @@ export const LookupSimSwapSchema = {
   },
   example: {
     status: "ok",
-    last_swapped_at: {},
+    last_swapped_at: "2026-07-02T09:14:00Z",
     min_days: 0,
     max_days: 7,
   },
@@ -7020,7 +7020,7 @@ export const LookupPortingEventSchema = {
     },
   },
   example: {
-    occurred_at: {},
+    occurred_at: "2023-02-08T00:00:00Z",
     action: "A",
   },
 } as const;
@@ -7072,11 +7072,11 @@ export const LookupPortingSchema = {
   example: {
     status: "ok",
     ported: true,
-    last_ported_at: {},
+    last_ported_at: "2023-02-08T00:00:00Z",
     last_ported_at_is_approximate: false,
     history: [
       {
-        occurred_at: {},
+        occurred_at: "2023-02-08T00:00:00Z",
         action: "A",
       },
     ],
@@ -8810,7 +8810,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "Free-form text to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. We do not track the window, so a send outside one is accepted and then fails, with `service_window_expired` on the message's `last_error`.\n",
+        "Free-form text to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
     },
     image: {
       allOf: [
@@ -8819,7 +8819,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "A free-form image to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. We do not track the window, so a send outside one is accepted and then fails, with `service_window_expired` on the message's `last_error`.\n",
+        "A free-form image to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
     },
     video: {
       allOf: [
@@ -8828,7 +8828,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "A free-form video to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. We do not track the window, so a send outside one is accepted and then fails, with `service_window_expired` on the message's `last_error`.\n",
+        "A free-form video to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
     },
     audio: {
       allOf: [
@@ -8837,7 +8837,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "Free-form audio to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. We do not track the window, so a send outside one is accepted and then fails, with `service_window_expired` on the message's `last_error`.\n",
+        "Free-form audio to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
     },
     sticker: {
       allOf: [
@@ -8846,7 +8846,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "A free-form sticker to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. We do not track the window, so a send outside one is accepted and then fails, with `service_window_expired` on the message's `last_error`.\n",
+        "A free-form sticker to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
     },
     document: {
       allOf: [
@@ -8855,7 +8855,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "A free-form document to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. We do not track the window, so a send outside one is accepted and then fails, with `service_window_expired` on the message's `last_error`.\n",
+        "A free-form document to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
     },
     location: {
       allOf: [
@@ -8864,7 +8864,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "A free-form location to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. We do not track the window, so a send outside one is accepted and then fails, with `service_window_expired` on the message's `last_error`.\n",
+        "A free-form location to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
     },
     tags: {
       type: "array",
@@ -9009,7 +9009,7 @@ export const EmailStatsSeriesPeriodSchema = {
       readOnly: true,
       description:
         "Inclusive start of the window. A calendar day (YYYY-MM-DD, in the requested `timezone`) on the day grain. On the hour grain, an RFC 3339 UTC instant marking the start of the first hour bucket, which falls on a local hour boundary when `timezone` is set.",
-      example: {},
+      example: "2026-05-01",
     },
     to: {
       type: "string",
@@ -9019,7 +9019,7 @@ export const EmailStatsSeriesPeriodSchema = {
       readOnly: true,
       description:
         "Inclusive end of the window. A calendar day (YYYY-MM-DD, in the requested `timezone`) on the day grain. On the hour grain, an RFC 3339 UTC instant marking the start of the last hour bucket, which falls on a local hour boundary when `timezone` is set.",
-      example: {},
+      example: "2026-05-31",
     },
     grain: {
       $ref: "#/components/schemas/StatsGrain",
@@ -9031,7 +9031,7 @@ export const EmailStatsSeriesPeriodSchema = {
       readOnly: true,
       description:
         "The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.\n",
-      example: {},
+      example: "2026-05-25T14:03:10Z",
     },
   },
 } as const;
@@ -9461,7 +9461,7 @@ export const EmailStatsPointSchema = {
       readOnly: true,
       description:
         "The day (YYYY-MM-DD, in the requested `timezone`) or hour this point covers, matching the period's grain. An hour bucket is an RFC 3339 UTC instant marking the start of the hour. It falls on a local hour boundary when `timezone` is set, which is on the UTC hour only for whole-hour offsets.",
-      example: "2026-05-25T00:00:00.000Z",
+      example: "2026-05-25",
     },
     sends_accepted: {
       type: "integer",
@@ -9572,7 +9572,7 @@ export const EmailStatsPeriodSchema = {
       minLength: 1,
       readOnly: true,
       description: "Inclusive start date the response covers (YYYY-MM-DD).",
-      example: {},
+      example: "2026-05-01",
     },
     to: {
       type: "string",
@@ -9580,7 +9580,7 @@ export const EmailStatsPeriodSchema = {
       minLength: 1,
       readOnly: true,
       description: "Inclusive end date the response covers (YYYY-MM-DD).",
-      example: {},
+      example: "2026-05-25",
     },
     data_as_of: {
       type: ["string", "null"],
@@ -9588,7 +9588,7 @@ export const EmailStatsPeriodSchema = {
       readOnly: true,
       description:
         'The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.\n',
-      example: {},
+      example: "2026-05-25T14:03:10Z",
     },
   },
 } as const;
@@ -9616,7 +9616,7 @@ export const EmailStatsSeriesPointSchema = {
       readOnly: true,
       description:
         "The day (YYYY-MM-DD) or hour (ISO 8601, on the hour) this point covers, matching the requested `trend_grain`.",
-      example: {},
+      example: "2026-05-12",
     },
     delivered: {
       type: "integer",
@@ -9768,7 +9768,7 @@ export const EmailStatsSummaryPeriodSchema = {
       readOnly: true,
       description:
         "Inclusive start of the window the response covers. A calendar day (YYYY-MM-DD, in the requested `timezone`) for day windows. For hour windows, an RFC 3339 UTC instant marking the start of the first hour, which falls on a local hour boundary when `timezone` is set.",
-      example: {},
+      example: "2026-05-01",
     },
     to: {
       type: "string",
@@ -9778,7 +9778,7 @@ export const EmailStatsSummaryPeriodSchema = {
       readOnly: true,
       description:
         "Inclusive end of the window the response covers. A calendar day (YYYY-MM-DD, in the requested `timezone`) for day windows. For hour windows, an RFC 3339 UTC instant marking the start of the last hour, which falls on a local hour boundary when `timezone` is set.",
-      example: {},
+      example: "2026-05-25",
     },
     data_as_of: {
       type: ["string", "null"],
@@ -9786,7 +9786,7 @@ export const EmailStatsSummaryPeriodSchema = {
       readOnly: true,
       description:
         'The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.\n',
-      example: {},
+      example: "2026-05-25T14:03:10Z",
     },
   },
 } as const;
@@ -12871,7 +12871,7 @@ export const MailboxStatsPointSchema = {
       readOnly: true,
       description:
         "The day (`YYYY-MM-DD`) or instant (RFC 3339, on the bucket boundary) this point covers, matching the period's grain.",
-      example: "2026-07-21T00:00:00.000Z",
+      example: "2026-07-21",
     },
     sends_accepted: {
       type: "integer",
@@ -14574,7 +14574,7 @@ export const EventDomainFailedSchema = {
       minLength: 1,
       format: "date-time",
       description: "When the event occurred.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventDomainFailedData",
@@ -14625,7 +14625,7 @@ export const EventDomainVerifiedSchema = {
       minLength: 1,
       format: "date-time",
       description: "When the event occurred.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventDomainVerifiedData",
@@ -14718,7 +14718,7 @@ export const EventEmailAcceptedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the API accepted the send.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailAcceptedData",
@@ -14805,7 +14805,7 @@ export const EventEmailBouncedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the bounce was recorded.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailBouncedData",
@@ -14876,7 +14876,7 @@ export const EventEmailCanceledSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the scheduled send was canceled.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailCanceledData",
@@ -14937,7 +14937,7 @@ export const EventEmailClickedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the click was recorded.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailClickedData",
@@ -14986,7 +14986,7 @@ export const EventEmailComplainedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the complaint was recorded.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailComplainedData",
@@ -15052,7 +15052,7 @@ export const EventEmailDeferredSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the deferral was recorded.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailDeferredData",
@@ -15089,7 +15089,7 @@ export const EventEmailDeliveredSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the recipient's mail server accepted the message.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailDeliveredData",
@@ -15126,7 +15126,7 @@ export const EventEmailListUnsubscribedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the unsubscribe was recorded.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailListUnsubscribedData",
@@ -15181,7 +15181,7 @@ export const EventEmailOpenedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the open was recorded.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailOpenedData",
@@ -15259,7 +15259,7 @@ export const EventEmailOutOfBandBounceSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the bounce notification was recorded.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailOutOfBandBounceData",
@@ -15296,7 +15296,7 @@ export const EventEmailProcessedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the message was prepared for delivery.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailProcessedData",
@@ -15408,7 +15408,7 @@ export const EventEmailReceivedSchema = {
       minLength: 1,
       format: "date-time",
       description: "When the API received the message.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailReceivedData",
@@ -15480,7 +15480,7 @@ export const EventEmailRejectedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the rejection was recorded.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailRejectedData",
@@ -15504,7 +15504,7 @@ export const EventEmailScheduledDataSchema = {
           minLength: 1,
           format: "date-time",
           description: "When the message is scheduled to send.",
-          example: {},
+          example: "2026-05-22T09:00:00Z",
         },
       },
     },
@@ -15530,7 +15530,7 @@ export const EventEmailScheduledSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the send was scheduled.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailScheduledData",
@@ -15567,7 +15567,7 @@ export const EventEmailUnsubscribedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the unsubscribe was recorded.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailUnsubscribedData",
@@ -15616,7 +15616,7 @@ export const EventEmailMailboxMessageDeliveredSchema = {
       minLength: 1,
       format: "date-time",
       description: "When the event occurred.",
-      example: {},
+      example: "2026-07-08T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailMailboxMessageDeliveredData",
@@ -15671,7 +15671,7 @@ export const EventEmailMailboxMessageFailedSchema = {
       minLength: 1,
       format: "date-time",
       description: "When the event occurred.",
-      example: {},
+      example: "2026-07-08T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailMailboxMessageFailedData",
@@ -15797,7 +15797,7 @@ export const EventEmailMailboxMessageReceivedSchema = {
       minLength: 1,
       format: "date-time",
       description: "When the event occurred.",
-      example: {},
+      example: "2026-07-08T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailMailboxMessageReceivedData",
@@ -15846,7 +15846,7 @@ export const EventEmailMailboxMessageSentSchema = {
       minLength: 1,
       format: "date-time",
       description: "When the event occurred.",
-      example: {},
+      example: "2026-07-08T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailMailboxMessageSentData",
@@ -15892,7 +15892,7 @@ export const EventEmailMailboxSuspendedSchema = {
       minLength: 1,
       format: "date-time",
       description: "When the event occurred.",
-      example: {},
+      example: "2026-07-08T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailMailboxSuspendedData",
@@ -15948,7 +15948,7 @@ export const EventEmailMailboxThreadCreatedSchema = {
       minLength: 1,
       format: "date-time",
       description: "When the event occurred.",
-      example: {},
+      example: "2026-07-08T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailMailboxThreadCreatedData",
@@ -16015,7 +16015,7 @@ export const EventEmailSuppressionCreatedSchema = {
       minLength: 1,
       format: "date-time",
       description: "When the event occurred.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventEmailSuppressionCreatedData",
@@ -16131,7 +16131,7 @@ export const EventPreferenceDeletedSchema = {
       format: "date-time",
       description:
         "When the delete took effect (`effective_at`), not when it was recorded.",
-      example: {},
+      example: "2026-08-12T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventPreferenceDeletedData",
@@ -16173,7 +16173,7 @@ export const EventPreferenceGrantedSchema = {
       format: "date-time",
       description:
         "When the statement took effect (`effective_at`), not when it was recorded.",
-      example: {},
+      example: "2026-08-12T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventPreferenceGrantedData",
@@ -16215,7 +16215,7 @@ export const EventPreferenceRevokedSchema = {
       format: "date-time",
       description:
         "When the statement took effect (`effective_at`), not when it was recorded.",
-      example: {},
+      example: "2026-08-12T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventPreferenceRevokedData",
@@ -16315,7 +16315,7 @@ export const EventSMSAcceptedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the API accepted the request.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSAcceptedData",
@@ -16369,7 +16369,7 @@ export const EventSMSDeliveredSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the carrier confirmed delivery.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSDeliveredData",
@@ -16417,7 +16417,7 @@ export const EventSMSExpiredSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the message expired.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSExpiredData",
@@ -16463,7 +16463,7 @@ export const EventSMSFailedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the failure was recorded.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSFailedData",
@@ -16544,7 +16544,7 @@ export const EventSMSReceivedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the sender sent the message.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSReceivedData",
@@ -16592,7 +16592,7 @@ export const EventSMSRejectedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the rejection was recorded.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSRejectedData",
@@ -16645,7 +16645,7 @@ export const EventSMSSentSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the message was handed to the carrier.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSSentData",
@@ -16692,7 +16692,7 @@ export const EventSMSUndeliveredSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the non-delivery was recorded.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSUndeliveredData",
@@ -16771,7 +16771,7 @@ export const EventSMSSuppressionCreatedSchema = {
       format: "date-time",
       description:
         "When the episode's opening statement took effect (`effective_at`).",
-      example: {},
+      example: "2026-08-12T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSSuppressionCreatedData",
@@ -16850,7 +16850,7 @@ export const EventVerifyAttemptDeliveredDataSchema = {
           minLength: 1,
           format: "date-time",
           description: "Time delivery was confirmed.",
-          example: {},
+          example: "2026-07-24T12:00:05Z",
         },
       },
     },
@@ -16876,7 +16876,7 @@ export const EventVerifyAttemptDeliveredSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time delivery was confirmed.",
-      example: {},
+      example: "2026-07-24T12:00:05Z",
     },
     data: {
       $ref: "#/components/schemas/EventVerifyAttemptDeliveredData",
@@ -16918,7 +16918,7 @@ export const EventVerifyAttemptSentDataSchema = {
           minLength: 1,
           format: "date-time",
           description: "Time the passcode was dispatched.",
-          example: {},
+          example: "2026-07-24T12:00:01Z",
         },
       },
     },
@@ -16944,7 +16944,7 @@ export const EventVerifyAttemptSentSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the passcode was dispatched.",
-      example: {},
+      example: "2026-07-24T12:00:01Z",
     },
     data: {
       $ref: "#/components/schemas/EventVerifyAttemptSentData",
@@ -16991,7 +16991,7 @@ export const EventVerifyAttemptUndeliveredDataSchema = {
           minLength: 1,
           format: "date-time",
           description: "Time the failure was recorded.",
-          example: {},
+          example: "2026-07-24T12:00:05Z",
         },
       },
     },
@@ -17016,7 +17016,7 @@ export const EventVerifyAttemptUndeliveredSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the failure was recorded.",
-      example: {},
+      example: "2026-07-24T12:00:05Z",
     },
     data: {
       $ref: "#/components/schemas/EventVerifyAttemptUndeliveredData",
@@ -17054,7 +17054,7 @@ export const EventVerifyVerificationCreatedDataSchema = {
           minLength: 1,
           format: "date-time",
           description: "Time the verification session was created.",
-          example: {},
+          example: "2026-07-24T12:00:00Z",
         },
       },
     },
@@ -17080,7 +17080,7 @@ export const EventVerifyVerificationCreatedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the verification session was created.",
-      example: {},
+      example: "2026-07-24T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventVerifyVerificationCreatedData",
@@ -17151,7 +17151,7 @@ export const EventVerifyVerificationFailedDataSchema = {
           minLength: 1,
           format: "date-time",
           description: "Time the verification was resolved.",
-          example: {},
+          example: "2026-07-24T12:00:05Z",
         },
       },
     },
@@ -17173,7 +17173,7 @@ export const EventVerifyVerificationFailedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the verification was resolved.",
-      example: {},
+      example: "2026-07-24T12:00:05Z",
     },
     data: {
       $ref: "#/components/schemas/EventVerifyVerificationFailedData",
@@ -17218,7 +17218,7 @@ export const EventVerifyVerificationVerifiedDataSchema = {
           minLength: 1,
           format: "date-time",
           description: "Time the verification was verified.",
-          example: {},
+          example: "2026-07-24T12:01:00Z",
         },
       },
     },
@@ -17244,7 +17244,7 @@ export const EventVerifyVerificationVerifiedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the verification was verified.",
-      example: {},
+      example: "2026-07-24T12:01:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventVerifyVerificationVerifiedData",
@@ -17347,7 +17347,7 @@ export const EventVoiceCallAnsweredSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the call was answered.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventVoiceCallAnsweredData",
@@ -17433,7 +17433,7 @@ export const EventVoiceCallEndedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time either party hung up or call setup failed.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventVoiceCallEndedData",
@@ -17469,7 +17469,7 @@ export const EventVoiceCallInitiatedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the call was initiated.",
-      example: {},
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventVoiceCallInitiatedData",
@@ -17564,7 +17564,7 @@ export const EventWhatsAppAcceptedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the API accepted and charged the send request.",
-      example: {},
+      example: "2026-07-16T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventWhatsAppAcceptedData",
@@ -17600,7 +17600,7 @@ export const EventWhatsAppDeliveredSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the message was delivered to the recipient's device.",
-      example: {},
+      example: "2026-07-16T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventWhatsAppDeliveredData",
@@ -17646,7 +17646,7 @@ export const EventWhatsAppFailedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the failure was recorded.",
-      example: "2026-07-16T12:00:00.000Z",
+      example: "2026-07-16T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventWhatsAppFailedData",
@@ -17682,7 +17682,7 @@ export const EventWhatsAppReadSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the recipient read the message.",
-      example: {},
+      example: "2026-07-16T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventWhatsAppReadData",
@@ -17794,7 +17794,7 @@ export const EventWhatsAppReceivedSchema = {
       format: "date-time",
       description:
         "Time the contact sent the message, as reported by WhatsApp.",
-      example: "2026-07-16T12:00:00.000Z",
+      example: "2026-07-16T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventWhatsAppReceivedData",
@@ -17841,7 +17841,7 @@ export const EventWhatsAppRejectedSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the rejection was recorded.",
-      example: "2026-07-23T12:00:00.000Z",
+      example: "2026-07-23T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventWhatsAppRejectedData",
@@ -17877,7 +17877,7 @@ export const EventWhatsAppSentSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the API handed the message to Meta for delivery.",
-      example: {},
+      example: "2026-07-16T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventWhatsAppSentData",
@@ -17948,7 +17948,7 @@ export const EventWhatsAppSuppressionCreatedSchema = {
       format: "date-time",
       description:
         "When the episode's opening statement took effect (`effective_at`).",
-      example: {},
+      example: "2026-08-12T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventWhatsAppSuppressionCreatedData",
@@ -18011,7 +18011,7 @@ export const WebhookReplayRequestSchema = {
       minLength: 1,
       description:
         "Replay events that occurred at or after this timestamp. Defaults to 24 hours before the request when omitted.\n",
-      example: {},
+      example: "2026-05-07T00:00:00Z",
     },
     until: {
       type: "string",
@@ -18019,7 +18019,7 @@ export const WebhookReplayRequestSchema = {
       minLength: 1,
       description:
         "Replay events that occurred before or at this timestamp. Omit to bound the window only by `since`.\n",
-      example: {},
+      example: "2026-05-07T23:59:59Z",
     },
   },
 } as const;
@@ -21780,7 +21780,7 @@ export const EventSMSAcceptedWritableSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the API accepted the request.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSAcceptedDataWritable",
@@ -21834,7 +21834,7 @@ export const EventSMSDeliveredWritableSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the carrier confirmed delivery.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSDeliveredDataWritable",
@@ -21882,7 +21882,7 @@ export const EventSMSExpiredWritableSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the message expired.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSExpiredDataWritable",
@@ -21928,7 +21928,7 @@ export const EventSMSFailedWritableSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the failure was recorded.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSFailedDataWritable",
@@ -21996,7 +21996,7 @@ export const EventSMSReceivedWritableSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the sender sent the message.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSReceivedDataWritable",
@@ -22044,7 +22044,7 @@ export const EventSMSRejectedWritableSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the rejection was recorded.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSRejectedDataWritable",
@@ -22097,7 +22097,7 @@ export const EventSMSSentWritableSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the message was handed to the carrier.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSSentDataWritable",
@@ -22144,7 +22144,7 @@ export const EventSMSUndeliveredWritableSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the non-delivery was recorded.",
-      example: "2026-05-21T12:00:00.000Z",
+      example: "2026-05-21T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventSMSUndeliveredDataWritable",
@@ -22190,7 +22190,7 @@ export const EventWhatsAppFailedWritableSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the failure was recorded.",
-      example: "2026-07-16T12:00:00.000Z",
+      example: "2026-07-16T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventWhatsAppFailedDataWritable",
@@ -22294,7 +22294,7 @@ export const EventWhatsAppReceivedWritableSchema = {
       format: "date-time",
       description:
         "Time the contact sent the message, as reported by WhatsApp.",
-      example: "2026-07-16T12:00:00.000Z",
+      example: "2026-07-16T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventWhatsAppReceivedDataWritable",
@@ -22341,7 +22341,7 @@ export const EventWhatsAppRejectedWritableSchema = {
       minLength: 1,
       format: "date-time",
       description: "Time the rejection was recorded.",
-      example: "2026-07-23T12:00:00.000Z",
+      example: "2026-07-23T12:00:00Z",
     },
     data: {
       $ref: "#/components/schemas/EventWhatsAppRejectedDataWritable",
