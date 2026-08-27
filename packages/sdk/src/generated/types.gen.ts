@@ -830,9 +830,11 @@ export type EmailTemplateId = string;
 export type EmailTemplateVersionId = string;
 
 /**
- * Structured key/value label attached to a message. Surfaces in list filters, the event log, and webhook payloads. Use tags for low-cardinality filtering dimensions (category, experiment ID, template ID). For arbitrary per-send context that does not need to be filterable, use `metadata`.
+ * Structured key/value label attached to a message or a call. Use tags for low-cardinality filtering dimensions (category, experiment ID, template ID); they surface in the list filter of whatever carries them.
  *
- * The send request defines the tag-count limit. Tag names are unique within a send; supplying the same name twice is rejected.
+ * On a message they also surface in the event log and in webhook payloads, and a message can carry `metadata` beside them for arbitrary per-send context that does not need to be filterable. A call has none of those three: its tags are set on the wire when the call is placed, and the call record is the one place you read them back.
+ *
+ * Whatever carries the tags defines how many it may have. Tag names are unique: a send that repeats one is rejected, and on a call the first instance of a name wins.
  *
  */
 export type Tag = {
@@ -9981,7 +9983,7 @@ export type NumberType =
   | (string & {});
 
 /**
- * Channel capability supported by a phone number. New capabilities may be added over time, so treat unrecognized values as supported capabilities rather than errors.
+ * A capability supported by a phone number. New capabilities may be added over time, so treat unrecognized values as supported capabilities rather than errors.
  */
 export type NumberCapability = "sms" | "mms" | "voice" | (string & {});
 
@@ -10026,7 +10028,7 @@ export type Number = {
    */
   readonly number_type: NumberType;
   /**
-   * Channel capabilities supported by this number.
+   * Capabilities supported by this number.
    */
   readonly capabilities: Array<NumberCapability>;
   /**
@@ -10074,7 +10076,7 @@ export type AvailableNumber = {
    */
   number_type: NumberType;
   /**
-   * Channel capabilities supported by this number.
+   * Capabilities supported by this number.
    */
   capabilities: Array<NumberCapability>;
 };
@@ -10281,6 +10283,10 @@ export type VoiceCall = {
    * Why we refused the call before dialing a carrier. Absent when the call connected or failed at the carrier; see `sip_response_code` for the carrier response.
    */
   readonly rejection_reason?: VoiceCallRejectionReason;
+  /**
+   * Your own `{name, value}` labels for this call, taken from the `X-Bird-Call-Tag` headers on the INVITE that placed it. Set them to organise calls by a dimension of your own (campaign, queue, agent, cost centre), then filter this list by them with `tag`. Read-only here: a call is labelled when it is placed, and never afterwards. What is here may be less than what was sent, and the call still goes through either way: a tag whose name or value breaks the rules below is dropped, anything past the first five is ignored, and a name sent more than once keeps its first value. Absent when the call carried none, and on calls recorded before this field existed.
+   */
+  readonly tags?: Array<Tag>;
   /**
    * When the call was initiated.
    */
@@ -12627,7 +12633,7 @@ export type PaginationLimit = number;
 export type StartingAfter = string;
 
 /**
- * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+ * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
  */
 export type EndingBefore = string;
 
@@ -12658,10 +12664,10 @@ export type CreatedAfter = string;
 export type CreatedBefore = string;
 
 /**
- * Filter by tag. Accepts `name` to match any message carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A message must match every tag listed to be returned.
+ * Filter by tag. Accepts `name` to match any record carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A record must match every tag listed to be returned.
  *
  */
-export type MessageTagFilter = Array<string>;
+export type TagFilter = Array<string>;
 
 /**
  * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
@@ -13215,7 +13221,7 @@ export type ListEmailMessagesData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
     /**
@@ -13231,7 +13237,7 @@ export type ListEmailMessagesData = {
      */
     status?: EmailMessageStatus;
     /**
-     * Filter by tag. Accepts `name` to match any message carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A message must match every tag listed to be returned.
+     * Filter by tag. Accepts `name` to match any record carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A record must match every tag listed to be returned.
      *
      */
     tag?: Array<string>;
@@ -13593,7 +13599,7 @@ export type ListContactsData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
     /**
@@ -13979,7 +13985,7 @@ export type ListContactPropertiesData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
   };
@@ -14380,7 +14386,7 @@ export type ListAudiencesData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
   };
@@ -14707,7 +14713,7 @@ export type ListAudienceContactsData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
   };
@@ -14987,7 +14993,7 @@ export type ListSmsMessagesData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
     /**
@@ -15025,7 +15031,7 @@ export type ListSmsMessagesData = {
      */
     from?: string;
     /**
-     * Filter by tag. Accepts `name` to match any message carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A message must match every tag listed to be returned.
+     * Filter by tag. Accepts `name` to match any record carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A record must match every tag listed to be returned.
      *
      */
     tag?: Array<string>;
@@ -15475,7 +15481,7 @@ export type ListSmsSuppressionsData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
   };
@@ -17739,7 +17745,7 @@ export type ListWhatsAppMessagesData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
     /**
@@ -17786,7 +17792,7 @@ export type ListWhatsAppMessagesData = {
      */
     category?: WhatsAppTemplateCategory;
     /**
-     * Filter by tag. Accepts `name` to match any message carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A message must match every tag listed to be returned.
+     * Filter by tag. Accepts `name` to match any record carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A record must match every tag listed to be returned.
      *
      */
     tag?: Array<string>;
@@ -19483,7 +19489,7 @@ export type ListDomainsData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
     /**
@@ -19897,7 +19903,7 @@ export type ListMailboxesData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
   };
@@ -20453,7 +20459,7 @@ export type ListMailboxReceiveRulesData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
   };
@@ -20698,7 +20704,7 @@ export type ListEmailThreadsData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
   };
@@ -20985,7 +20991,7 @@ export type ListEmailThreadMessagesData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
   };
@@ -21462,7 +21468,7 @@ export type ListWorkspaceNumbersData = {
      */
     prefix?: string;
     /**
-     * Filter by channel capability. Repeat the parameter to require several at once: `capabilities=sms&capabilities=voice` returns only numbers that support both.
+     * Filter by capability. Repeat the parameter to require several at once: `capabilities=sms&capabilities=voice` returns only numbers that support both.
      */
     capabilities?: Array<string>;
     /**
@@ -21474,7 +21480,7 @@ export type ListWorkspaceNumbersData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
   };
@@ -21541,7 +21547,7 @@ export type ListAvailableNumbersData = {
      */
     prefix?: string;
     /**
-     * Filter by channel capability. Repeat the parameter to require several at once: `capabilities=sms&capabilities=voice` returns only numbers that support both.
+     * Filter by capability. Repeat the parameter to require several at once: `capabilities=sms&capabilities=voice` returns only numbers that support both.
      */
     capabilities?: Array<string>;
     /**
@@ -21553,7 +21559,7 @@ export type ListAvailableNumbersData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
   };
@@ -21679,7 +21685,7 @@ export type ListNumbersOrdersData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
   };
@@ -22039,6 +22045,11 @@ export type ListVoiceCallsData = {
      */
     number?: string;
     /**
+     * Filter by tag. Accepts `name` to match any record carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A record must match every tag listed to be returned.
+     *
+     */
+    tag?: Array<string>;
+    /**
      * Return only calls that started at or after this instant, inclusive. RFC 3339 timestamp.
      */
     started_after?: string;
@@ -22055,7 +22066,7 @@ export type ListVoiceCallsData = {
      */
     starting_after?: string;
     /**
-     * Cursor from the `prev_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order.
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
   };

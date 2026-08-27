@@ -1472,7 +1472,7 @@ export const TagSchema = {
   additionalProperties: false,
   required: ["name", "value"],
   description:
-    "Structured key/value label attached to a message. Surfaces in list filters, the event log, and webhook payloads. Use tags for low-cardinality filtering dimensions (category, experiment ID, template ID). For arbitrary per-send context that does not need to be filterable, use `metadata`.\n\nThe send request defines the tag-count limit. Tag names are unique within a send; supplying the same name twice is rejected.\n",
+    "Structured key/value label attached to a message or a call. Use tags for low-cardinality filtering dimensions (category, experiment ID, template ID); they surface in the list filter of whatever carries them.\n\nOn a message they also surface in the event log and in webhook payloads, and a message can carry `metadata` beside them for arbitrary per-send context that does not need to be filterable. A call has none of those three: its tags are set on the wire when the call is placed, and the call record is the one place you read them back.\n\nWhatever carries the tags defines how many it may have. Tag names are unique: a send that repeats one is rejected, and on a call the first instance of a name wins.\n",
   properties: {
     name: {
       type: "string",
@@ -17537,7 +17537,7 @@ export const NumberCapabilitySchema = {
   minLength: 1,
   "x-extensible-enum": ["sms", "mms", "voice"],
   description:
-    "Channel capability supported by a phone number. New capabilities may be added over time, so treat unrecognized values as supported capabilities rather than errors.",
+    "A capability supported by a phone number. New capabilities may be added over time, so treat unrecognized values as supported capabilities rather than errors.",
 } as const;
 
 export const NumberOwnershipSchema = {
@@ -17633,7 +17633,7 @@ export const NumberSchema = {
       items: {
         $ref: "#/components/schemas/NumberCapability",
       },
-      description: "Channel capabilities supported by this number.",
+      description: "Capabilities supported by this number.",
     },
     status: {
       type: "string",
@@ -17719,7 +17719,7 @@ export const AvailableNumberSchema = {
       items: {
         $ref: "#/components/schemas/NumberCapability",
       },
-      description: "Channel capabilities supported by this number.",
+      description: "Capabilities supported by this number.",
     },
   },
 } as const;
@@ -18133,6 +18133,16 @@ export const VoiceCallSchema = {
       ],
       description:
         "Why we refused the call before dialing a carrier. Absent when the call connected or failed at the carrier; see `sip_response_code` for the carrier response.",
+    },
+    tags: {
+      type: "array",
+      maxItems: 5,
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      description:
+        "Your own `{name, value}` labels for this call, taken from the `X-Bird-Call-Tag` headers on the INVITE that placed it. Set them to organise calls by a dimension of your own (campaign, queue, agent, cost centre), then filter this list by them with `tag`. Read-only here: a call is labelled when it is placed, and never afterwards. What is here may be less than what was sent, and the call still goes through either way: a tag whose name or value breaks the rules below is dropped, anything past the first five is ignored, and a name sent more than once keeps its first value. Absent when the call carried none, and on calls recorded before this field existed.",
     },
     started_at: {
       type: "string",
