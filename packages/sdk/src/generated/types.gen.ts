@@ -2096,7 +2096,7 @@ export type AudienceContactsRemoveRequest = {
 export type MessageDirection = "outbound" | "inbound";
 
 /**
- * Content classification. Tells Bird and carriers why you're sending; per-country compliance rules (opt-out policy, quiet hours) key on it as they roll out.
+ * Content classification: why you are sending. Carriers see it, and where a destination country requires the sender to be registered, that registration is approved for a category: a send outside what it covers returns a `422` `SenderCategoryNotPermitted`. A registration approved for `marketing` covers all four values; one approved for `transactional`, `authentication`, or `service` covers those three and not `marketing`. Use `authentication` for a one-time passcode and `marketing` for a promotion; otherwise pick the value matching the message's purpose.
  */
 export type SmsMessageCategory =
   "transactional" | "marketing" | "authentication" | "service";
@@ -2106,16 +2106,18 @@ export type SmsMessageId = string;
 /**
  * Delivery status:
  *
- * - `scheduled`: Queued for a future send time.
  * - `accepted`: Accepted and awaiting carrier handoff.
  * - `sent`: Handed to the carrier and awaiting a delivery receipt.
  * - `delivered`: Confirmed as delivered.
- * - `undelivered`: Temporarily unreachable.
- * - `failed`: Permanently failed.
+ * - `undelivered`: The carrier reported delivery as failed for a reason that may clear later, such as a handset out of coverage or a carrier at capacity. Final all the same: the message is not retried, so reaching the recipient means sending again.
+ * - `failed`: The carrier reported delivery as failed for a reason that will not clear, such as an unassigned number, a recipient who has opted out, or content the carrier refused.
  * - `rejected`: Refused before carrier handoff.
- * - `canceled`: Canceled before a scheduled send.
  * - `expired`: Reached its validity limit without a final receipt.
  * - `received`: Received as an inbound message.
+ *
+ * `scheduled` and `canceled` are declared ahead of the send-later scheduling
+ * feature that produces them, so their arrival is not a breaking change. No
+ * message carries either status today.
  *
  */
 export type SmsMessageStatus =
@@ -2230,7 +2232,7 @@ export type SmsErrorCode =
 export type SmsError = {
   code: SmsErrorCode;
   /**
-   * Human-readable explanation of the failure.
+   * The failure in words, from whatever refused the message: the carrier's own reason text on a delivery receipt, or ours on a message stopped before a carrier saw it. Free-form, so branch on `code` and show this to a human.
    */
   description: string;
   /**
@@ -2292,12 +2294,12 @@ export type SmsMessage = {
     [key: string]: unknown;
   };
   /**
-   * Settings Bird applied to this message, with any option you omitted filled in with the default that was in force when you sent it. Absent on inbound messages, and on outbound messages sent before Bird began recording these settings.
+   * The settings applied to this message, with any option you omitted filled in with the default in force when you sent it. Absent on inbound messages, and on any outbound message for which no settings were recorded.
    *
    */
   readonly options?: SmsMessageEffectiveOptions;
   /**
-   * How long, in seconds, Bird keeps trying to deliver before the message transitions to `expired`.
+   * Preview feature: how long, in seconds, the carrier may keep attempting delivery before the message is marked `expired`. Not returned yet.
    */
   readonly validity_period?: number;
   /**
@@ -2407,12 +2409,12 @@ export type SmsMessageSendRequest = unknown & {
    */
   text?: string;
   /**
-   * Content classification. Tells Bird and carriers why you're sending; per-country compliance rules (opt-out policy, quiet hours) key on it as they roll out. Required on a free-text send; omit it on a template send, where the category is derived from the template.
+   * Content classification: why you are sending. Required on a free-text send; omit it on a template send, where the category is derived from the template. Where the destination country requires the sender to be registered, a category outside what that registration covers returns a `422` `SenderCategoryNotPermitted`.
    *
    */
   category?: SmsMessageCategory;
   /**
-   * Preview feature: how long, in seconds (60-172800), Bird keeps trying to deliver before the message transitions to `expired`. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.
+   * Preview feature: how long, in seconds (60-172800), the carrier may keep attempting delivery before the message is marked `expired`. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.
    *
    */
   validity_period?: number;
@@ -2653,7 +2655,7 @@ export type SmsTemplateVersionId = string;
  */
 export type SmsTemplate = {
   /**
-   * Unique identifier for the template.
+   * The template's generated identifier. Accepted anywhere a template is referenced: the `{template_ref}` path segment, and `template.id` on a send. The `slug` works in the same places and is more readable.
    */
   readonly id: SmsTemplateId;
   /**
@@ -4713,6 +4715,135 @@ export type WhatsAppLocation = {
 };
 
 /**
+ * The contact's name, in the parts their device supplied. Every part is optional: WhatsApp sends what the card holds and omits the rest.
+ *
+ */
+export type WhatsAppContactName = {
+  /**
+   * The whole name as the contact's device renders it.
+   */
+  formatted_name?: string;
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  prefix?: string;
+  suffix?: string;
+};
+
+/**
+ * Where the contact works, as their card records it.
+ */
+export type WhatsAppContactOrg = {
+  company?: string;
+  department?: string;
+  title?: string;
+};
+
+/**
+ * One phone number on a shared contact card.
+ */
+export type WhatsAppContactPhone = {
+  /**
+   * The number as the card holds it, normalized to E.164 where we can parse it. A card is whatever the contact's device stored, so a number that no country's numbering plan accepts, an extension among them, is passed through exactly as it arrived rather than dropped. Parse defensively: most values are E.164 and none is guaranteed to be.
+   *
+   */
+  phone_number?: string;
+  /**
+   * The label the contact's device attached, for example `CELL`, `Home` or `iPhone`. Free text passed through verbatim: WhatsApp declares no vocabulary here and does not normalize the casing, so neither do we.
+   *
+   */
+  type?: string;
+};
+
+/**
+ * One email address on a shared contact card.
+ */
+export type WhatsAppContactEmail = {
+  email?: string;
+  /**
+   * The label the contact's device attached, for example `Personal` or `Work`. Free text passed through verbatim.
+   *
+   */
+  type?: string;
+};
+
+/**
+ * One website on a shared contact card.
+ */
+export type WhatsAppContactUrl = {
+  /**
+   * The address as the card holds it, which is often bare rather than a full URL, so it is passed through as text rather than validated.
+   *
+   */
+  url?: string;
+  /**
+   * The label the contact's device attached, for example `Company`. Free text passed through verbatim.
+   *
+   */
+  type?: string;
+};
+
+/**
+ * One postal address on a shared contact card.
+ */
+export type WhatsAppContactAddress = {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  /**
+   * The country as the card holds it, left exactly as WhatsApp sent it: it describes a postal address rather than a routing destination.
+   *
+   */
+  country_code?: string;
+  /**
+   * The label the contact's device attached, for example `Home`. Free text passed through verbatim.
+   *
+   */
+  type?: string;
+};
+
+/**
+ * A contact card the contact shared, either by tapping a button that asked for their number or by sending a card from their address book. Inbound only.
+ * Nothing here is required. WhatsApp sends the parts the card holds and omits the rest, and a card that arrives with only an `origin` is still meaningful, so an empty card reads back empty rather than being dropped.
+ *
+ */
+export type WhatsAppContactCard = {
+  /**
+   * Why the card arrived. `contact_request` means the contact tapped a button this workspace sent asking for their number, which is the only signal that the message answers that ask; `other` means they shared a card in the chat. Open enum: treat an unrecognized value as a way of sharing added since.
+   *
+   */
+  origin?: string;
+  /**
+   * The contact's card in vCard format. WhatsApp sends it on a card shared in the chat and omits it on a button tap, which carries the number alone.
+   *
+   */
+  vcard?: string;
+  /**
+   * The contact's name, when the card carries one.
+   */
+  name?: WhatsAppContactName;
+  /**
+   * Where the contact works, when the card carries it.
+   */
+  org?: WhatsAppContactOrg;
+  /**
+   * The contact's birthday, which WhatsApp sends as `YYYY-MM-DD`. Passed through as text rather than typed as a date: the value comes off the contact's own device unvalidated, and a card we could not parse would otherwise have to lose the field or fail the whole read.
+   *
+   */
+  birthday?: string;
+  /**
+   * The numbers on the card. A button tap carries the contact's own number here, which is the point of asking.
+   *
+   */
+  phone_numbers?: Array<WhatsAppContactPhone>;
+  emails?: Array<WhatsAppContactEmail>;
+  urls?: Array<WhatsAppContactUrl>;
+  addresses?: Array<WhatsAppContactAddress>;
+};
+
+/**
  * A message whose content we do not model, named so it is visible in the message log rather than arriving empty. Inbound only.
  *
  */
@@ -4819,6 +4950,11 @@ export type WhatsAppMessage = {
    * Location the message carried.
    */
   readonly location?: WhatsAppLocation;
+  /**
+   * Contact cards the contact shared, either by tapping a button that asked for their number or by sending a card from their address book. Inbound only: sending a contact card is not supported.
+   *
+   */
+  readonly contact_cards?: Array<WhatsAppContactCard>;
   /**
    * Set when the contact sent content we do not model, naming the WhatsApp content type so the message is not silently empty. Inbound only.
    *
@@ -10054,6 +10190,11 @@ export type EventWhatsAppReceivedData = EventWhatsAppBase & {
    */
   location?: WhatsAppLocation;
   /**
+   * Contact cards the contact shared, either by tapping a button that asked for their number or by sending a card from their address book.
+   *
+   */
+  contact_cards?: Array<WhatsAppContactCard>;
+  /**
    * Set when the contact sent content the API does not model, naming the WhatsApp content type.
    *
    */
@@ -11195,7 +11336,7 @@ export type AudienceMemberListWritable = {
 export type SmsErrorWritable = {
   code: SmsErrorCode;
   /**
-   * Human-readable explanation of the failure.
+   * The failure in words, from whatever refused the message: the carrier's own reason text on a delivery receipt, or ours on a message stopped before a carrier saw it. Free-form, so branch on `code` and show this to a human.
    */
   description: string;
   /**
@@ -12770,6 +12911,11 @@ export type EventWhatsAppReceivedDataWritable = EventWhatsAppBase & {
    * Location the contact sent.
    */
   location?: WhatsAppLocation;
+  /**
+   * Contact cards the contact shared, either by tapping a button that asked for their number or by sending a card from their address book.
+   *
+   */
+  contact_cards?: Array<WhatsAppContactCard>;
   /**
    * Set when the contact sent content the API does not model, naming the WhatsApp content type.
    *
@@ -15641,7 +15787,7 @@ export type ListSmsMessagesData = {
      */
     direction?: MessageDirection;
     /**
-     * Keep only messages whose current `status` matches; repeat the parameter to match any of several. One of `scheduled`, `accepted`, `sent`, `delivered`, `undelivered`, `failed`, `rejected`, `canceled`, `expired`, or `received`.
+     * Keep only messages whose current `status` matches; repeat the parameter to match any of several. One of `scheduled`, `accepted`, `sent`, `delivered`, `undelivered`, `failed`, `rejected`, `canceled`, `expired`, or `received`. `scheduled` and `canceled` are accepted but match nothing until send-later scheduling ships.
      *
      */
     status?: Array<string>;

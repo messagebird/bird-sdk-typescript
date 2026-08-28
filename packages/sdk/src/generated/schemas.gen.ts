@@ -3747,7 +3747,7 @@ export const SMSMessageCategorySchema = {
   minLength: 1,
   enum: ["transactional", "marketing", "authentication", "service"],
   description:
-    "Content classification. Tells Bird and carriers why you're sending; per-country compliance rules (opt-out policy, quiet hours) key on it as they roll out.",
+    "Content classification: why you are sending. Carriers see it, and where a destination country requires the sender to be registered, that registration is approved for a category: a send outside what it covers returns a `422` `SenderCategoryNotPermitted`. A registration approved for `marketing` covers all four values; one approved for `transactional`, `authentication`, or `service` covers those three and not `marketing`. Use `authentication` for a one-time passcode and `marketing` for a promotion; otherwise pick the value matching the message's purpose.",
 } as const;
 
 export const SMSMessageIDSchema = {
@@ -3773,7 +3773,7 @@ export const SMSMessageStatusSchema = {
     "received",
   ],
   description:
-    "Delivery status:\n\n- `scheduled`: Queued for a future send time.\n- `accepted`: Accepted and awaiting carrier handoff.\n- `sent`: Handed to the carrier and awaiting a delivery receipt.\n- `delivered`: Confirmed as delivered.\n- `undelivered`: Temporarily unreachable.\n- `failed`: Permanently failed.\n- `rejected`: Refused before carrier handoff.\n- `canceled`: Canceled before a scheduled send.\n- `expired`: Reached its validity limit without a final receipt.\n- `received`: Received as an inbound message.\n",
+    "Delivery status:\n\n- `accepted`: Accepted and awaiting carrier handoff.\n- `sent`: Handed to the carrier and awaiting a delivery receipt.\n- `delivered`: Confirmed as delivered.\n- `undelivered`: The carrier reported delivery as failed for a reason that may clear later, such as a handset out of coverage or a carrier at capacity. Final all the same: the message is not retried, so reaching the recipient means sending again.\n- `failed`: The carrier reported delivery as failed for a reason that will not clear, such as an unassigned number, a recipient who has opted out, or content the carrier refused.\n- `rejected`: Refused before carrier handoff.\n- `expired`: Reached its validity limit without a final receipt.\n- `received`: Received as an inbound message.\n\n`scheduled` and `canceled` are declared ahead of the send-later scheduling\nfeature that produces them, so their arrival is not a breaking change. No\nmessage carries either status today.\n",
 } as const;
 
 export const SMSSegmentsSchema = {
@@ -3912,7 +3912,8 @@ export const SMSErrorSchema = {
     description: {
       type: "string",
       minLength: 1,
-      description: "Human-readable explanation of the failure.",
+      description:
+        "The failure in words, from whatever refused the message: the carrier's own reason text on a delivery receipt, or ours on a message stopped before a carrier saw it. Free-form, so branch on `code` and show this to a human.",
       example: "Carrier filtered as spam",
     },
     carrier_error_code: {
@@ -4028,13 +4029,13 @@ export const SMSMessageSchema = {
         },
       ],
       description:
-        "Settings Bird applied to this message, with any option you omitted filled in with the default that was in force when you sent it. Absent on inbound messages, and on outbound messages sent before Bird began recording these settings.\n",
+        "The settings applied to this message, with any option you omitted filled in with the default in force when you sent it. Absent on inbound messages, and on any outbound message for which no settings were recorded.\n",
     },
     validity_period: {
       type: "integer",
       readOnly: true,
       description:
-        "How long, in seconds, Bird keeps trying to deliver before the message transitions to `expired`.",
+        "Preview feature: how long, in seconds, the carrier may keep attempting delivery before the message is marked `expired`. Not returned yet.",
     },
     carrier: {
       type: "string",
@@ -4242,14 +4243,14 @@ export const SMSMessageSendRequestSchema = {
         },
       ],
       description:
-        "Content classification. Tells Bird and carriers why you're sending; per-country compliance rules (opt-out policy, quiet hours) key on it as they roll out. Required on a free-text send; omit it on a template send, where the category is derived from the template.\n",
+        "Content classification: why you are sending. Required on a free-text send; omit it on a template send, where the category is derived from the template. Where the destination country requires the sender to be registered, a category outside what that registration covers returns a `422` `SenderCategoryNotPermitted`.\n",
     },
     validity_period: {
       type: "integer",
       minimum: 60,
       maximum: 172800,
       description:
-        "Preview feature: how long, in seconds (60-172800), Bird keeps trying to deliver before the message transitions to `expired`. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.\n",
+        "Preview feature: how long, in seconds (60-172800), the carrier may keep attempting delivery before the message is marked `expired`. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.\n",
     },
     tags: {
       type: "array",
@@ -4625,7 +4626,8 @@ export const SMSTemplateSchema = {
   properties: {
     id: {
       readOnly: true,
-      description: "Unique identifier for the template.",
+      description:
+        "The template's generated identifier. Accepted anywhere a template is referenced: the `{template_ref}` path segment, and `template.id` on a send. The `slug` works in the same places and is more readable.",
       $ref: "#/components/schemas/SMSTemplateID",
     },
     slug: {
@@ -8190,6 +8192,239 @@ export const WhatsAppLocationSchema = {
   },
 } as const;
 
+export const WhatsAppContactNameSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The contact's name, in the parts their device supplied. Every part is optional: WhatsApp sends what the card holds and omits the rest.\n",
+  properties: {
+    formatted_name: {
+      type: "string",
+      description: "The whole name as the contact's device renders it.",
+      example: "Barbara J. Johnson",
+    },
+    first_name: {
+      type: "string",
+      example: "Barbara",
+    },
+    middle_name: {
+      type: "string",
+      example: "Joana",
+    },
+    last_name: {
+      type: "string",
+      example: "Johnson",
+    },
+    prefix: {
+      type: "string",
+      example: "Dr.",
+    },
+    suffix: {
+      type: "string",
+      example: "Esq.",
+    },
+  },
+} as const;
+
+export const WhatsAppContactOrgSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Where the contact works, as their card records it.",
+  properties: {
+    company: {
+      type: "string",
+      example: "Lucky Shrub",
+    },
+    department: {
+      type: "string",
+      example: "Engineering",
+    },
+    title: {
+      type: "string",
+      example: "Software Engineer",
+    },
+  },
+} as const;
+
+export const WhatsAppContactPhoneSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One phone number on a shared contact card.",
+  properties: {
+    phone_number: {
+      type: "string",
+      description:
+        "The number as the card holds it, normalized to E.164 where we can parse it. A card is whatever the contact's device stored, so a number that no country's numbering plan accepts, an extension among them, is passed through exactly as it arrived rather than dropped. Parse defensively: most values are E.164 and none is guaranteed to be.\n",
+      example: "+16505551234",
+    },
+    type: {
+      type: "string",
+      description:
+        "The label the contact's device attached, for example `CELL`, `Home` or `iPhone`. Free text passed through verbatim: WhatsApp declares no vocabulary here and does not normalize the casing, so neither do we.\n",
+      example: "CELL",
+    },
+  },
+} as const;
+
+export const WhatsAppContactEmailSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One email address on a shared contact card.",
+  properties: {
+    email: {
+      type: "string",
+      example: "barbara@example.com",
+    },
+    type: {
+      type: "string",
+      description:
+        "The label the contact's device attached, for example `Personal` or `Work`. Free text passed through verbatim.\n",
+      example: "Personal",
+    },
+  },
+} as const;
+
+export const WhatsAppContactUrlSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One website on a shared contact card.",
+  properties: {
+    url: {
+      type: "string",
+      description:
+        "The address as the card holds it, which is often bare rather than a full URL, so it is passed through as text rather than validated.\n",
+      example: "luckyshrub.example.com",
+    },
+    type: {
+      type: "string",
+      description:
+        "The label the contact's device attached, for example `Company`. Free text passed through verbatim.\n",
+      example: "Company",
+    },
+  },
+} as const;
+
+export const WhatsAppContactAddressSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One postal address on a shared contact card.",
+  properties: {
+    street: {
+      type: "string",
+      example: "1 Hacker Way",
+    },
+    city: {
+      type: "string",
+      example: "Menlo Park",
+    },
+    state: {
+      type: "string",
+      example: "CA",
+    },
+    zip: {
+      type: "string",
+      example: "94025",
+    },
+    country: {
+      type: "string",
+      example: "United States",
+    },
+    country_code: {
+      type: "string",
+      description:
+        "The country as the card holds it, left exactly as WhatsApp sent it: it describes a postal address rather than a routing destination.\n",
+      example: "US",
+    },
+    type: {
+      type: "string",
+      description:
+        "The label the contact's device attached, for example `Home`. Free text passed through verbatim.\n",
+      example: "Home",
+    },
+  },
+} as const;
+
+export const WhatsAppContactCardSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A contact card the contact shared, either by tapping a button that asked for their number or by sending a card from their address book. Inbound only.\nNothing here is required. WhatsApp sends the parts the card holds and omits the rest, and a card that arrives with only an `origin` is still meaningful, so an empty card reads back empty rather than being dropped.\n",
+  properties: {
+    origin: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": ["contact_request", "other"],
+      description:
+        "Why the card arrived. `contact_request` means the contact tapped a button this workspace sent asking for their number, which is the only signal that the message answers that ask; `other` means they shared a card in the chat. Open enum: treat an unrecognized value as a way of sharing added since.\n",
+      example: "contact_request",
+    },
+    vcard: {
+      type: "string",
+      description:
+        "The contact's card in vCard format. WhatsApp sends it on a card shared in the chat and omits it on a button tap, which carries the number alone.\n",
+      example:
+        "BEGIN:VCARD\nVERSION:3.0\nN:Johnson;Barbara;;;\nTEL;type=CELL:+16505551234\nEND:VCARD\n",
+    },
+    name: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppContactName",
+        },
+      ],
+      description: "The contact's name, when the card carries one.",
+    },
+    org: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppContactOrg",
+        },
+      ],
+      description: "Where the contact works, when the card carries it.",
+    },
+    birthday: {
+      type: "string",
+      description:
+        "The contact's birthday, which WhatsApp sends as `YYYY-MM-DD`. Passed through as text rather than typed as a date: the value comes off the contact's own device unvalidated, and a card we could not parse would otherwise have to lose the field or fail the whole read.\n",
+      example: "1999-01-23",
+    },
+    phone_numbers: {
+      type: "array",
+      description:
+        "The numbers on the card. A button tap carries the contact's own number here, which is the point of asking.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppContactPhone",
+      },
+    },
+    emails: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/WhatsAppContactEmail",
+      },
+    },
+    urls: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/WhatsAppContactUrl",
+      },
+    },
+    addresses: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/WhatsAppContactAddress",
+      },
+    },
+  },
+  example: {
+    origin: "contact_request",
+    phone_numbers: [
+      {
+        phone_number: "+16505551234",
+        type: "CELL",
+      },
+    ],
+  },
+} as const;
+
 export const WhatsAppUnsupportedSchema = {
   type: "object",
   additionalProperties: false,
@@ -8201,7 +8436,6 @@ export const WhatsAppUnsupportedSchema = {
       type: "string",
       minLength: 1,
       "x-extensible-enum": [
-        "contacts",
         "reaction",
         "interactive",
         "button",
@@ -8382,6 +8616,15 @@ export const WhatsAppMessageSchema = {
         },
       ],
       description: "Location the message carried.",
+    },
+    contact_cards: {
+      readOnly: true,
+      type: "array",
+      description:
+        "Contact cards the contact shared, either by tapping a button that asked for their number or by sending a card from their address book. Inbound only: sending a contact card is not supported.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppContactCard",
+      },
     },
     unsupported: {
       readOnly: true,
@@ -17765,6 +18008,14 @@ export const EventWhatsAppReceivedDataSchema = {
           ],
           description: "Location the contact sent.",
         },
+        contact_cards: {
+          type: "array",
+          description:
+            "Contact cards the contact shared, either by tapping a button that asked for their number or by sending a card from their address book.\n",
+          items: {
+            $ref: "#/components/schemas/WhatsAppContactCard",
+          },
+        },
         unsupported: {
           allOf: [
             {
@@ -19829,7 +20080,8 @@ export const SMSErrorWritableSchema = {
     description: {
       type: "string",
       minLength: 1,
-      description: "Human-readable explanation of the failure.",
+      description:
+        "The failure in words, from whatever refused the message: the carrier's own reason text on a delivery receipt, or ours on a message stopped before a carrier saw it. Free-form, so branch on `code` and show this to a human.",
       example: "Carrier filtered as spam",
     },
     carrier_error_code: {
@@ -22264,6 +22516,14 @@ export const EventWhatsAppReceivedDataWritableSchema = {
             },
           ],
           description: "Location the contact sent.",
+        },
+        contact_cards: {
+          type: "array",
+          description:
+            "Contact cards the contact shared, either by tapping a button that asked for their number or by sending a card from their address book.\n",
+          items: {
+            $ref: "#/components/schemas/WhatsAppContactCard",
+          },
         },
         unsupported: {
           allOf: [
