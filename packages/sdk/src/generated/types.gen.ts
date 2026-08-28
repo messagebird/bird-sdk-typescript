@@ -13136,6 +13136,54 @@ export type StatsTimezone = string;
  */
 export type EmailStatsTemplateFilter = string;
 
+export type GetCurrentWorkspaceData = {
+  body?: never;
+  path?: never;
+  query?: never;
+  url: "/v1/workspace";
+};
+
+export type GetCurrentWorkspaceErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetCurrentWorkspaceError =
+  GetCurrentWorkspaceErrors[keyof GetCurrentWorkspaceErrors];
+
+export type GetCurrentWorkspaceResponses = {
+  /**
+   * The current workspace.
+   */
+  200: Workspace;
+};
+
+export type GetCurrentWorkspaceResponse =
+  GetCurrentWorkspaceResponses[keyof GetCurrentWorkspaceResponses];
+
 export type PublishRealtimeAppEventData = {
   body: RealtimePublish;
   headers?: {

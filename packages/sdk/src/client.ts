@@ -21,6 +21,7 @@ import { DomainsResource } from "./resources/domains.gen.js";
 import { ContactPropertiesResource } from "./resources/contactProperties.gen.js";
 import { ContactsResource } from "./resources/contacts.js";
 import { PreferencesResource } from "./resources/preferences.js";
+import { WorkspaceResource } from "./resources/workspace.gen.js";
 import { SmsResource } from "./resources/sms.js";
 import { SmsKeywordRulesResource } from "./resources/smsKeywordRules.gen.js";
 import { SmsSuppressionsResource } from "./resources/smsSuppressions.gen.js";
@@ -197,6 +198,9 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
   /** Preferences: `bird.preferences.list(...)`, `.get(...)`, `.create(...)`, `.delete(...)`. */
   readonly preferences: PreferencesResource;
 
+  /** Workspace: `bird.workspace.get()` — the workspace this credential is scoped to. */
+  readonly workspace: WorkspaceResource;
+
   /** Audiences: `bird.audiences.create(...)`, `.list(...)`, `.addContacts(...)`, … */
   readonly audiences: AudiencesResource;
 
@@ -278,6 +282,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
     this.verify = new VerifyResource(this.core, this.#client);
     this.contacts = new ContactsResource(this.core, this.#client);
     this.preferences = new PreferencesResource(this.core, this.#client);
+    this.workspace = new WorkspaceResource(this.core, this.#client);
     this.audiences = new AudiencesResource(this.core, this.#client);
     this.contactProperties = new ContactPropertiesResource(
       this.core,

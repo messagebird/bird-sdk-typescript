@@ -126,6 +126,9 @@ import type {
   GetContactPropertyErrors,
   GetContactPropertyResponses,
   GetContactResponses,
+  GetCurrentWorkspaceData,
+  GetCurrentWorkspaceErrors,
+  GetCurrentWorkspaceResponses,
   GetDomainData,
   GetDomainErrors,
   GetDomainResponses,
@@ -427,6 +430,36 @@ export type Options<
    */
   meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * Get the current workspace
+ *
+ * Returns the workspace the current credentials are scoped to: its ID, name, the ID of the organization that owns it, and its notification and logo settings. The organization's own name and members are not included. Requires at least read access to the workspace.
+ *
+ */
+export const getCurrentWorkspace = <ThrowOnError extends boolean = false>(
+  options?: Options<GetCurrentWorkspaceData, ThrowOnError>,
+): RequestResult<
+  GetCurrentWorkspaceResponses,
+  GetCurrentWorkspaceErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetCurrentWorkspaceResponses,
+    GetCurrentWorkspaceErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/workspace",
+    ...options,
+  });
 
 /**
  * Publish a Realtime event

@@ -20,6 +20,7 @@ export type _Numbers = Pick<BirdClient["numbers"], "list" | "get" | "release">;
 export type _NumbersAvailable = Pick<BirdClient["numbers"]["available"], "list" | "get">;
 export type _NumbersOrders = Pick<BirdClient["numbers"]["orders"], "create" | "list" | "get">;
 export type _Domains = Pick<BirdClient["domains"], "list" | "get" | "create" | "verify" | "update" | "delete">;
+export type _Workspace = Pick<BirdClient["workspace"], "get">;
 export type _Webhooks = Pick<BirdClient["webhooks"], "unwrap">;
 export type _Preferences = Pick<BirdClient["preferences"], "list" | "get" | "create" | "delete">;
 export type _Contacts = Pick<BirdClient["contacts"], "list" | "get" | "create" | "update" | "delete" | "batch">;

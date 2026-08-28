@@ -1008,3 +1008,8 @@ const msg = await bird.whatsapp.send({
 });
 console.log(msg.id, msg.status);
 }
+
+export async function _ex_141() {
+const workspace = await bird.workspace.get();
+console.log(workspace.id, workspace.name); // "ws_…" "Production"
+}

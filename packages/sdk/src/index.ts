@@ -164,6 +164,7 @@ export type {
   PreferenceCreateParams,
   PreferenceWriteResult,
 } from "./resources/preferences.js";
+export type { Workspace } from "./resources/workspace.gen.js";
 export type {
   PreferenceStatus,
   PreferenceCoverage,
