@@ -2816,7 +2816,7 @@ export const createEmailLookup = <ThrowOnError extends boolean = false>(
  *
  * Creates a verification and sends the recipient a one-time passcode. Provide an email address, a phone number, or both in `to`. The service sends over one channel at a time and moves to the next planned channel if delivery fails.
  *
- * Calling this again for the same recipient reuses the verification in progress. During the resend cooldown, it returns the current state without sending. After the cooldown, it sends a fresh passcode.
+ * Calling this again for the same recipient reuses the verification in progress. During the resend cooldown, it returns the current state without sending, so nothing is charged and no send budget is spent. After the cooldown, it sends a fresh passcode, and that send draws on the recipient's hourly send cap exactly as a new verification does, so repeated resends can exhaust the cap and return `429` for the rest of that rolling hour. [Abuse guardrails](/docs/guides/verify/sending-verifications#abuse-guardrails) gives the figures.
  *
  * The `200` response contains the current state, never the passcode. Submit the recipient's passcode with [Check a verification](/docs/api/reference/create-verification-check) before `expires_at`. An invalid recipient returns `422`; exceeding the send rate limit returns `429`.
  *
@@ -2856,10 +2856,14 @@ export const createVerification = <ThrowOnError extends boolean = false>(
  *
  * A wrong or expired passcode returns `200 OK` with `success: false` and a `reason` such as `incorrect_code` or `expired`. `success: true` means the verification is complete. Each verification reports its final outcome once and cannot be checked again.
  *
- * An error status is returned only when the check cannot be evaluated. A `404`
- * means no verification matches the recipient or the matching one already
- * reached its final state. A `422` indicates an invalid recipient. A `429`
- * means passcodes for a recipient are being checked too quickly.
+ * An error status is returned only when the check cannot be evaluated. A `404
+ * E13000` means no active verification matched the recipient: either none
+ * exists for it, or the most recent one is already resolved as verified,
+ * expired, or out of attempts. One code covers all of those, so a `404` is not
+ * evidence the recipient failed to verify. Treat your own record of an earlier
+ * `success: true` as the outcome, and create a new verification only if the
+ * recipient still needs to verify. A `422` indicates an invalid recipient. A
+ * `429` means passcodes for a recipient are being checked too quickly.
  *
  */
 export const createVerificationCheck = <ThrowOnError extends boolean = false>(
@@ -2895,9 +2899,9 @@ export const createVerificationCheck = <ThrowOnError extends boolean = false>(
  *
  * Advances an in-progress verification to the next channel in its plan and sends a fresh passcode there. Identify the verification by the same `to` recipient used to create it; no verification ID is required.
  *
- * The send bypasses the resend cooldown, and passcodes sent earlier remain valid. The response sets `last_channel` to the most recent completed send. Concurrent requests each advance the plan by at most one channel and return committed state.
+ * The send bypasses the resend cooldown and does not draw on the recipient's hourly send cap; what bounds it is the channel plan, since each call advances by at most one channel. Passcodes sent earlier remain valid. The response sets `last_channel` to the most recent completed send. Concurrent requests each advance the plan by at most one channel and return committed state.
  *
- * A missing in-progress verification returns `404`. A plan with no further channel returns `422 NoNextChannel`; create the verification again to resend on the current channel. If every remaining channel fails, the operation returns `422 NoAvailableChannel`. Requests that exceed the send rate limit return `429`.
+ * A recipient with no in-progress verification returns `404 E13000`, whether none was ever created or the most recent one is already resolved. A recipient who has already verified is in that set, so a `404` here is not evidence they still need verifying, and creating another verification would send a passcode they no longer need. A plan with no further channel returns `422 NoNextChannel`; create the verification again to resend on the current channel. If every remaining channel fails, the operation returns `422 NoAvailableChannel`. Requests that exceed the send rate limit return `429`.
  *
  */
 export const createVerificationNextChannel = <
