@@ -22290,7 +22290,7 @@ export type ListWorkspaceNumbersData = {
      */
     number_type?: NumberType;
     /**
-     * Return only numbers that start with these digits, matched right after the country dial code: with `country_code=US`, `prefix=212` returns the +1 212 area-code numbers allocated to you. Digits only, and `country_code` is required alongside it, since the digits are national ones. Leave out the country dial code and any national dialing prefix such as a leading 0. Short codes never match a prefix search.
+     * Return only numbers that start with these digits. With `country_code`, the digits are national ones, matched right after the country dial code: with `country_code=US`, `prefix=212` returns the +1 212 area-code numbers allocated to you. Leave out the dial code and any national dialing prefix such as a leading 0; short codes never match a country-anchored prefix search. Without `country_code`, the digits are matched from the start of each stored number, ignoring a leading `+`, so short codes are reachable and a full number in digits finds itself. Digits only: up to 10 of them with `country_code`, 15 without.
      */
     prefix?: string;
     /**
