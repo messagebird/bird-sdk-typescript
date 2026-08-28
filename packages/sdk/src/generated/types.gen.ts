@@ -2141,12 +2141,24 @@ export type SmsSegments = {
    */
   readonly count: number;
   /**
-   * Encoding used for the body. The `GSM_7BIT` encoding fits 160 characters in one segment, or 153 per part in a multi-segment message. The `UCS2` encoding applies when the body contains a character outside the GSM 03.38 alphabet, including emoji, CJK, and some accented characters. It fits 70 characters in one segment, or 67 per part in a multi-segment message.
+   * Encoding used for the body. The `GSM_7BIT` encoding fits 160 septets
+   * (seven-bit units) in one segment, or 153 per part in a multi-segment
+   * message. The `UCS2` encoding applies when the body contains a character
+   * outside the GSM 03.38 alphabet, including emoji, CJK, and some accented
+   * characters. It fits 70 UTF-16 code units in one segment, or 67 per part.
+   *
+   * Neither limit counts characters, and both alphabets have characters that
+   * cost two units. Under `GSM_7BIT` there are ten such entries, and they are
+   * the whole set: `^`, `{`, `}`, `\`, `[`, `]`, `~`, `|`, `€`, and the form
+   * feed control. Eighty of those fill a single segment. Under `UCS2` an emoji
+   * outside the Basic Multilingual Plane is a surrogate pair costing two code
+   * units, so 35 of those fill a single segment.
    *
    */
   readonly encoding: "GSM_7BIT" | "UCS2";
   /**
-   * Character count of the body under the selected encoding.
+   * Character count of the body, counted in Unicode code points under either encoding. This is not the segment measure: a `GSM_7BIT` extended-table character counts once here but costs two septets, and a `UCS2` emoji outside the Basic Multilingual Plane counts once here but costs two of the segment's 70 code units.
+   *
    */
   readonly characters: number;
 };
@@ -13104,7 +13116,7 @@ export type IncludeTotal = boolean;
 export type OrderDesc = "asc" | "desc";
 
 /**
- * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+ * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
  */
 export type XWorkspaceId = string;
 
@@ -13188,7 +13200,7 @@ export type PublishRealtimeAppEventData = {
   body: RealtimePublish;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -13265,7 +13277,7 @@ export type PublishRealtimeAppBatchData = {
   body: RealtimeBatchPublish;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -13342,7 +13354,7 @@ export type ListRealtimeAppChannelsData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
   };
@@ -13414,7 +13426,7 @@ export type GetRealtimeAppChannelData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
   };
@@ -13486,7 +13498,7 @@ export type ListRealtimeAppChannelMembersData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
   };
@@ -13553,7 +13565,7 @@ export type DisconnectRealtimeAppMemberData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -13634,7 +13646,7 @@ export type SendRealtimeAppMemberEventData = {
   body: RealtimeMemberPublish;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -16547,7 +16559,7 @@ export type ListSmsKeywordRulesData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
   };
@@ -16622,7 +16634,7 @@ export type CreateSmsKeywordRuleData = {
   body: SmsKeywordRuleCreate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -16694,7 +16706,7 @@ export type DeleteSmsKeywordRuleData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -16767,7 +16779,7 @@ export type GetSmsKeywordRuleData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
   };
@@ -16826,7 +16838,7 @@ export type UpdateSmsKeywordRuleData = {
   body: SmsKeywordRuleUpdate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -18173,7 +18185,7 @@ export type CreatePhoneNumberLookupData = {
   body: PhoneNumberLookupRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -18250,7 +18262,7 @@ export type CreateEmailLookupData = {
   body: EmailLookupRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -18327,7 +18339,7 @@ export type CreateVerificationData = {
   body: VerificationCreateRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -18404,7 +18416,7 @@ export type CreateVerificationCheckData = {
   body: VerificationCheckRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -18481,7 +18493,7 @@ export type CreateVerificationNextChannelData = {
   body: VerificationNextChannelRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -22271,7 +22283,7 @@ export type ListWorkspaceNumbersData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
   };
@@ -22354,7 +22366,7 @@ export type ListAvailableNumbersData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
   };
@@ -22433,7 +22445,7 @@ export type GetAvailableNumberData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
   };
@@ -22492,7 +22504,7 @@ export type ListNumbersOrdersData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
   };
@@ -22559,7 +22571,7 @@ export type CreateNumbersOrderData = {
   body: NumbersOrderCreate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -22643,7 +22655,7 @@ export type GetNumbersOrderData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
   };
@@ -22702,7 +22714,7 @@ export type ReleaseWorkspaceNumberData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -22779,7 +22791,7 @@ export type GetWorkspaceNumberData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication; API-key requests derive the workspace from the key.
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
      */
     "X-Workspace-Id"?: string;
   };
