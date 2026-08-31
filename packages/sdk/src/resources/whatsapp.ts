@@ -15,10 +15,14 @@ export type WhatsappSendParams = WhatsAppMessageSendRequest;
 export class WhatsappResource extends WhatsappResourceBase {
   /**
    * Send one message, carrying exactly one kind of content: a template, or
-   * free-form `text`, `image`, `video`, `audio`, `sticker`, `document` or
-   * `location`. Every send but a Bird-managed template needs `from`, a number
-   * this workspace owns. The result is `accepted`, not yet delivered — read it
-   * back with `get` to confirm.
+   * free-form `text`, `image`, `video`, `audio`, `sticker`, `document`,
+   * `location` or `interactive` — the last being the arm that gives the
+   * recipient something to tap: reply buttons, a list menu, a link button,
+   * media cards, or a request for their location or contact details. Set
+   * `in_reply_to_message_id` to quote an earlier message from the same
+   * conversation. Every send but a Bird-managed
+   * template needs `from`, a number this workspace owns. The result is
+   * `accepted`, not yet delivered — read it back with `get` to confirm.
    *
    * @example
    * const msg = await bird.whatsapp.send({

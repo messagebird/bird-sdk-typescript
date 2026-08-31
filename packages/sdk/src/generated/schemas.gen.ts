@@ -7735,7 +7735,7 @@ export const WhatsAppAddressSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Sender or recipient of a WhatsApp message: a phone number, a business-scoped user ID, or both.",
+    "Sender or recipient of a WhatsApp message: a phone number, a business-scoped user ID, or both. A message received from a WhatsApp user carries whatever profile they publish, which may be neither.",
   properties: {
     phone_number: {
       type: "string",
@@ -7749,6 +7749,18 @@ export const WhatsAppAddressSchema = {
       description:
         "Business-scoped user ID, Meta's identifier for the WhatsApp user. Present only on the WhatsApp-user side of the message.\n",
       example: "NL.xxxx",
+    },
+    username: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Present only on a message received from a WhatsApp user, on `from`; never on an outbound send's `to`, where the profile is not known. Absent when the contact has not adopted one, and on a message received before this workspace started recording them. Same form as a number's own username (`WhatsAppNumberProfile.username`), without a leading `@`; a message cannot be addressed by it.\n",
+    },
+    display_name: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Present only on a message received from a WhatsApp user, on `from`; never on an outbound send's `to`, where the profile is not known. Absent when the message carries no profile, and on a message received before this workspace started recording them.\n",
     },
   },
 } as const;
@@ -8426,6 +8438,378 @@ export const WhatsAppContactCardSchema = {
   },
 } as const;
 
+export const WhatsAppInteractiveTypeSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "button",
+    "list",
+    "cta_url",
+    "carousel",
+    "location_request_message",
+    "request_contact_info",
+  ],
+  description:
+    "Which kind of interactive message this is.\n\n- `button`: up to three tappable buttons, each sending its own identifier\n  back as an inbound message. Carried in `buttons`.\n- `list`: a single button that opens a menu of rows to choose one from.\n- `cta_url`: a single button that opens a link.\n- `carousel`: 2 to 10 media cards the recipient scrolls through sideways,\n  each with its own buttons. Carried in `cards`.\n- `location_request_message`: a single button that asks the recipient to\n  share where they are. A tap arrives as an inbound `location` message.\n- `request_contact_info`: a single button that asks the recipient to share\n  their phone number. A tap arrives as an inbound message carrying the number\n  on `contact_cards`, with `origin` set to `contact_request`.\n\nThe last two name no field of their own: the ask is the whole message, and\n`body_text` is all they carry.\n\nOpen enum: WhatsApp adds interactive kinds over time, so treat an\nunrecognized value as a future kind rather than an error.\n",
+  example: "button",
+} as const;
+
+export const WhatsAppInteractiveHeaderTypeSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["text", "image", "video", "document"],
+  description:
+    "A header's kind, and which field carries it. Open enum: WhatsApp adds header kinds over time, so treat an unrecognized value as a future kind rather than an error.\n",
+  example: "image",
+} as const;
+
+export const WhatsAppInteractiveHeaderSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  description:
+    "What the interactive message showed above its body. `type` names the kind and the field that carries it: `text` for a line of copy, `url` for the file every other kind shows. As on the message itself, the read vocabulary is open: dispatch on `type` and treat an unrecognized value as a header kind added since.\n",
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveHeaderType",
+        },
+      ],
+      description: "Which kind of header this is, and which field carries it.",
+    },
+    text: {
+      type: "string",
+      description: "The line of text shown above the body.",
+      example: "New workshop dates announced",
+    },
+    url: {
+      type: "string",
+      format: "uri",
+      description:
+        "The URL of the file shown above the body, as the send supplied it. Interactive content is outbound only, so Bird neither stores nor proxies the file.\n",
+      example: "https://cdn.example.com/banners/workshop.png",
+    },
+  },
+} as const;
+
+export const WhatsAppInteractiveButtonTypeSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["quick_reply", "cta_url"],
+  description:
+    "Which kind of button this is, and which field carries it.\n\n- `quick_reply`: sends its own identifier back as an inbound message.\n- `cta_url`: opens a link in the recipient's browser.\n\nOpen enum: WhatsApp adds button kinds over time, so treat an unrecognized\nvalue as a future kind rather than an error.\n",
+  example: "quick_reply",
+} as const;
+
+export const WhatsAppInteractiveQuickReplyButtonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["slug", "text"],
+  description:
+    "A reply button's label and the handle it carries back. On the echo of a message Bird sent, the pair the send declared; on an inbound `interactive_reply`, the pair the contact tapped. No length is declared here, because a tap can echo a template's quick-reply button, whose label runs longer than an interactive message's own allows.\n",
+  properties: {
+    slug: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The handle the button carries back, never shown to the recipient. On a tap on a template's quick-reply button, it is the payload that template declared.\n",
+      example: "change-booking",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      description: "The label the recipient saw.",
+      example: "Change",
+    },
+  },
+} as const;
+
+export const WhatsAppInteractiveCtaUrlSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["text", "url"],
+  description:
+    "The link button the message offered: its label and the address it opens.\n",
+  properties: {
+    text: {
+      type: "string",
+      minLength: 1,
+      description: "The button's label.",
+      example: "See dates",
+    },
+    url: {
+      type: "string",
+      format: "uri",
+      minLength: 1,
+      description: "The address the button opens, as the send supplied it.",
+      example: "https://example.com/workshops?click_id=a1b2c3",
+    },
+  },
+} as const;
+
+export const WhatsAppInteractiveButtonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  description:
+    "One button the message offered. The field named by `type` is the one that is present. As on the message itself, the read vocabulary is open: dispatch on `type` and treat an unrecognized value as a button kind added since.\n",
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveButtonType",
+        },
+      ],
+      description: "Which kind of button this is, and which field carries it.",
+    },
+    quick_reply: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveQuickReplyButton",
+        },
+      ],
+      description: "The button's label and the handle it sends back.",
+    },
+    cta_url: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveCtaUrl",
+        },
+      ],
+      description: "The button's label and the address it opens.",
+    },
+  },
+} as const;
+
+export const WhatsAppInteractiveListRowSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["slug", "text"],
+  description:
+    "One option in a list's menu. On the echo of a message Bird sent, the row as declared; on an inbound `interactive_reply`, the row the contact chose. No length is declared here: this is what WhatsApp reported, not what a send is held to.\n",
+  properties: {
+    slug: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The handle the row carries back, never shown to the recipient.",
+      example: "priority_express",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      description: "The row's label, shown as its title in the menu.",
+      example: "Priority Mail Express",
+    },
+    description: {
+      type: "string",
+      description:
+        "The second line under the label. Absent when the row carried none.",
+      example: "Next day to 2 days",
+    },
+  },
+} as const;
+
+export const WhatsAppInteractiveListSectionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "rows"],
+  description: "One group of options in the menu the message showed.",
+  properties: {
+    title: {
+      type: "string",
+      minLength: 1,
+      description: "The group's heading, shown above its rows.",
+      example: "As soon as possible",
+    },
+    rows: {
+      type: "array",
+      description: "The options in this group, in the order shown.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppInteractiveListRow",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppInteractiveListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["button_text", "sections"],
+  description:
+    "The menu the message offered: a button that opens it, and the groups of options behind it.\n",
+  properties: {
+    button_text: {
+      type: "string",
+      minLength: 1,
+      description: "The label of the button that opens the menu.",
+      example: "Shipping options",
+    },
+    sections: {
+      type: "array",
+      description: "The groups of options in the menu, in the order shown.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppInteractiveListSection",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppInteractiveCardSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["header", "buttons"],
+  description: "One card the carousel showed, in the position it appeared in.",
+  properties: {
+    header: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveHeader",
+        },
+      ],
+      description: "The image or video shown at the top of the card.",
+    },
+    body_text: {
+      type: "string",
+      description: "The card's own text. Absent when the card carried none.",
+      example: "*Blue Echeveria*",
+    },
+    buttons: {
+      type: "array",
+      description: "The buttons the card offered, in the order shown.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppInteractiveButton",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppInteractiveSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Interactive content of a WhatsApp message: body text plus something the recipient can tap. The field named by `type` is the one that is present, except on `location_request_message` and `request_contact_info`, which name no field: each is a single button asking the recipient for something, so `body_text` is the whole message. Outbound only, and so an echo of what the send asked for: a contact cannot send interactive content, and a tap on it reads as `interactive_reply`, or on a location or contact request as the message the recipient shared in answer. Unlike the send schema, this one does not pin each `type` to its field. The vocabulary in `type` is open, so dispatch on it and treat an unrecognized value as a kind added since. Only the discriminator is open: this schema declares no additional properties, so a new kind's own payload field arrives here in the same change that introduces the kind, which is additive.\n",
+  required: ["type", "body_text"],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveType",
+        },
+      ],
+      description:
+        "Which kind of interactive message this is, and which field carries it.",
+    },
+    header: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveHeader",
+        },
+      ],
+      description:
+        "What was shown above the body. Absent when the message carried no header.",
+    },
+    body_text: {
+      type: "string",
+      minLength: 1,
+      description: "The message's main text.",
+      example: "Your workshop is scheduled for 9am tomorrow.",
+    },
+    footer_text: {
+      type: "string",
+      description:
+        "The small print below the body. Absent when the message carried none.",
+      example: "Lucky Shrub, your gateway to succulents",
+    },
+    buttons: {
+      type: "array",
+      description: "The buttons the message offered, in the order shown.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppInteractiveButton",
+      },
+    },
+    list: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveList",
+        },
+      ],
+      description: "The menu the message offered.",
+    },
+    cta_url: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveCtaUrl",
+        },
+      ],
+      description: "The link button the message offered.",
+    },
+    cards: {
+      type: "array",
+      description:
+        "The cards the message offered, in the order they appeared, left to right.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppInteractiveCard",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppInteractiveReplyTypeSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["button", "list"],
+  description:
+    "Which kind of tap the reply came from.\n\n- `button`: a reply button on an interactive message, or a quick-reply\n  button on a template. Both carry an identifier and a label, so they read\n  the same way.\n- `list`: a row chosen from a list's menu. Only this kind carries a\n  `description`.\n\nOpen enum: WhatsApp adds interactive kinds over time, so treat an\nunrecognized value as a future kind rather than an error.\n",
+  example: "button",
+} as const;
+
+export const WhatsAppInteractiveReplySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "What the contact tapped, on an inbound message answering an interactive message or a template's quick-reply button. `type` names the kind and the field it names carries it, as everywhere else in this arm. Inbound only: a message that offers something to tap reads as `interactive` instead, and the two never appear together.\n",
+  required: ["type"],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveReplyType",
+        },
+      ],
+      description:
+        "Which kind of tap this reply came from, and which field carries it.",
+    },
+    button: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveQuickReplyButton",
+        },
+      ],
+      description:
+        "The button the contact tapped, as you declared it. On a reply to a template's quick-reply button, `slug` is the button's payload, which WhatsApp sets to the button's own label.\n",
+    },
+    list: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveListRow",
+        },
+      ],
+      description:
+        "The row the contact chose, as you declared it. `description` is present only when the row carried one.\n",
+    },
+  },
+  example: {
+    type: "list",
+    list: {
+      slug: "priority_express",
+      text: "Priority Mail Express",
+      description: "Next day to 2 days",
+    },
+  },
+} as const;
+
 export const WhatsAppUnsupportedSchema = {
   type: "object",
   additionalProperties: false,
@@ -8626,6 +9010,36 @@ export const WhatsAppMessageSchema = {
       items: {
         $ref: "#/components/schemas/WhatsAppContactCard",
       },
+    },
+    interactive: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractive",
+        },
+      ],
+      description:
+        "Interactive content the message carried. Outbound only: a contact cannot send one. A tap on a reply button or a list row reads back as `interactive_reply` on the contact's inbound message; a `cta_url` link sends nothing back, and the two request kinds are answered by an inbound `location` or `contact_cards` message.\n",
+    },
+    in_reply_to_message_id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMessageID",
+        },
+      ],
+      description:
+        "The message this one answers. On an inbound message it is what WhatsApp reports as the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. An outbound message echoes the `in_reply_to_message_id` it was sent with. Absent when the message answers nothing, and absent on an inbound message whose target we cannot match to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.\n",
+    },
+    interactive_reply: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveReply",
+        },
+      ],
+      description:
+        "What the contact tapped, on a message answering an interactive message or a template's quick-reply button. Inbound only.\n",
     },
     unsupported: {
       readOnly: true,
@@ -9017,6 +9431,850 @@ export const WhatsAppDocumentSendSchema = {
   },
 } as const;
 
+export const WhatsAppInteractiveTypeWriteSchema = {
+  type: "string",
+  minLength: 1,
+  enum: [
+    "button",
+    "list",
+    "cta_url",
+    "carousel",
+    "location_request_message",
+    "request_contact_info",
+  ],
+  "x-enum-varnames": [
+    "WhatsAppInteractiveTypeWriteButton",
+    "WhatsAppInteractiveTypeWriteList",
+    "WhatsAppInteractiveTypeWriteCtaUrl",
+    "WhatsAppInteractiveTypeWriteCarousel",
+    "WhatsAppInteractiveTypeWriteLocationRequestMessage",
+    "WhatsAppInteractiveTypeWriteRequestContactInfo",
+  ],
+  description:
+    "Which kind of interactive message to send.\n\n- `button`: up to three tappable buttons, each sending its own identifier\n  back as an inbound message. Carried in `buttons`.\n- `list`: a single button that opens a menu of rows to choose one from.\n- `cta_url`: a single button that opens a link, so the address stays out of\n  the message body.\n- `carousel`: 2 to 10 media cards the recipient scrolls through sideways,\n  each with its own buttons. Carried in `cards`.\n- `location_request_message`: a single button that asks the recipient to\n  share where they are. A tap arrives as an inbound `location` message.\n- `request_contact_info`: a single button that asks the recipient to share\n  their phone number. A tap arrives as an inbound message carrying the number\n  on `contact_cards`, with `origin` set to `contact_request`.\n\nThe last two name no field of their own: the ask is the whole message, and\n`body_text` is all they carry.\n\nClosed on the write side: a kind Bird cannot send to Meta is rejected rather\nthan accepted and then failed asynchronously.\n",
+  example: "button",
+} as const;
+
+export const WhatsAppInteractiveHeaderTypeWriteSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["text", "image", "video", "document"],
+  "x-enum-varnames": [
+    "WhatsAppInteractiveHeaderTypeWriteText",
+    "WhatsAppInteractiveHeaderTypeWriteImage",
+    "WhatsAppInteractiveHeaderTypeWriteVideo",
+    "WhatsAppInteractiveHeaderTypeWriteDocument",
+  ],
+  description:
+    "A header's kind, and which field carries it. `text` is a line of copy; the rest each show a file whose address you give in `url`. A `list` accepts `text` only, and a carousel card accepts `image` or `video` only. Closed on the write side: a kind Bird cannot send to Meta is rejected rather than accepted and then failed asynchronously.\n",
+  example: "image",
+} as const;
+
+export const WhatsAppInteractiveHeaderSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  description:
+    "What to show above an interactive message's body. `type` names the kind and the field that carries it: `text` for a line of copy, `url` for the file every other kind shows, the same pairing a template's `parameters` use. A `list` accepts a `text` header only, and any other kind on it is refused.\n",
+  oneOf: [
+    {
+      properties: {
+        type: {
+          const: "text",
+        },
+        url: {
+          not: {},
+        },
+      },
+      required: ["type", "text"],
+    },
+    {
+      properties: {
+        type: {
+          enum: ["image", "video", "document"],
+        },
+        text: {
+          not: {},
+        },
+      },
+      required: ["type", "url"],
+    },
+  ],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveHeaderTypeWrite",
+        },
+      ],
+      description: "Which kind of header this is, and which field carries it.",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      maxLength: 60,
+      description:
+        "A single line of text above the body. Send it on a `text` header.",
+      example: "New workshop dates announced",
+    },
+    url: {
+      type: "string",
+      format: "uri",
+      minLength: 1,
+      description:
+        "Public `https` URL of the file to show. Send it on an `image`, `video` or `document` header. An image must be JPEG or PNG, up to 5 MB; a video, MP4 with H.264 video and AAC audio, up to 16 MB; a document, up to 100 MB, and PDF, Word, Excel, PowerPoint and plain text render reliably in the WhatsApp client while other file types are transmitted but unsupported. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch.\n",
+      example: "https://cdn.example.com/banners/workshop.png",
+    },
+  },
+  example: {
+    type: "image",
+    url: "https://cdn.example.com/banners/workshop.png",
+  },
+} as const;
+
+export const WhatsAppInteractiveButtonTypeWriteSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["quick_reply", "cta_url"],
+  "x-enum-varnames": [
+    "WhatsAppInteractiveButtonTypeWriteQuickReply",
+    "WhatsAppInteractiveButtonTypeWriteCtaUrl",
+  ],
+  description:
+    "Which kind of button this is, and which field carries it.\n\n- `quick_reply`: sends its own identifier back as an inbound message. The\n  name `WhatsAppTemplateButtonTypeWrite` already uses for the same control.\n- `cta_url`: opens a link in the recipient's browser.\n\nClosed on the write side: a kind Bird cannot send to Meta is rejected rather\nthan accepted and then failed asynchronously.\n",
+  example: "quick_reply",
+} as const;
+
+export const WhatsAppInteractiveQuickReplyButtonSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["slug", "text"],
+  description:
+    "One tappable reply button. Tapping it sends `slug` back as an inbound message, which reads as an `interactive_reply`.\n",
+  properties: {
+    slug: {
+      type: "string",
+      minLength: 1,
+      maxLength: 256,
+      description:
+        "Your own handle for this button, echoed back on the reply. You choose the value and it is never shown to the recipient, so it can carry whatever your application needs to route the answer. Any characters, up to 256.\n",
+      example: "change-booking",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      maxLength: 20,
+      description:
+        "The button's label. It must differ from every other button's label in the same message, because the recipient's reply is identified to them by the label they tapped.\n",
+      example: "Change",
+    },
+  },
+  example: {
+    slug: "change-booking",
+    text: "Change",
+  },
+} as const;
+
+export const WhatsAppInteractiveCtaUrlSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["text", "url"],
+  description:
+    "A button that opens a link in the recipient's browser, so a long or opaque address never has to appear in the message body.\n",
+  properties: {
+    text: {
+      type: "string",
+      minLength: 1,
+      maxLength: 20,
+      description: "The button's label.",
+      example: "See dates",
+    },
+    url: {
+      type: "string",
+      format: "uri",
+      minLength: 1,
+      maxLength: 2000,
+      description:
+        "The address the button opens. It is fixed for every recipient, so per recipient tracking belongs in the address you supply, for example as a query parameter you generate per send.\n",
+      example: "https://example.com/workshops?click_id=a1b2c3",
+    },
+  },
+  example: {
+    text: "See dates",
+    url: "https://example.com/workshops?click_id=a1b2c3",
+  },
+} as const;
+
+export const WhatsAppInteractiveButtonSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  description:
+    "One button on an interactive message or on a carousel card. `type` names the kind and the field that carries it, so a button kind WhatsApp adds later arrives as another `type` here rather than as a new shape somewhere else.\n",
+  oneOf: [
+    {
+      properties: {
+        type: {
+          const: "quick_reply",
+        },
+        cta_url: {
+          not: {},
+        },
+      },
+      required: ["type", "quick_reply"],
+    },
+    {
+      properties: {
+        type: {
+          const: "cta_url",
+        },
+        quick_reply: {
+          not: {},
+        },
+      },
+      required: ["type", "cta_url"],
+    },
+  ],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveButtonTypeWrite",
+        },
+      ],
+      description: "Which kind of button this is, and which field carries it.",
+    },
+    quick_reply: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveQuickReplyButtonSend",
+        },
+      ],
+      description:
+        "The button's label and the handle it sends back. Send this on a `quick_reply` button.",
+    },
+    cta_url: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveCtaUrlSend",
+        },
+      ],
+      description:
+        "The button's label and the address it opens. Send this on a `cta_url` button.",
+    },
+  },
+  example: {
+    type: "quick_reply",
+    quick_reply: {
+      slug: "change-booking",
+      text: "Change",
+    },
+  },
+} as const;
+
+export const WhatsAppInteractiveListRowSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["slug", "text"],
+  description:
+    "One option in a list's menu. Choosing it sends `slug` back as an inbound message, which reads as an `interactive_reply`.\n",
+  properties: {
+    slug: {
+      type: "string",
+      minLength: 1,
+      maxLength: 200,
+      description:
+        "Your own handle for this option, echoed back on the reply. You choose the value and it is never shown to the recipient. Any characters, up to 200.\n",
+      example: "priority_express",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      maxLength: 24,
+      description:
+        "The option's label, shown as the row's title in the menu. It must differ from every other row's label and from every button's label in the same message, not merely within its own group; a repeat returns a `422` `WhatsAppInteractiveDuplicateLabel`.\n",
+      example: "Priority Mail Express",
+    },
+    description: {
+      type: "string",
+      maxLength: 72,
+      description:
+        "A second line under the label, for detail that will not fit in it.",
+      example: "Next day to 2 days",
+    },
+  },
+  example: {
+    slug: "priority_express",
+    text: "Priority Mail Express",
+    description: "Next day to 2 days",
+  },
+} as const;
+
+export const WhatsAppInteractiveListSectionSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "rows"],
+  description:
+    "One group of options in a list's menu. A menu with a single group still carries a title, which WhatsApp shows above its rows.\n",
+  properties: {
+    title: {
+      type: "string",
+      minLength: 1,
+      maxLength: 24,
+      description: "The group's heading, shown above its rows.",
+      example: "As soon as possible",
+    },
+    rows: {
+      type: "array",
+      minItems: 1,
+      maxItems: 10,
+      description:
+        "The options in this group. A message carries at most 10 rows across all its groups combined, so this per-group maximum is not additive: more than 10 in total returns a `422` `WhatsAppInteractiveLimitExceeded`. Row labels must be unique across the whole message too, not just within a group.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppInteractiveListRowSend",
+      },
+    },
+  },
+  example: {
+    title: "As soon as possible",
+    rows: [
+      {
+        slug: "priority_express",
+        text: "Priority Mail Express",
+        description: "Next day to 2 days",
+      },
+    ],
+  },
+} as const;
+
+export const WhatsAppInteractiveListSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["button_text", "sections"],
+  description:
+    "A menu of options behind a single button. The recipient taps the button, WhatsApp opens the menu, and choosing one option sends it back as a reply.\n",
+  properties: {
+    button_text: {
+      type: "string",
+      minLength: 1,
+      maxLength: 20,
+      description: "The label of the button that opens the menu.",
+      example: "Shipping options",
+    },
+    sections: {
+      type: "array",
+      minItems: 1,
+      maxItems: 10,
+      description:
+        "The groups of options in the menu, in the order shown. At most 10 rows across all groups combined, each carrying a label unique across the whole message.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppInteractiveListSectionSend",
+      },
+    },
+  },
+  example: {
+    button_text: "Shipping options",
+    sections: [
+      {
+        title: "As soon as possible",
+        rows: [
+          {
+            slug: "priority_express",
+            text: "Priority Mail Express",
+            description: "Next day to 2 days",
+          },
+        ],
+      },
+      {
+        title: "I can wait a bit",
+        rows: [
+          {
+            slug: "ground_advantage",
+            text: "Ground Advantage",
+            description: "2 to 5 days",
+          },
+        ],
+      },
+    ],
+  },
+} as const;
+
+export const WhatsAppInteractiveCardHeaderSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "url"],
+  description:
+    "The media at the top of a carousel card. Every card must carry one, and it must be an image or a video: a card takes no text or document header.\n",
+  oneOf: [
+    {
+      properties: {
+        type: {
+          const: "image",
+        },
+      },
+    },
+    {
+      properties: {
+        type: {
+          const: "video",
+        },
+      },
+    },
+  ],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveHeaderTypeWrite",
+        },
+      ],
+      description:
+        "Which kind of media this is. A card accepts `image` or `video` only.\n",
+    },
+    url: {
+      type: "string",
+      format: "uri",
+      minLength: 1,
+      description:
+        "Public `https` URL of the file to show at the top of the card. An image must be JPEG or PNG, up to 5 MB; a video, MP4 with H.264 video and AAC audio, up to 16 MB. WhatsApp fetches it at send time, on the same terms as a message header's `url`.\n",
+      example: "https://cdn.example.com/plants/blue-echeveria.jpeg",
+    },
+  },
+  example: {
+    type: "image",
+    url: "https://cdn.example.com/plants/blue-echeveria.jpeg",
+  },
+} as const;
+
+export const WhatsAppInteractiveCardSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["header", "buttons"],
+  description:
+    "One card in a carousel: media at the top, optional text of its own, and the buttons under it. A card has no footer, and its position in `cards` is the position it appears in.\n",
+  oneOf: [
+    {
+      properties: {
+        buttons: {
+          maxItems: 1,
+          items: {
+            properties: {
+              type: {
+                const: "cta_url",
+              },
+            },
+          },
+        },
+      },
+    },
+    {
+      properties: {
+        buttons: {
+          items: {
+            properties: {
+              type: {
+                const: "quick_reply",
+              },
+            },
+          },
+        },
+      },
+    },
+  ],
+  properties: {
+    header: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveCardHeaderSend",
+        },
+      ],
+      description: "The image or video at the top of the card.",
+    },
+    body_text: {
+      type: "string",
+      minLength: 1,
+      maxLength: 160,
+      pattern: "^[^\\n]*(\\n[^\\n]*){0,2}$",
+      description:
+        "The card's own text, below its media, with at most two line breaks. Optional: a card can carry media and buttons alone.\n",
+      example:
+        "*Blue Echeveria*\n\nA rosette-shaped succulent with powdery blue leaves.",
+    },
+    buttons: {
+      type: "array",
+      minItems: 1,
+      maxItems: 3,
+      description:
+        "The buttons under the card, in the order given. Either one `cta_url` button or up to three `quick_reply` buttons: the two kinds cannot be mixed on one card. Every card in the carousel must carry the same kinds in the same number, and a carousel whose cards disagree returns a `422` `WhatsAppInteractiveCarouselButtonsMismatch`.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppInteractiveButtonSend",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppInteractiveSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "body_text"],
+  description:
+    "An interactive message to send: body text plus something for the recipient to tap. Name the kind in `type` and carry that kind's field alongside it: `buttons`, `list`, `cta_url` or `cards`. The schema pins each `type` to its own field and bars the other kinds', so a request carrying a second kind's field alongside the right one is refused. `location_request_message` and `request_contact_info` name no field: each is a single button asking the recipient for something, so `body_text` is the whole message and every other kind's field is barred. Deliverable only inside an open 24-hour customer service window; outside one, send a template instead.\n",
+  oneOf: [
+    {
+      properties: {
+        type: {
+          const: "button",
+        },
+        body_text: {
+          maxLength: 1024,
+        },
+        buttons: {
+          items: {
+            properties: {
+              type: {
+                const: "quick_reply",
+              },
+            },
+          },
+        },
+        list: {
+          not: {},
+        },
+        cta_url: {
+          not: {},
+        },
+        cards: {
+          not: {},
+        },
+      },
+      required: ["type", "buttons"],
+    },
+    {
+      properties: {
+        type: {
+          const: "list",
+        },
+        header: {
+          properties: {
+            type: {
+              const: "text",
+            },
+            url: {
+              not: {},
+            },
+          },
+        },
+        buttons: {
+          not: {},
+        },
+        cta_url: {
+          not: {},
+        },
+        cards: {
+          not: {},
+        },
+      },
+      required: ["type", "list"],
+    },
+    {
+      properties: {
+        type: {
+          const: "cta_url",
+        },
+        body_text: {
+          maxLength: 1024,
+        },
+        buttons: {
+          not: {},
+        },
+        list: {
+          not: {},
+        },
+        cards: {
+          not: {},
+        },
+      },
+      required: ["type", "cta_url"],
+    },
+    {
+      properties: {
+        type: {
+          const: "carousel",
+        },
+        body_text: {
+          maxLength: 1024,
+        },
+        header: {
+          not: {},
+        },
+        footer_text: {
+          not: {},
+        },
+        buttons: {
+          not: {},
+        },
+        list: {
+          not: {},
+        },
+        cta_url: {
+          not: {},
+        },
+      },
+      required: ["type", "cards"],
+    },
+    {
+      properties: {
+        type: {
+          const: "location_request_message",
+        },
+        body_text: {
+          maxLength: 1024,
+        },
+        header: {
+          not: {},
+        },
+        footer_text: {
+          not: {},
+        },
+        buttons: {
+          not: {},
+        },
+        list: {
+          not: {},
+        },
+        cta_url: {
+          not: {},
+        },
+        cards: {
+          not: {},
+        },
+      },
+      required: ["type"],
+    },
+    {
+      properties: {
+        type: {
+          const: "request_contact_info",
+        },
+        body_text: {
+          maxLength: 1024,
+        },
+        header: {
+          not: {},
+        },
+        footer_text: {
+          not: {},
+        },
+        buttons: {
+          not: {},
+        },
+        list: {
+          not: {},
+        },
+        cta_url: {
+          not: {},
+        },
+        cards: {
+          not: {},
+        },
+      },
+      required: ["type"],
+    },
+  ],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveTypeWrite",
+        },
+      ],
+      description:
+        "Which kind of interactive message this is, and which field carries it.",
+    },
+    header: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveHeaderSend",
+        },
+      ],
+      description:
+        "Optional content above the body. A `list` accepts a `text` header only; `button` and `cta_url` also accept an image, video or document. A `carousel` accepts none: its cards carry their own media. Neither request kind accepts one.\n",
+    },
+    body_text: {
+      type: "string",
+      minLength: 1,
+      maxLength: 4096,
+      description:
+        "The message's main text, required on every kind, and the whole message on `location_request_message` and `request_contact_info`. The WhatsApp client turns any URL it contains into a clickable link. Only a `list` may use the full length; the other kinds cap it at 1024 characters.\n",
+      example: "Your workshop is scheduled for 9am tomorrow.",
+    },
+    footer_text: {
+      type: "string",
+      minLength: 1,
+      maxLength: 60,
+      description:
+        "Optional small print below the body and above the buttons. A `carousel` and both request kinds take no footer.\n",
+      example: "Dates are subject to change.",
+    },
+    buttons: {
+      type: "array",
+      minItems: 1,
+      maxItems: 3,
+      description:
+        "The buttons to show, in the order given. Send this on a `button` message, where every button is a `quick_reply`. Every label must be unique within the message; a repeat returns a `422` `WhatsAppInteractiveDuplicateLabel`.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppInteractiveButtonSend",
+      },
+    },
+    list: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveListSend",
+        },
+      ],
+      description: "The menu to show. Send this on a `list` message.",
+    },
+    cta_url: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveCtaUrlSend",
+        },
+      ],
+      description: "The link button to show. Send this on a `cta_url` message.",
+    },
+    cards: {
+      type: "array",
+      minItems: 2,
+      maxItems: 10,
+      description:
+        "The cards to show, in the order they appear, left to right. Send this on a `carousel` message, with between 2 and 10 cards. The message's own `body_text` introduces them; a carousel carries no header and no footer of its own.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppInteractiveCardSend",
+      },
+    },
+  },
+  examples: [
+    {
+      type: "button",
+      header: {
+        type: "image",
+        url: "https://cdn.example.com/banners/workshop.png",
+      },
+      body_text:
+        "Your gardening workshop is scheduled for 9am tomorrow. Use the buttons if you need to reschedule.",
+      footer_text: "Lucky Shrub, your gateway to succulents",
+      buttons: [
+        {
+          type: "quick_reply",
+          quick_reply: {
+            slug: "change-booking",
+            text: "Change",
+          },
+        },
+        {
+          type: "quick_reply",
+          quick_reply: {
+            slug: "cancel-booking",
+            text: "Cancel",
+          },
+        },
+      ],
+    },
+    {
+      type: "list",
+      header: {
+        type: "text",
+        text: "Choose a shipping option",
+      },
+      body_text: "Which shipping option do you prefer?",
+      list: {
+        button_text: "Shipping options",
+        sections: [
+          {
+            title: "As soon as possible",
+            rows: [
+              {
+                slug: "priority_express",
+                text: "Priority Mail Express",
+                description: "Next day to 2 days",
+              },
+            ],
+          },
+          {
+            title: "I can wait a bit",
+            rows: [
+              {
+                slug: "ground_advantage",
+                text: "Ground Advantage",
+                description: "2 to 5 days",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      type: "cta_url",
+      body_text: "Tap the button below to see the available dates.",
+      footer_text: "Dates are subject to change.",
+      cta_url: {
+        text: "See dates",
+        url: "https://example.com/workshops?click_id=a1b2c3",
+      },
+    },
+    {
+      type: "carousel",
+      body_text: "Here are two of our latest arrivals, each under $25:",
+      cards: [
+        {
+          header: {
+            type: "image",
+            url: "https://cdn.example.com/plants/blue-echeveria.jpeg",
+          },
+          body_text:
+            "Blue Echeveria. A rosette-shaped succulent with powdery blue leaves.",
+          buttons: [
+            {
+              type: "cta_url",
+              cta_url: {
+                text: "Buy now",
+                url: "https://shop.example.com/blue-echeveria",
+              },
+            },
+          ],
+        },
+        {
+          header: {
+            type: "image",
+            url: "https://cdn.example.com/plants/zebra-haworthia.jpeg",
+          },
+          body_text:
+            "Zebra Haworthia. Striking white stripes on deep green leaves.",
+          buttons: [
+            {
+              type: "cta_url",
+              cta_url: {
+                text: "Buy now",
+                url: "https://shop.example.com/zebra-haworthia",
+              },
+            },
+          ],
+        },
+      ],
+    },
+    {
+      type: "location_request_message",
+      body_text:
+        "Let's start with your pickup. Share your current location, or type an address instead.",
+    },
+    {
+      type: "request_contact_info",
+      body_text:
+        "To confirm your booking we need a number to reach you on. Tap below to share yours.",
+    },
+  ],
+} as const;
+
 export const WhatsAppMessageSendRequestSchema = {
   type: "object",
   additionalProperties: false,
@@ -9109,6 +10367,25 @@ export const WhatsAppMessageSendRequestSchema = {
       ],
       description:
         "A free-form location to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
+    },
+    interactive: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppInteractiveSend",
+        },
+      ],
+      description:
+        "Free-form interactive content to send instead of a template: body text plus reply buttons, a menu, a link button, media cards, or a single button asking the recipient to share their location or their phone number. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
+    },
+    in_reply_to_message_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMessageID",
+        },
+      ],
+      description:
+        "Quote a message the contact will see above this one, the way replying in the WhatsApp client does. Name a message from the same conversation: one this workspace sent to this recipient, or received from them. Any content quotes, template or free-form. A message this workspace does not hold, or one older than the 15-day window we keep provider ids for, returns a `422` `WhatsAppInReplyToNotFound`. A message that never reached WhatsApp, or one from a different conversation than this send's `to` and `from`, returns a `422` `WhatsAppInReplyToNotQuotable`.\n",
+      example: "wam_01kya19eknftrs2s6p82asmvnh",
     },
     tags: {
       type: "array",
@@ -18779,6 +20056,24 @@ export const SIPTrunkIDSchema = {
   example: "spt_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const VoiceCallRouteTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["reject", "trunk", "forward"],
+  description:
+    "Which answer a number carries.\n\n- `reject`: refuses the call. This is where every number starts.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
+  example: "reject",
+} as const;
+
+export const VoiceInboundForwardAsSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["dialed_number", "calling_number"],
+  description:
+    'Which of a forwarded call\'s two numbers it shows as the caller.\n\n"dialed_number" is the number the caller dialled, which is one of yours.\nCarriers treat it as fully yours, so it is the least likely to be altered or\nscreened. Whoever answers sees which of your numbers was called, not who called\nit. It needs your workspace approved to place calls from numbers you bought from\nus; where it is not, this value is refused and the call shows the calling\nnumber.\n\n"calling_number" is the caller\'s own number, so the phone rings as though they\nhad dialled it directly and the call can be returned from the call log. Because\nthe number is not one you own, some carriers (most often in the US and parts of\nEurope) mark such calls as unverified, replace the number, or screen them.\n',
+  example: "dialed_number",
+} as const;
+
 export const VoiceCallRejectionReasonSchema = {
   type: "string",
   minLength: 1,
@@ -18811,6 +20106,104 @@ export const VoiceCallRejectionReasonSchema = {
   description:
     "Why we refused the call before dialing a carrier. Every refusal is signalled\nto your PBX as `503`, so `sip_response_code` alone cannot tell these causes\napart. This field is where the cause lives.\n\nMost of them you can fix yourself:\n\n- `source_not_allowed`: The call came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it, or present a number you have\n  already verified.\n- `destination_not_enabled`: You have not turned on calling to this\n  destination country. Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet did not cover the call. Top up, or turn\n  on automatic top-ups.\n- `daily_spend_exceeded`: The call would have passed your organization's daily\n  voice spend limit. The limit resets at the start of the next UTC day.\n- `concurrent_calls_exceeded`: You already have as many calls in progress as\n  your account allows. Wait for one to end, or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed calls faster than your account\n  allows. Slow the rate you dial at, then retry.\n\nFor all other reasons, contact support and provide the call `id`:\n\n- `routing_not_configured`: No dial plan is attached to this trunk yet.\n  Expected on a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The call could not be priced for your account.\n",
   example: "destination_not_enabled",
+} as const;
+
+export const VoiceCallInboundRouteRejectSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceCallRouteType",
+        },
+      ],
+      description:
+        "The number turned the call away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.\n",
+    },
+  },
+} as const;
+
+export const VoiceCallInboundRouteTrunkSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "trunk_id"],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceCallRouteType",
+        },
+      ],
+      description: "The call was delivered to one of your SIP trunks.",
+    },
+    trunk_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SIPTrunkID",
+        },
+      ],
+      description:
+        "The SIP trunk the call was delivered to. Recorded as it was at the time, so it may name a trunk you have since changed or deleted.\n",
+    },
+  },
+} as const;
+
+export const VoiceCallInboundRouteForwardSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "forward_to", "forward_as"],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceCallRouteType",
+        },
+      ],
+      description: "The call was forwarded to another of your numbers.",
+    },
+    forward_to: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The number the call was forwarded to, in E.164 format. Recorded as it was at the time, so it may name a number you have since stopped verifying.\n",
+      example: "+14155551234",
+    },
+    forward_as: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceInboundForwardAs",
+        },
+      ],
+      description:
+        "Which of the call's two numbers the forwarded leg presented as its caller. The value that went on the wire, not the one the number is set to now.\n",
+    },
+  },
+} as const;
+
+export const VoiceCallInboundRouteSchema = {
+  description:
+    'Which answer the dialled number gave an incoming call, as it was acted on. The\ntype selects the shape: "reject" turned the call away, "trunk" delivered it to\none of your SIP trunks, and "forward" placed a call to another of your numbers\nand connected the two.\n\nIt says what the number was set to do, not that it worked. A "trunk" route on a\ncall that never connected is a number pointed at a trunk that did not take it;\nthe call\'s status is what carries the outcome.\n',
+  oneOf: [
+    {
+      $ref: "#/components/schemas/VoiceCallInboundRouteReject",
+    },
+    {
+      $ref: "#/components/schemas/VoiceCallInboundRouteTrunk",
+    },
+    {
+      $ref: "#/components/schemas/VoiceCallInboundRouteForward",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      reject: "#/components/schemas/VoiceCallInboundRouteReject",
+      trunk: "#/components/schemas/VoiceCallInboundRouteTrunk",
+      forward: "#/components/schemas/VoiceCallInboundRouteForward",
+    },
+  },
 } as const;
 
 export const VoiceMediaQualitySchema = {
@@ -19010,7 +20403,17 @@ export const VoiceCallSchema = {
         },
       ],
       description:
-        "Why we refused the call before dialing a carrier. Absent when the call connected or failed at the carrier; see `sip_response_code` for the carrier response.",
+        "Why we refused the call before dialing a carrier. Absent whenever the refusal was not ours: a call that connected, a call the carrier or the far end turned down (`sip_response_code` carries their answer, and a 6xx decline reads as `rejected` rather than `failed`), and an incoming call turned away by the number it dialed, which fails no check of ours and so names no reason. `route` says what that number was set to do.",
+    },
+    route: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceCallInboundRoute",
+        },
+      ],
+      description:
+        "Which answer your number gave an incoming call: a SIP trunk, a forward, or a refusal. Recorded when the call was handled, so changing the number's setup afterwards does not change what its past calls say. Absent on outbound calls, and on calls recorded before this field existed.",
     },
     tags: {
       type: "array",

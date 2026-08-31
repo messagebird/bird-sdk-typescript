@@ -2997,7 +2997,10 @@ export const createVerificationNextChannel = <
  * Returns the workspace's WhatsApp messages as a cursor-paginated list,
  * newest first, outbound and inbound alike. Each message carries the one
  * content object it was built from: `template`, or free-form `text`,
- * `image`, `video`, `audio`, `sticker`, `document` or `location`. An inbound
+ * `image`, `video`, `audio`, `sticker`, `document`, `location`,
+ * `interactive` or `contact_cards`. An inbound message carries
+ * `interactive_reply` when the contact tapped a reply button or a list row,
+ * on an interactive message or on a template's quick reply. An inbound
  * message whose content WhatsApp models and we do not carries `unsupported`
  * instead, naming the type rather than reading back empty.
  * Filter by direction, status, recipient (`to`), sender (`from`),
@@ -3046,8 +3049,9 @@ export const listWhatsAppMessages = <ThrowOnError extends boolean = false>(
  *
  * Sends one WhatsApp message to one recipient. The request carries exactly one
  * kind of content: a message template, or free-form `text`, `image`, `video`,
- * `audio`, `sticker`, `document` or `location`. A request carrying none is
- * rejected with a `422`, and one carrying more than one is too.
+ * `audio`, `sticker`, `document`, `location` or `interactive`. A request
+ * carrying none is rejected with a `422`, and one carrying more than one is
+ * too.
  *
  * A **template** is the only content WhatsApp delivers outside an open
  * customer service window, so it is what starts a conversation. Name the
@@ -3066,6 +3070,23 @@ export const listWhatsAppMessages = <ThrowOnError extends boolean = false>(
  * A window that closes between accept and dispatch still fails
  * asynchronously, carrying `service_window_expired` on the message's
  * `last_error`. Every free-form send requires `from`.
+ *
+ * **Interactive content** gives the recipient something to tap. `interactive`
+ * names its kind in `type` and carries that kind's own field: reply `buttons`,
+ * a `list` menu, a `cta_url` link button, or `cards` for a carousel;
+ * `location_request_message` and `request_contact_info` are each a single
+ * button asking the recipient for something, so `body_text` is the whole
+ * message. A tap on a reply button or a list row comes back as an inbound
+ * message carrying `interactive_reply`. The other kinds answer in their own
+ * shape: a `cta_url` link opens in the recipient's browser and sends nothing
+ * back, and the two request kinds come back as the thing they asked for, an
+ * inbound `location` or `contact_cards` message.
+ * Interactive content is free-form, so the customer service window and the
+ * `from` requirement above both apply.
+ *
+ * Set `in_reply_to_message_id` to quote a message the contact sees above this
+ * one, the way replying in the WhatsApp client does. Any content quotes, and
+ * the quoted message must be one from this same conversation.
  *
  * The `202` response is the accepted message, echoing the resolved content; it
  * is not a delivery confirmation. Follow delivery with
@@ -3117,7 +3138,7 @@ export const createWhatsAppMessage = <ThrowOnError extends boolean = false>(
 /**
  * Get a WhatsApp message
  *
- * Returns a single WhatsApp message: its current delivery status, per-stage timestamps (`sent_at`, `delivered_at`, `read_at`), and failure detail when it failed. It carries the one content object it was built from: `template`, or free-form `text`, `image`, `video`, `audio`, `sticker`, `document` or `location`. An inbound message whose content WhatsApp models and we do not carries `unsupported` instead, naming the type rather than reading back empty. The `status` advances asynchronously as delivery progresses, so poll this endpoint (or subscribe to `whatsapp.*` webhook events) after a send to confirm delivery. For the per-event timeline, use [List events for a WhatsApp message](/docs/api/reference/list-whatsapp-message-events) instead.
+ * Returns a single WhatsApp message: its current delivery status, per-stage timestamps (`sent_at`, `delivered_at`, `read_at`), and failure detail when it failed. It carries the one content object it was built from: `template`, or free-form `text`, `image`, `video`, `audio`, `sticker`, `document`, `location`, `interactive` or `contact_cards`. An inbound message carries `interactive_reply` when the contact tapped a reply button or a list row. An inbound message whose content WhatsApp models and we do not carries `unsupported` instead, naming the type rather than reading back empty. The `status` advances asynchronously as delivery progresses, so poll this endpoint (or subscribe to `whatsapp.*` webhook events) after a send to confirm delivery. For the per-event timeline, use [List events for a WhatsApp message](/docs/api/reference/list-whatsapp-message-events) instead.
  *
  */
 export const getWhatsAppMessage = <ThrowOnError extends boolean = false>(

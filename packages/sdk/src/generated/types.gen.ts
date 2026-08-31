@@ -4458,7 +4458,7 @@ export type WhatsAppMessageStatus =
 export type WhatsAppMessageId = string;
 
 /**
- * Sender or recipient of a WhatsApp message: a phone number, a business-scoped user ID, or both.
+ * Sender or recipient of a WhatsApp message: a phone number, a business-scoped user ID, or both. A message received from a WhatsApp user carries whatever profile they publish, which may be neither.
  */
 export type WhatsAppAddress = {
   /**
@@ -4470,6 +4470,16 @@ export type WhatsAppAddress = {
    *
    */
   bsuid?: string;
+  /**
+   * Present only on a message received from a WhatsApp user, on `from`; never on an outbound send's `to`, where the profile is not known. Absent when the contact has not adopted one, and on a message received before this workspace started recording them. Same form as a number's own username (`WhatsAppNumberProfile.username`), without a leading `@`; a message cannot be addressed by it.
+   *
+   */
+  username?: string;
+  /**
+   * Present only on a message received from a WhatsApp user, on `from`; never on an outbound send's `to`, where the profile is not known. Absent when the message carries no profile, and on a message received before this workspace started recording them.
+   *
+   */
+  display_name?: string;
 };
 
 /**
@@ -4856,6 +4866,269 @@ export type WhatsAppContactCard = {
 };
 
 /**
+ * Which kind of interactive message this is.
+ *
+ * - `button`: up to three tappable buttons, each sending its own identifier
+ * back as an inbound message. Carried in `buttons`.
+ * - `list`: a single button that opens a menu of rows to choose one from.
+ * - `cta_url`: a single button that opens a link.
+ * - `carousel`: 2 to 10 media cards the recipient scrolls through sideways,
+ * each with its own buttons. Carried in `cards`.
+ * - `location_request_message`: a single button that asks the recipient to
+ * share where they are. A tap arrives as an inbound `location` message.
+ * - `request_contact_info`: a single button that asks the recipient to share
+ * their phone number. A tap arrives as an inbound message carrying the number
+ * on `contact_cards`, with `origin` set to `contact_request`.
+ *
+ * The last two name no field of their own: the ask is the whole message, and
+ * `body_text` is all they carry.
+ *
+ * Open enum: WhatsApp adds interactive kinds over time, so treat an
+ * unrecognized value as a future kind rather than an error.
+ *
+ */
+export type WhatsAppInteractiveType =
+  | "button"
+  | "list"
+  | "cta_url"
+  | "carousel"
+  | "location_request_message"
+  | "request_contact_info"
+  | (string & {});
+
+/**
+ * A header's kind, and which field carries it. Open enum: WhatsApp adds header kinds over time, so treat an unrecognized value as a future kind rather than an error.
+ *
+ */
+export type WhatsAppInteractiveHeaderType =
+  "text" | "image" | "video" | "document" | (string & {});
+
+/**
+ * What the interactive message showed above its body. `type` names the kind and the field that carries it: `text` for a line of copy, `url` for the file every other kind shows. As on the message itself, the read vocabulary is open: dispatch on `type` and treat an unrecognized value as a header kind added since.
+ *
+ */
+export type WhatsAppInteractiveHeader = {
+  /**
+   * Which kind of header this is, and which field carries it.
+   */
+  type: WhatsAppInteractiveHeaderType;
+  /**
+   * The line of text shown above the body.
+   */
+  text?: string;
+  /**
+   * The URL of the file shown above the body, as the send supplied it. Interactive content is outbound only, so Bird neither stores nor proxies the file.
+   *
+   */
+  url?: string;
+};
+
+/**
+ * Which kind of button this is, and which field carries it.
+ *
+ * - `quick_reply`: sends its own identifier back as an inbound message.
+ * - `cta_url`: opens a link in the recipient's browser.
+ *
+ * Open enum: WhatsApp adds button kinds over time, so treat an unrecognized
+ * value as a future kind rather than an error.
+ *
+ */
+export type WhatsAppInteractiveButtonType =
+  "quick_reply" | "cta_url" | (string & {});
+
+/**
+ * A reply button's label and the handle it carries back. On the echo of a message Bird sent, the pair the send declared; on an inbound `interactive_reply`, the pair the contact tapped. No length is declared here, because a tap can echo a template's quick-reply button, whose label runs longer than an interactive message's own allows.
+ *
+ */
+export type WhatsAppInteractiveQuickReplyButton = {
+  /**
+   * The handle the button carries back, never shown to the recipient. On a tap on a template's quick-reply button, it is the payload that template declared.
+   *
+   */
+  slug: string;
+  /**
+   * The label the recipient saw.
+   */
+  text: string;
+};
+
+/**
+ * The link button the message offered: its label and the address it opens.
+ *
+ */
+export type WhatsAppInteractiveCtaUrl = {
+  /**
+   * The button's label.
+   */
+  text: string;
+  /**
+   * The address the button opens, as the send supplied it.
+   */
+  url: string;
+};
+
+/**
+ * One button the message offered. The field named by `type` is the one that is present. As on the message itself, the read vocabulary is open: dispatch on `type` and treat an unrecognized value as a button kind added since.
+ *
+ */
+export type WhatsAppInteractiveButton = {
+  /**
+   * Which kind of button this is, and which field carries it.
+   */
+  type: WhatsAppInteractiveButtonType;
+  /**
+   * The button's label and the handle it sends back.
+   */
+  quick_reply?: WhatsAppInteractiveQuickReplyButton;
+  /**
+   * The button's label and the address it opens.
+   */
+  cta_url?: WhatsAppInteractiveCtaUrl;
+};
+
+/**
+ * One option in a list's menu. On the echo of a message Bird sent, the row as declared; on an inbound `interactive_reply`, the row the contact chose. No length is declared here: this is what WhatsApp reported, not what a send is held to.
+ *
+ */
+export type WhatsAppInteractiveListRow = {
+  /**
+   * The handle the row carries back, never shown to the recipient.
+   */
+  slug: string;
+  /**
+   * The row's label, shown as its title in the menu.
+   */
+  text: string;
+  /**
+   * The second line under the label. Absent when the row carried none.
+   */
+  description?: string;
+};
+
+/**
+ * One group of options in the menu the message showed.
+ */
+export type WhatsAppInteractiveListSection = {
+  /**
+   * The group's heading, shown above its rows.
+   */
+  title: string;
+  /**
+   * The options in this group, in the order shown.
+   */
+  rows: Array<WhatsAppInteractiveListRow>;
+};
+
+/**
+ * The menu the message offered: a button that opens it, and the groups of options behind it.
+ *
+ */
+export type WhatsAppInteractiveList = {
+  /**
+   * The label of the button that opens the menu.
+   */
+  button_text: string;
+  /**
+   * The groups of options in the menu, in the order shown.
+   */
+  sections: Array<WhatsAppInteractiveListSection>;
+};
+
+/**
+ * One card the carousel showed, in the position it appeared in.
+ */
+export type WhatsAppInteractiveCard = {
+  /**
+   * The image or video shown at the top of the card.
+   */
+  header: WhatsAppInteractiveHeader;
+  /**
+   * The card's own text. Absent when the card carried none.
+   */
+  body_text?: string;
+  /**
+   * The buttons the card offered, in the order shown.
+   */
+  buttons: Array<WhatsAppInteractiveButton>;
+};
+
+/**
+ * Interactive content of a WhatsApp message: body text plus something the recipient can tap. The field named by `type` is the one that is present, except on `location_request_message` and `request_contact_info`, which name no field: each is a single button asking the recipient for something, so `body_text` is the whole message. Outbound only, and so an echo of what the send asked for: a contact cannot send interactive content, and a tap on it reads as `interactive_reply`, or on a location or contact request as the message the recipient shared in answer. Unlike the send schema, this one does not pin each `type` to its field. The vocabulary in `type` is open, so dispatch on it and treat an unrecognized value as a kind added since. Only the discriminator is open: this schema declares no additional properties, so a new kind's own payload field arrives here in the same change that introduces the kind, which is additive.
+ *
+ */
+export type WhatsAppInteractive = {
+  /**
+   * Which kind of interactive message this is, and which field carries it.
+   */
+  type: WhatsAppInteractiveType;
+  /**
+   * What was shown above the body. Absent when the message carried no header.
+   */
+  header?: WhatsAppInteractiveHeader;
+  /**
+   * The message's main text.
+   */
+  body_text: string;
+  /**
+   * The small print below the body. Absent when the message carried none.
+   */
+  footer_text?: string;
+  /**
+   * The buttons the message offered, in the order shown.
+   */
+  buttons?: Array<WhatsAppInteractiveButton>;
+  /**
+   * The menu the message offered.
+   */
+  list?: WhatsAppInteractiveList;
+  /**
+   * The link button the message offered.
+   */
+  cta_url?: WhatsAppInteractiveCtaUrl;
+  /**
+   * The cards the message offered, in the order they appeared, left to right.
+   *
+   */
+  cards?: Array<WhatsAppInteractiveCard>;
+};
+
+/**
+ * Which kind of tap the reply came from.
+ *
+ * - `button`: a reply button on an interactive message, or a quick-reply
+ * button on a template. Both carry an identifier and a label, so they read
+ * the same way.
+ * - `list`: a row chosen from a list's menu. Only this kind carries a
+ * `description`.
+ *
+ * Open enum: WhatsApp adds interactive kinds over time, so treat an
+ * unrecognized value as a future kind rather than an error.
+ *
+ */
+export type WhatsAppInteractiveReplyType = "button" | "list" | (string & {});
+
+/**
+ * What the contact tapped, on an inbound message answering an interactive message or a template's quick-reply button. `type` names the kind and the field it names carries it, as everywhere else in this arm. Inbound only: a message that offers something to tap reads as `interactive` instead, and the two never appear together.
+ *
+ */
+export type WhatsAppInteractiveReply = {
+  /**
+   * Which kind of tap this reply came from, and which field carries it.
+   */
+  type: WhatsAppInteractiveReplyType;
+  /**
+   * The button the contact tapped, as you declared it. On a reply to a template's quick-reply button, `slug` is the button's payload, which WhatsApp sets to the button's own label.
+   *
+   */
+  button?: WhatsAppInteractiveQuickReplyButton;
+  /**
+   * The row the contact chose, as you declared it. `description` is present only when the row carried one.
+   *
+   */
+  list?: WhatsAppInteractiveListRow;
+};
+
+/**
  * A message whose content we do not model, named so it is visible in the message log rather than arriving empty. Inbound only.
  *
  */
@@ -4967,6 +5240,21 @@ export type WhatsAppMessage = {
    *
    */
   readonly contact_cards?: Array<WhatsAppContactCard>;
+  /**
+   * Interactive content the message carried. Outbound only: a contact cannot send one. A tap on a reply button or a list row reads back as `interactive_reply` on the contact's inbound message; a `cta_url` link sends nothing back, and the two request kinds are answered by an inbound `location` or `contact_cards` message.
+   *
+   */
+  readonly interactive?: WhatsAppInteractive;
+  /**
+   * The message this one answers. On an inbound message it is what WhatsApp reports as the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. An outbound message echoes the `in_reply_to_message_id` it was sent with. Absent when the message answers nothing, and absent on an inbound message whose target we cannot match to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.
+   *
+   */
+  readonly in_reply_to_message_id?: WhatsAppMessageId;
+  /**
+   * What the contact tapped, on a message answering an interactive message or a template's quick-reply button. Inbound only.
+   *
+   */
+  readonly interactive_reply?: WhatsAppInteractiveReply;
   /**
    * Set when the contact sent content we do not model, naming the WhatsApp content type so the message is not silently empty. Inbound only.
    *
@@ -5139,6 +5427,331 @@ export type WhatsAppDocumentSend = {
 };
 
 /**
+ * Which kind of interactive message to send.
+ *
+ * - `button`: up to three tappable buttons, each sending its own identifier
+ * back as an inbound message. Carried in `buttons`.
+ * - `list`: a single button that opens a menu of rows to choose one from.
+ * - `cta_url`: a single button that opens a link, so the address stays out of
+ * the message body.
+ * - `carousel`: 2 to 10 media cards the recipient scrolls through sideways,
+ * each with its own buttons. Carried in `cards`.
+ * - `location_request_message`: a single button that asks the recipient to
+ * share where they are. A tap arrives as an inbound `location` message.
+ * - `request_contact_info`: a single button that asks the recipient to share
+ * their phone number. A tap arrives as an inbound message carrying the number
+ * on `contact_cards`, with `origin` set to `contact_request`.
+ *
+ * The last two name no field of their own: the ask is the whole message, and
+ * `body_text` is all they carry.
+ *
+ * Closed on the write side: a kind Bird cannot send to Meta is rejected rather
+ * than accepted and then failed asynchronously.
+ *
+ */
+export type WhatsAppInteractiveTypeWrite =
+  | "button"
+  | "list"
+  | "cta_url"
+  | "carousel"
+  | "location_request_message"
+  | "request_contact_info";
+
+/**
+ * A header's kind, and which field carries it. `text` is a line of copy; the rest each show a file whose address you give in `url`. A `list` accepts `text` only, and a carousel card accepts `image` or `video` only. Closed on the write side: a kind Bird cannot send to Meta is rejected rather than accepted and then failed asynchronously.
+ *
+ */
+export type WhatsAppInteractiveHeaderTypeWrite =
+  "text" | "image" | "video" | "document";
+
+export type WhatsAppInteractiveHeaderSend = (
+  | {
+      type: "text";
+      url?: unknown;
+    }
+  | {
+      type: "image" | "video" | "document";
+      text?: unknown;
+    }
+) & {
+  /**
+   * Which kind of header this is, and which field carries it.
+   */
+  type: WhatsAppInteractiveHeaderTypeWrite;
+  /**
+   * A single line of text above the body. Send it on a `text` header.
+   */
+  text?: string;
+  /**
+   * Public `https` URL of the file to show. Send it on an `image`, `video` or `document` header. An image must be JPEG or PNG, up to 5 MB; a video, MP4 with H.264 video and AAC audio, up to 16 MB; a document, up to 100 MB, and PDF, Word, Excel, PowerPoint and plain text render reliably in the WhatsApp client while other file types are transmitted but unsupported. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch.
+   *
+   */
+  url?: string;
+};
+
+/**
+ * Which kind of button this is, and which field carries it.
+ *
+ * - `quick_reply`: sends its own identifier back as an inbound message. The
+ * name `WhatsAppTemplateButtonTypeWrite` already uses for the same control.
+ * - `cta_url`: opens a link in the recipient's browser.
+ *
+ * Closed on the write side: a kind Bird cannot send to Meta is rejected rather
+ * than accepted and then failed asynchronously.
+ *
+ */
+export type WhatsAppInteractiveButtonTypeWrite = "quick_reply" | "cta_url";
+
+/**
+ * One tappable reply button. Tapping it sends `slug` back as an inbound message, which reads as an `interactive_reply`.
+ *
+ */
+export type WhatsAppInteractiveQuickReplyButtonSend = {
+  /**
+   * Your own handle for this button, echoed back on the reply. You choose the value and it is never shown to the recipient, so it can carry whatever your application needs to route the answer. Any characters, up to 256.
+   *
+   */
+  slug: string;
+  /**
+   * The button's label. It must differ from every other button's label in the same message, because the recipient's reply is identified to them by the label they tapped.
+   *
+   */
+  text: string;
+};
+
+/**
+ * A button that opens a link in the recipient's browser, so a long or opaque address never has to appear in the message body.
+ *
+ */
+export type WhatsAppInteractiveCtaUrlSend = {
+  /**
+   * The button's label.
+   */
+  text: string;
+  /**
+   * The address the button opens. It is fixed for every recipient, so per recipient tracking belongs in the address you supply, for example as a query parameter you generate per send.
+   *
+   */
+  url: string;
+};
+
+export type WhatsAppInteractiveButtonSend = (
+  | {
+      type: "quick_reply";
+      cta_url?: unknown;
+    }
+  | {
+      type: "cta_url";
+      quick_reply?: unknown;
+    }
+) & {
+  /**
+   * Which kind of button this is, and which field carries it.
+   */
+  type: WhatsAppInteractiveButtonTypeWrite;
+  /**
+   * The button's label and the handle it sends back. Send this on a `quick_reply` button.
+   */
+  quick_reply?: WhatsAppInteractiveQuickReplyButtonSend;
+  /**
+   * The button's label and the address it opens. Send this on a `cta_url` button.
+   */
+  cta_url?: WhatsAppInteractiveCtaUrlSend;
+};
+
+/**
+ * One option in a list's menu. Choosing it sends `slug` back as an inbound message, which reads as an `interactive_reply`.
+ *
+ */
+export type WhatsAppInteractiveListRowSend = {
+  /**
+   * Your own handle for this option, echoed back on the reply. You choose the value and it is never shown to the recipient. Any characters, up to 200.
+   *
+   */
+  slug: string;
+  /**
+   * The option's label, shown as the row's title in the menu. It must differ from every other row's label and from every button's label in the same message, not merely within its own group; a repeat returns a `422` `WhatsAppInteractiveDuplicateLabel`.
+   *
+   */
+  text: string;
+  /**
+   * A second line under the label, for detail that will not fit in it.
+   */
+  description?: string;
+};
+
+/**
+ * One group of options in a list's menu. A menu with a single group still carries a title, which WhatsApp shows above its rows.
+ *
+ */
+export type WhatsAppInteractiveListSectionSend = {
+  /**
+   * The group's heading, shown above its rows.
+   */
+  title: string;
+  /**
+   * The options in this group. A message carries at most 10 rows across all its groups combined, so this per-group maximum is not additive: more than 10 in total returns a `422` `WhatsAppInteractiveLimitExceeded`. Row labels must be unique across the whole message too, not just within a group.
+   *
+   */
+  rows: Array<WhatsAppInteractiveListRowSend>;
+};
+
+/**
+ * A menu of options behind a single button. The recipient taps the button, WhatsApp opens the menu, and choosing one option sends it back as a reply.
+ *
+ */
+export type WhatsAppInteractiveListSend = {
+  /**
+   * The label of the button that opens the menu.
+   */
+  button_text: string;
+  /**
+   * The groups of options in the menu, in the order shown. At most 10 rows across all groups combined, each carrying a label unique across the whole message.
+   *
+   */
+  sections: Array<WhatsAppInteractiveListSectionSend>;
+};
+
+export type WhatsAppInteractiveCardHeaderSend = (
+  | {
+      type?: "image";
+    }
+  | {
+      type?: "video";
+    }
+) & {
+  /**
+   * Which kind of media this is. A card accepts `image` or `video` only.
+   *
+   */
+  type: WhatsAppInteractiveHeaderTypeWrite;
+  /**
+   * Public `https` URL of the file to show at the top of the card. An image must be JPEG or PNG, up to 5 MB; a video, MP4 with H.264 video and AAC audio, up to 16 MB. WhatsApp fetches it at send time, on the same terms as a message header's `url`.
+   *
+   */
+  url: string;
+};
+
+export type WhatsAppInteractiveCardSend = (
+  | {
+      buttons?: unknown;
+    }
+  | {
+      buttons?: unknown;
+    }
+) & {
+  /**
+   * The image or video at the top of the card.
+   */
+  header: WhatsAppInteractiveCardHeaderSend;
+  /**
+   * The card's own text, below its media, with at most two line breaks. Optional: a card can carry media and buttons alone.
+   *
+   */
+  body_text?: string;
+  /**
+   * The buttons under the card, in the order given. Either one `cta_url` button or up to three `quick_reply` buttons: the two kinds cannot be mixed on one card. Every card in the carousel must carry the same kinds in the same number, and a carousel whose cards disagree returns a `422` `WhatsAppInteractiveCarouselButtonsMismatch`.
+   *
+   */
+  buttons: Array<WhatsAppInteractiveButtonSend>;
+};
+
+export type WhatsAppInteractiveSend = (
+  | {
+      type: "button";
+      body_text?: unknown;
+      buttons: unknown;
+      list?: unknown;
+      cta_url?: unknown;
+      cards?: unknown;
+    }
+  | {
+      type: "list";
+      header?: {
+        type?: "text";
+        url?: unknown;
+      };
+      buttons?: unknown;
+      cta_url?: unknown;
+      cards?: unknown;
+    }
+  | {
+      type: "cta_url";
+      body_text?: unknown;
+      buttons?: unknown;
+      list?: unknown;
+      cards?: unknown;
+    }
+  | {
+      type: "carousel";
+      body_text?: unknown;
+      header?: unknown;
+      footer_text?: unknown;
+      buttons?: unknown;
+      list?: unknown;
+      cta_url?: unknown;
+    }
+  | {
+      type: "location_request_message";
+      body_text?: unknown;
+      header?: unknown;
+      footer_text?: unknown;
+      buttons?: unknown;
+      list?: unknown;
+      cta_url?: unknown;
+      cards?: unknown;
+    }
+  | {
+      type: "request_contact_info";
+      body_text?: unknown;
+      header?: unknown;
+      footer_text?: unknown;
+      buttons?: unknown;
+      list?: unknown;
+      cta_url?: unknown;
+      cards?: unknown;
+    }
+) & {
+  /**
+   * Which kind of interactive message this is, and which field carries it.
+   */
+  type: WhatsAppInteractiveTypeWrite;
+  /**
+   * Optional content above the body. A `list` accepts a `text` header only; `button` and `cta_url` also accept an image, video or document. A `carousel` accepts none: its cards carry their own media. Neither request kind accepts one.
+   *
+   */
+  header?: WhatsAppInteractiveHeaderSend;
+  /**
+   * The message's main text, required on every kind, and the whole message on `location_request_message` and `request_contact_info`. The WhatsApp client turns any URL it contains into a clickable link. Only a `list` may use the full length; the other kinds cap it at 1024 characters.
+   *
+   */
+  body_text: string;
+  /**
+   * Optional small print below the body and above the buttons. A `carousel` and both request kinds take no footer.
+   *
+   */
+  footer_text?: string;
+  /**
+   * The buttons to show, in the order given. Send this on a `button` message, where every button is a `quick_reply`. Every label must be unique within the message; a repeat returns a `422` `WhatsAppInteractiveDuplicateLabel`.
+   *
+   */
+  buttons?: Array<WhatsAppInteractiveButtonSend>;
+  /**
+   * The menu to show. Send this on a `list` message.
+   */
+  list?: WhatsAppInteractiveListSend;
+  /**
+   * The link button to show. Send this on a `cta_url` message.
+   */
+  cta_url?: WhatsAppInteractiveCtaUrlSend;
+  /**
+   * The cards to show, in the order they appear, left to right. Send this on a `carousel` message, with between 2 and 10 cards. The message's own `body_text` introduces them; a carousel carries no header and no footer of its own.
+   *
+   */
+  cards?: Array<WhatsAppInteractiveCardSend>;
+};
+
+/**
  * A WhatsApp message to send. Carry exactly one kind of content: a request with none returns a `422` `WhatsAppContentRequired`, and one carrying more than one returns a `422` `WhatsAppContentAmbiguous`. The schema does not express that constraint, because which combinations are available depends on the content types your workspace can send.
  *
  */
@@ -5193,6 +5806,16 @@ export type WhatsAppMessageSendRequest = {
    *
    */
   location?: WhatsAppLocationSend;
+  /**
+   * Free-form interactive content to send instead of a template: body text plus reply buttons, a menu, a link button, media cards, or a single button asking the recipient to share their location or their phone number. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.
+   *
+   */
+  interactive?: WhatsAppInteractiveSend;
+  /**
+   * Quote a message the contact will see above this one, the way replying in the WhatsApp client does. Name a message from the same conversation: one this workspace sent to this recipient, or received from them. Any content quotes, template or free-form. A message this workspace does not hold, or one older than the 15-day window we keep provider ids for, returns a `422` `WhatsAppInReplyToNotFound`. A message that never reached WhatsApp, or one from a different conversation than this send's `to` and `from`, returns a `422` `WhatsAppInReplyToNotQuotable`.
+   *
+   */
+  in_reply_to_message_id?: WhatsAppMessageId;
   /**
    * Structured `{name, value}` labels for filtering. Tags become first-class query dimensions: filter the list endpoint by tag name. Maximum 20 tags per send. Use tags for low-cardinality dimensions (`category`, `experiment_variant`). For arbitrary structured context you do not need as a filter dimension, use `metadata` instead.
    *
@@ -10603,6 +11226,37 @@ export type NumbersOrderCreate = {
 export type SipTrunkId = string;
 
 /**
+ * Which answer a number carries.
+ *
+ * - `reject`: refuses the call. This is where every number starts.
+ * - `trunk`: delivers the call to one of your SIP trunks.
+ * - `forward`: places a call to one of your verified caller IDs and connects the two.
+ *
+ * It selects the answer's own shape, so a new way to answer a call arrives as a
+ * new value alongside a new set of fields.
+ *
+ */
+export type VoiceCallRouteType = "reject" | "trunk" | "forward";
+
+/**
+ * Which of a forwarded call's two numbers it shows as the caller.
+ *
+ * "dialed_number" is the number the caller dialled, which is one of yours.
+ * Carriers treat it as fully yours, so it is the least likely to be altered or
+ * screened. Whoever answers sees which of your numbers was called, not who called
+ * it. It needs your workspace approved to place calls from numbers you bought from
+ * us; where it is not, this value is refused and the call shows the calling
+ * number.
+ *
+ * "calling_number" is the caller's own number, so the phone rings as though they
+ * had dialled it directly and the call can be returned from the call log. Because
+ * the number is not one you own, some carriers (most often in the US and parts of
+ * Europe) mark such calls as unverified, replace the number, or screen them.
+ *
+ */
+export type VoiceInboundForwardAs = "dialed_number" | "calling_number";
+
+/**
  * Why we refused the call before dialing a carrier. Every refusal is signalled
  * to your PBX as `503`, so `sip_response_code` alone cannot tell these causes
  * apart. This field is where the cause lives.
@@ -10648,6 +11302,65 @@ export type VoiceCallRejectionReason =
   | "concurrent_calls_exceeded"
   | "calls_per_second_exceeded"
   | "call_not_permitted";
+
+export type VoiceCallInboundRouteReject = {
+  /**
+   * The number turned the call away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.
+   *
+   */
+  type: VoiceCallRouteType;
+};
+
+export type VoiceCallInboundRouteTrunk = {
+  /**
+   * The call was delivered to one of your SIP trunks.
+   */
+  type: VoiceCallRouteType;
+  /**
+   * The SIP trunk the call was delivered to. Recorded as it was at the time, so it may name a trunk you have since changed or deleted.
+   *
+   */
+  trunk_id: SipTrunkId;
+};
+
+export type VoiceCallInboundRouteForward = {
+  /**
+   * The call was forwarded to another of your numbers.
+   */
+  type: VoiceCallRouteType;
+  /**
+   * The number the call was forwarded to, in E.164 format. Recorded as it was at the time, so it may name a number you have since stopped verifying.
+   *
+   */
+  forward_to: string;
+  /**
+   * Which of the call's two numbers the forwarded leg presented as its caller. The value that went on the wire, not the one the number is set to now.
+   *
+   */
+  forward_as: VoiceInboundForwardAs;
+};
+
+/**
+ * Which answer the dialled number gave an incoming call, as it was acted on. The
+ * type selects the shape: "reject" turned the call away, "trunk" delivered it to
+ * one of your SIP trunks, and "forward" placed a call to another of your numbers
+ * and connected the two.
+ *
+ * It says what the number was set to do, not that it worked. A "trunk" route on a
+ * call that never connected is a number pointed at a trunk that did not take it;
+ * the call's status is what carries the outcome.
+ *
+ */
+export type VoiceCallInboundRoute =
+  | ({
+      type: "reject";
+    } & VoiceCallInboundRouteReject)
+  | ({
+      type: "trunk";
+    } & VoiceCallInboundRouteTrunk)
+  | ({
+      type: "forward";
+    } & VoiceCallInboundRouteForward);
 
 export type VoiceMediaQuality = {
   /**
@@ -10733,9 +11446,13 @@ export type VoiceCall = {
    */
   readonly sip_response_code?: number | null;
   /**
-   * Why we refused the call before dialing a carrier. Absent when the call connected or failed at the carrier; see `sip_response_code` for the carrier response.
+   * Why we refused the call before dialing a carrier. Absent whenever the refusal was not ours: a call that connected, a call the carrier or the far end turned down (`sip_response_code` carries their answer, and a 6xx decline reads as `rejected` rather than `failed`), and an incoming call turned away by the number it dialed, which fails no check of ours and so names no reason. `route` says what that number was set to do.
    */
   readonly rejection_reason?: VoiceCallRejectionReason;
+  /**
+   * Which answer your number gave an incoming call: a SIP trunk, a forward, or a refusal. Recorded when the call was handled, so changing the number's setup afterwards does not change what its past calls say. Absent on outbound calls, and on calls recorded before this field existed.
+   */
+  readonly route?: VoiceCallInboundRoute;
   /**
    * Your own `{name, value}` labels for this call, taken from the `X-Bird-Call-Tag` headers on the INVITE that placed it. Set them to organise calls by a dimension of your own (campaign, queue, agent, cost centre), then filter this list by them with `tag`. Read-only here: a call is labelled when it is placed, and never afterwards. What is here may be less than what was sent, and the call still goes through either way: a tag whose name or value breaks the rules below is dropped, anything past the first five is ignored, and a name sent more than once keeps its first value. Absent when the call carried none, and on calls recorded before this field existed.
    */

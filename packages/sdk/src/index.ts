@@ -272,6 +272,10 @@ export {
   VerificationTerminalReason,
   WhatsAppErrorCode,
   WhatsAppEventType,
+  WhatsAppInteractiveButtonType,
+  WhatsAppInteractiveHeaderType,
+  WhatsAppInteractiveReplyType,
+  WhatsAppInteractiveType,
   WhatsAppTemplateCategory,
   WhatsAppTemplateParameterType,
 } from "./open-enums.gen.js";
@@ -300,6 +304,10 @@ export type {
   VerificationTerminalReasonValue,
   WhatsAppErrorCodeValue,
   WhatsAppEventTypeValue,
+  WhatsAppInteractiveButtonTypeValue,
+  WhatsAppInteractiveHeaderTypeValue,
+  WhatsAppInteractiveReplyTypeValue,
+  WhatsAppInteractiveTypeValue,
   WhatsAppTemplateCategoryValue,
   WhatsAppTemplateParameterTypeValue,
 } from "./open-enums.gen.js";

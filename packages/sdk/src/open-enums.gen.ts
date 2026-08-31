@@ -386,6 +386,64 @@ export const WhatsAppEventType = {
 export type WhatsAppEventTypeValue = (typeof WhatsAppEventType)[keyof typeof WhatsAppEventType];
 
 /**
+ * Values of WhatsAppInteractiveButtonType known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppInteractiveButtonType = {
+  CtaUrl: "cta_url",
+  QuickReply: "quick_reply",
+} as const;
+
+/** A known WhatsAppInteractiveButtonType value. */
+export type WhatsAppInteractiveButtonTypeValue = (typeof WhatsAppInteractiveButtonType)[keyof typeof WhatsAppInteractiveButtonType];
+
+/**
+ * Values of WhatsAppInteractiveHeaderType known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppInteractiveHeaderType = {
+  Document: "document",
+  Image: "image",
+  Text: "text",
+  Video: "video",
+} as const;
+
+/** A known WhatsAppInteractiveHeaderType value. */
+export type WhatsAppInteractiveHeaderTypeValue = (typeof WhatsAppInteractiveHeaderType)[keyof typeof WhatsAppInteractiveHeaderType];
+
+/**
+ * Values of WhatsAppInteractiveReplyType known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppInteractiveReplyType = {
+  Button: "button",
+  List: "list",
+} as const;
+
+/** A known WhatsAppInteractiveReplyType value. */
+export type WhatsAppInteractiveReplyTypeValue = (typeof WhatsAppInteractiveReplyType)[keyof typeof WhatsAppInteractiveReplyType];
+
+/**
+ * Values of WhatsAppInteractiveType known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppInteractiveType = {
+  Button: "button",
+  Carousel: "carousel",
+  CtaUrl: "cta_url",
+  List: "list",
+  LocationRequestMessage: "location_request_message",
+  RequestContactInfo: "request_contact_info",
+} as const;
+
+/** A known WhatsAppInteractiveType value. */
+export type WhatsAppInteractiveTypeValue = (typeof WhatsAppInteractiveType)[keyof typeof WhatsAppInteractiveType];
+
+/**
  * Values of WhatsAppTemplateCategory known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
