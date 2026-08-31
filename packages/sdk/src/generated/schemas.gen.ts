@@ -12789,6 +12789,7 @@ export const MailboxSchema = {
     "retention_tier",
     "message_count",
     "thread_count",
+    "size_bytes",
     "metadata",
     "created_at",
     "updated_at",
@@ -12869,6 +12870,13 @@ export const MailboxSchema = {
       format: "int64",
       readOnly: true,
       description: "Number of retained threads.",
+    },
+    size_bytes: {
+      type: "integer",
+      format: "int64",
+      readOnly: true,
+      description:
+        "Stored bytes across the mailbox's retained messages: the metadata and extracted text kept for the retention tier plus attachment bytes. Message bodies and raw MIME expire after 30 days and do not count. Maintained with each message written or deleted, so the value is current; messages stored before the counter existed are not counted.",
     },
     unread_thread_count: {
       type: ["integer", "null"],

@@ -7267,6 +7267,10 @@ export type Mailbox = {
    */
   readonly thread_count: number;
   /**
+   * Stored bytes across the mailbox's retained messages: the metadata and extracted text kept for the retention tier plus attachment bytes. Message bodies and raw MIME expire after 30 days and do not count. Maintained with each message written or deleted, so the value is current; messages stored before the counter existed are not counted.
+   */
+  readonly size_bytes: number;
+  /**
    * Number of threads with unread messages in this mailbox, excluding trash. `null` on create/update responses.
    *
    */
@@ -22132,6 +22136,10 @@ export type ReplyEmailThreadMessageErrors = {
    */
   404: Error;
   /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
    * The resource existed but is no longer available.
    */
   410: Error;
@@ -22212,6 +22220,10 @@ export type CreateMailboxMessageErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
