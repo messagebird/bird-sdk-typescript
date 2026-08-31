@@ -33,6 +33,7 @@ import { WebhooksResource, type WebhookOptions } from "./resources/webhooks.js";
 import { RealtimeResource, type RealtimeOptions } from "./resources/realtime.js";
 import { LookupResource } from "./resources/lookup.gen.js";
 import { NumbersResource } from "./resources/numbers.js";
+import { BirdError, BirdMissingApiKeyError } from "./errors.js";
 
 // The SDK's own version, sent as User-Agent. Injected at build time from
 // package.json (tsdown/vitest `define`) so it never drifts from the published
@@ -43,7 +44,12 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 const DEFAULT_MAX_RETRIES = 2;
 
 export interface BirdClientOptions {
-  apiKey: string;
+  /**
+   * Required for API calls. A webhook receiver may omit it and configure only
+   * `webhooks: { secret }`; API methods on such a client throw
+   * {@link BirdMissingApiKeyError}.
+   */
+  apiKey?: string;
   /** Explicit base URL; overrides region resolution. For local/self-hosted use. */
   baseUrl?: string;
   /** Region override (e.g. `"eu1"`); the API key prefix is used by default. */
@@ -93,11 +99,16 @@ type EmailDefaultsOf<O> = O extends {
   : undefined;
 
 // Precedence: explicit baseUrl, then explicit region, then the key's region
-// prefix. There is no region-less data-plane host, so an unresolvable region throws.
-function resolveBaseUrl(options: BirdClientOptions): string {
+// prefix. There is no region-less data-plane host, so an unresolvable region
+// throws — except on a keyless (receiver-only) client, which never makes a
+// request; there the error moves to the first API call.
+function resolveBaseUrl(options: BirdClientOptions): string | undefined {
   if (options.baseUrl) return options.baseUrl;
-  const region = options.region ?? regionFromApiKey(options.apiKey);
+  const region =
+    options.region ??
+    (options.apiKey ? regionFromApiKey(options.apiKey) : undefined);
   if (!region) {
+    if (!options.apiKey) return undefined;
     throw new Error(
       "Unable to determine region: API key is not in the expected " +
         "bk_{region}_{token} format. Pass an explicit `region` or `baseUrl`.",
@@ -162,7 +173,8 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
   // The generated hey-api client, configured with this instance's base URL,
   // auth, and fetch. Resources call the generated SDK functions through it.
   readonly #client: Client;
-  readonly #baseUrl: string;
+  readonly #baseUrl: string | undefined;
+  readonly #missingAuth?: string;
   readonly #fetch: typeof fetch;
   readonly #headers: Record<string, string>;
 
@@ -227,11 +239,20 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
 
   constructor(options: O) {
     const opts: BirdClientOptions = options; // widen for safe optional access
+    if (!opts.apiKey && !opts.webhooks?.secret) {
+      throw new BirdError(
+        "Configure `apiKey` for API calls, or `webhooks: { secret }` for a receiver-only client.",
+      );
+    }
+    if (!opts.apiKey) {
+      this.#missingAuth =
+        "This client has no API key (webhook verification only); pass `apiKey` to call the API.";
+    }
     this.#baseUrl = resolveBaseUrl(opts);
     this.#fetch = opts.fetch ?? fetch;
     this.#headers = {
       ...opts.defaultHeaders,
-      Authorization: `Bearer ${opts.apiKey}`,
+      ...(opts.apiKey ? { Authorization: `Bearer ${opts.apiKey}` } : {}),
       "User-Agent": `bird-sdk-js/${__SDK_VERSION__}`,
       // Bird-* client-identity headers attribute the SDK surface. The User-Agent
       // does not. These headers are edge-safe, so they omit OS, architecture, and
@@ -253,6 +274,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
     this.core = new BirdHTTPClient({
       timeout: opts.timeout ?? DEFAULT_TIMEOUT_MS,
       maxRetries: opts.maxRetries ?? DEFAULT_MAX_RETRIES,
+      missingAuth: this.#missingAuth,
       credentials: {
         RealtimeKey: {
           header: "X-Realtime-Key",
@@ -291,7 +313,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
     this.domains = new DomainsResource(this.core, this.#client);
     this.lookup = new LookupResource(this.core, this.#client);
     this.numbers = new NumbersResource(this.core, this.#client);
-    this.webhooks = new WebhooksResource(opts.webhooks);
+    this.webhooks = new WebhooksResource(this.core, this.#client, opts.webhooks);
     this.realtime = new RealtimeResource(this.core, this.#client, opts.realtime);
   }
 
@@ -312,6 +334,12 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
     req: BirdRequest,
     options?: RequestOptions,
   ): APIPromise<T> {
+    if (this.#missingAuth || this.#baseUrl === undefined) {
+      throw new BirdMissingApiKeyError(
+        this.#missingAuth ??
+          "This client has no API key (webhook verification only); pass `apiKey` to call the API.",
+      );
+    }
     const url = resolveRawRequestUrl(this.#baseUrl, req.path);
     return apiPromise(
       this.core.request<T>(

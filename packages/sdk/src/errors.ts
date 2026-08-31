@@ -39,6 +39,18 @@ export class BirdTimeoutError extends BirdError {
   }
 }
 
+/**
+ * An API call on a client constructed without `apiKey` (a receiver-only
+ * client, which can still `unwrap` webhooks). Thrown before any request.
+ */
+export class BirdMissingApiKeyError extends BirdError {
+  constructor(message: string) {
+    super(message);
+    this.name = "BirdMissingApiKeyError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 /** A webhook payload failed signature verification (bad signature, stale timestamp, malformed headers). */
 export class BirdWebhookVerificationError extends BirdError {
   constructor(message: string) {

@@ -1,10 +1,13 @@
-// `bird.webhooks` — verifies a delivered payload's Standard Webhooks signature
-// and returns it as a typed, discriminated event union. Pure crypto: it never
-// touches the transport layer, so it carries no client/core dependency.
+// `bird.webhooks` — manages webhook endpoints (generated base) and verifies a
+// delivered payload's Standard Webhooks signature, returning it as a typed,
+// discriminated event union. `unwrap` itself is pure crypto: it never touches
+// the transport layer.
 
 import { Webhook } from "standardwebhooks";
 import type { WebhookEvent } from "../generated/types.gen.js";
 import { BirdWebhookVerificationError } from "../errors.js";
+import type { Resource } from "./base.js";
+import { WebhooksResourceBase } from "./webhooks.gen.js";
 
 /** A verified webhook event, discriminated on `type`. */
 export type BirdWebhookEvent = WebhookEvent;
@@ -18,10 +21,15 @@ export interface WebhookOptions {
   secret?: string;
 }
 
-export class WebhooksResource {
+export class WebhooksResource extends WebhooksResourceBase {
   readonly #secret?: string;
 
-  constructor(config?: WebhookOptions) {
+  constructor(
+    core: ConstructorParameters<typeof Resource>[0],
+    client: ConstructorParameters<typeof Resource>[1],
+    config?: WebhookOptions,
+  ) {
+    super(core, client);
     this.#secret = config?.secret;
   }
 

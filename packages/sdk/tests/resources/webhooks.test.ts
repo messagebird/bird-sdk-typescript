@@ -87,3 +87,18 @@ function _narrowing(event: BirdWebhookEvent) {
   }
 }
 void _narrowing;
+
+describe("receiver-only unwrap", () => {
+  it("verifies on a client constructed without an apiKey", () => {
+    const payload = JSON.stringify({
+      type: "email.delivered",
+      email_id: "em_1",
+      recipient_id: "er_1",
+      workspace_id: "ws_1",
+      recipient: "a@b.com",
+    });
+    const receiver = new BirdClient({ webhooks: { secret: SECRET } });
+    const event = receiver.webhooks.unwrap(payload, signed(payload));
+    expect(event.type).toBe("email.delivered");
+  });
+});

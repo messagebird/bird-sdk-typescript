@@ -81,6 +81,9 @@ import type {
   CreateVerificationNextChannelErrors,
   CreateVerificationNextChannelResponses,
   CreateVerificationResponses,
+  CreateWebhookData,
+  CreateWebhookErrors,
+  CreateWebhookResponses,
   CreateWhatsAppMessageData,
   CreateWhatsAppMessageErrors,
   CreateWhatsAppMessageResponses,
@@ -111,6 +114,9 @@ import type {
   DeleteSmsSuppressionData,
   DeleteSmsSuppressionErrors,
   DeleteSmsSuppressionResponses,
+  DeleteWebhookData,
+  DeleteWebhookErrors,
+  DeleteWebhookResponses,
   DisconnectRealtimeAppMemberData,
   DisconnectRealtimeAppMemberErrors,
   DisconnectRealtimeAppMemberResponses,
@@ -270,6 +276,9 @@ import type {
   GetVoiceCallData,
   GetVoiceCallErrors,
   GetVoiceCallResponses,
+  GetWebhookData,
+  GetWebhookErrors,
+  GetWebhookResponses,
   GetWhatsAppMessageData,
   GetWhatsAppMessageErrors,
   GetWhatsAppMessageResponses,
@@ -348,6 +357,12 @@ import type {
   ListVoiceCallsData,
   ListVoiceCallsErrors,
   ListVoiceCallsResponses,
+  ListWebhookAttemptsData,
+  ListWebhookAttemptsErrors,
+  ListWebhookAttemptsResponses,
+  ListWebhooksData,
+  ListWebhooksErrors,
+  ListWebhooksResponses,
   ListWhatsAppMessageEventsData,
   ListWhatsAppMessageEventsErrors,
   ListWhatsAppMessageEventsResponses,
@@ -375,9 +390,15 @@ import type {
   ResumeMailboxData,
   ResumeMailboxErrors,
   ResumeMailboxResponses,
+  RotateWebhookSecretData,
+  RotateWebhookSecretErrors,
+  RotateWebhookSecretResponses,
   SendRealtimeAppMemberEventData,
   SendRealtimeAppMemberEventErrors,
   SendRealtimeAppMemberEventResponses,
+  TestWebhookData,
+  TestWebhookErrors,
+  TestWebhookResponses,
   UnarchiveContactPropertyData,
   UnarchiveContactPropertyErrors,
   UnarchiveContactPropertyResponses,
@@ -408,6 +429,9 @@ import type {
   UpdateSmsKeywordRuleData,
   UpdateSmsKeywordRuleErrors,
   UpdateSmsKeywordRuleResponses,
+  UpdateWebhookData,
+  UpdateWebhookErrors,
+  UpdateWebhookResponses,
   VerifyDomainData,
   VerifyDomainErrors,
   VerifyDomainResponses,
@@ -4577,6 +4601,260 @@ export const listMailboxLabels = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/email/mailboxes/{mailbox_id}/labels",
+    ...options,
+  });
+
+/**
+ * List webhook endpoints
+ *
+ * Returns the workspace's webhook endpoints as a cursor-paginated list, newest first by default. Endpoint objects never include the signing secret; to inspect a single endpoint, use [Get a webhook endpoint](/docs/api/reference/get-webhook).
+ *
+ */
+export const listWebhooks = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWebhooksData, ThrowOnError>,
+): RequestResult<ListWebhooksResponses, ListWebhooksErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListWebhooksResponses,
+    ListWebhooksErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/webhooks",
+    ...options,
+  });
+
+/**
+ * Create a webhook endpoint
+ *
+ * Registers an `active` webhook endpoint that receives the event types in `events` as signed HTTPS `POST` requests. See the [webhooks guide](/docs/guides/webhooks) for delivery, signing, and retry behavior.
+ *
+ * The `201` response is the only response that includes the signing secret (`whsec_` prefix). Store it immediately; if it is lost, [rotate the signing secret](/docs/api/reference/rotate-webhook-secret).
+ *
+ * A non-HTTPS or non-public `url`, an unknown event type, or exceeding the organization's endpoint limit returns `422`.
+ *
+ */
+export const createWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<CreateWebhookData, ThrowOnError>,
+): RequestResult<CreateWebhookResponses, CreateWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateWebhookResponses,
+    CreateWebhookErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/webhooks",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a webhook endpoint
+ *
+ * Permanently removes the webhook endpoint and stops all deliveries to it, including retries of earlier failed deliveries. This cannot be undone: recreating an endpoint later mints a new `id` and signing secret. To stop deliveries temporarily instead, set `status` to `paused` with [Update a webhook endpoint](/docs/api/reference/update-webhook).
+ *
+ */
+export const deleteWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteWebhookData, ThrowOnError>,
+): RequestResult<DeleteWebhookResponses, DeleteWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteWebhookResponses,
+    DeleteWebhookErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/webhooks/{webhook_id}",
+    ...options,
+  });
+
+/**
+ * Get a webhook endpoint
+ *
+ * Returns one webhook endpoint's configuration and current delivery `status`, including its URL and subscribed event types. The signing secret is never included; if you lost it, mint a new one with [Rotate webhook signing secret](/docs/api/reference/rotate-webhook-secret).
+ *
+ */
+export const getWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<GetWebhookData, ThrowOnError>,
+): RequestResult<GetWebhookResponses, GetWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetWebhookResponses,
+    GetWebhookErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/webhooks/{webhook_id}",
+    ...options,
+  });
+
+/**
+ * Update a webhook endpoint
+ *
+ * Updates the webhook endpoint. Only the fields you send change: `events` replaces the
+ * whole subscription set, and `status` pauses or re-enables delivery.
+ *
+ * The `200` response is the updated endpoint. Invalid input (a non-HTTPS or non-public
+ * `url`, an event type outside the catalog) returns a `422`.
+ *
+ */
+export const updateWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateWebhookData, ThrowOnError>,
+): RequestResult<UpdateWebhookResponses, UpdateWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    UpdateWebhookResponses,
+    UpdateWebhookErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/webhooks/{webhook_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Rotate webhook signing secret
+ *
+ * Generates a new signing secret for the endpoint and returns it exactly once: store it
+ * immediately, it cannot be retrieved after this response. For 24 hours every delivery
+ * is signed with both the old and the new secret, so a receiver verifying with either
+ * keeps working while you roll the new one out. After the window the old secret stops
+ * signing. Verification details are in the [webhooks guide](/docs/guides/webhooks).
+ *
+ * An endpoint holds at most 5 concurrently valid secrets, so rotating repeatedly within
+ * the overlap window fails with `WebhookTooManySecrets` until an older secret expires.
+ *
+ */
+export const rotateWebhookSecret = <ThrowOnError extends boolean = false>(
+  options: Options<RotateWebhookSecretData, ThrowOnError>,
+): RequestResult<
+  RotateWebhookSecretResponses,
+  RotateWebhookSecretErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RotateWebhookSecretResponses,
+    RotateWebhookSecretErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/webhooks/{webhook_id}/rotate-secret",
+    ...options,
+  });
+
+/**
+ * Test a webhook with a sample event
+ *
+ * Sends a signed synthetic event and returns whether your endpoint accepted it, its HTTP status, and the round-trip latency. An unreachable endpoint returns `status: failed` in the response body. The endpoint has 10 seconds to respond.
+ *
+ * The body is a minimal JSON object with the event `type`, signed like a real delivery. It does not mirror that event's payload. Tests work on paused endpoints and do not appear in [List delivery attempts](/docs/api/reference/list-webhook-attempts).
+ *
+ * The operation returns `412` if the endpoint lacks a valid signing secret or, when `event_type` is omitted, has no subscribed event type to use.
+ *
+ */
+export const testWebhook = <ThrowOnError extends boolean = false>(
+  options: Options<TestWebhookData, ThrowOnError>,
+): RequestResult<TestWebhookResponses, TestWebhookErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    TestWebhookResponses,
+    TestWebhookErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/webhooks/{webhook_id}/test",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List delivery attempts
+ *
+ * Returns the endpoint's recent delivery attempts, newest first. Each entry is one HTTP
+ * request, so a retried event appears once per try; use it to see what failed and why
+ * before requesting redelivery with
+ * [Replay missed events](/docs/api/reference/create-webhook-replay).
+ *
+ * Bound the window with the `before`/`after` timestamps and cap the page with `limit`.
+ * To page further back without a cursor, pass the oldest `attempted_at`
+ * you received as `before`.
+ *
+ */
+export const listWebhookAttempts = <ThrowOnError extends boolean = false>(
+  options: Options<ListWebhookAttemptsData, ThrowOnError>,
+): RequestResult<
+  ListWebhookAttemptsResponses,
+  ListWebhookAttemptsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListWebhookAttemptsResponses,
+    ListWebhookAttemptsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/webhooks/{webhook_id}/attempts",
     ...options,
   });
 

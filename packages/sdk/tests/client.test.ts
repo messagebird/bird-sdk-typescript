@@ -4,6 +4,7 @@ import {
   BirdError,
   BirdAPIError,
   BirdAuthError,
+  BirdMissingApiKeyError,
   BirdRateLimitError,
   regionFromApiKey,
   baseUrlForRegion,
@@ -82,5 +83,28 @@ describe("Error hierarchy", () => {
     expect(err).toBeInstanceOf(BirdAPIError);
     expect(err.statusCode).toBe(429);
     expect(err.retryAfter).toBe(30);
+  });
+});
+
+describe("receiver-only client (no apiKey)", () => {
+  const secret = "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oD";
+
+  it("constructs from a webhook secret alone", () => {
+    const client = new BirdClient({ webhooks: { secret } });
+    expect(client).toBeInstanceOf(BirdClient);
+  });
+
+  it("rejects API calls with BirdMissingApiKeyError", async () => {
+    const client = new BirdClient({ webhooks: { secret } });
+    await expect(client.workspace.get()).rejects.toThrow(BirdMissingApiKeyError);
+  });
+
+  it("rejects the raw escape hatch before building a request", () => {
+    const client = new BirdClient({ webhooks: { secret } });
+    expect(() => client.request({ method: "GET", path: "/v1/workspace" })).toThrow(BirdMissingApiKeyError);
+  });
+
+  it("throws at construction when neither apiKey nor webhook secret is configured", () => {
+    expect(() => new BirdClient({})).toThrow(BirdError);
   });
 });

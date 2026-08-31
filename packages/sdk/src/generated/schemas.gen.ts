@@ -14498,6 +14498,14 @@ export const EmailSmtpConfigUpdateSchema = {
   },
 } as const;
 
+export const WebhookSortFieldSchema = {
+  type: "string",
+  enum: ["created_at", "url"],
+  default: "created_at",
+  description:
+    "Field to sort webhook endpoints by: `created_at` (the default; newest first with the default `order`) or `url`.\n",
+} as const;
+
 export const WebhookEndpointIDSchema = {
   type: "string",
   minLength: 1,

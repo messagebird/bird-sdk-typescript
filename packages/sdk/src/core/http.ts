@@ -13,6 +13,7 @@
 import {
   BirdConnectionError,
   BirdError,
+  BirdMissingApiKeyError,
   BirdTimeoutError,
   mapResponseToError,
   parseRetryAfter,
@@ -66,6 +67,11 @@ export interface CoreDefaults {
    * those operations and never an unrelated request.
    */
   credentials?: Record<string, { header: string; value?: string; how: string }>;
+  /**
+   * Set on a keyless (receiver-only) client: every API call throws this
+   * message as a `BirdMissingApiKeyError` before any request is built.
+   */
+  missingAuth?: string;
 }
 
 const BACKOFF_BASE_MS = 500;
@@ -109,6 +115,9 @@ export class BirdHTTPClient {
     call: (ctx: AttemptContext) => Promise<FetchOutcome<T>>,
     options: RequestLifecycleOptions,
   ): Promise<{ data: T; response: BirdResponse }> {
+    if (this.defaults.missingAuth) {
+      throw new BirdMissingApiKeyError(this.defaults.missingAuth);
+    }
     const maxRetries = options.maxRetries ?? this.defaults.maxRetries;
     const timeout = options.timeout ?? this.defaults.timeout;
     // Generated once, reused on every attempt — regenerating would double-execute.

@@ -977,28 +977,82 @@ for await (const call of bird.voice.list({ status: ["ringing", "in_progress"] })
 }
 
 export async function _ex_136() {
+const attempts = await bird.webhooks.attempts(
+  "whk_01krdgeqcxet5s7t44vh8rt9mg",
+);
+for (const attempt of attempts.data) {
+  console.log(attempt.status, attempt.response_status_code);
+}
+}
+
+export async function _ex_137() {
+const created = await bird.webhooks.create({
+  url: "https://acme.com/hooks/bird",
+  events: ["email.delivered", "email.bounced"],
+  description: "Delivery pipeline",
+});
+console.log(created.id, created.secret);
+}
+
+export async function _ex_138() {
+await bird.webhooks.delete("whk_01krdgeqcxet5s7t44vh8rt9mg");
+}
+
+export async function _ex_139() {
+const endpoint = await bird.webhooks.get("whk_01krdgeqcxet5s7t44vh8rt9mg");
+console.log(endpoint.url, endpoint.events);
+}
+
+export async function _ex_140() {
+for await (const endpoint of bird.webhooks.list()) {
+  console.log(endpoint.id, endpoint.url, endpoint.status);
+}
+}
+
+export async function _ex_141() {
+const rotated = await bird.webhooks.rotateSecret(
+  "whk_01krdgeqcxet5s7t44vh8rt9mg",
+);
+console.log(rotated.secret);
+}
+
+export async function _ex_142() {
+const result = await bird.webhooks.test("whk_01krdgeqcxet5s7t44vh8rt9mg", {
+  event_type: "email.delivered",
+});
+console.log(result.status);
+}
+
+export async function _ex_143() {
 // Pass the RAW request body; set the secret via new BirdClient({ webhooks: { secret } }).
 const event = bird.webhooks.unwrap(rawBody, headers);
 console.log(event.type); // discriminated union: narrow on event.type
 }
 
-export async function _ex_137() {
+export async function _ex_144() {
+const endpoint = await bird.webhooks.update("whk_01krdgeqcxet5s7t44vh8rt9mg", {
+  events: ["email.delivered"],
+});
+console.log(endpoint.events);
+}
+
+export async function _ex_145() {
 const msg = await bird.whatsapp.get("wa_abc123");
 msg.status; // "accepted" | "delivered" | …
 }
 
-export async function _ex_138() {
+export async function _ex_146() {
 for await (const msg of bird.whatsapp.list({ status: ["delivered"] })) {
   console.log(msg.id, msg.status);
 }
 }
 
-export async function _ex_139() {
+export async function _ex_147() {
 const { data } = await bird.whatsapp.listEvents("wa_abc123");
 for (const event of data) console.log(event.type, event.occurred_at);
 }
 
-export async function _ex_140() {
+export async function _ex_148() {
 const msg = await bird.whatsapp.send({
   to: "+15551234567",
   template: {
@@ -1009,7 +1063,7 @@ const msg = await bird.whatsapp.send({
 console.log(msg.id, msg.status);
 }
 
-export async function _ex_141() {
+export async function _ex_149() {
 const workspace = await bird.workspace.get();
 console.log(workspace.id, workspace.name); // "ws_…" "Production"
 }

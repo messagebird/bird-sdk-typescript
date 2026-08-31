@@ -8160,6 +8160,12 @@ export type EmailSmtpConfigUpdate = {
   track_clicks?: boolean;
 };
 
+/**
+ * Field to sort webhook endpoints by: `created_at` (the default; newest first with the default `order`) or `url`.
+ *
+ */
+export type WebhookSortField = "created_at" | "url";
+
 export type WebhookEndpointId = string;
 
 /**
@@ -22278,6 +22284,537 @@ export type ListMailboxLabelsResponses = {
 
 export type ListMailboxLabelsResponse =
   ListMailboxLabelsResponses[keyof ListMailboxLabelsResponses];
+
+export type ListWebhooksData = {
+  body?: never;
+  path?: never;
+  query?: {
+    sort?: WebhookSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: "asc" | "desc";
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+  };
+  url: "/v1/webhooks";
+};
+
+export type ListWebhooksErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWebhooksError = ListWebhooksErrors[keyof ListWebhooksErrors];
+
+export type ListWebhooksResponses = {
+  /**
+   * Paginated list of webhook endpoints.
+   */
+  200: WebhookEndpointList;
+};
+
+export type ListWebhooksResponse =
+  ListWebhooksResponses[keyof ListWebhooksResponses];
+
+export type CreateWebhookData = {
+  body: WebhookEndpointCreate;
+  headers?: {
+    /**
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/webhooks";
+};
+
+export type CreateWebhookErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type CreateWebhookError = CreateWebhookErrors[keyof CreateWebhookErrors];
+
+export type CreateWebhookResponses = {
+  /**
+   * Created webhook endpoint, including its one-time signing secret.
+   */
+  201: WebhookEndpointCreated;
+};
+
+export type CreateWebhookResponse =
+  CreateWebhookResponses[keyof CreateWebhookResponses];
+
+export type DeleteWebhookData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the webhook endpoint (`whk_` prefix), as returned when it was created.
+     */
+    webhook_id: WebhookEndpointId;
+  };
+  query?: never;
+  url: "/v1/webhooks/{webhook_id}";
+};
+
+export type DeleteWebhookErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type DeleteWebhookError = DeleteWebhookErrors[keyof DeleteWebhookErrors];
+
+export type DeleteWebhookResponses = {
+  /**
+   * Webhook endpoint deleted.
+   */
+  204: void;
+};
+
+export type DeleteWebhookResponse =
+  DeleteWebhookResponses[keyof DeleteWebhookResponses];
+
+export type GetWebhookData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the webhook endpoint (`whk_` prefix), as returned when it was created.
+     */
+    webhook_id: WebhookEndpointId;
+  };
+  query?: never;
+  url: "/v1/webhooks/{webhook_id}";
+};
+
+export type GetWebhookErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWebhookError = GetWebhookErrors[keyof GetWebhookErrors];
+
+export type GetWebhookResponses = {
+  /**
+   * Webhook endpoint with its current URL, subscriptions, and status.
+   */
+  200: WebhookEndpoint;
+};
+
+export type GetWebhookResponse = GetWebhookResponses[keyof GetWebhookResponses];
+
+export type UpdateWebhookData = {
+  body: WebhookEndpointUpdate;
+  headers?: {
+    /**
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the webhook endpoint (`whk_` prefix), as returned when it was created.
+     */
+    webhook_id: WebhookEndpointId;
+  };
+  query?: never;
+  url: "/v1/webhooks/{webhook_id}";
+};
+
+export type UpdateWebhookErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type UpdateWebhookError = UpdateWebhookErrors[keyof UpdateWebhookErrors];
+
+export type UpdateWebhookResponses = {
+  /**
+   * Webhook endpoint after the update.
+   */
+  200: WebhookEndpoint;
+};
+
+export type UpdateWebhookResponse =
+  UpdateWebhookResponses[keyof UpdateWebhookResponses];
+
+export type RotateWebhookSecretData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the webhook endpoint (`whk_` prefix), as returned when it was created.
+     */
+    webhook_id: WebhookEndpointId;
+  };
+  query?: never;
+  url: "/v1/webhooks/{webhook_id}/rotate-secret";
+};
+
+export type RotateWebhookSecretErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type RotateWebhookSecretError =
+  RotateWebhookSecretErrors[keyof RotateWebhookSecretErrors];
+
+export type RotateWebhookSecretResponses = {
+  /**
+   * New signing secret.
+   */
+  200: WebhookRotateSecretResponse;
+};
+
+export type RotateWebhookSecretResponse =
+  RotateWebhookSecretResponses[keyof RotateWebhookSecretResponses];
+
+export type TestWebhookData = {
+  body?: WebhookTestRequest;
+  headers?: {
+    /**
+     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the webhook endpoint (`whk_` prefix), as returned when it was created.
+     */
+    webhook_id: WebhookEndpointId;
+  };
+  query?: never;
+  url: "/v1/webhooks/{webhook_id}/test";
+};
+
+export type TestWebhookErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type TestWebhookError = TestWebhookErrors[keyof TestWebhookErrors];
+
+export type TestWebhookResponses = {
+  /**
+   * The test result, including whether your endpoint accepted the event.
+   */
+  200: WebhookTestResponse;
+};
+
+export type TestWebhookResponse =
+  TestWebhookResponses[keyof TestWebhookResponses];
+
+export type ListWebhookAttemptsData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the webhook endpoint (`whk_` prefix), as returned when it was created.
+     */
+    webhook_id: WebhookEndpointId;
+  };
+  query?: {
+    /**
+     * Maximum number of attempts to return. Defaults to 50, capped at 100.
+     */
+    limit?: number;
+    /**
+     * Only return attempts strictly before this timestamp.
+     */
+    before?: string;
+    /**
+     * Only return attempts strictly after this timestamp.
+     */
+    after?: string;
+  };
+  url: "/v1/webhooks/{webhook_id}/attempts";
+};
+
+export type ListWebhookAttemptsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWebhookAttemptsError =
+  ListWebhookAttemptsErrors[keyof ListWebhookAttemptsErrors];
+
+export type ListWebhookAttemptsResponses = {
+  /**
+   * Recent delivery attempts.
+   */
+  200: WebhookAttemptList;
+};
+
+export type ListWebhookAttemptsResponse =
+  ListWebhookAttemptsResponses[keyof ListWebhookAttemptsResponses];
 
 export type ListWorkspaceNumbersData = {
   body?: never;

@@ -25,6 +25,7 @@ export {
   BirdValidationError,
   BirdRateLimitError,
   BirdWebhookVerificationError,
+  BirdMissingApiKeyError,
   type ErrorDetail,
   type NextAction,
 } from "./errors.js";
@@ -212,6 +213,18 @@ export type {
   WebhookHeaders,
   WebhookOptions,
 } from "./resources/webhooks.js";
+export type {
+  WebhookEndpoint,
+  WebhookEndpointCreated,
+  WebhookTestResponse,
+  WebhookAttemptList,
+  WebhookRotateSecretResponse,
+  WebhooksListQuery,
+  WebhooksCreateParams,
+  WebhooksTestParams,
+  WebhooksAttemptsQuery,
+  WebhooksUpdateParams,
+} from "./resources/webhooks.gen.js";
 export type {
   // response types
   RealtimePublishResult,
