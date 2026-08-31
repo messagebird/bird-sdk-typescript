@@ -4467,7 +4467,7 @@ export const getEmailThreadMessageBody = <ThrowOnError extends boolean = false>(
 /**
  * List a thread message's attachments
  *
- * Returns the attachments on a message in a conversation. Attachment bytes are downloadable for 30 days after the message occurred. Later requests return `410 Gone`, while the attachment metadata stays readable on the message's `attachment_manifest`.
+ * Returns the attachments on a message in a conversation. Attachment bytes are downloadable for the mailbox's retention tier after the message occurred. Later requests return `410 Gone`, while the attachment metadata stays readable on the message's `attachment_manifest`.
  *
  */
 export const listEmailThreadMessageAttachments = <

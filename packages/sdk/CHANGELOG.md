@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.44.0
+
+- Mailbox `retention_tier` now accepts `90d` and `1y` on create and update, gated by the organization's plan; a tier the plan does not include is rejected with `E17048`.
+
 ## 0.43.0
 
 - The client is constructible with only the webhook secret — no API key — for receiver-only deployments; an API call on such a client fails with a missing-API-key error before any request is sent.

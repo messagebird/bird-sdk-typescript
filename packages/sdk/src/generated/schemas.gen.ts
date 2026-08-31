@@ -12775,7 +12775,7 @@ export const MailboxSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A durable mailbox identity for an agent. A mailbox owns an email address, groups mail into threads, applies receive policy, and remembers message metadata and extracted text for its retention tier. The original rendered source of each message remains available for 30 days.\n",
+    "A durable mailbox identity for an agent. A mailbox owns an email address, groups mail into threads, applies receive policy, and remembers message metadata, extracted text, and attachments for its retention tier. The body and raw MIME of each message remain available for 30 days.\n",
   required: [
     "id",
     "address",
@@ -12856,7 +12856,7 @@ export const MailboxSchema = {
       type: "string",
       enum: ["30d", "90d", "1y"],
       description:
-        "How long the mailbox remembers message metadata and extracted text. Original rendered source (HTML, raw message, attachments) is always available for 30 days regardless of tier.",
+        "How long the mailbox remembers message metadata, extracted text, and attachments. Message bodies and raw MIME stay available for 30 days regardless of tier.",
     },
     message_count: {
       type: "integer",
@@ -12980,10 +12980,10 @@ export const MailboxCreateSchema = {
     },
     retention_tier: {
       type: "string",
-      enum: ["30d"],
+      enum: ["30d", "90d", "1y"],
       default: "30d",
       description:
-        "How long the mailbox remembers message metadata and extracted text. Original rendered source is always available for 30 days regardless of tier.",
+        "How long the mailbox remembers message metadata, extracted text, and attachments. Message bodies and raw MIME stay available for 30 days regardless of tier. Tiers longer than 30 days require a plan that includes them.",
     },
     metadata: {
       type: "object",
@@ -13026,9 +13026,9 @@ export const MailboxUpdateSchema = {
     },
     retention_tier: {
       type: "string",
-      enum: ["30d"],
+      enum: ["30d", "90d", "1y"],
       description:
-        "How long the mailbox remembers message metadata and extracted text. Lowering the tier deletes remembered messages older than the new horizon, and requires `confirm=true` when that would happen.",
+        "How long the mailbox remembers message metadata, extracted text, and attachments. Message bodies and raw MIME stay available for 30 days regardless of tier. Tiers longer than 30 days require a plan that includes them. Lowering the tier deletes remembered messages older than the new horizon, and requires `confirm=true` when that would happen.",
     },
     metadata: {
       type: "object",
@@ -13825,7 +13825,7 @@ export const EmailThreadMessageAttachmentSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Attachment metadata on a conversation message. The metadata stays readable for the mailbox's retention tier. The attachment bytes are downloadable for 30 days after the message occurred.\n",
+    "Attachment metadata on a conversation message. Both the metadata and the attachment bytes stay available for the mailbox's retention tier.\n",
   required: ["id", "filename", "content_type", "size"],
   properties: {
     id: {
@@ -13877,7 +13877,7 @@ export const EmailThreadMessageSourceSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "When the log entry (and the message's original rendered source) expires.",
+        "When the log entry (and the message's body and raw MIME) expires.",
     },
   },
 } as const;
@@ -13886,7 +13886,7 @@ export const EmailThreadMessageSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A message in a mailbox conversation, either direction. Message metadata and extracted text stay readable for the mailbox's retention tier. The original rendered source (HTML body, raw MIME, attachment bytes) is available through the body, raw, and attachment endpoints for 30 days after the message occurred.\n",
+    "A message in a mailbox conversation, either direction. Message metadata, extracted text, and attachment bytes stay readable for the mailbox's retention tier. The body and raw MIME are available through the body and raw endpoints for 30 days after the message occurred.\n",
   required: [
     "id",
     "direction",
@@ -14066,7 +14066,7 @@ export const EmailThreadMessageSchema = {
         $ref: "#/components/schemas/EmailThreadMessageAttachment",
       },
       description:
-        "Attachment metadata (filename, content type, size). Stays readable for the mailbox's retention tier even after the attachment bytes themselves have expired.\n",
+        "Attachment metadata (filename, content type, size). Both the metadata and the attachment bytes stay available for the mailbox's retention tier.\n",
     },
     reference_ids: {
       type: "array",
@@ -21499,7 +21499,7 @@ export const MailboxWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A durable mailbox identity for an agent. A mailbox owns an email address, groups mail into threads, applies receive policy, and remembers message metadata and extracted text for its retention tier. The original rendered source of each message remains available for 30 days.\n",
+    "A durable mailbox identity for an agent. A mailbox owns an email address, groups mail into threads, applies receive policy, and remembers message metadata, extracted text, and attachments for its retention tier. The body and raw MIME of each message remain available for 30 days.\n",
   required: [
     "display_name",
     "default_reply_to",
@@ -21532,7 +21532,7 @@ export const MailboxWritableSchema = {
       type: "string",
       enum: ["30d", "90d", "1y"],
       description:
-        "How long the mailbox remembers message metadata and extracted text. Original rendered source (HTML, raw message, attachments) is always available for 30 days regardless of tier.",
+        "How long the mailbox remembers message metadata, extracted text, and attachments. Message bodies and raw MIME stay available for 30 days regardless of tier.",
     },
     metadata: {
       type: "object",
@@ -21751,7 +21751,7 @@ export const EmailThreadMessageWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A message in a mailbox conversation, either direction. Message metadata and extracted text stay readable for the mailbox's retention tier. The original rendered source (HTML body, raw MIME, attachment bytes) is available through the body, raw, and attachment endpoints for 30 days after the message occurred.\n",
+    "A message in a mailbox conversation, either direction. Message metadata, extracted text, and attachment bytes stay readable for the mailbox's retention tier. The body and raw MIME are available through the body and raw endpoints for 30 days after the message occurred.\n",
   required: ["labels", "contact_id"],
   properties: {
     labels: {

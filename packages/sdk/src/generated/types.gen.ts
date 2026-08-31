@@ -7208,7 +7208,7 @@ export type MailboxOwner = {
 };
 
 /**
- * A durable mailbox identity for an agent. A mailbox owns an email address, groups mail into threads, applies receive policy, and remembers message metadata and extracted text for its retention tier. The original rendered source of each message remains available for 30 days.
+ * A durable mailbox identity for an agent. A mailbox owns an email address, groups mail into threads, applies receive policy, and remembers message metadata, extracted text, and attachments for its retention tier. The body and raw MIME of each message remain available for 30 days.
  *
  */
 export type Mailbox = {
@@ -7255,7 +7255,7 @@ export type Mailbox = {
    */
   readonly inbound_address_id: InboundAddressId;
   /**
-   * How long the mailbox remembers message metadata and extracted text. Original rendered source (HTML, raw message, attachments) is always available for 30 days regardless of tier.
+   * How long the mailbox remembers message metadata, extracted text, and attachments. Message bodies and raw MIME stay available for 30 days regardless of tier.
    */
   retention_tier: "30d" | "90d" | "1y";
   /**
@@ -7332,9 +7332,9 @@ export type MailboxCreate = {
    */
   receive_policy?: "open" | "replies_only" | "allowlist" | "drop";
   /**
-   * How long the mailbox remembers message metadata and extracted text. Original rendered source is always available for 30 days regardless of tier.
+   * How long the mailbox remembers message metadata, extracted text, and attachments. Message bodies and raw MIME stay available for 30 days regardless of tier. Tiers longer than 30 days require a plan that includes them.
    */
-  retention_tier?: "30d";
+  retention_tier?: "30d" | "90d" | "1y";
   /**
    * Your own key/value data to attach to the mailbox. Up to 2 KB. Keys starting with `__bird` are reserved.
    */
@@ -7368,9 +7368,9 @@ export type MailboxUpdate = {
    */
   receive_policy?: "open" | "replies_only" | "allowlist" | "drop";
   /**
-   * How long the mailbox remembers message metadata and extracted text. Lowering the tier deletes remembered messages older than the new horizon, and requires `confirm=true` when that would happen.
+   * How long the mailbox remembers message metadata, extracted text, and attachments. Message bodies and raw MIME stay available for 30 days regardless of tier. Tiers longer than 30 days require a plan that includes them. Lowering the tier deletes remembered messages older than the new horizon, and requires `confirm=true` when that would happen.
    */
-  retention_tier?: "30d";
+  retention_tier?: "30d" | "90d" | "1y";
   /**
    * Replaces the mailbox's key/value data. Up to 2 KB. Keys starting with `__bird` are reserved.
    */
@@ -7747,7 +7747,7 @@ export type EmailThreadMessageRecipient = {
 };
 
 /**
- * Attachment metadata on a conversation message. The metadata stays readable for the mailbox's retention tier. The attachment bytes are downloadable for 30 days after the message occurred.
+ * Attachment metadata on a conversation message. Both the metadata and the attachment bytes stay available for the mailbox's retention tier.
  *
  */
 export type EmailThreadMessageAttachment = {
@@ -7779,13 +7779,13 @@ export type EmailThreadMessageSource = {
    */
   readonly resource: string;
   /**
-   * When the log entry (and the message's original rendered source) expires.
+   * When the log entry (and the message's body and raw MIME) expires.
    */
   readonly available_until: string;
 };
 
 /**
- * A message in a mailbox conversation, either direction. Message metadata and extracted text stay readable for the mailbox's retention tier. The original rendered source (HTML body, raw MIME, attachment bytes) is available through the body, raw, and attachment endpoints for 30 days after the message occurred.
+ * A message in a mailbox conversation, either direction. Message metadata, extracted text, and attachment bytes stay readable for the mailbox's retention tier. The body and raw MIME are available through the body and raw endpoints for 30 days after the message occurred.
  *
  */
 export type EmailThreadMessage = {
@@ -7904,7 +7904,7 @@ export type EmailThreadMessage = {
    */
   readonly attachment_count: number;
   /**
-   * Attachment metadata (filename, content type, size). Stays readable for the mailbox's retention tier even after the attachment bytes themselves have expired.
+   * Attachment metadata (filename, content type, size). Both the metadata and the attachment bytes stay available for the mailbox's retention tier.
    *
    */
   readonly attachment_manifest: Array<EmailThreadMessageAttachment>;
@@ -12381,7 +12381,7 @@ export type InboundAttachmentListWritable = {
 };
 
 /**
- * A durable mailbox identity for an agent. A mailbox owns an email address, groups mail into threads, applies receive policy, and remembers message metadata and extracted text for its retention tier. The original rendered source of each message remains available for 30 days.
+ * A durable mailbox identity for an agent. A mailbox owns an email address, groups mail into threads, applies receive policy, and remembers message metadata, extracted text, and attachments for its retention tier. The body and raw MIME of each message remain available for 30 days.
  *
  */
 export type MailboxWritable = {
@@ -12407,7 +12407,7 @@ export type MailboxWritable = {
    */
   receive_policy: "open" | "replies_only" | "allowlist" | "drop";
   /**
-   * How long the mailbox remembers message metadata and extracted text. Original rendered source (HTML, raw message, attachments) is always available for 30 days regardless of tier.
+   * How long the mailbox remembers message metadata, extracted text, and attachments. Message bodies and raw MIME stay available for 30 days regardless of tier.
    */
   retention_tier: "30d" | "90d" | "1y";
   /**
@@ -12516,7 +12516,7 @@ export type EmailThreadListWritable = {
 } & ListEnvelope;
 
 /**
- * A message in a mailbox conversation, either direction. Message metadata and extracted text stay readable for the mailbox's retention tier. The original rendered source (HTML body, raw MIME, attachment bytes) is available through the body, raw, and attachment endpoints for 30 days after the message occurred.
+ * A message in a mailbox conversation, either direction. Message metadata, extracted text, and attachment bytes stay readable for the mailbox's retention tier. The body and raw MIME are available through the body and raw endpoints for 30 days after the message occurred.
  *
  */
 export type EmailThreadMessageWritable = {
@@ -20823,6 +20823,10 @@ export type CreateMailboxErrors = {
    */
   401: Error;
   /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
    * Insufficient permissions
    */
   403: Error;
@@ -21018,6 +21022,10 @@ export type UpdateMailboxErrors = {
    * Authentication required
    */
   401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
   /**
    * Insufficient permissions
    */
