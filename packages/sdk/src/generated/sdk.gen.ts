@@ -281,6 +281,8 @@ import type {
   GetWebhookResponses,
   GetWhatsAppMessageData,
   GetWhatsAppMessageErrors,
+  GetWhatsAppMessageMediaData,
+  GetWhatsAppMessageMediaErrors,
   GetWhatsAppMessageResponses,
   GetWorkspaceNumberData,
   GetWorkspaceNumberErrors,
@@ -3049,9 +3051,9 @@ export const listWhatsAppMessages = <ThrowOnError extends boolean = false>(
  *
  * Sends one WhatsApp message to one recipient. The request carries exactly one
  * kind of content: a message template, or free-form `text`, `image`, `video`,
- * `audio`, `sticker`, `document`, `location` or `interactive`. A request
- * carrying none is rejected with a `422`, and one carrying more than one is
- * too.
+ * `audio`, `sticker`, `document`, `location`, `contact_cards` or
+ * `interactive`. A request carrying none is rejected with a `422`, and one
+ * carrying more than one is too.
  *
  * A **template** is the only content WhatsApp delivers outside an open
  * customer service window, so it is what starts a conversation. Name the
@@ -3083,6 +3085,11 @@ export const listWhatsAppMessages = <ThrowOnError extends boolean = false>(
  * inbound `location` or `contact_cards` message.
  * Interactive content is free-form, so the customer service window and the
  * `from` requirement above both apply.
+ *
+ * **Contact cards** share up to five contacts in one message. Each card's
+ * `name` needs `formatted_name` plus at least one other part, and a
+ * `phone_number` in E.164 earns that card a button opening a chat with it.
+ * Contact cards are free-form too, so the same window and `from` rules apply.
  *
  * Set `in_reply_to_message_id` to quote a message the contact sees above this
  * one, the way replying in the WhatsApp client does. Any content quotes, and
@@ -3192,6 +3199,50 @@ export const listWhatsAppMessageEvents = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/whatsapp/messages/{message_id}/events",
+    ...options,
+  });
+
+/**
+ * Get a WhatsApp message's media
+ *
+ * Redirects to a short-lived URL for the media on a received WhatsApp message.
+ * Inbound media is stored because WhatsApp's own URL is not fetchable
+ * without our credentials; this endpoint is what the `url` on the message's
+ * `image`, `video`, `audio`, `sticker` or `document` points at. The bytes
+ * live in object storage and are served straight from there, so they never
+ * transit the API.
+ *
+ * The response is a `302` whose `Location` is that pre-authorized storage URL,
+ * valid for 15 minutes; your client must follow redirects. The `Authorization`
+ * header must be absent from the request that fetches that URL: a client that
+ * attaches credentials centrally, at its transport, interceptor or middleware
+ * layer rather than per request, re-adds the header on every hop including the
+ * redirect, so the storage URL must be fetched with a client that carries
+ * none.
+ *
+ * Media is kept for 30 days after the message is received, and the message
+ * itself is kept longer. A message older than that still lists its media's
+ * `mime_type` and `caption`, and this operation returns `410` once the bytes
+ * have expired. Outbound messages have no media to serve.
+ *
+ */
+export const getWhatsAppMessageMedia = <ThrowOnError extends boolean = false>(
+  options: Options<GetWhatsAppMessageMediaData, ThrowOnError>,
+): RequestResult<unknown, GetWhatsAppMessageMediaErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    unknown,
+    GetWhatsAppMessageMediaErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/messages/{message_id}/media/{media_id}",
     ...options,
   });
 

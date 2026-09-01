@@ -144,6 +144,7 @@ export type {
   LookupEmailParams,
 } from "./resources/lookup.gen.js";
 export type { WhatsappSendParams } from "./resources/whatsapp.js";
+export type { WhatsappMedia } from "./resources/whatsappMessages.js";
 export type {
   WhatsAppMessage,
   WhatsappListQuery,

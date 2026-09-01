@@ -308,6 +308,7 @@ export type TemplateStatusValue = (typeof TemplateStatus)[keyof typeof TemplateS
 export const VerificationAttemptFailureReason = {
   CarrierRejected: "carrier_rejected",
   ChannelDisabled: "channel_disabled",
+  ChannelRestricted: "channel_restricted",
   ChannelUnavailable: "channel_unavailable",
   DeliveryTimeout: "delivery_timeout",
   HardBounce: "hard_bounce",

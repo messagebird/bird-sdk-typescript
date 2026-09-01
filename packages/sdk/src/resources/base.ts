@@ -34,6 +34,7 @@ export abstract class Resource {
     options: RequestOptions | undefined,
     invoke: (ctx: CallContext) => Promise<FetchOutcome<T>>,
     schemes?: string[],
+    successStatus?: number,
   ): APIPromise<T> {
     // Resolved eagerly so a missing credential throws before the lifecycle starts,
     // never as a rejected promise with a request already in flight.
@@ -41,7 +42,7 @@ export abstract class Resource {
     return apiPromise(
       this.core.request<T>(
         (ctx) => invoke(callContext(ctx, options, credentials)),
-        lifecycle(method, options),
+        { ...lifecycle(method, options), successStatus },
       ),
     );
   }

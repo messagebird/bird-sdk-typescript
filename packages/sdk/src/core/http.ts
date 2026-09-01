@@ -39,6 +39,12 @@ export interface RequestLifecycleOptions {
   timeout?: number;
   /** Max retry attempts. Overrides the client default. */
   maxRetries?: number;
+  /**
+   * A 3xx this operation answers on success. Set only where the contract is a
+   * redirect the caller must take itself, because the target is pre-authorized
+   * and must not receive this client's credentials.
+   */
+  successStatus?: number;
 }
 
 /** The shape a generated hey-api SDK call resolves to. */
@@ -161,7 +167,7 @@ export class BirdHTTPClient {
         await retryOrThrow(() => new BirdConnectionError("No response received from the server"));
         continue;
       }
-      if (res.ok) {
+      if (res.ok || res.status === options.successStatus) {
         return { data: outcome.data as T, response: toBirdResponse(res) };
       }
       if (!isRetryableStatus(res.status) || attempt >= maxRetries) {

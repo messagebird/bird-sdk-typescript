@@ -1053,6 +1053,14 @@ for (const event of data) console.log(event.type, event.occurred_at);
 }
 
 export async function _ex_148() {
+const media = await bird.whatsapp.messages.media(
+  "wam_01kya19eknftrs2s6p82asmvnh",
+  "waf_01kyb2m4xq7whs0d8n3prv6tez",
+);
+console.log(media.contentType, media.contentLength);
+}
+
+export async function _ex_149() {
 const msg = await bird.whatsapp.send({
   to: "+15551234567",
   template: {
@@ -1063,7 +1071,7 @@ const msg = await bird.whatsapp.send({
 console.log(msg.id, msg.status);
 }
 
-export async function _ex_149() {
+export async function _ex_150() {
 const workspace = await bird.workspace.get();
 console.log(workspace.id, workspace.name); // "ws_…" "Production"
 }

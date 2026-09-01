@@ -7466,11 +7466,12 @@ export const VerificationAttemptFailureReasonSchema = {
     "undelivered",
     "channel_unavailable",
     "channel_disabled",
+    "channel_restricted",
     "delivery_timeout",
     "not_billable",
   ],
   description:
-    "Why a passcode send did not deliver:\n\n- `carrier_rejected`: The SMS carrier rejected the send.\n- `hard_bounce`: The email permanently bounced.\n- `soft_bounce`: The email temporarily bounced, such as when a mailbox is full.\n- `undelivered`: The channel reported a generic delivery failure.\n- `channel_unavailable`: The channel could not be used, so the verification\n  moved to the next channel.\n- `channel_disabled`: Sending on the channel is temporarily disabled, so the\n  verification moved to the next channel.\n- `delivery_timeout`: No delivery confirmation arrived before the channel's\n  timeout, so the verification moved to the next channel.\n- `not_billable`: The send could not be charged, so it was never handed to the\n  channel. Usually the workspace balance is too low to cover it. Topping up\n  the balance is what clears this.\n\nNew reasons may be added over time. Treat unrecognized values as reasons added\nlater rather than errors.",
+    "Why a passcode send did not deliver:\n\n- `carrier_rejected`: The SMS carrier rejected the send.\n- `hard_bounce`: The email permanently bounced.\n- `soft_bounce`: The email temporarily bounced, such as when a mailbox is full.\n- `undelivered`: The channel reported a generic delivery failure.\n- `channel_unavailable`: The channel could not be used, so the verification\n  moved to the next channel.\n- `channel_disabled`: Sending on the channel is temporarily disabled, so the\n  verification moved to the next channel.\n- `channel_restricted`: The channel does not carry passcodes to this\n  destination country. The verification moves to the next channel enabled\n  there, or fails when the country has no other.\n- `delivery_timeout`: No delivery confirmation arrived before the channel's\n  timeout, so the verification moved to the next channel.\n- `not_billable`: The send could not be charged, so it was never handed to the\n  channel. Usually the workspace balance is too low to cover it. Topping up\n  the balance is what clears this.\n\nNew reasons may be added over time. Treat unrecognized values as reasons added\nlater rather than errors.",
 } as const;
 
 export const WhatsAppTemplateCategorySchema = {
@@ -8273,7 +8274,7 @@ export const WhatsAppContactPhoneSchema = {
     type: {
       type: "string",
       description:
-        "The label the contact's device attached, for example `CELL`, `Home` or `iPhone`. Free text passed through verbatim: WhatsApp declares no vocabulary here and does not normalize the casing, so neither do we.\n",
+        "The label attached to this value, for example `CELL`, `Home` or `iPhone`. Free text: WhatsApp defines no vocabulary. A label on a received card is lowercased; one this workspace sent reads back exactly as sent.\n",
       example: "CELL",
     },
   },
@@ -8291,7 +8292,7 @@ export const WhatsAppContactEmailSchema = {
     type: {
       type: "string",
       description:
-        "The label the contact's device attached, for example `Personal` or `Work`. Free text passed through verbatim.\n",
+        "The label attached to this value, for example `CELL`, `Home` or `iPhone`. Free text: WhatsApp defines no vocabulary. A label on a received card is lowercased; one this workspace sent reads back exactly as sent.\n",
       example: "Personal",
     },
   },
@@ -8311,7 +8312,7 @@ export const WhatsAppContactUrlSchema = {
     type: {
       type: "string",
       description:
-        "The label the contact's device attached, for example `Company`. Free text passed through verbatim.\n",
+        "The label attached to this value, for example `CELL`, `Home` or `iPhone`. Free text: WhatsApp defines no vocabulary. A label on a received card is lowercased; one this workspace sent reads back exactly as sent.\n",
       example: "Company",
     },
   },
@@ -8351,7 +8352,7 @@ export const WhatsAppContactAddressSchema = {
     type: {
       type: "string",
       description:
-        "The label the contact's device attached, for example `Home`. Free text passed through verbatim.\n",
+        "The label attached to this value, for example `CELL`, `Home` or `iPhone`. Free text: WhatsApp defines no vocabulary. A label on a received card is lowercased; one this workspace sent reads back exactly as sent.\n",
       example: "Home",
     },
   },
@@ -8361,20 +8362,20 @@ export const WhatsAppContactCardSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A contact card the contact shared, either by tapping a button that asked for their number or by sending a card from their address book. Inbound only.\nNothing here is required. WhatsApp sends the parts the card holds and omits the rest, and a card that arrives with only an `origin` is still meaningful, so an empty card reads back empty rather than being dropped.\n",
+    "A contact card on this message: one the contact shared, or one this workspace sent.\nNothing here is required. WhatsApp sends the parts the card holds and omits the rest, and a card that arrives with only an `origin` is still meaningful, so an empty card reads back empty rather than being dropped.\n",
   properties: {
     origin: {
       type: "string",
       minLength: 1,
       "x-extensible-enum": ["contact_request", "other"],
       description:
-        "Why the card arrived. `contact_request` means the contact tapped a button this workspace sent asking for their number, which is the only signal that the message answers that ask; `other` means they shared a card in the chat. Open enum: treat an unrecognized value as a way of sharing added since.\n",
+        "Why the card arrived. `contact_request` means the contact tapped a button this workspace sent asking for their number, which is the only signal that the message answers that ask; `other` means they shared a card in the chat. Open enum: treat an unrecognized value as a way of sharing added since. Set on a card the contact shared; absent on one this workspace sent.\n",
       example: "contact_request",
     },
     vcard: {
       type: "string",
       description:
-        "The contact's card in vCard format. WhatsApp sends it on a card shared in the chat and omits it on a button tap, which carries the number alone.\n",
+        "The contact's card in vCard format. WhatsApp sends it on a card shared in the chat and omits it on a button tap, which carries the number alone. Set on a card the contact shared; absent on one this workspace sent.\n",
       example:
         "BEGIN:VCARD\nVERSION:3.0\nN:Johnson;Barbara;;;\nTEL;type=CELL:+16505551234\nEND:VCARD\n",
     },
@@ -9006,7 +9007,7 @@ export const WhatsAppMessageSchema = {
       readOnly: true,
       type: "array",
       description:
-        "Contact cards the contact shared, either by tapping a button that asked for their number or by sending a card from their address book. Inbound only: sending a contact card is not supported.\n",
+        "Contact cards on this message: cards the contact shared, either by tapping a button that asked for their number or by sending one from their address book, or the cards this workspace sent.\n",
       items: {
         $ref: "#/components/schemas/WhatsAppContactCard",
       },
@@ -10275,6 +10276,263 @@ export const WhatsAppInteractiveSendSchema = {
   ],
 } as const;
 
+export const WhatsAppContactNameSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The contact's name. `formatted_name` is what the card shows, and WhatsApp additionally requires at least one of the parts below it, so a card carrying only a formatted name is rejected.\n",
+  required: ["formatted_name"],
+  properties: {
+    formatted_name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 256,
+      description: "The whole name, as the card should render it.",
+      example: "Barbara J. Johnson",
+    },
+    first_name: {
+      type: "string",
+      maxLength: 256,
+      example: "Barbara",
+    },
+    middle_name: {
+      type: "string",
+      maxLength: 256,
+      example: "Joana",
+    },
+    last_name: {
+      type: "string",
+      maxLength: 256,
+      example: "Johnson",
+    },
+    prefix: {
+      type: "string",
+      maxLength: 64,
+      example: "Dr.",
+    },
+    suffix: {
+      type: "string",
+      maxLength: 64,
+      example: "Esq.",
+    },
+  },
+} as const;
+
+export const WhatsAppContactOrgSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Where the contact works, as the card should record it.",
+  properties: {
+    company: {
+      type: "string",
+      maxLength: 128,
+      example: "Lucky Shrub",
+    },
+    department: {
+      type: "string",
+      maxLength: 128,
+      example: "Legal",
+    },
+    title: {
+      type: "string",
+      maxLength: 128,
+      example: "Lead Counsel",
+    },
+  },
+} as const;
+
+export const WhatsAppContactPhoneSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One phone number to put on a contact card.",
+  required: ["phone_number"],
+  properties: {
+    phone_number: {
+      type: "string",
+      minLength: 1,
+      maxLength: 32,
+      description:
+        "The number to show. Send it in E.164 to get a card the recipient can message from; any other form still renders, with an invite button.\n",
+      example: "+16505551234",
+    },
+    type: {
+      type: "string",
+      maxLength: 64,
+      description:
+        "A label for the number, shown beside it. Free text: WhatsApp defines no vocabulary, and the label is sent exactly as written.\n",
+      example: "Mobile",
+    },
+  },
+} as const;
+
+export const WhatsAppContactEmailSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One email address to put on a contact card.",
+  required: ["email"],
+  properties: {
+    email: {
+      type: "string",
+      minLength: 1,
+      maxLength: 254,
+      example: "barbara@example.com",
+    },
+    type: {
+      type: "string",
+      maxLength: 64,
+      description:
+        "A label for the address, shown beside it. Free text, sent exactly as written.\n",
+      example: "Work",
+    },
+  },
+} as const;
+
+export const WhatsAppContactUrlSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One website to put on a contact card.",
+  required: ["url"],
+  properties: {
+    url: {
+      type: "string",
+      minLength: 1,
+      maxLength: 2048,
+      description:
+        "The address to show. Not validated as a URL, because a card commonly carries a bare domain.\n",
+      example: "https://luckyshrub.example.com",
+    },
+    type: {
+      type: "string",
+      maxLength: 64,
+      description:
+        "A label for the website, shown beside it. Free text, sent exactly as written.\n",
+      example: "Company",
+    },
+  },
+} as const;
+
+export const WhatsAppContactAddressSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One postal address to put on a contact card.",
+  properties: {
+    street: {
+      type: "string",
+      maxLength: 128,
+      example: "1 Lucky Shrub Way",
+    },
+    city: {
+      type: "string",
+      maxLength: 128,
+      example: "Menlo Park",
+    },
+    state: {
+      type: "string",
+      maxLength: 128,
+      example: "CA",
+    },
+    zip: {
+      type: "string",
+      maxLength: 128,
+      example: "94025",
+    },
+    country: {
+      type: "string",
+      maxLength: 128,
+      example: "United States",
+    },
+    country_code: {
+      type: "string",
+      maxLength: 128,
+      description:
+        "The country as it should appear on the address, commonly the ISO two-letter code.",
+      example: "US",
+    },
+    type: {
+      type: "string",
+      maxLength: 64,
+      description:
+        "A label for the address, shown beside it. Free text, sent exactly as written.\n",
+      example: "Office",
+    },
+  },
+} as const;
+
+export const WhatsAppContactCardSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A contact card to send. WhatsApp shows the name on the card and the rest in a profile view the recipient opens from it.\nA card carrying a phone number renders buttons that message or save the contact; a card without one can only be added to an address book.\n",
+  required: ["name"],
+  properties: {
+    name: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppContactNameSend",
+        },
+      ],
+    },
+    org: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppContactOrgSend",
+        },
+      ],
+      description: "Where the contact works.",
+    },
+    birthday: {
+      type: "string",
+      pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+      description:
+        "The contact's birthday, as `YYYY-MM-DD`. WhatsApp rejects any other shape, and a date no calendar holds is rejected too.\n",
+      example: "1999-01-23",
+    },
+    phone_numbers: {
+      type: "array",
+      maxItems: 10,
+      description:
+        "The numbers on the card. A number in E.164 renders a button that opens a WhatsApp chat with it; one that is not renders an invite instead.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppContactPhoneSend",
+      },
+    },
+    emails: {
+      type: "array",
+      maxItems: 10,
+      items: {
+        $ref: "#/components/schemas/WhatsAppContactEmailSend",
+      },
+    },
+    urls: {
+      type: "array",
+      maxItems: 10,
+      items: {
+        $ref: "#/components/schemas/WhatsAppContactUrlSend",
+      },
+    },
+    addresses: {
+      type: "array",
+      maxItems: 10,
+      items: {
+        $ref: "#/components/schemas/WhatsAppContactAddressSend",
+      },
+    },
+  },
+  example: {
+    name: {
+      formatted_name: "Barbara J. Johnson",
+      first_name: "Barbara",
+      last_name: "Johnson",
+    },
+    phone_numbers: [
+      {
+        phone_number: "+16505551234",
+        type: "Mobile",
+      },
+    ],
+  },
+} as const;
+
 export const WhatsAppMessageSendRequestSchema = {
   type: "object",
   additionalProperties: false,
@@ -10376,6 +10634,16 @@ export const WhatsAppMessageSendRequestSchema = {
       ],
       description:
         "Free-form interactive content to send instead of a template: body text plus reply buttons, a menu, a link button, media cards, or a single button asking the recipient to share their location or their phone number. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
+    },
+    contact_cards: {
+      type: "array",
+      minItems: 1,
+      maxItems: 5,
+      description:
+        "Contact cards to send instead of a template. Up to five: WhatsApp accepts far more, and a message that opens as one name plus a count of the rest is not a card the recipient will read.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppContactCardSend",
+      },
     },
     in_reply_to_message_id: {
       allOf: [
@@ -19070,6 +19338,15 @@ export const EventWhatsAppBaseSchema = {
         order_id: "ord_123",
       },
     },
+    in_reply_to_message_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMessageID",
+        },
+      ],
+      description:
+        "The message this one answers. On an outbound message it is the `in_reply_to_message_id` the send request quoted. On an inbound message it is what WhatsApp reports as the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. Absent when the message answers nothing, and absent on an inbound message whose target we cannot match to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.\n",
+    },
   },
 } as const;
 
@@ -19309,15 +19586,6 @@ export const EventWhatsAppReceivedDataSchema = {
           items: {
             $ref: "#/components/schemas/WhatsAppContactCard",
           },
-        },
-        in_reply_to_message_id: {
-          allOf: [
-            {
-              $ref: "#/components/schemas/WhatsAppMessageID",
-            },
-          ],
-          description:
-            "The message this one answers, when WhatsApp reports it as a reply. Absent when it answers nothing, or when the message it names is not one we hold.\n",
         },
         interactive_reply: {
           allOf: [
@@ -23964,15 +24232,6 @@ export const EventWhatsAppReceivedDataWritableSchema = {
           items: {
             $ref: "#/components/schemas/WhatsAppContactCard",
           },
-        },
-        in_reply_to_message_id: {
-          allOf: [
-            {
-              $ref: "#/components/schemas/WhatsAppMessageID",
-            },
-          ],
-          description:
-            "The message this one answers, when WhatsApp reports it as a reply. Absent when it answers nothing, or when the message it names is not one we hold.\n",
         },
         interactive_reply: {
           allOf: [

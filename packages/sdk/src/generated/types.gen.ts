@@ -4289,6 +4289,9 @@ export type VerificationChannelEntry = {
  * moved to the next channel.
  * - `channel_disabled`: Sending on the channel is temporarily disabled, so the
  * verification moved to the next channel.
+ * - `channel_restricted`: The channel does not carry passcodes to this
+ * destination country. The verification moves to the next channel enabled
+ * there, or fails when the country has no other.
  * - `delivery_timeout`: No delivery confirmation arrived before the channel's
  * timeout, so the verification moved to the next channel.
  * - `not_billable`: The send could not be charged, so it was never handed to the
@@ -4305,6 +4308,7 @@ export type VerificationAttemptFailureReason =
   | "undelivered"
   | "channel_unavailable"
   | "channel_disabled"
+  | "channel_restricted"
   | "delivery_timeout"
   | "not_billable"
   | (string & {});
@@ -4771,7 +4775,7 @@ export type WhatsAppContactPhone = {
    */
   phone_number?: string;
   /**
-   * The label the contact's device attached, for example `CELL`, `Home` or `iPhone`. Free text passed through verbatim: WhatsApp declares no vocabulary here and does not normalize the casing, so neither do we.
+   * The label attached to this value, for example `CELL`, `Home` or `iPhone`. Free text: WhatsApp defines no vocabulary. A label on a received card is lowercased; one this workspace sent reads back exactly as sent.
    *
    */
   type?: string;
@@ -4783,7 +4787,7 @@ export type WhatsAppContactPhone = {
 export type WhatsAppContactEmail = {
   email?: string;
   /**
-   * The label the contact's device attached, for example `Personal` or `Work`. Free text passed through verbatim.
+   * The label attached to this value, for example `CELL`, `Home` or `iPhone`. Free text: WhatsApp defines no vocabulary. A label on a received card is lowercased; one this workspace sent reads back exactly as sent.
    *
    */
   type?: string;
@@ -4799,7 +4803,7 @@ export type WhatsAppContactUrl = {
    */
   url?: string;
   /**
-   * The label the contact's device attached, for example `Company`. Free text passed through verbatim.
+   * The label attached to this value, for example `CELL`, `Home` or `iPhone`. Free text: WhatsApp defines no vocabulary. A label on a received card is lowercased; one this workspace sent reads back exactly as sent.
    *
    */
   type?: string;
@@ -4820,25 +4824,25 @@ export type WhatsAppContactAddress = {
    */
   country_code?: string;
   /**
-   * The label the contact's device attached, for example `Home`. Free text passed through verbatim.
+   * The label attached to this value, for example `CELL`, `Home` or `iPhone`. Free text: WhatsApp defines no vocabulary. A label on a received card is lowercased; one this workspace sent reads back exactly as sent.
    *
    */
   type?: string;
 };
 
 /**
- * A contact card the contact shared, either by tapping a button that asked for their number or by sending a card from their address book. Inbound only.
+ * A contact card on this message: one the contact shared, or one this workspace sent.
  * Nothing here is required. WhatsApp sends the parts the card holds and omits the rest, and a card that arrives with only an `origin` is still meaningful, so an empty card reads back empty rather than being dropped.
  *
  */
 export type WhatsAppContactCard = {
   /**
-   * Why the card arrived. `contact_request` means the contact tapped a button this workspace sent asking for their number, which is the only signal that the message answers that ask; `other` means they shared a card in the chat. Open enum: treat an unrecognized value as a way of sharing added since.
+   * Why the card arrived. `contact_request` means the contact tapped a button this workspace sent asking for their number, which is the only signal that the message answers that ask; `other` means they shared a card in the chat. Open enum: treat an unrecognized value as a way of sharing added since. Set on a card the contact shared; absent on one this workspace sent.
    *
    */
   origin?: string;
   /**
-   * The contact's card in vCard format. WhatsApp sends it on a card shared in the chat and omits it on a button tap, which carries the number alone.
+   * The contact's card in vCard format. WhatsApp sends it on a card shared in the chat and omits it on a button tap, which carries the number alone. Set on a card the contact shared; absent on one this workspace sent.
    *
    */
   vcard?: string;
@@ -5236,7 +5240,7 @@ export type WhatsAppMessage = {
    */
   readonly location?: WhatsAppLocation;
   /**
-   * Contact cards the contact shared, either by tapping a button that asked for their number or by sending a card from their address book. Inbound only: sending a contact card is not supported.
+   * Contact cards on this message: cards the contact shared, either by tapping a button that asked for their number or by sending one from their address book, or the cards this workspace sent.
    *
    */
   readonly contact_cards?: Array<WhatsAppContactCard>;
@@ -5752,6 +5756,121 @@ export type WhatsAppInteractiveSend = (
 };
 
 /**
+ * The contact's name. `formatted_name` is what the card shows, and WhatsApp additionally requires at least one of the parts below it, so a card carrying only a formatted name is rejected.
+ *
+ */
+export type WhatsAppContactNameSend = {
+  /**
+   * The whole name, as the card should render it.
+   */
+  formatted_name: string;
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  prefix?: string;
+  suffix?: string;
+};
+
+/**
+ * Where the contact works, as the card should record it.
+ */
+export type WhatsAppContactOrgSend = {
+  company?: string;
+  department?: string;
+  title?: string;
+};
+
+/**
+ * One phone number to put on a contact card.
+ */
+export type WhatsAppContactPhoneSend = {
+  /**
+   * The number to show. Send it in E.164 to get a card the recipient can message from; any other form still renders, with an invite button.
+   *
+   */
+  phone_number: string;
+  /**
+   * A label for the number, shown beside it. Free text: WhatsApp defines no vocabulary, and the label is sent exactly as written.
+   *
+   */
+  type?: string;
+};
+
+/**
+ * One email address to put on a contact card.
+ */
+export type WhatsAppContactEmailSend = {
+  email: string;
+  /**
+   * A label for the address, shown beside it. Free text, sent exactly as written.
+   *
+   */
+  type?: string;
+};
+
+/**
+ * One website to put on a contact card.
+ */
+export type WhatsAppContactUrlSend = {
+  /**
+   * The address to show. Not validated as a URL, because a card commonly carries a bare domain.
+   *
+   */
+  url: string;
+  /**
+   * A label for the website, shown beside it. Free text, sent exactly as written.
+   *
+   */
+  type?: string;
+};
+
+/**
+ * One postal address to put on a contact card.
+ */
+export type WhatsAppContactAddressSend = {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+  /**
+   * The country as it should appear on the address, commonly the ISO two-letter code.
+   */
+  country_code?: string;
+  /**
+   * A label for the address, shown beside it. Free text, sent exactly as written.
+   *
+   */
+  type?: string;
+};
+
+/**
+ * A contact card to send. WhatsApp shows the name on the card and the rest in a profile view the recipient opens from it.
+ * A card carrying a phone number renders buttons that message or save the contact; a card without one can only be added to an address book.
+ *
+ */
+export type WhatsAppContactCardSend = {
+  name: WhatsAppContactNameSend;
+  /**
+   * Where the contact works.
+   */
+  org?: WhatsAppContactOrgSend;
+  /**
+   * The contact's birthday, as `YYYY-MM-DD`. WhatsApp rejects any other shape, and a date no calendar holds is rejected too.
+   *
+   */
+  birthday?: string;
+  /**
+   * The numbers on the card. A number in E.164 renders a button that opens a WhatsApp chat with it; one that is not renders an invite instead.
+   *
+   */
+  phone_numbers?: Array<WhatsAppContactPhoneSend>;
+  emails?: Array<WhatsAppContactEmailSend>;
+  urls?: Array<WhatsAppContactUrlSend>;
+  addresses?: Array<WhatsAppContactAddressSend>;
+};
+
+/**
  * A WhatsApp message to send. Carry exactly one kind of content: a request with none returns a `422` `WhatsAppContentRequired`, and one carrying more than one returns a `422` `WhatsAppContentAmbiguous`. The schema does not express that constraint, because which combinations are available depends on the content types your workspace can send.
  *
  */
@@ -5811,6 +5930,11 @@ export type WhatsAppMessageSendRequest = {
    *
    */
   interactive?: WhatsAppInteractiveSend;
+  /**
+   * Contact cards to send instead of a template. Up to five: WhatsApp accepts far more, and a message that opens as one name plus a count of the rest is not a card the recipient will read.
+   *
+   */
+  contact_cards?: Array<WhatsAppContactCardSend>;
   /**
    * Quote a message the contact will see above this one, the way replying in the WhatsApp client does. Name a message from the same conversation: one this workspace sent to this recipient, or received from them. Any content quotes, template or free-form. A message this workspace does not hold, or one older than the 15-day window we keep provider ids for, returns a `422` `WhatsAppInReplyToNotFound`. A message that never reached WhatsApp, or one from a different conversation than this send's `to` and `from`, returns a `422` `WhatsAppInReplyToNotQuotable`.
    *
@@ -10709,6 +10833,11 @@ export type EventWhatsAppBase = {
   metadata: {
     [key: string]: unknown;
   } | null;
+  /**
+   * The message this one answers. On an outbound message it is the `in_reply_to_message_id` the send request quoted. On an inbound message it is what WhatsApp reports as the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. Absent when the message answers nothing, and absent on an inbound message whose target we cannot match to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.
+   *
+   */
+  in_reply_to_message_id?: WhatsAppMessageId;
 };
 
 /**
@@ -10839,11 +10968,6 @@ export type EventWhatsAppReceivedData = EventWhatsAppBase & {
    *
    */
   contact_cards?: Array<WhatsAppContactCard>;
-  /**
-   * The message this one answers, when WhatsApp reports it as a reply. Absent when it answers nothing, or when the message it names is not one we hold.
-   *
-   */
-  in_reply_to_message_id?: WhatsAppMessageId;
   /**
    * What the contact tapped, when the message answers an interactive message or a template's quick-reply button.
    *
@@ -13670,11 +13794,6 @@ export type EventWhatsAppReceivedDataWritable = EventWhatsAppBase & {
    *
    */
   contact_cards?: Array<WhatsAppContactCard>;
-  /**
-   * The message this one answers, when WhatsApp reports it as a reply. Absent when it answers nothing, or when the message it names is not one we hold.
-   *
-   */
-  in_reply_to_message_id?: WhatsAppMessageId;
   /**
    * What the contact tapped, when the message answers an interactive message or a template's quick-reply button.
    *
@@ -19621,6 +19740,57 @@ export type ListWhatsAppMessageEventsResponses = {
 
 export type ListWhatsAppMessageEventsResponse =
   ListWhatsAppMessageEventsResponses[keyof ListWhatsAppMessageEventsResponses];
+
+export type GetWhatsAppMessageMediaData = {
+  body?: never;
+  path: {
+    /**
+     * WhatsApp message ID.
+     */
+    message_id: WhatsAppMessageId;
+    /**
+     * Media ID, as returned in `id` on the message's content object.
+     */
+    media_id: WhatsAppFileId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/messages/{message_id}/media/{media_id}";
+};
+
+export type GetWhatsAppMessageMediaErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The resource existed but is no longer available.
+   */
+  410: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWhatsAppMessageMediaError =
+  GetWhatsAppMessageMediaErrors[keyof GetWhatsAppMessageMediaErrors];
 
 export type GetEmailStatsDailyData = {
   body?: never;

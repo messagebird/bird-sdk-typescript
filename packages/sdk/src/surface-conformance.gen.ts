@@ -13,6 +13,7 @@ export type _SmsStatsInbound = Pick<BirdClient["sms"]["stats"]["inbound"], "summ
 export type _SmsSuppressions = Pick<BirdClient["smsSuppressions"], "list" | "get" | "add" | "remove">;
 export type _SmsKeywordRules = Pick<BirdClient["smsKeywordRules"], "list" | "get" | "create" | "update" | "delete">;
 export type _Whatsapp = Pick<BirdClient["whatsapp"], "send" | "get" | "list" | "listEvents">;
+export type _WhatsappMessages = Pick<BirdClient["whatsapp"]["messages"], "media">;
 export type _Voice = Pick<BirdClient["voice"], "list" | "get">;
 export type _VerifyVerifications = Pick<BirdClient["verify"]["verifications"], "create" | "check" | "nextChannel">;
 export type _Lookup = Pick<BirdClient["lookup"], "phoneNumber" | "email">;
