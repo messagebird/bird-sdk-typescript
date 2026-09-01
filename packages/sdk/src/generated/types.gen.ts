@@ -10840,6 +10840,16 @@ export type EventWhatsAppReceivedData = EventWhatsAppBase & {
    */
   contact_cards?: Array<WhatsAppContactCard>;
   /**
+   * The message this one answers, when WhatsApp reports it as a reply. Absent when it answers nothing, or when the message it names is not one we hold.
+   *
+   */
+  in_reply_to_message_id?: WhatsAppMessageId;
+  /**
+   * What the contact tapped, when the message answers an interactive message or a template's quick-reply button.
+   *
+   */
+  interactive_reply?: WhatsAppInteractiveReply;
+  /**
    * Set when the contact sent content the API does not model, naming the WhatsApp content type.
    *
    */
@@ -11268,6 +11278,10 @@ export type VoiceInboundForwardAs = "dialed_number" | "calling_number";
  * - `caller_id_not_verified`: The number in the `From` header is not a verified
  * caller ID for this workspace. Verify it, or present a number you have
  * already verified.
+ * - `number_ownership_not_verified`: You bought this number, but the country that
+ * issued it has not yet accepted the documents proving your workspace owns it.
+ * Open the number under Numbers and complete its ownership requirements, then
+ * place the call again.
  * - `destination_not_enabled`: You have not turned on calling to this
  * destination country. Enable it in your voice destination settings.
  * - `insufficient_balance`: Your wallet did not cover the call. Top up, or turn
@@ -11301,7 +11315,8 @@ export type VoiceCallRejectionReason =
   | "daily_spend_exceeded"
   | "concurrent_calls_exceeded"
   | "calls_per_second_exceeded"
-  | "call_not_permitted";
+  | "call_not_permitted"
+  | "number_ownership_not_verified";
 
 export type VoiceCallInboundRouteReject = {
   /**
@@ -13655,6 +13670,16 @@ export type EventWhatsAppReceivedDataWritable = EventWhatsAppBase & {
    *
    */
   contact_cards?: Array<WhatsAppContactCard>;
+  /**
+   * The message this one answers, when WhatsApp reports it as a reply. Absent when it answers nothing, or when the message it names is not one we hold.
+   *
+   */
+  in_reply_to_message_id?: WhatsAppMessageId;
+  /**
+   * What the contact tapped, when the message answers an interactive message or a template's quick-reply button.
+   *
+   */
+  interactive_reply?: WhatsAppInteractiveReply;
   /**
    * Set when the contact sent content the API does not model, naming the WhatsApp content type.
    *

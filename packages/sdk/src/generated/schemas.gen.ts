@@ -19310,6 +19310,24 @@ export const EventWhatsAppReceivedDataSchema = {
             $ref: "#/components/schemas/WhatsAppContactCard",
           },
         },
+        in_reply_to_message_id: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppMessageID",
+            },
+          ],
+          description:
+            "The message this one answers, when WhatsApp reports it as a reply. Absent when it answers nothing, or when the message it names is not one we hold.\n",
+        },
+        interactive_reply: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppInteractiveReply",
+            },
+          ],
+          description:
+            "What the contact tapped, when the message answers an interactive message or a template's quick-reply button.\n",
+        },
         unsupported: {
           allOf: [
             {
@@ -20089,6 +20107,7 @@ export const VoiceCallRejectionReasonSchema = {
     "concurrent_calls_exceeded",
     "calls_per_second_exceeded",
     "call_not_permitted",
+    "number_ownership_not_verified",
   ],
   "x-enum-varnames": [
     "VoiceCallRejectionReasonSourceNotAllowed",
@@ -20102,9 +20121,10 @@ export const VoiceCallRejectionReasonSchema = {
     "VoiceCallRejectionReasonConcurrentCallsExceeded",
     "VoiceCallRejectionReasonCallsPerSecondExceeded",
     "VoiceCallRejectionReasonCallNotPermitted",
+    "VoiceCallRejectionReasonNumberOwnershipNotVerified",
   ],
   description:
-    "Why we refused the call before dialing a carrier. Every refusal is signalled\nto your PBX as `503`, so `sip_response_code` alone cannot tell these causes\napart. This field is where the cause lives.\n\nMost of them you can fix yourself:\n\n- `source_not_allowed`: The call came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it, or present a number you have\n  already verified.\n- `destination_not_enabled`: You have not turned on calling to this\n  destination country. Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet did not cover the call. Top up, or turn\n  on automatic top-ups.\n- `daily_spend_exceeded`: The call would have passed your organization's daily\n  voice spend limit. The limit resets at the start of the next UTC day.\n- `concurrent_calls_exceeded`: You already have as many calls in progress as\n  your account allows. Wait for one to end, or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed calls faster than your account\n  allows. Slow the rate you dial at, then retry.\n\nFor all other reasons, contact support and provide the call `id`:\n\n- `routing_not_configured`: No dial plan is attached to this trunk yet.\n  Expected on a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The call could not be priced for your account.\n",
+    "Why we refused the call before dialing a carrier. Every refusal is signalled\nto your PBX as `503`, so `sip_response_code` alone cannot tell these causes\napart. This field is where the cause lives.\n\nMost of them you can fix yourself:\n\n- `source_not_allowed`: The call came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it, or present a number you have\n  already verified.\n- `number_ownership_not_verified`: You bought this number, but the country that\n  issued it has not yet accepted the documents proving your workspace owns it.\n  Open the number under Numbers and complete its ownership requirements, then\n  place the call again.\n- `destination_not_enabled`: You have not turned on calling to this\n  destination country. Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet did not cover the call. Top up, or turn\n  on automatic top-ups.\n- `daily_spend_exceeded`: The call would have passed your organization's daily\n  voice spend limit. The limit resets at the start of the next UTC day.\n- `concurrent_calls_exceeded`: You already have as many calls in progress as\n  your account allows. Wait for one to end, or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed calls faster than your account\n  allows. Slow the rate you dial at, then retry.\n\nFor all other reasons, contact support and provide the call `id`:\n\n- `routing_not_configured`: No dial plan is attached to this trunk yet.\n  Expected on a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The call could not be priced for your account.\n",
   example: "destination_not_enabled",
 } as const;
 
@@ -23944,6 +23964,24 @@ export const EventWhatsAppReceivedDataWritableSchema = {
           items: {
             $ref: "#/components/schemas/WhatsAppContactCard",
           },
+        },
+        in_reply_to_message_id: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppMessageID",
+            },
+          ],
+          description:
+            "The message this one answers, when WhatsApp reports it as a reply. Absent when it answers nothing, or when the message it names is not one we hold.\n",
+        },
+        interactive_reply: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppInteractiveReply",
+            },
+          ],
+          description:
+            "What the contact tapped, when the message answers an interactive message or a template's quick-reply button.\n",
         },
         unsupported: {
           allOf: [
