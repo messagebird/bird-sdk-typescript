@@ -4057,7 +4057,7 @@ export const createMailbox = <ThrowOnError extends boolean = false>(
 /**
  * Delete a mailbox
  *
- * Deletes a mailbox. The address stops receiving mail immediately and enters quarantine. After 30 days, your workspace can bind the address to a new mailbox; the address remains reserved to your workspace. The mailbox and its remembered messages are kept for 30 days, so you can bring it back with `POST /email/mailboxes/{mailbox_id}/restore`. Once those 30 days are up they are deleted for good.
+ * Deletes a mailbox. The address stops receiving mail immediately and enters quarantine. After 30 days, your workspace can bind the address to a new mailbox; the address remains reserved to your workspace. You can restore the mailbox for 30 days with `POST /email/mailboxes/{mailbox_id}/restore`. Normal message-retention expiry continues during that period. After 30 days, the mailbox and its remaining messages are permanently deleted.
  *
  */
 export const deleteMailbox = <ThrowOnError extends boolean = false>(
@@ -4109,7 +4109,7 @@ export const getMailbox = <ThrowOnError extends boolean = false>(
 /**
  * Update a mailbox
  *
- * Updates a mailbox. The address and domain are immutable. Lowering the retention tier deletes any remembered message older than the new cutoff, so the request requires `confirm=true`.
+ * Updates a mailbox. The address and domain are immutable. Lowering the retention tier makes remembered messages older than the new cutoff eligible for deletion. If any exist, the request requires `confirm=true`. A tier change is applied to the mailbox's stored messages in the background; lowering the tier again while that is still being applied is refused with `E17050`. You can still raise it to a tier your plan permits.
  *
  */
 export const updateMailbox = <ThrowOnError extends boolean = false>(
@@ -4139,7 +4139,7 @@ export const updateMailbox = <ThrowOnError extends boolean = false>(
 /**
  * Restore a deleted mailbox
  *
- * Restores a mailbox deleted less than 30 days ago. The address is bound back to the mailbox and starts receiving again, and the remembered messages and conversations are available as before the delete. Once the 30-day window has passed the mailbox and its messages are permanently deleted and can no longer be restored (`404`). Restoring a mailbox that is not deleted returns a conflict, as does an address that is no longer available.
+ * Restores a mailbox deleted less than 30 days ago. The address is bound back to the mailbox and starts receiving again. Remaining remembered messages and conversations become available again; normal message-retention expiry continues while a mailbox is deleted. Once the 30-day window has passed, the mailbox and any remaining messages are permanently deleted and can no longer be restored (`404`). Restoring a mailbox that is not deleted returns a conflict, as does an address that is no longer available.
  *
  */
 export const restoreMailbox = <ThrowOnError extends boolean = false>(

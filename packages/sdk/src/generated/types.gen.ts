@@ -7999,7 +7999,7 @@ export type Mailbox = {
    */
   receive_policy: "open" | "replies_only" | "allowlist" | "drop";
   /**
-   * Lifecycle state. Suspended mailboxes stop emitting events. Inbound mail is retained as blocked.
+   * Lifecycle state. `active` means the mailbox can send, receive, and expose conversations. `suspended` pauses sending, conversation reads, and events; inbound mail is retained with the `blocked` label until you resume it.
    */
   readonly state: "active" | "suspended";
   /**
@@ -8024,7 +8024,7 @@ export type Mailbox = {
    */
   readonly thread_count: number;
   /**
-   * Stored bytes across the mailbox's retained messages: the metadata and extracted text kept for the retention tier plus attachment bytes. Message bodies and raw MIME expire after 30 days and do not count. Maintained with each message written or deleted, so the value is current; messages stored before the counter existed are not counted.
+   * Stored bytes across the mailbox's retained messages: subject, preview, extracted text, and attachment bytes. Message bodies and raw MIME expire after 30 days and do not count. Maintained with each message written or deleted, so the value is current; messages stored before the counter existed are not counted.
    */
   readonly size_bytes: number;
   /**
@@ -8041,7 +8041,7 @@ export type Mailbox = {
   /**
    * Whether we generated the local part of the address. `false` means a custom handle was chosen at creation. On the shared `inbox.ai` domain a custom handle counts against your plan's custom-handle allowance.
    */
-  readonly local_part_generated?: boolean;
+  readonly local_part_generated: boolean;
   /**
    * When the mailbox was created.
    */
@@ -8051,7 +8051,7 @@ export type Mailbox = {
    */
   readonly updated_at: string;
   /**
-   * When the mailbox was deleted, or `null` if it is active. A deleted mailbox stops receiving mail immediately but can be restored for 30 days, after which it and its remembered messages are permanently removed.
+   * When the mailbox was deleted, or `null` if it is active. A deleted mailbox stops receiving mail immediately but can be restored for 30 days, after which it and any remaining remembered messages are permanently removed.
    */
   readonly deleted_at?: string | null;
 };
@@ -8129,7 +8129,7 @@ export type MailboxUpdate = {
    */
   receive_policy?: "open" | "replies_only" | "allowlist" | "drop";
   /**
-   * How long the mailbox remembers message metadata, extracted text, and attachments. Message bodies and raw MIME stay available for 30 days regardless of tier. Tiers longer than 30 days require a plan that includes them. Lowering the tier deletes remembered messages older than the new horizon, and requires `confirm=true` when that would happen.
+   * How long the mailbox remembers message metadata, extracted text, and attachments. Message bodies and raw MIME stay available for 30 days regardless of tier. Tiers longer than 30 days require a plan that includes them. Lowering the tier immediately hides remembered messages older than the new horizon. Deletion waits at least ten minutes and until the background retention update has processed every stored message. The update starts every ten minutes and can take hours for large mailboxes; the next hourly purge deletes eligible messages. A lowering that would affect messages requires `confirm=true`.
    */
   retention_tier?: "30d" | "90d" | "1y";
   /**
@@ -8752,7 +8752,7 @@ export type EmailThreadMessageReplyRequest = {
   };
   category?: EmailMessageCategory;
   /**
-   * File attachments to include with the reply. The send is rejected when the estimated generated message size exceeds 20 MB (bodies plus all attachments after base64 encoding). Keep total raw attachment content at or below 15 MB for reliable headroom. Attachment metadata stays on the message's `attachment_manifest`, and the bytes are downloadable for 30 days.
+   * File attachments to include with the reply. The send is rejected when the estimated generated message size exceeds 20 MB (bodies plus all attachments after base64 encoding). Keep total raw attachment content at or below 15 MB for reliable headroom. Attachment metadata stays on the message's `attachment_manifest`, and the bytes are downloadable for the mailbox's retention tier.
    *
    */
   attachments?: Array<EmailAttachment>;
@@ -8793,7 +8793,7 @@ export type EmailMailboxComposeRequest = {
    */
   reply_to?: Array<EmailAddressInput>;
   /**
-   * File attachments. The send is rejected when the estimated generated message size exceeds 20 MB (bodies plus all attachments after base64 encoding). Keep total raw attachment content at or below 15 MB for reliable headroom. Attachment metadata stays on the message's `attachment_manifest`, and the bytes are downloadable for 30 days.
+   * File attachments. The send is rejected when the estimated generated message size exceeds 20 MB (bodies plus all attachments after base64 encoding). Keep total raw attachment content at or below 15 MB for reliable headroom. Attachment metadata stays on the message's `attachment_manifest`, and the bytes are downloadable for the mailbox's retention tier.
    *
    */
   attachments?: Array<EmailAttachment>;
@@ -9816,7 +9816,7 @@ export type EventEmailMailboxMessageReceivedData = {
    */
   truncated_text?: boolean;
   /**
-   * Number of attachments on the message. Attachment content remains available during the 30-day original-source retention window.
+   * Number of attachments on the message. Attachment content remains available for the mailbox's retention tier.
    */
   attachment_count: number;
   /**
@@ -21932,7 +21932,7 @@ export type UpdateMailboxData = {
   };
   query?: {
     /**
-     * Set to `true` when lowering `retention_tier` would delete remembered messages older than the new cutoff. The request is rejected without it in that case.
+     * Set to `true` when lowering `retention_tier` would make remembered messages older than the new cutoff eligible for deletion. The request is rejected without it in that case.
      */
     confirm?: boolean;
   };
@@ -21960,6 +21960,10 @@ export type UpdateMailboxErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *

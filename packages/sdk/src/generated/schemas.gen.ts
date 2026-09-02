@@ -14354,6 +14354,7 @@ export const MailboxSchema = {
     "thread_count",
     "size_bytes",
     "metadata",
+    "local_part_generated",
     "created_at",
     "updated_at",
   ],
@@ -14397,7 +14398,7 @@ export const MailboxSchema = {
       enum: ["active", "suspended"],
       readOnly: true,
       description:
-        "Lifecycle state. Suspended mailboxes stop emitting events. Inbound mail is retained as blocked.",
+        "Lifecycle state. `active` means the mailbox can send, receive, and expose conversations. `suspended` pauses sending, conversation reads, and events; inbound mail is retained with the `blocked` label until you resume it.",
     },
     channel: {
       type: "string",
@@ -14439,7 +14440,7 @@ export const MailboxSchema = {
       format: "int64",
       readOnly: true,
       description:
-        "Stored bytes across the mailbox's retained messages: the metadata and extracted text kept for the retention tier plus attachment bytes. Message bodies and raw MIME expire after 30 days and do not count. Maintained with each message written or deleted, so the value is current; messages stored before the counter existed are not counted.",
+        "Stored bytes across the mailbox's retained messages: subject, preview, extracted text, and attachment bytes. Message bodies and raw MIME expire after 30 days and do not count. Maintained with each message written or deleted, so the value is current; messages stored before the counter existed are not counted.",
     },
     unread_thread_count: {
       type: ["integer", "null"],
@@ -14479,7 +14480,7 @@ export const MailboxSchema = {
       format: "date-time",
       readOnly: true,
       description:
-        "When the mailbox was deleted, or `null` if it is active. A deleted mailbox stops receiving mail immediately but can be restored for 30 days, after which it and its remembered messages are permanently removed.",
+        "When the mailbox was deleted, or `null` if it is active. A deleted mailbox stops receiving mail immediately but can be restored for 30 days, after which it and any remaining remembered messages are permanently removed.",
     },
   },
 } as const;
@@ -14599,7 +14600,7 @@ export const MailboxUpdateSchema = {
       type: "string",
       enum: ["30d", "90d", "1y"],
       description:
-        "How long the mailbox remembers message metadata, extracted text, and attachments. Message bodies and raw MIME stay available for 30 days regardless of tier. Tiers longer than 30 days require a plan that includes them. Lowering the tier deletes remembered messages older than the new horizon, and requires `confirm=true` when that would happen.",
+        "How long the mailbox remembers message metadata, extracted text, and attachments. Message bodies and raw MIME stay available for 30 days regardless of tier. Tiers longer than 30 days require a plan that includes them. Lowering the tier immediately hides remembered messages older than the new horizon. Deletion waits at least ten minutes and until the background retention update has processed every stored message. The update starts every ten minutes and can take hours for large mailboxes; the next hourly purge deletes eligible messages. A lowering that would affect messages requires `confirm=true`.",
     },
     metadata: {
       type: "object",
@@ -15803,7 +15804,7 @@ export const EmailThreadMessageReplyRequestSchema = {
       },
       maxItems: 20,
       description:
-        "File attachments to include with the reply. The send is rejected when the estimated generated message size exceeds 20 MB (bodies plus all attachments after base64 encoding). Keep total raw attachment content at or below 15 MB for reliable headroom. Attachment metadata stays on the message's `attachment_manifest`, and the bytes are downloadable for 30 days.\n",
+        "File attachments to include with the reply. The send is rejected when the estimated generated message size exceeds 20 MB (bodies plus all attachments after base64 encoding). Keep total raw attachment content at or below 15 MB for reliable headroom. Attachment metadata stays on the message's `attachment_manifest`, and the bytes are downloadable for the mailbox's retention tier.\n",
     },
   },
   example: {
@@ -15880,7 +15881,7 @@ export const EmailMailboxComposeRequestSchema = {
       },
       maxItems: 20,
       description:
-        "File attachments. The send is rejected when the estimated generated message size exceeds 20 MB (bodies plus all attachments after base64 encoding). Keep total raw attachment content at or below 15 MB for reliable headroom. Attachment metadata stays on the message's `attachment_manifest`, and the bytes are downloadable for 30 days.\n",
+        "File attachments. The send is rejected when the estimated generated message size exceeds 20 MB (bodies plus all attachments after base64 encoding). Keep total raw attachment content at or below 15 MB for reliable headroom. Attachment metadata stays on the message's `attachment_manifest`, and the bytes are downloadable for the mailbox's retention tier.\n",
     },
     tags: {
       type: "array",
@@ -17574,7 +17575,7 @@ export const EventEmailMailboxMessageReceivedDataSchema = {
       type: "integer",
       minimum: 0,
       description:
-        "Number of attachments on the message. Attachment content remains available during the 30-day original-source retention window.",
+        "Number of attachments on the message. Attachment content remains available for the mailbox's retention tier.",
       example: 1,
     },
     authentication: {

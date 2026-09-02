@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.52.0
+
+- **Breaking:** changing a mailbox's `retention_tier` now applies to its stored messages in the background rather than as part of the update call. Lowering the tier a second time before the first change finishes is rejected with `E17050`; retry later. You can still raise the tier to one your plan permits. Large mailboxes can take hours to finish.
+- When your plan includes mailbox storage, the allowance is shared by every mailbox in the organization. Sending is rejected with `E17049` once the organization's mailboxes reach it. Soft-deleted mailboxes count while they can still be restored.
+
 ## 0.51.0
 
 - **Breaking:** `bird.sms.sendBatch` and `bird.email.sendBatch` now take `{ messages: [...] }`, and the `SmsSendBatchParams` and `EmailSendBatchParams` types name that envelope; passing a bare array of sends still works but is deprecated.
