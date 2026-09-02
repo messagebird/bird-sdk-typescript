@@ -22,11 +22,16 @@ void withFrom.email.send({ to: ["a@b.com"], subject: "s", html: "<p>h</p>" });
 void withFrom.email.send({ from: "x@acme.com", to: ["a@b.com"], subject: "s", html: "h" });
 
 // @ts-expect-error a batch item needs `from` too when no default is configured
+void noDefault.email.sendBatch({ messages: [{ to: ["a@b.com"], subject: "s", html: "<p>h</p>" }] });
+void withFrom.email.sendBatch({ messages: [{ to: ["a@b.com"], subject: "s", html: "<p>h</p>" }] });
+void withFrom.email.sendBatch({
+  messages: [{ from: "x@acme.com", to: ["a@b.com"], subject: "s", html: "h" }],
+});
+
+// The deprecated bare-array form keeps the same per-item relaxation.
+// @ts-expect-error a bare-array batch item needs `from` when no default is configured
 void noDefault.email.sendBatch([{ to: ["a@b.com"], subject: "s", html: "<p>h</p>" }]);
 void withFrom.email.sendBatch([{ to: ["a@b.com"], subject: "s", html: "<p>h</p>" }]);
-void withFrom.email.sendBatch([
-  { from: "x@acme.com", to: ["a@b.com"], subject: "s", html: "h" },
-]);
 
 // A default configured for one field does not relax another.
 const withPool = new BirdClient({ apiKey: "bk_eu1_x", email: { ip_pool_id: "ipp_shared" } });

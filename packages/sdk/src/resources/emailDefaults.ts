@@ -34,8 +34,8 @@ type DefaultedKeys<D> = D extends object
   : never;
 /** `send` params with defaulted fields made optional. */
 export type EmailSend<D> = PartialBy<EmailMessageSendRequest, DefaultedKeys<D>>;
-/** `sendBatch` params — every item relaxed the same way `send` is. */
-export type EmailSendBatch<D> = Array<EmailSend<D>>;
+/** `sendBatch` params — every item under `messages` relaxed the same way `send` is. */
+export type EmailSendBatch<D> = { messages: Array<EmailSend<D>> };
 
 /**
  * Merge configured channel defaults under one set of per-call params.

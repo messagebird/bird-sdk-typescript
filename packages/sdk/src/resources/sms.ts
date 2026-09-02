@@ -68,36 +68,45 @@ export class SmsResource extends SmsResourceBase {
   }
 
   /**
-   * Send up to 100 independent SMS messages in one call. Each item is a full send
-   * (free text or template); all items are validated before any are queued.
+   * Send up to 100 independent SMS messages in one call. Each item under
+   * `messages` is a full send (free text or template); all items are validated
+   * before any are queued.
+   *
+   * Passing a bare array of sends is deprecated — wrap them in
+   * `{ messages: [...] }`.
    *
    * @example
-   * const result = await bird.sms.sendBatch([
-   *   {
-   *     from: "+15557654321",
-   *     to: "+15551111111",
-   *     text: "Hi Alice!",
-   *     category: "marketing",
-   *   },
-   *   {
-   *     from: "+15557654321",
-   *     to: "+15552222222",
-   *     text: "Hi Bob!",
-   *     category: "marketing",
-   *   },
-   * ]);
+   * const result = await bird.sms.sendBatch({
+   *   messages: [
+   *     {
+   *       from: "+15557654321",
+   *       to: "+15551111111",
+   *       text: "Hi Alice!",
+   *       category: "marketing",
+   *     },
+   *     {
+   *       from: "+15557654321",
+   *       to: "+15552222222",
+   *       text: "Hi Bob!",
+   *       category: "marketing",
+   *     },
+   *   ],
+   * });
    */
   sendBatch(
-    params: SmsSendBatchParams,
+    params: SmsSendBatchParams | SmsSendParams[],
     options?: RequestOptions,
   ): APIPromise<SmsSendBatchResult> {
+    const body: SmsSendBatchParams = Array.isArray(params)
+      ? { messages: params }
+      : params;
     return this.call<SmsSendBatchResult>(
       "POST",
       options,
       ({ signal, headers }) =>
         createSmsMessageBatch({
           client: this.client,
-          body: params,
+          body,
           headers,
           signal,
         }),

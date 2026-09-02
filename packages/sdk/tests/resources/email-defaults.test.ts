@@ -56,15 +56,26 @@ describe("email channel defaults", () => {
   it("applies defaults to every batch item", async () => {
     const { fn, calls } = capture();
     const bird = new BirdClient({ apiKey: "bk_eu1_x", fetch: fn, email: { from: "noreply@acme.com" } });
-    await bird.email.sendBatch([
-      { to: ["a@b.com"], subject: "s", html: "<p>h</p>" },
-      { from: "sales@acme.com", to: ["c@d.com"], subject: "s", html: "<p>h</p>" },
-    ]);
+    await bird.email.sendBatch({
+      messages: [
+        { to: ["a@b.com"], subject: "s", html: "<p>h</p>" },
+        { from: "sales@acme.com", to: ["c@d.com"], subject: "s", html: "<p>h</p>" },
+      ],
+    });
     const body = await calls[0].clone().json();
-    expect(body.map((m: { from: string }) => m.from)).toEqual([
+    expect(body.messages.map((m: { from: string }) => m.from)).toEqual([
       "noreply@acme.com",
       "sales@acme.com",
     ]);
+  });
+
+  it("wraps a deprecated bare-array batch into the messages envelope", async () => {
+    const { fn, calls } = capture();
+    const bird = new BirdClient({ apiKey: "bk_eu1_x", fetch: fn, email: { from: "noreply@acme.com" } });
+    await bird.email.sendBatch([{ to: ["a@b.com"], subject: "s", html: "<p>h</p>" }]);
+    const body = await calls[0].clone().json();
+    expect(body.messages).toHaveLength(1);
+    expect(body.messages[0].from).toBe("noreply@acme.com");
   });
 
   it("merges multiple defaults (reply_to, category)", async () => {

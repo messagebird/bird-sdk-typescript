@@ -326,20 +326,22 @@ console.log(msg.id, msg.status); // "em_…", "accepted"
 }
 
 export async function _ex_50() {
-const batch = await bird.email.sendBatch([
-  {
-    from: { email: "onboarding@messagebird.dev", name: "Bird" },
-    to: ["alice@example.com"],
-    subject: "Your receipt",
-    html: "<p>Thanks, Alice.</p>",
-  },
-  {
-    from: { email: "onboarding@messagebird.dev", name: "Bird" },
-    to: ["bob@example.com"],
-    subject: "Your receipt",
-    html: "<p>Thanks, Bob.</p>",
-  },
-]);
+const batch = await bird.email.sendBatch({
+  messages: [
+    {
+      from: { email: "onboarding@messagebird.dev", name: "Bird" },
+      to: ["alice@example.com"],
+      subject: "Your receipt",
+      html: "<p>Thanks, Alice.</p>",
+    },
+    {
+      from: { email: "onboarding@messagebird.dev", name: "Bird" },
+      to: ["bob@example.com"],
+      subject: "Your receipt",
+      html: "<p>Thanks, Bob.</p>",
+    },
+  ],
+});
 for (const item of batch.data) console.log(item.id, item.status);
 }
 
@@ -721,20 +723,22 @@ console.log(msg.id, msg.status);
 }
 
 export async function _ex_102() {
-const result = await bird.sms.sendBatch([
-  {
-    from: "+15557654321",
-    to: "+15551111111",
-    text: "Hi Alice!",
-    category: "marketing",
-  },
-  {
-    from: "+15557654321",
-    to: "+15552222222",
-    text: "Hi Bob!",
-    category: "marketing",
-  },
-]);
+const result = await bird.sms.sendBatch({
+  messages: [
+    {
+      from: "+15557654321",
+      to: "+15551111111",
+      text: "Hi Alice!",
+      category: "marketing",
+    },
+    {
+      from: "+15557654321",
+      to: "+15552222222",
+      text: "Hi Bob!",
+      category: "marketing",
+    },
+  ],
+});
 }
 
 export async function _ex_103() {

@@ -1239,10 +1239,15 @@ export type EmailMessageSendRequest = {
 };
 
 /**
- * Batch of email message send requests. All items are validated before any are queued. Attachments are allowed on individual messages. Each message must stay within the 20 MB estimated generated message-size cap. The serialized JSON request body for the batch has a hard 20 MB cap.
- *
+ * Batch of email message send requests.
  */
-export type EmailMessageBatchRequest = Array<EmailMessageSendRequest>;
+export type EmailMessageBatchRequest = {
+  /**
+   * Email message send requests, up to 100. All items are validated before any are queued. Attachments are allowed on individual messages. Each message must stay within the 20 MB estimated generated message-size cap. The serialized JSON request body for the batch has a hard 20 MB cap.
+   *
+   */
+  messages: Array<EmailMessageSendRequest>;
+};
 
 export type EmailMessageBatchItem = {
   /**
@@ -2493,9 +2498,14 @@ export type SmsMessageSendRequest = unknown & {
 };
 
 /**
- * Batch of SMS message send requests. All items are validated before any are queued.
+ * Batch of SMS message send requests.
  */
-export type SmsMessageBatchRequest = Array<SmsMessageSendRequest>;
+export type SmsMessageBatchRequest = {
+  /**
+   * SMS message send requests, up to 100. Each is an independent send; all are validated before any is queued.
+   */
+  messages: Array<SmsMessageSendRequest>;
+};
 
 /**
  * Aggregate result for an SMS batch.

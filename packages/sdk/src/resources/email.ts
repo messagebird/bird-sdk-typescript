@@ -178,30 +178,36 @@ export class EmailResource<
    * is accepted (the API's 202). Channel defaults are applied per item, so a
    * field set as a default may be omitted from every item (per-item value wins).
    *
+   * Passing a bare array of sends is deprecated — wrap them in
+   * `{ messages: [...] }`.
+   *
    * @example Send a batch of messages
-   * const batch = await bird.email.sendBatch([
-   *   {
-   *     from: { email: "onboarding@messagebird.dev", name: "Bird" },
-   *     to: ["alice@example.com"],
-   *     subject: "Your receipt",
-   *     html: "<p>Thanks, Alice.</p>",
-   *   },
-   *   {
-   *     from: { email: "onboarding@messagebird.dev", name: "Bird" },
-   *     to: ["bob@example.com"],
-   *     subject: "Your receipt",
-   *     html: "<p>Thanks, Bob.</p>",
-   *   },
-   * ]);
+   * const batch = await bird.email.sendBatch({
+   *   messages: [
+   *     {
+   *       from: { email: "onboarding@messagebird.dev", name: "Bird" },
+   *       to: ["alice@example.com"],
+   *       subject: "Your receipt",
+   *       html: "<p>Thanks, Alice.</p>",
+   *     },
+   *     {
+   *       from: { email: "onboarding@messagebird.dev", name: "Bird" },
+   *       to: ["bob@example.com"],
+   *       subject: "Your receipt",
+   *       html: "<p>Thanks, Bob.</p>",
+   *     },
+   *   ],
+   * });
    * for (const item of batch.data) console.log(item.id, item.status);
    */
   sendBatch(
-    params: EmailSendBatch<D>,
+    params: EmailSendBatch<D> | Array<EmailSend<D>>,
     options?: RequestOptions,
   ): APIPromise<EmailSendBatchResult> {
-    const body = params.map((item) =>
-      withDefaults(this.#defaults, item),
-    ) as EmailSendBatchParams;
+    const items = Array.isArray(params) ? params : params.messages;
+    const body = {
+      messages: items.map((item) => withDefaults(this.#defaults, item)),
+    } as EmailSendBatchParams;
     return this.call<EmailSendBatchResult>(
       "POST",
       options,

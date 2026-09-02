@@ -2172,44 +2172,54 @@ export const EmailMessageSendRequestSchema = {
 } as const;
 
 export const EmailMessageBatchRequestSchema = {
-  type: "array",
-  items: {
-    $ref: "#/components/schemas/EmailMessageSendRequest",
+  type: "object",
+  additionalProperties: false,
+  description: "Batch of email message send requests.",
+  required: ["messages"],
+  properties: {
+    messages: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailMessageSendRequest",
+      },
+      minItems: 1,
+      maxItems: 100,
+      description:
+        "Email message send requests, up to 100. All items are validated before any are queued. Attachments are allowed on individual messages. Each message must stay within the 20 MB estimated generated message-size cap. The serialized JSON request body for the batch has a hard 20 MB cap.\n",
+    },
   },
-  minItems: 1,
-  maxItems: 100,
-  description:
-    "Batch of email message send requests. All items are validated before any are queued. Attachments are allowed on individual messages. Each message must stay within the 20 MB estimated generated message-size cap. The serialized JSON request body for the batch has a hard 20 MB cap.\n",
-  example: [
-    {
-      from: {
-        email: "noreply@acme.com",
-        name: "Acme Support",
-      },
-      to: [
-        {
-          email: "delivered@messagebird.dev",
-          name: "Jane Doe",
+  example: {
+    messages: [
+      {
+        from: {
+          email: "noreply@acme.com",
+          name: "Acme Support",
         },
-      ],
-      subject: "Your receipt for order #1234",
-      text: "Thanks for your purchase! Your receipt is attached.",
-    },
-    {
-      from: {
-        email: "noreply@acme.com",
-        name: "Acme Support",
+        to: [
+          {
+            email: "delivered@messagebird.dev",
+            name: "Jane Doe",
+          },
+        ],
+        subject: "Your receipt for order #1234",
+        text: "Thanks for your purchase! Your receipt is attached.",
       },
-      to: [
-        {
-          email: "delivered@messagebird.dev",
-          name: "John Roe",
+      {
+        from: {
+          email: "noreply@acme.com",
+          name: "Acme Support",
         },
-      ],
-      subject: "Your receipt for order #1235",
-      text: "Thanks for your purchase! Your receipt is attached.",
-    },
-  ],
+        to: [
+          {
+            email: "delivered@messagebird.dev",
+            name: "John Roe",
+          },
+        ],
+        subject: "Your receipt for order #1235",
+        text: "Thanks for your purchase! Your receipt is attached.",
+      },
+    ],
+  },
 } as const;
 
 export const EmailMessageBatchItemSchema = {
@@ -4358,14 +4368,22 @@ export const SMSMessageSendRequestSchema = {
 } as const;
 
 export const SMSMessageBatchRequestSchema = {
-  type: "array",
-  items: {
-    $ref: "#/components/schemas/SMSMessageSendRequest",
+  type: "object",
+  additionalProperties: false,
+  description: "Batch of SMS message send requests.",
+  required: ["messages"],
+  properties: {
+    messages: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/SMSMessageSendRequest",
+      },
+      minItems: 1,
+      maxItems: 100,
+      description:
+        "SMS message send requests, up to 100. Each is an independent send; all are validated before any is queued.",
+    },
   },
-  minItems: 1,
-  maxItems: 100,
-  description:
-    "Batch of SMS message send requests. All items are validated before any are queued.",
 } as const;
 
 export const SMSBatchSummarySchema = {

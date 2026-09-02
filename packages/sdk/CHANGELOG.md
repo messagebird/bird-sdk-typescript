@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.51.0
+
+- **Breaking:** `bird.sms.sendBatch` and `bird.email.sendBatch` now take `{ messages: [...] }`, and the `SmsSendBatchParams` and `EmailSendBatchParams` types name that envelope; passing a bare array of sends still works but is deprecated.
+
 ## 0.50.0
 
 - Batch email sends now take `scheduled_at` on each item, so one batch can mix scheduled and immediate messages.
