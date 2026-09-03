@@ -4399,6 +4399,10 @@ export type VerificationOptions = {
    * Reorder or narrow the delivery channels for this request. List channel names in the order to try them; a channel you omit is not used for this request, and a channel not already enabled for the recipient is ignored. A list that leaves no usable channel fails the request with `422`. Omit the field to use the configured order.
    */
   channels?: Array<VerificationChannel>;
+  /**
+   * Which of the built-in message translations to send. SMS is translated; every other channel sends English whatever you set here. A tag with no translation of its own falls back to its base language, then to English. The tag is fixed for the verification, so a resend arrives in the same language as the first message. Omit to send in English.
+   */
+  language?: LanguageTag;
 };
 
 export type VerificationCreateRequest = {
