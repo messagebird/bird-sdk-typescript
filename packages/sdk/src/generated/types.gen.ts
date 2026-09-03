@@ -1046,9 +1046,9 @@ export type EmailMessage = {
    */
   readonly delivered_at?: string | null;
   /**
-   * When this message is scheduled to send, for a send created with a future send time. Null for an immediate send. Stays set after the scheduled send fires.
+   * When this message is scheduled to send, for a send created with a future send time. Absent for an immediate send. Stays set after the scheduled send fires.
    */
-  readonly scheduled_at?: string | null;
+  readonly scheduled_at?: string;
 };
 
 export type EmailMessageList = {
@@ -1282,6 +1282,11 @@ export type EmailMessageBatchItem = {
    *
    */
   readonly template_version_id?: EmailTemplateVersionId | null;
+  /**
+   * When this item is scheduled to send, for an item created with a future send time. Absent for an item that sends immediately.
+   *
+   */
+  readonly scheduled_at?: string;
 };
 
 export type EmailMessageBatchResponse = {

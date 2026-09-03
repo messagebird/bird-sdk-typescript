@@ -1850,11 +1850,11 @@ export const EmailMessageSchema = {
         "When all recipients reached a terminal delivered state, or null if not yet fully delivered.",
     },
     scheduled_at: {
-      type: ["string", "null"],
+      type: "string",
       format: "date-time",
       readOnly: true,
       description:
-        "When this message is scheduled to send, for a send created with a future send time. Null for an immediate send. Stays set after the scheduled send fires.",
+        "When this message is scheduled to send, for a send created with a future send time. Absent for an immediate send. Stays set after the scheduled send fires.",
     },
   },
 } as const;
@@ -2296,6 +2296,13 @@ export const EmailMessageBatchItemSchema = {
       readOnly: true,
       description:
         "The exact template version this item rendered from, or null for an inline item. Record it if you need to reproduce what was sent: a template's live version changes every time you submit it.\n",
+    },
+    scheduled_at: {
+      type: "string",
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this item is scheduled to send, for an item created with a future send time. Absent for an item that sends immediately.\n",
     },
   },
 } as const;
