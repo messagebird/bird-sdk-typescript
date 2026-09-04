@@ -4244,7 +4244,7 @@ export const SMSMessageSendRequestSchema = {
       type: "string",
       minLength: 1,
       description:
-        "Sender to send from. Use an E.164 number such as `+15557654321`, or a short code of 5-6 digits. You can also use an alphanumeric sender ID of 1-11 letters, digits, spaces, dashes, or underscores. It must contain at least one letter, for example `MyBrand`. A numeric sender must be a number your workspace owns; an alphanumeric sender is accepted where the destination country permits one. Required on a free-text send: omitting it returns a `422` `SMSNoEligibleSender`. Not accepted alongside `template`, which selects its sender automatically.\n",
+        "Sender to send from. It must be a sender the workspace holds: a number it owns in E.164, such as `+15557654321`, a short code it holds, such as `24680`, or an alphanumeric sender ID it has claimed, such as `MyBrand`. A sender the workspace does not hold returns a `422` `SMSSenderNotConfigured`, and an alphanumeric sender must also be permitted, and where required registered, for the destination country. Required on a free-text send: omitting it returns a `422` `SMSNoEligibleSender`. Not accepted alongside `template`, which selects its sender automatically.\n",
       example: "+15557654321",
     },
     text: {
@@ -7465,7 +7465,7 @@ export const VerificationToSchema = {
 export const VerificationChannelSchema = {
   type: "string",
   minLength: 1,
-  "x-extensible-enum": ["email", "sms", "whatsapp", "telegram"],
+  "x-extensible-enum": ["email", "sms", "whatsapp", "telegram", "voice"],
   description:
     "The channel a passcode is delivered over. Open enum: new channels may be added over time, so treat any unrecognized value as a future channel rather than an error.",
 } as const;
@@ -7569,7 +7569,13 @@ export const VerificationSchema = {
         },
         last_channel: {
           type: ["string", "null"],
-          "x-extensible-enum": ["email", "sms", "whatsapp", "telegram"],
+          "x-extensible-enum": [
+            "email",
+            "sms",
+            "whatsapp",
+            "telegram",
+            "voice",
+          ],
           readOnly: true,
           description:
             "The channel the most recent passcode was sent on, or `null` before the first send. Open enum; new channels may be added over time, so treat any unrecognized value as a future channel rather than an error.",
@@ -7626,7 +7632,7 @@ export const VerificationOptionsSchema = {
     language: {
       $ref: "#/components/schemas/LanguageTag",
       description:
-        "Which of the built-in message translations to send. SMS is translated; every other channel sends English whatever you set here. A tag with no translation of its own falls back to its base language, then to English. The tag is fixed for the verification, so a resend arrives in the same language as the first message. Omit to send in English.",
+        "Which of the built-in message translations to send. It applies to SMS, email and WhatsApp, and has no effect on a Telegram verification. A tag with no translation of its own falls back to its base language, and then to English. The attempt's `template_language` reports which translation was used. The tag is fixed for the verification, so a resend arrives in the same language as the first message.\n\nOmit it and the language is read from the recipient phone number's country, so a French number gets French without you asking. Set it to override that. A verification with no phone number, and one whose country has no translation here, sends English.\n\nSupported: en, ar, bg, cs, da, de, el, es, fi, fr, he, hi, hr, hu, id, it, ja, ko, lt, lv, mk, mn, ms, nb-NO, nl, no, pl, pt, ro, ru, sk, sl, sr, sv, th, tr, uk, vi, zh, zh-TW. Every one of them is available on SMS and email. Mongolian (mn) is the one WhatsApp cannot carry, so a WhatsApp passcode falls back to English for it.",
     },
   },
 } as const;
@@ -20376,9 +20382,9 @@ export const SIPTrunkIDSchema = {
 export const VoiceCallRouteTypeSchema = {
   type: "string",
   minLength: 1,
-  enum: ["reject", "trunk", "forward"],
+  enum: ["reject", "trunk", "forward", "voicemail"],
   description:
-    "Which answer a number carries.\n\n- `reject`: refuses the call. This is where every number starts.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
+    "Which answer a number carries.\n\n- `reject`: refuses the call. This is where every number starts.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n- `voicemail`: answers, plays your greeting, and records what the caller says.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
   example: "reject",
 } as const;
 
@@ -20575,6 +20581,8 @@ export const VoiceCallCostSchema = {
     "outbound_amount",
     "inbound_amount",
     "call_handling_amount",
+    "recording_amount",
+    "transcription_amount",
   ],
   description:
     "What was charged for a call, split into the components that make it up.\n",
@@ -20613,6 +20621,20 @@ export const VoiceCallCostSchema = {
       readOnly: true,
       description:
         "What we charged for handling the call itself, as a decimal string. A call is charged for handling once, however many legs it has, so only one leg's record carries it. `null` until this component is priced.\n",
+      example: null,
+    },
+    recording_amount: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What we charged to record the call, as a decimal string, billed per second over the same billable time as the rest of the call. `null` until this component is priced.\n",
+      example: null,
+    },
+    transcription_amount: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What we charged to transcribe the call's audio, as a decimal string, billed per second of recorded audio rather than for the length of the call. A transcript is produced after the call ends, so this can appear after the rest of the cost. `null` until this component is priced.\n",
       example: null,
     },
   },

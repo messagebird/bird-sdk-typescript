@@ -2421,7 +2421,7 @@ export type SmsMessageSendRequest = unknown & {
    */
   to: string;
   /**
-   * Sender to send from. Use an E.164 number such as `+15557654321`, or a short code of 5-6 digits. You can also use an alphanumeric sender ID of 1-11 letters, digits, spaces, dashes, or underscores. It must contain at least one letter, for example `MyBrand`. A numeric sender must be a number your workspace owns; an alphanumeric sender is accepted where the destination country permits one. Required on a free-text send: omitting it returns a `422` `SMSNoEligibleSender`. Not accepted alongside `template`, which selects its sender automatically.
+   * Sender to send from. It must be a sender the workspace holds: a number it owns in E.164, such as `+15557654321`, a short code it holds, such as `24680`, or an alphanumeric sender ID it has claimed, such as `MyBrand`. A sender the workspace does not hold returns a `422` `SMSSenderNotConfigured`, and an alphanumeric sender must also be permitted, and where required registered, for the destination country. Required on a free-text send: omitting it returns a `422` `SMSNoEligibleSender`. Not accepted alongside `template`, which selects its sender automatically.
    *
    */
   from?: string;
@@ -4287,7 +4287,7 @@ export type VerificationTo = {
  * The channel a passcode is delivered over. Open enum: new channels may be added over time, so treat any unrecognized value as a future channel rather than an error.
  */
 export type VerificationChannel =
-  "email" | "sms" | "whatsapp" | "telegram" | (string & {});
+  "email" | "sms" | "whatsapp" | "telegram" | "voice" | (string & {});
 
 export type VerificationChannelEntry = {
   channel: VerificationChannel;
@@ -4400,7 +4400,11 @@ export type VerificationOptions = {
    */
   channels?: Array<VerificationChannel>;
   /**
-   * Which of the built-in message translations to send. SMS is translated; every other channel sends English whatever you set here. A tag with no translation of its own falls back to its base language, then to English. The tag is fixed for the verification, so a resend arrives in the same language as the first message. Omit to send in English.
+   * Which of the built-in message translations to send. It applies to SMS, email and WhatsApp, and has no effect on a Telegram verification. A tag with no translation of its own falls back to its base language, and then to English. The attempt's `template_language` reports which translation was used. The tag is fixed for the verification, so a resend arrives in the same language as the first message.
+   *
+   * Omit it and the language is read from the recipient phone number's country, so a French number gets French without you asking. Set it to override that. A verification with no phone number, and one whose country has no translation here, sends English.
+   *
+   * Supported: en, ar, bg, cs, da, de, el, es, fi, fr, he, hi, hr, hu, id, it, ja, ko, lt, lv, mk, mn, ms, nb-NO, nl, no, pl, pt, ro, ru, sk, sl, sr, sv, th, tr, uk, vi, zh, zh-TW. Every one of them is available on SMS and email. Mongolian (mn) is the one WhatsApp cannot carry, so a WhatsApp passcode falls back to English for it.
    */
   language?: LanguageTag;
 };
@@ -11384,12 +11388,13 @@ export type SipTrunkId = string;
  * - `reject`: refuses the call. This is where every number starts.
  * - `trunk`: delivers the call to one of your SIP trunks.
  * - `forward`: places a call to one of your verified caller IDs and connects the two.
+ * - `voicemail`: answers, plays your greeting, and records what the caller says.
  *
  * It selects the answer's own shape, so a new way to answer a call arrives as a
  * new value alongside a new set of fields.
  *
  */
-export type VoiceCallRouteType = "reject" | "trunk" | "forward";
+export type VoiceCallRouteType = "reject" | "trunk" | "forward" | "voicemail";
 
 /**
  * Which of a forwarded call's two numbers it shows as the caller.
@@ -11569,6 +11574,16 @@ export type VoiceCallCost = {
    *
    */
   readonly call_handling_amount: string | null;
+  /**
+   * What we charged to record the call, as a decimal string, billed per second over the same billable time as the rest of the call. `null` until this component is priced.
+   *
+   */
+  readonly recording_amount: string | null;
+  /**
+   * What we charged to transcribe the call's audio, as a decimal string, billed per second of recorded audio rather than for the length of the call. A transcript is produced after the call ends, so this can appear after the rest of the cost. `null` until this component is priced.
+   *
+   */
+  readonly transcription_amount: string | null;
 };
 
 export type VoiceCall = {

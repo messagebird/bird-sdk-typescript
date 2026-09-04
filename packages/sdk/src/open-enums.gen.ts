@@ -329,6 +329,7 @@ export const VerificationChannel = {
   Email: "email",
   Sms: "sms",
   Telegram: "telegram",
+  Voice: "voice",
   Whatsapp: "whatsapp",
 } as const;
 
