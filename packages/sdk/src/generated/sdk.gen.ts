@@ -4139,7 +4139,7 @@ export const updateMailbox = <ThrowOnError extends boolean = false>(
 /**
  * Restore a deleted mailbox
  *
- * Restores a mailbox deleted less than 30 days ago. The address is bound back to the mailbox and starts receiving again. Remaining remembered messages and conversations become available again; normal message-retention expiry continues while a mailbox is deleted. Once the 30-day window has passed, the mailbox and any remaining messages are permanently deleted and can no longer be restored (`404`). Restoring a mailbox that is not deleted returns a conflict, as does an address that is no longer available.
+ * Restores receiving and access to unexpired messages. Returns `404` if deletion was 30 or more days ago or permanent erasure has started, and `409` if the mailbox is not deleted or its address is unavailable.
  *
  */
 export const restoreMailbox = <ThrowOnError extends boolean = false>(
