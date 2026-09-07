@@ -420,6 +420,7 @@ export type {
   EmailBounceStats,
   EmailBounceStatsWithRates,
   EmailBounceType,
+  EmailBroadcastId,
   EmailBroadcastStatsPoint,
   EmailBroadcastStatsPointWritable,
   EmailCategoryStatsPoint,

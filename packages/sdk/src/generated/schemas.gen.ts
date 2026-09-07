@@ -2722,6 +2722,13 @@ export const AudienceIDSchema = {
   example: "adn_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const EmailBroadcastIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^eb_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "eb_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const ContactIdentifierFilterSchema = {
   type: "string",
   enum: ["email", "phone_number"],
@@ -16750,6 +16757,7 @@ export const EventEmailBaseSchema = {
     "recipient_role",
     "tags",
     "metadata",
+    "broadcast_id",
   ],
   properties: {
     email_id: {
@@ -16791,6 +16799,19 @@ export const EventEmailBaseSchema = {
       example: {
         order_id: "ord_123",
       },
+    },
+    broadcast_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The broadcast this send went out as part of, echoed on every per-recipient event for the send so you can attribute engagement to the broadcast without an extra lookup. Null when the send was not part of a broadcast. On `email.unsubscribed` and `email.list_unsubscribed`, null can also mean the recipient used an unsubscribe link that names no broadcast, so on those two events null does not rule a broadcast out.\n",
+      example: "eb_01krdgeqcxet5s7t44vh8rt9mg",
     },
   },
 } as const;

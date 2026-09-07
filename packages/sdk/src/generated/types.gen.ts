@@ -1609,6 +1609,8 @@ export type EmailMessageContent = {
 
 export type AudienceId = string;
 
+export type EmailBroadcastId = string;
+
 /**
  * Which identifier a contact has on file, `email` for an email address or `phone_number` for a phone number.
  */
@@ -9328,6 +9330,11 @@ export type EventEmailBase = {
   metadata: {
     [key: string]: unknown;
   } | null;
+  /**
+   * The broadcast this send went out as part of, echoed on every per-recipient event for the send so you can attribute engagement to the broadcast without an extra lookup. Null when the send was not part of a broadcast. On `email.unsubscribed` and `email.list_unsubscribed`, null can also mean the recipient used an unsubscribe link that names no broadcast, so on those two events null does not rule a broadcast out.
+   *
+   */
+  broadcast_id: EmailBroadcastId | null;
 };
 
 /**
