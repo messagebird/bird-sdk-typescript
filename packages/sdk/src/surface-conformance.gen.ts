@@ -6,6 +6,7 @@ import type { BirdClient } from "./client.js";
 
 export type _Email = Pick<BirdClient["email"], "send" | "sendBatch" | "get" | "list" | "cancel">;
 export type _EmailStats = Pick<BirdClient["email"]["stats"], "summary" | "daily" | "hourly" | "byTag" | "byCategory" | "bySendingIp" | "bySendingDomain" | "byRecipientDomain" | "byMailboxProvider" | "byMailboxProviderRegion" | "byTemplate" | "byLocation" | "byClient" | "byBounceCode" | "byComplaintType" | "byBroadcast">;
+export type _EmailTemplates = Pick<BirdClient["email"]["templates"], "list">;
 export type _Sms = Pick<BirdClient["sms"], "send" | "sendBatch" | "get" | "list" | "listEvents">;
 export type _SmsTemplates = Pick<BirdClient["smsTemplates"], "list" | "get">;
 export type _SmsStats = Pick<BirdClient["sms"]["stats"], "summary" | "daily" | "hourly" | "byCountry" | "byCarrier" | "byCategory" | "byOriginator" | "byStatus" | "byErrorCode" | "byTag">;

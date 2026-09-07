@@ -15,7 +15,7 @@ The official TypeScript SDK for the [Bird](https://bird.com) API: email, SMS, Wh
 pnpm add @messagebird/sdk
 ```
 
-> This SDK is generated from Bird's public OpenAPI bundle inside Bird's internal monorepo, which is the single source of truth; this repository tracks tagged releases. Generation runs in the monorepo, so `pnpm generate` won't work from a clone here — see [CONTRIBUTING.md](./CONTRIBUTING.md).
+> This SDK is generated from Bird's public OpenAPI bundle inside Bird's internal monorepo, which is the single source of truth; this repository tracks tagged releases. Generation runs in the monorepo, so `pnpm generate` won't work from a clone here — see [contribution guide](https://github.com/messagebird/bird-sdk-typescript/blob/main/CONTRIBUTING.md).
 
 ## Quickstart
 

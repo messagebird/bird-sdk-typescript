@@ -23,6 +23,7 @@ import type {
   EmailSendBatch,
 } from "./emailDefaults.js";
 import { EmailStatsResource } from "./emailStats.gen.js";
+import { EmailTemplatesResource } from "./emailTemplates.gen.js";
 import { EmailMailboxesResource } from "./emailMailboxes.js";
 import { EmailThreadsResource } from "./emailThreads.js";
 import type {
@@ -61,6 +62,9 @@ export class EmailResource<
   /** Conversations across every mailbox — `bird.email.threads.list(...)`, `.get(...)`, … */
   readonly threads: EmailThreadsResource;
 
+  /** Email templates: `bird.email.templates.list(...)`. */
+  readonly templates: EmailTemplatesResource;
+
   constructor(
     core: ConstructorParameters<typeof Resource>[0],
     client: ConstructorParameters<typeof Resource>[1],
@@ -71,6 +75,7 @@ export class EmailResource<
     this.stats = new EmailStatsResource(core, client);
     this.mailboxes = new EmailMailboxesResource(core, client, defaults);
     this.threads = new EmailThreadsResource(core, client);
+    this.templates = new EmailTemplatesResource(core, client);
   }
 
   /**

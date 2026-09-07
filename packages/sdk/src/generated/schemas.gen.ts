@@ -13954,6 +13954,270 @@ export const SuppressionCreateSchema = {
   },
 } as const;
 
+export const EmailTemplateCategorySchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["transactional", "marketing"],
+  description:
+    "Whether the template is for `transactional` email or `marketing` email.",
+} as const;
+
+export const EmailTemplateSourceSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["html"],
+  description:
+    "The authoring format the template is written in, fixed at creation. `html` is finished markup you provide, optionally personalized with Liquid.",
+} as const;
+
+export const EmailTemplateThemeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["arcane", "barebone", "matte", "protocol", "studio"],
+  description:
+    "The visual theme a built-in template is designed in. Each of the catalog's five themes ships its own set of eight emails, and the sets overlap only partly, so the theme is what you choose between once you know which email you want. Only built-in `system` templates have one.",
+} as const;
+
+export const EmailTemplateLanguageStateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Where one of the template's languages stands: whether sends are using it, and whether its draft contains an unpublished edit.\n",
+  required: ["status"],
+  properties: {
+    status: {
+      $ref: "#/components/schemas/TemplateLanguageStatus",
+    },
+    draft: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether the draft holds an edit to this language that has not been published. If this is true and the status is `live`, sends are still using the older content, and your edit goes out the next time you submit.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "workspace_id",
+    "slug",
+    "name",
+    "scope",
+    "status",
+    "category",
+    "source",
+    "theme",
+    "draft_version_id",
+    "live_version_id",
+    "published_version_id",
+    "live_version_number",
+    "languages",
+    "default_language",
+    "available_languages",
+    "description",
+    "last_submitted_at",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      description: "Template ID.",
+      $ref: "#/components/schemas/EmailTemplateID",
+    },
+    workspace_id: {
+      readOnly: true,
+      description:
+        "The workspace that owns the template. Null for a built-in `system` template, which no workspace owns.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WorkspaceID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The name you send the template by. You can use either the slug or the id when you send. It never changes after the template is created. A built-in `system` template's slug always starts with `bird_`.",
+      example: "welcome-email",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The template's display name, shown wherever the template is listed. You can change it any time. It defaults to the slug if you do not set one.",
+      example: "Welcome email",
+    },
+    description: {
+      type: ["string", "null"],
+      description:
+        "What the template is for, in your own words. Null if you have not set one.",
+    },
+    scope: {
+      $ref: "#/components/schemas/TemplateScope",
+    },
+    status: {
+      $ref: "#/components/schemas/TemplateStatus",
+    },
+    category: {
+      $ref: "#/components/schemas/EmailTemplateCategory",
+    },
+    source: {
+      $ref: "#/components/schemas/EmailTemplateSource",
+    },
+    theme: {
+      readOnly: true,
+      description:
+        "The visual theme a built-in template is designed in, or null for a template your workspace authored (which has no theme).",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateTheme",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    draft_version_id: {
+      readOnly: true,
+      description:
+        "The current editable draft version. Null for a built-in `system` template, which has no draft.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    live_version_id: {
+      readOnly: true,
+      description:
+        "The version a send resolves to, or null if the template has never been published.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    published_version_id: {
+      readOnly: true,
+      deprecated: true,
+      description:
+        "Deprecated: use `live_version_id` instead, which carries the same value.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    live_version_number: {
+      type: ["integer", "null"],
+      minimum: 1,
+      readOnly: true,
+      description:
+        "The live version's sequential number (1, 2, 3…), the same one version history reports, or null if the template has never been published. A built-in `system` template is permanently published as version 1. A rollback moves it backwards, because it names the version that is live rather than how many exist.\n",
+    },
+    available_languages: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      description:
+        "The languages this template currently supports for sending, as BCP-47 tags. Empty until the template is published, because sends serve published content. This set may shrink for reasons other than editing, so read it rather than assuming it matches what was published.\n",
+      example: ["en"],
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description:
+        "The language the draft defaults to. Read this language's content when you have no particular preference for which one you want.\n",
+    },
+    languages: {
+      type: "object",
+      readOnly: true,
+      propertyNames: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/EmailTemplateLanguageState",
+      },
+      description:
+        "Every language this template has, keyed by language tag, each with its state. Enough to show which templates need attention in a list without a request per row.\n",
+      example: {
+        en: {
+          status: "live",
+        },
+        de: {
+          status: "draft",
+        },
+      },
+    },
+    last_submitted_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this template was last submitted. Null if it never has been. Only submitting moves this timestamp, so a rollback keeps reporting the last real submit.\n",
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was created. Null for a built-in `system` template.",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was last modified. Null for a built-in `system` template.",
+    },
+  },
+} as const;
+
+export const EmailTemplateListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of email templates.",
+          items: {
+            $ref: "#/components/schemas/EmailTemplateSummary",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
 export const ActorSchema = {
   type: "object",
   additionalProperties: false,
@@ -22996,6 +23260,61 @@ export const SuppressionListWritableSchema = {
           description: "Page of suppression records.",
           items: {
             $ref: "#/components/schemas/SuppressionWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EmailTemplateLanguageStateWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Where one of the template's languages stands: whether sends are using it, and whether its draft contains an unpublished edit.\n",
+} as const;
+
+export const EmailTemplateSummaryWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "category", "source", "description"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The template's display name, shown wherever the template is listed. You can change it any time. It defaults to the slug if you do not set one.",
+      example: "Welcome email",
+    },
+    description: {
+      type: ["string", "null"],
+      description:
+        "What the template is for, in your own words. Null if you have not set one.",
+    },
+    category: {
+      $ref: "#/components/schemas/EmailTemplateCategory",
+    },
+    source: {
+      $ref: "#/components/schemas/EmailTemplateSource",
+    },
+  },
+} as const;
+
+export const EmailTemplateListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of email templates.",
+          items: {
+            $ref: "#/components/schemas/EmailTemplateSummaryWritable",
           },
         },
       },

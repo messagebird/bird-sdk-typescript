@@ -7755,6 +7755,123 @@ export type SuppressionCreate = {
   email: string;
 };
 
+/**
+ * Whether the template is for `transactional` email or `marketing` email.
+ */
+export type EmailTemplateCategory = "transactional" | "marketing";
+
+/**
+ * The authoring format the template is written in, fixed at creation. `html` is finished markup you provide, optionally personalized with Liquid.
+ */
+export type EmailTemplateSource = "html" | (string & {});
+
+/**
+ * The visual theme a built-in template is designed in. Each of the catalog's five themes ships its own set of eight emails, and the sets overlap only partly, so the theme is what you choose between once you know which email you want. Only built-in `system` templates have one.
+ */
+export type EmailTemplateTheme =
+  "arcane" | "barebone" | "matte" | "protocol" | "studio";
+
+/**
+ * Where one of the template's languages stands: whether sends are using it, and whether its draft contains an unpublished edit.
+ *
+ */
+export type EmailTemplateLanguageState = {
+  status: TemplateLanguageStatus;
+  /**
+   * Whether the draft holds an edit to this language that has not been published. If this is true and the status is `live`, sends are still using the older content, and your edit goes out the next time you submit.
+   *
+   */
+  readonly draft?: boolean;
+};
+
+export type EmailTemplateSummary = {
+  /**
+   * Template ID.
+   */
+  readonly id: EmailTemplateId;
+  /**
+   * The workspace that owns the template. Null for a built-in `system` template, which no workspace owns.
+   */
+  readonly workspace_id: WorkspaceId | null;
+  /**
+   * The name you send the template by. You can use either the slug or the id when you send. It never changes after the template is created. A built-in `system` template's slug always starts with `bird_`.
+   */
+  readonly slug: TemplateSlug;
+  /**
+   * The template's display name, shown wherever the template is listed. You can change it any time. It defaults to the slug if you do not set one.
+   */
+  name: string;
+  /**
+   * What the template is for, in your own words. Null if you have not set one.
+   */
+  description: string | null;
+  scope: TemplateScope;
+  status: TemplateStatus;
+  category: EmailTemplateCategory;
+  source: EmailTemplateSource;
+  /**
+   * The visual theme a built-in template is designed in, or null for a template your workspace authored (which has no theme).
+   */
+  readonly theme: EmailTemplateTheme | null;
+  /**
+   * The current editable draft version. Null for a built-in `system` template, which has no draft.
+   */
+  readonly draft_version_id: EmailTemplateVersionId | null;
+  /**
+   * The version a send resolves to, or null if the template has never been published.
+   */
+  readonly live_version_id: EmailTemplateVersionId | null;
+  /**
+   * Deprecated: use `live_version_id` instead, which carries the same value.
+   *
+   *
+   * @deprecated
+   */
+  readonly published_version_id: EmailTemplateVersionId | null;
+  /**
+   * The live version's sequential number (1, 2, 3…), the same one version history reports, or null if the template has never been published. A built-in `system` template is permanently published as version 1. A rollback moves it backwards, because it names the version that is live rather than how many exist.
+   *
+   */
+  readonly live_version_number: number | null;
+  /**
+   * The languages this template currently supports for sending, as BCP-47 tags. Empty until the template is published, because sends serve published content. This set may shrink for reasons other than editing, so read it rather than assuming it matches what was published.
+   *
+   */
+  readonly available_languages: Array<LanguageTag>;
+  /**
+   * The language the draft defaults to. Read this language's content when you have no particular preference for which one you want.
+   *
+   */
+  readonly default_language: LanguageTag;
+  /**
+   * Every language this template has, keyed by language tag, each with its state. Enough to show which templates need attention in a list without a request per row.
+   *
+   */
+  readonly languages: {
+    [key in LanguageTag]?: EmailTemplateLanguageState;
+  };
+  /**
+   * When this template was last submitted. Null if it never has been. Only submitting moves this timestamp, so a rollback keeps reporting the last real submit.
+   *
+   */
+  readonly last_submitted_at: string | null;
+  /**
+   * When the template was created. Null for a built-in `system` template.
+   */
+  readonly created_at: string | null;
+  /**
+   * When the template was last modified. Null for a built-in `system` template.
+   */
+  readonly updated_at: string | null;
+};
+
+export type EmailTemplateList = {
+  /**
+   * Page of email templates.
+   */
+  data: Array<EmailTemplateSummary>;
+} & ListEnvelope;
+
 export type Actor = {
   /**
    * Actor identifier.
@@ -13139,6 +13256,34 @@ export type SuppressionListWritable = {
    * Page of suppression records.
    */
   data: Array<SuppressionWritable>;
+} & ListEnvelope;
+
+/**
+ * Where one of the template's languages stands: whether sends are using it, and whether its draft contains an unpublished edit.
+ *
+ */
+export type EmailTemplateLanguageStateWritable = {
+  [key: string]: never;
+};
+
+export type EmailTemplateSummaryWritable = {
+  /**
+   * The template's display name, shown wherever the template is listed. You can change it any time. It defaults to the slug if you do not set one.
+   */
+  name: string;
+  /**
+   * What the template is for, in your own words. Null if you have not set one.
+   */
+  description: string | null;
+  category: EmailTemplateCategory;
+  source: EmailTemplateSource;
+};
+
+export type EmailTemplateListWritable = {
+  /**
+   * Page of email templates.
+   */
+  data: Array<EmailTemplateSummaryWritable>;
 } & ListEnvelope;
 
 export type ActorWritable = {
@@ -21663,6 +21808,83 @@ export type VerifyDomainResponses = {
 
 export type VerifyDomainResponse =
   VerifyDomainResponses[keyof VerifyDomainResponses];
+
+export type ListEmailTemplatesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Filter by who owns the template. Use `system` for our built-in templates and `workspace` for the ones your workspace created. Leave it out to get both.
+     */
+    scope?: TemplateScope;
+    /**
+     * Return only `transactional` or `marketing` templates; omit to return both categories.
+     */
+    category?: EmailTemplateCategory;
+    /**
+     * Return only templates authored in this format.
+     */
+    source?: EmailTemplateSource;
+    /**
+     * Filter by the visual theme a built-in template is designed in. Only our built-in templates have a theme, so naming one returns built-ins alone.
+     */
+    theme?: EmailTemplateTheme;
+    /**
+     * A case-insensitive substring search across the template's slug, name, and description.
+     */
+    q?: string;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/email/templates";
+};
+
+export type ListEmailTemplatesErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEmailTemplatesError =
+  ListEmailTemplatesErrors[keyof ListEmailTemplatesErrors];
+
+export type ListEmailTemplatesResponses = {
+  /**
+   * Paginated list of email templates.
+   */
+  200: EmailTemplateList;
+};
+
+export type ListEmailTemplatesResponse =
+  ListEmailTemplatesResponses[keyof ListEmailTemplatesResponses];
 
 export type ListMailboxesData = {
   body?: never;

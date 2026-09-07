@@ -273,3 +273,9 @@ export async function mailboxThreadMessageList() {
     console.log(msg.id, msg.direction);
   }
 }
+
+export async function emailTemplatesList() {
+  for await (const tpl of bird.email.templates.list({ scope: "workspace" })) {
+    console.log(tpl.slug, tpl.name);
+  }
+}

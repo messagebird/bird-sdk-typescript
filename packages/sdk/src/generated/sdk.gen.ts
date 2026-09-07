@@ -311,6 +311,9 @@ import type {
   ListEmailMessagesData,
   ListEmailMessagesErrors,
   ListEmailMessagesResponses,
+  ListEmailTemplatesData,
+  ListEmailTemplatesErrors,
+  ListEmailTemplatesResponses,
   ListEmailThreadMessageAttachmentsData,
   ListEmailThreadMessageAttachmentsErrors,
   ListEmailThreadMessageAttachmentsResponses,
@@ -3995,6 +3998,48 @@ export const verifyDomain = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/email/domains/{domain_id}/verify",
+    ...options,
+  });
+
+/**
+ * List email templates
+ *
+ * Returns a paginated list of email templates, newest first.
+ *
+ * The list covers both the workspace's own templates and our built-in `system` templates. Use
+ * `scope` to get only one of the two, or leave it out to get both. When you leave it out, the
+ * workspace's own templates come first, newest first, and our built-in templates fill the rest of
+ * the list once the workspace's templates run out.
+ *
+ * Filter further by category or authoring format, or search with `q`, a case-insensitive substring
+ * match against the template's slug, name, and description.
+ *
+ * Our built-in templates come in five visual themes. Each theme ships its own set of eight
+ * emails, and the sets overlap only partly. Use `theme` to see one of them. A template your
+ * workspace authored has no theme, so naming one returns our built-ins alone.
+ *
+ */
+export const listEmailTemplates = <ThrowOnError extends boolean = false>(
+  options?: Options<ListEmailTemplatesData, ThrowOnError>,
+): RequestResult<
+  ListEmailTemplatesResponses,
+  ListEmailTemplatesErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListEmailTemplatesResponses,
+    ListEmailTemplatesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates",
     ...options,
   });
 

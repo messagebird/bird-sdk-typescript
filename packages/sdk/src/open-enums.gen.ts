@@ -70,6 +70,18 @@ export const EmailLookupResult = {
 export type EmailLookupResultValue = (typeof EmailLookupResult)[keyof typeof EmailLookupResult];
 
 /**
+ * Values of EmailTemplateSource known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailTemplateSource = {
+  Html: "html",
+} as const;
+
+/** A known EmailTemplateSource value. */
+export type EmailTemplateSourceValue = (typeof EmailTemplateSource)[keyof typeof EmailTemplateSource];
+
+/**
  * Values of LookupFlag known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.

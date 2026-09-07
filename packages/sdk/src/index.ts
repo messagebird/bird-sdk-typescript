@@ -93,6 +93,10 @@ export type {
   SmsTemplateListQuery,
 } from "./resources/smsTemplates.gen.js";
 export type {
+  EmailTemplateSummary,
+  EmailTemplatesListQuery,
+} from "./resources/emailTemplates.gen.js";
+export type {
   SmsStatsSummary,
   SmsStatsResponse,
   SmsStatsByCountryResponse,
@@ -253,6 +257,7 @@ export {
   EmailLookupFlag,
   EmailLookupReason,
   EmailLookupResult,
+  EmailTemplateSource,
   LookupFlag,
   LookupPropertyStatus,
   NumberCapability,
@@ -285,6 +290,7 @@ export type {
   EmailLookupFlagValue,
   EmailLookupReasonValue,
   EmailLookupResultValue,
+  EmailTemplateSourceValue,
   LookupFlagValue,
   LookupPropertyStatusValue,
   NumberCapabilityValue,
