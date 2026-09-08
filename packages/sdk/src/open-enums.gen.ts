@@ -297,22 +297,6 @@ export const TemplateLanguageStatus = {
 export type TemplateLanguageStatusValue = (typeof TemplateLanguageStatus)[keyof typeof TemplateLanguageStatus];
 
 /**
- * Values of TemplateStatus known at this SDK version. The wire value is an open
- * string: a value added by a newer server deserializes unchanged, so switch on
- * these with a `default` branch rather than treating the set as closed.
- */
-export const TemplateStatus = {
-  Active: "active",
-  Draft: "draft",
-  Inactive: "inactive",
-  Pending: "pending",
-  Rejected: "rejected",
-} as const;
-
-/** A known TemplateStatus value. */
-export type TemplateStatusValue = (typeof TemplateStatus)[keyof typeof TemplateStatus];
-
-/**
  * Values of VerificationAttemptFailureReason known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.

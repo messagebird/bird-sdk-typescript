@@ -174,6 +174,7 @@ export type { Workspace } from "./resources/workspace.gen.js";
 export type {
   PreferenceStatus,
   PreferenceCoverage,
+  TemplateStatus,
 } from "./generated/types.gen.js";
 export type {
   Contact,
@@ -272,7 +273,6 @@ export {
   SMSSuppressionOrigin,
   SMSSuppressionReason,
   TemplateLanguageStatus,
-  TemplateStatus,
   VerificationAttemptFailureReason,
   VerificationChannel,
   VerificationTerminalReason,
@@ -305,7 +305,6 @@ export type {
   SMSSuppressionOriginValue,
   SMSSuppressionReasonValue,
   TemplateLanguageStatusValue,
-  TemplateStatusValue,
   VerificationAttemptFailureReasonValue,
   VerificationChannelValue,
   VerificationTerminalReasonValue,

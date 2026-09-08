@@ -4524,9 +4524,9 @@ export const TemplateStatusSchema = {
   type: "string",
   minLength: 1,
   readOnly: true,
-  "x-extensible-enum": ["draft", "pending", "active", "rejected", "inactive"],
+  enum: ["draft", "pending", "active", "rejected", "inactive"],
   description:
-    "Where the template stands as a whole. The same five states on every channel.\n\n- `draft`: nothing has ever gone live.\n- `pending`: nothing is live and at least one language is in review.\n- `active`: at least one language is live, so something can be sent.\n- `rejected`: it was reviewed and every language was refused.\n- `inactive`: nothing is live and nothing is in review, so content was withdrawn or was blocked before anything went live.\n\nThis summary answers whether the template is usable at all. A template with\none language live is `active` even while another is still drafted or refused.\nRead `languages` to determine the state of each language and its reason.\n\nWhich of the five a template can reach follows its channel's review model. A\nchannel whose content a third party reviews reaches all five; one whose\ncontent goes live on publish moves between `draft`, `active` and `inactive`.\n\nOpen enum: treat a value you do not recognize as a new one rather than as\nan error.\n",
+    "Where the template stands as a whole. The same five states on every channel.\n\n- `draft`: nothing has ever gone live.\n- `pending`: nothing is live and at least one language is in review.\n- `active`: at least one language is live, so something can be sent.\n- `rejected`: it was reviewed and every language was refused.\n- `inactive`: nothing is live and nothing is in review, so content was withdrawn or was blocked before anything went live.\n\nA template with one language live is `active` even while another is still\ndrafted or refused. Read `languages` for the state of each language and its\nreason.\n\nWhich values a channel reports follows its review model. A channel whose\ncontent a third party reviews uses all five. On email and SMS, where content\ngoes live on publish, a template is `draft`, `active` or `inactive`, and\n`pending` and `rejected` are reserved for the review stage coming to both, so\na template reaching either is not a breaking change.\n",
   example: "active",
 } as const;
 
@@ -9106,7 +9106,7 @@ export const WhatsAppMessageSchema = {
     last_error: {
       $ref: "#/components/schemas/WhatsAppError",
       description:
-        "Failure detail for a message that did not reach the recipient. Present only when the message failed.",
+        "Failure detail for a message that did not reach the recipient. Present only when the message failed or was rejected.",
     },
     created_at: {
       type: "string",
@@ -10695,7 +10695,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "Quote a message the contact will see above this one, the way replying in the WhatsApp client does. Name a message from the same conversation: one this workspace sent to this recipient, or received from them. Any content quotes, template or free-form. A message this workspace does not hold, or one older than the 15-day window we keep provider ids for, returns a `422` `WhatsAppInReplyToNotFound`. A message that never reached WhatsApp, or one from a different conversation than this send's `to` and `from`, returns a `422` `WhatsAppInReplyToNotQuotable`.\n",
+        "Quote a message the contact will see above this one, the way replying in the WhatsApp client does. Name a message from the same conversation: one this workspace sent to this recipient, or received from them. Any content quotes, template or free-form. The quote is resolved before the send is accepted, so a quote WhatsApp cannot render fails this request rather than the message. An id naming no message this workspace holds, or one older than the 15 days we keep provider ids for, answers `404`; a message that never reached WhatsApp, or one from a different conversation than this send's `to` and `from`, answers `422`. Nothing is charged either way.\n",
       example: "wam_01kya19eknftrs2s6p82asmvnh",
     },
     tags: {
@@ -13411,7 +13411,7 @@ export const DNSRecordSchema = {
       type: ["string", "null"],
       readOnly: true,
       description:
-        "Human-readable detail for a failed check on this record: what was found in DNS and why it did not match. `null` when the record is verified or not yet checked.\n",
+        "Human-readable detail for a check that did not pass on this record: what was found in DNS and why it did not match. Also set while `pending` when the record is published but does not match the expected value, which is the case you can act on. `null` when the record is `verified`, when nothing is published at this name yet, or before the first check.\n",
     },
     safe_to_remove: {
       type: ["boolean", "null"],
@@ -22755,7 +22755,7 @@ export const WhatsAppMessageWritableSchema = {
     last_error: {
       $ref: "#/components/schemas/WhatsAppErrorWritable",
       description:
-        "Failure detail for a message that did not reach the recipient. Present only when the message failed.",
+        "Failure detail for a message that did not reach the recipient. Present only when the message failed or was rejected.",
     },
     tags: {
       type: "array",

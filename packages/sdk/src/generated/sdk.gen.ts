@@ -4102,7 +4102,7 @@ export const createMailbox = <ThrowOnError extends boolean = false>(
 /**
  * Delete a mailbox
  *
- * Deletes a mailbox. The address stops receiving mail immediately and enters quarantine. After 30 days, your workspace can bind the address to a new mailbox; the address remains reserved to your workspace. You can restore the mailbox for 30 days with `POST /email/mailboxes/{mailbox_id}/restore`. Normal message-retention expiry continues during that period. After 30 days, the mailbox and its remaining messages are permanently deleted.
+ * Deletes a mailbox. The address stops receiving mail immediately and enters quarantine. After 30 days, your workspace can bind the address to a new mailbox; the address remains reserved to your workspace. You can restore the mailbox for 30 days with `POST /email/mailboxes/{mailbox_id}/restore`. Normal message-retention expiry continues during that period. After 30 days, the mailbox and its remaining messages are permanently deleted. Returns `409` (`E01028`) if an enabled inbound route targets the mailbox. Disable, delete, or redirect those routes before retrying.
  *
  */
 export const deleteMailbox = <ThrowOnError extends boolean = false>(

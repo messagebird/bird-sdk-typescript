@@ -2586,20 +2586,19 @@ export type TemplateScope = "system" | "workspace";
  * - `rejected`: it was reviewed and every language was refused.
  * - `inactive`: nothing is live and nothing is in review, so content was withdrawn or was blocked before anything went live.
  *
- * This summary answers whether the template is usable at all. A template with
- * one language live is `active` even while another is still drafted or refused.
- * Read `languages` to determine the state of each language and its reason.
+ * A template with one language live is `active` even while another is still
+ * drafted or refused. Read `languages` for the state of each language and its
+ * reason.
  *
- * Which of the five a template can reach follows its channel's review model. A
- * channel whose content a third party reviews reaches all five; one whose
- * content goes live on publish moves between `draft`, `active` and `inactive`.
- *
- * Open enum: treat a value you do not recognize as a new one rather than as
- * an error.
+ * Which values a channel reports follows its review model. A channel whose
+ * content a third party reviews uses all five. On email and SMS, where content
+ * goes live on publish, a template is `draft`, `active` or `inactive`, and
+ * `pending` and `rejected` are reserved for the review stage coming to both, so
+ * a template reaching either is not a breaking change.
  *
  */
 export type TemplateStatus =
-  "draft" | "pending" | "active" | "rejected" | "inactive" | (string & {});
+  "draft" | "pending" | "active" | "rejected" | "inactive";
 
 /**
  * A single variable slot a template fills in from the values supplied when sending. The same shape on email, SMS and WhatsApp, so reading what a template needs works the same way whichever channel you are sending on.
@@ -5291,7 +5290,7 @@ export type WhatsAppMessage = {
   readonly unsupported?: WhatsAppUnsupported;
   readonly status: WhatsAppMessageStatus;
   /**
-   * Failure detail for a message that did not reach the recipient. Present only when the message failed.
+   * Failure detail for a message that did not reach the recipient. Present only when the message failed or was rejected.
    */
   last_error?: WhatsAppError;
   /**
@@ -5961,7 +5960,7 @@ export type WhatsAppMessageSendRequest = {
    */
   contact_cards?: Array<WhatsAppContactCardSend>;
   /**
-   * Quote a message the contact will see above this one, the way replying in the WhatsApp client does. Name a message from the same conversation: one this workspace sent to this recipient, or received from them. Any content quotes, template or free-form. A message this workspace does not hold, or one older than the 15-day window we keep provider ids for, returns a `422` `WhatsAppInReplyToNotFound`. A message that never reached WhatsApp, or one from a different conversation than this send's `to` and `from`, returns a `422` `WhatsAppInReplyToNotQuotable`.
+   * Quote a message the contact will see above this one, the way replying in the WhatsApp client does. Name a message from the same conversation: one this workspace sent to this recipient, or received from them. Any content quotes, template or free-form. The quote is resolved before the send is accepted, so a quote WhatsApp cannot render fails this request rather than the message. An id naming no message this workspace holds, or one older than the 15 days we keep provider ids for, answers `404`; a message that never reached WhatsApp, or one from a different conversation than this send's `to` and `from`, answers `422`. Nothing is charged either way.
    *
    */
   in_reply_to_message_id?: WhatsAppMessageId;
@@ -7434,7 +7433,7 @@ export type DnsRecord = {
    */
   readonly status: "pending" | "verified" | "warning" | "failed";
   /**
-   * Human-readable detail for a failed check on this record: what was found in DNS and why it did not match. `null` when the record is verified or not yet checked.
+   * Human-readable detail for a check that did not pass on this record: what was found in DNS and why it did not match. Also set while `pending` when the record is published but does not match the expected value, which is the case you can act on. `null` when the record is `verified`, when nothing is published at this name yet, or before the first check.
    *
    */
   readonly error?: string | null;
@@ -12817,7 +12816,7 @@ export type WhatsAppErrorWritable = {
 
 export type WhatsAppMessageWritable = {
   /**
-   * Failure detail for a message that did not reach the recipient. Present only when the message failed.
+   * Failure detail for a message that did not reach the recipient. Present only when the message failed or was rejected.
    */
   last_error?: WhatsAppErrorWritable;
   /**
@@ -19778,6 +19777,10 @@ export type CreateWhatsAppMessageErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -19790,6 +19793,11 @@ export type CreateWhatsAppMessageErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   *
+   */
+  503: Error;
 };
 
 export type CreateWhatsAppMessageError =
@@ -22081,6 +22089,10 @@ export type DeleteMailboxErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
