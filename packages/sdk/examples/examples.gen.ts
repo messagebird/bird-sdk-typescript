@@ -1082,6 +1082,48 @@ console.log(msg.id, msg.status);
 }
 
 export async function _ex_151() {
+const tpl = await bird.whatsapp.templates.get("bird_otp");
+console.log(tpl.default_language, tpl.live_version_id);
+}
+
+export async function _ex_152() {
+for await (const tpl of bird.whatsapp.templates.list()) {
+  console.log(tpl.slug, tpl.status, tpl.available_languages);
+}
+}
+
+export async function _ex_153() {
+const version = await bird.whatsapp.templates.versions.get(
+  "bird_otp",
+  "wav_01ky4x8e4genzb7way45txfkm1",
+);
+console.log(version.id, Object.keys(version.languages));
+}
+
+export async function _ex_154() {
+const language = await bird.whatsapp.templates.versions.languages.get(
+  "bird_otp",
+  "wav_01ky4x8e4genzb7way45txfkm1",
+  "nl-BE",
+);
+for (const component of language.components) console.log(component.type);
+}
+
+export async function _ex_155() {
+const { data } = await bird.whatsapp.templates.versions.languages.list(
+  "bird_otp",
+  "wav_01ky4x8e4genzb7way45txfkm1",
+);
+for (const language of data) console.log(language.language, language.status);
+}
+
+export async function _ex_156() {
+for await (const version of bird.whatsapp.templates.versions.list("bird_otp")) {
+  console.log(version.id, version.version_number);
+}
+}
+
+export async function _ex_157() {
 const workspace = await bird.workspace.get();
 console.log(workspace.id, workspace.name); // "ws_…" "Production"
 }

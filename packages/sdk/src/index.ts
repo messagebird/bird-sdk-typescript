@@ -156,6 +156,19 @@ export type {
   WhatsAppEventList,
 } from "./resources/whatsapp.gen.js";
 export type {
+  WhatsAppTemplate,
+  WhatsappTemplatesListQuery,
+} from "./resources/whatsappTemplates.gen.js";
+export type {
+  WhatsAppTemplateVersion,
+  WhatsAppTemplateVersionSummary,
+  WhatsappTemplatesVersionsListQuery,
+} from "./resources/whatsappTemplatesVersions.gen.js";
+export type {
+  WhatsAppTemplateLanguage,
+  WhatsAppTemplateLanguageList,
+} from "./resources/whatsappTemplatesVersionsLanguages.gen.js";
+export type {
   Verification,
   VerificationCheckResult,
   VerifyVerificationsCreateParams,
@@ -283,7 +296,10 @@ export {
   WhatsAppInteractiveReplyType,
   WhatsAppInteractiveType,
   WhatsAppTemplateCategory,
+  WhatsAppTemplateLanguageStatus,
   WhatsAppTemplateParameterType,
+  WhatsAppTemplateQualityScore,
+  WhatsAppTemplateRejectionCategory,
 } from "./open-enums.gen.js";
 export type {
   EmailEventTypeValue,
@@ -315,7 +331,10 @@ export type {
   WhatsAppInteractiveReplyTypeValue,
   WhatsAppInteractiveTypeValue,
   WhatsAppTemplateCategoryValue,
+  WhatsAppTemplateLanguageStatusValue,
   WhatsAppTemplateParameterTypeValue,
+  WhatsAppTemplateQualityScoreValue,
+  WhatsAppTemplateRejectionCategoryValue,
 } from "./open-enums.gen.js";
 export type {
   Mailbox,

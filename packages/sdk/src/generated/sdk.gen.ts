@@ -284,6 +284,15 @@ import type {
   GetWhatsAppMessageMediaData,
   GetWhatsAppMessageMediaErrors,
   GetWhatsAppMessageResponses,
+  GetWhatsAppTemplateData,
+  GetWhatsAppTemplateErrors,
+  GetWhatsAppTemplateResponses,
+  GetWhatsAppTemplateVersionData,
+  GetWhatsAppTemplateVersionErrors,
+  GetWhatsAppTemplateVersionLanguageData,
+  GetWhatsAppTemplateVersionLanguageErrors,
+  GetWhatsAppTemplateVersionLanguageResponses,
+  GetWhatsAppTemplateVersionResponses,
   GetWorkspaceNumberData,
   GetWorkspaceNumberErrors,
   GetWorkspaceNumberResponses,
@@ -374,6 +383,15 @@ import type {
   ListWhatsAppMessagesData,
   ListWhatsAppMessagesErrors,
   ListWhatsAppMessagesResponses,
+  ListWhatsAppTemplatesData,
+  ListWhatsAppTemplatesErrors,
+  ListWhatsAppTemplatesResponses,
+  ListWhatsAppTemplateVersionLanguagesData,
+  ListWhatsAppTemplateVersionLanguagesErrors,
+  ListWhatsAppTemplateVersionLanguagesResponses,
+  ListWhatsAppTemplateVersionsData,
+  ListWhatsAppTemplateVersionsErrors,
+  ListWhatsAppTemplateVersionsResponses,
   ListWorkspaceNumbersData,
   ListWorkspaceNumbersErrors,
   ListWorkspaceNumbersResponses,
@@ -3250,6 +3268,194 @@ export const getWhatsAppMessageMedia = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * List available message templates
+ *
+ * Returns the WhatsApp message templates available to your workspace: both the workspace's own templates (`scope: workspace`) and our built-in, Meta-approved templates (`scope: system`); filter to one tier with `scope`. Each entry carries the template's `slug` (the handle you reference when sending), its aggregated `status`, and the languages a send can currently resolve. It also summarizes where every language stands at Meta, so a list page can show an accurate row without another request. Content is not here: it lives under [a version](/docs/api/reference/get-whatsapp-template-version). The list is cursor-paginated. With no `scope`, the workspace's own templates come first, newest first, followed by our built-in templates.
+ *
+ */
+export const listWhatsAppTemplates = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWhatsAppTemplatesData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppTemplatesResponses,
+  ListWhatsAppTemplatesErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListWhatsAppTemplatesResponses,
+    ListWhatsAppTemplatesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates",
+    ...options,
+  });
+
+/**
+ * Get a message template
+ *
+ * Returns one template by its ID or slug: its lifecycle, the languages a send can currently resolve, a summary of where every language stands at Meta, and a pointer to the version that is live. Content is not here: read [a version](/docs/api/reference/get-whatsapp-template-version) for that.
+ *
+ */
+export const getWhatsAppTemplate = <ThrowOnError extends boolean = false>(
+  options: Options<GetWhatsAppTemplateData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppTemplateResponses,
+  GetWhatsAppTemplateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWhatsAppTemplateResponses,
+    GetWhatsAppTemplateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}",
+    ...options,
+  });
+
+/**
+ * List a template's versions
+ *
+ * Returns the template's versions, newest first. Each names the languages it holds and what became of them; content is not here, since a page of versions would carry a copy of every language in every one of them. Read a single version for its content.
+ *
+ */
+export const listWhatsAppTemplateVersions = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListWhatsAppTemplateVersionsData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppTemplateVersionsResponses,
+  ListWhatsAppTemplateVersionsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListWhatsAppTemplateVersionsResponses,
+    ListWhatsAppTemplateVersionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}/versions",
+    ...options,
+  });
+
+/**
+ * Get a template version
+ *
+ * Returns one version: the content of every language it holds and what its submission did with each.
+ *
+ */
+export const getWhatsAppTemplateVersion = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetWhatsAppTemplateVersionData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppTemplateVersionResponses,
+  GetWhatsAppTemplateVersionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWhatsAppTemplateVersionResponses,
+    GetWhatsAppTemplateVersionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}",
+    ...options,
+  });
+
+/**
+ * List a version's languages
+ *
+ * Returns every language a version holds, without content: each language's tag, what this version's submission did with it, its write counter, and a hash over its content. Compare the hashes to tell which languages actually differ before fetching any content. Fetch [a single language](/docs/api/reference/get-whatsapp-template-version-language) for its content blocks.
+ *
+ */
+export const listWhatsAppTemplateVersionLanguages = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListWhatsAppTemplateVersionLanguagesData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppTemplateVersionLanguagesResponses,
+  ListWhatsAppTemplateVersionLanguagesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListWhatsAppTemplateVersionLanguagesResponses,
+    ListWhatsAppTemplateVersionLanguagesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/languages",
+    ...options,
+  });
+
+/**
+ * Get a version's language
+ *
+ * Returns one language of one version: its content blocks, what this version's submission did with it, and everything Meta holds about it: review outcome and category.
+ *
+ */
+export const getWhatsAppTemplateVersionLanguage = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetWhatsAppTemplateVersionLanguageData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppTemplateVersionLanguageResponses,
+  GetWhatsAppTemplateVersionLanguageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWhatsAppTemplateVersionLanguageResponses,
+    GetWhatsAppTemplateVersionLanguageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/languages/{language}",
+    ...options,
+  });
+
+/**
  * Get daily sending statistics
  *
  * Returns one row of aggregate sending statistics per calendar day for the workspace: UTC days by default, or your local days when `timezone` is set. Days with no activity are included with zero counts, so the series charts without client-side gap handling. Suited to charts and trend lines; for per-message exact accounting use the message detail endpoints.
@@ -4944,7 +5150,7 @@ export const testWebhook = <ThrowOnError extends boolean = false>(
  * Returns the endpoint's recent delivery attempts, newest first. Each entry is one HTTP
  * request, so a retried event appears once per try; use it to see what failed and why
  * before requesting redelivery with
- * [Replay missed events](/docs/api/reference/create-webhook-replay).
+ * [Replay failed deliveries](/docs/api/reference/create-webhook-replay).
  *
  * Bound the window with the `before`/`after` timestamps and cap the page with `limit`.
  * To page further back without a cursor, pass the oldest `attempted_at`

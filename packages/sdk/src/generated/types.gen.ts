@@ -173,6 +173,8 @@ export type WebhookEvent =
       type: "whatsapp_suppression.created";
     } & EventWhatsAppSuppressionCreated);
 
+export type WorkspaceId = string;
+
 export type ErrorDetail = {
   /**
    * Dotted field path, such as `to[0].email`, `subject`, or `.`. When the request was rejected for a query parameter the endpoint does not declare, this carries that parameter's name instead of a field path.
@@ -293,14 +295,9 @@ export type Error = {
   error: ErrorBody;
 };
 
-/**
- * Deployment region identifier.
- */
-export type Region = "us1" | "eu1";
+export type UserId = string;
 
 export type OrganizationId = string;
-
-export type WorkspaceId = string;
 
 export type ListEnvelope = {
   /**
@@ -323,6 +320,11 @@ export type ListEnvelopeWithTotal = ListEnvelope & {
    */
   total?: number | null;
 };
+
+/**
+ * Deployment region identifier.
+ */
+export type Region = "us1" | "eu1";
 
 export type DocsSearchResult = {
   /**
@@ -2572,7 +2574,7 @@ export type SmsEventList = {
 };
 
 /**
- * Whether the template is one of our built-in templates (`system`) or one your workspace created (`workspace`). Every SMS template is `system`.
+ * Whether the template is one of our built-in templates (`system`) or one your workspace created (`workspace`).
  *
  */
 export type TemplateScope = "system" | "workspace";
@@ -2700,7 +2702,11 @@ export type SmsTemplate = {
    * What the template is for. Null when unset.
    */
   readonly description: string | null;
-  scope: TemplateScope;
+  /**
+   * Whether the template is one of our built-in templates (`system`) or one your workspace created (`workspace`). Every SMS template is `system`.
+   *
+   */
+  readonly scope: TemplateScope;
   status: TemplateStatus;
   /**
    * Content classification applied to messages sent from this template.
@@ -4628,7 +4634,8 @@ export type WhatsAppMessageTemplate = {
    */
   readonly slug: TemplateSlug;
   /**
-   * Content classification applied to messages sent from this template.
+   * The category this message was priced at, recorded as it stood when the message was sent. For a template you authored this is the category Meta applies to the language the send resolved to, which can differ from the category declared on the template: Meta categorizes each language separately and may move one. A built-in `bird_` template is priced at the single category the built-in declares, the same in every language.
+   *
    */
   readonly category: WhatsAppTemplateCategory;
   /**
@@ -5344,7 +5351,7 @@ export type WhatsAppTemplateSend = unknown & {
    */
   slug?: TemplateSlug;
   /**
-   * Which of the template's languages to send, as a BCP-47 tag (for example `en` or `pt-BR`); Meta's underscore form (`pt_BR`) is accepted and normalized. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not carry the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected. The accepted message echoes the canonical BCP-47 form of the language it resolved to.
+   * Which of the template's languages to send, as a BCP-47 tag (for example `en` or `pt-BR`); Meta's underscore form (`pt_BR`) is accepted and normalized. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not carry the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected. The accepted message echoes the canonical BCP-47 form of the language it resolved to, which is the language it is priced at: Meta categorizes each language separately, so a send served by a different language than the one you asked for is priced at that language's category.
    *
    */
   language?: LanguageTag;
@@ -6025,6 +6032,650 @@ export type WhatsAppEventList = {
    * Timeline events for this WhatsApp message, in chronological order. The timeline is bounded and returned in full; this list is not paginated.
    */
   data: Array<WhatsAppEvent>;
+};
+
+export type WhatsAppTemplateExampleParameter = {
+  /**
+   * The kind of value this parameter accepts.
+   */
+  readonly type: WhatsAppTemplateParameterType;
+  /**
+   * An example value for a text parameter. Present when `type` is `text`.
+   */
+  readonly text?: string;
+  /**
+   * The address of the file a media header shows, as it was given when the header was authored rather than WhatsApp's copy of it. Present when `type` is `image`, `video`, `gif` or `document`.
+   *
+   */
+  readonly url?: string;
+  /**
+   * The named placeholder this example fills. Present whenever the template declares named parameters, which is what a send must name; absent only for a positional template, whose values go in `{{n}}` order.
+   *
+   */
+  readonly name?: string;
+};
+
+export type WhatsAppTemplateButton = {
+  /**
+   * The button's behavior.
+   *
+   * - `url`: opens a link.
+   * - `quick_reply`: sends its own label back to you as an inbound message.
+   * - `phone_number`: dials the number it carries.
+   * - `otp`: copies a one-time passcode. It belongs only on an authentication
+   * template, and that template takes no other button type.
+   * - `copy_code`: copies a coupon code to the recipient's clipboard. It
+   * belongs only on a marketing template, which takes at most one.
+   * - `request_contact_info`: asks the recipient to share the phone number
+   * their WhatsApp account carries. It belongs only on a utility or
+   * marketing template, as that template's only button.
+   *
+   * This is an open enum. Accept unrecognized values.
+   *
+   */
+  readonly type: string;
+  /**
+   * How the recipient receives the one-time passcode. Present on authentication-template OTP buttons.
+   */
+  readonly otp_type?: string;
+  /**
+   * The button's label. Absent on an authentication template's passcode button until the language has been submitted, since WhatsApp writes that label itself. Absent on a `request_contact_info` draft for a related reason: WhatsApp fixes that label, so a draft that carried it reads back without it. Once the language is submitted, this carries the label WhatsApp wrote, which is `Share Contact Info` in every language today.
+   *
+   */
+  readonly text?: string;
+  /**
+   * The address the button opens, with any variable placeholder shown inline. Present on link buttons.
+   */
+  readonly url?: string;
+  /**
+   * The number the button dials. Present on dial buttons.
+   */
+  readonly phone_number?: string;
+  /**
+   * Example values for this button's variables, in placeholder order. Present when the button address has variables, and on a `copy_code` button, where the single value is the sample coupon code WhatsApp reviewed.
+   *
+   */
+  readonly example_parameters?: Array<WhatsAppTemplateExampleParameter>;
+};
+
+/**
+ * One content block inside a carousel card.
+ */
+export type WhatsAppTemplateCardComponent = {
+  /**
+   * The card block's type.
+   */
+  readonly type: string;
+  /**
+   * The card header's content type. Present on a card's header block.
+   */
+  readonly format?: string;
+  /**
+   * The block's text content, with any variable placeholders shown inline.
+   */
+  readonly text?: string;
+  /**
+   * Example values for this block's variables, in placeholder order.
+   */
+  readonly example_parameters?: Array<WhatsAppTemplateExampleParameter>;
+  /**
+   * The buttons this card carries. Present on a card's buttons block.
+   */
+  readonly buttons?: Array<WhatsAppTemplateButton>;
+};
+
+/**
+ * One card in a carousel.
+ */
+export type WhatsAppTemplateCard = {
+  /**
+   * This card's content blocks, in display order.
+   */
+  readonly components: Array<WhatsAppTemplateCardComponent>;
+};
+
+export type WhatsAppTemplateComponent = {
+  /**
+   * The content block's type within the template.
+   */
+  readonly type: string;
+  /**
+   * The header block's content type. Present on a header block. A `text` header carries a line of copy. The `image`, `video`, `gif`, and `document` formats each show a file whose address is in the block's `example_parameters`. The `location` format shows a map. It carries no content because the coordinates belong to the message rather than the template.
+   *
+   */
+  readonly format?: string;
+  /**
+   * The block's text content, with any variable placeholders shown inline. Present when the block carries text. An authentication template's body and footer are written by WhatsApp from the two settings below rather than by you, so their text is absent until the language has been submitted and WhatsApp has supplied it.
+   *
+   */
+  readonly text?: string;
+  /**
+   * Whether this authentication template's body ends with WhatsApp's advice not to share the code. Present on an authentication template's body block.
+   *
+   */
+  readonly add_security_recommendation?: boolean;
+  /**
+   * How long the passcode stays valid, which WhatsApp states in this footer. Present on an authentication template's footer block. Omitting it on a write leaves the footer off entirely.
+   *
+   */
+  readonly code_expiration_minutes?: number;
+  /**
+   * Example values for this block's variables, in placeholder order (one per `{{n}}`). Use them to see what a filled message looks like. Present when the block has variables.
+   */
+  readonly example_parameters?: Array<WhatsAppTemplateExampleParameter>;
+  /**
+   * The buttons attached to this block. Present when the block carries buttons.
+   */
+  readonly buttons?: Array<WhatsAppTemplateButton>;
+  /**
+   * The cards this block scrolls through, in display order. Present on a `carousel` block.
+   *
+   */
+  readonly cards?: Array<WhatsAppTemplateCard>;
+};
+
+/**
+ * Language review and health status:
+ *
+ * - `approved`: Passed review and can be sent.
+ * - `pending`: Under review.
+ * - `rejected`: Failed review.
+ * - `paused` or `disabled`: Sending is suspended.
+ * - `in_appeal`: A decision is being appealed.
+ * - `pending_deletion`: Scheduled for deletion by Meta.
+ * - `limit_exceeded`: Sending is blocked by a limit.
+ * - `archived`: Reclaimed after 12 months without use; recoverable for 28 days.
+ * - `deleted`: Permanently deleted.
+ * - `submit_failed`: A submission or a deletion did not complete and will not be retried. `error.description` says why, and `error.meta_error_code` is set only where WhatsApp itself refused.
+ * - `outcome_unknown`: A create or an edit reached WhatsApp but no response came back, so the outcome is still being resolved against WhatsApp. An unanswered deletion is retried instead of landing here. `error.description` says so, and `error.meta_error_code` is absent, since nothing was refused.
+ *
+ * This is an open enum. Accept unrecognized values.
+ *
+ */
+export type WhatsAppTemplateLanguageStatus =
+  | "approved"
+  | "pending"
+  | "rejected"
+  | "paused"
+  | "disabled"
+  | "in_appeal"
+  | "pending_deletion"
+  | "limit_exceeded"
+  | "archived"
+  | "deleted"
+  | "submit_failed"
+  | "outcome_unknown"
+  | (string & {});
+
+/**
+ * Why Meta refused a language's content, in Meta's own vocabulary, lowercased. Read it with `reason`, which carries Meta's human-written detail, and `recommendation`, which carries its suggested fix. This is an open enum. Accept unrecognized values.
+ *
+ */
+export type WhatsAppTemplateRejectionCategory =
+  | "abusive_content"
+  | "incorrect_category"
+  | "invalid_format"
+  | "scam"
+  | "tag_content_mismatch"
+  | (string & {});
+
+/**
+ * Why Meta refused a language's content, and what it says about fixing it. Present when `status` is `rejected`.
+ *
+ */
+export type WhatsAppTemplateRejection = {
+  /**
+   * Meta's own classification of the refusal.
+   */
+  category?: WhatsAppTemplateRejectionCategory;
+  /**
+   * Meta's detail about the refusal, passed through unmodified.
+   */
+  readonly reason?: string | null;
+  /**
+   * Meta's suggested fix, the only thing it says about how to make the content acceptable. Meta sends it for some refusals and not others.
+   *
+   */
+  readonly recommendation?: string | null;
+};
+
+/**
+ * Why the submission itself did not complete. Distinct from `rejection`, which is Meta refusing the content it was given.
+ *
+ */
+export type WhatsAppTemplateSubmissionError = {
+  /**
+   * Human-readable explanation of why the submission did not complete.
+   */
+  readonly description: string;
+  /**
+   * WhatsApp's most specific code for the refusal: its error subcode when it sent one, otherwise its top-level code. Opaque, treat it as a string. Absent when the failure was Bird's own verdict rather than a WhatsApp refusal.
+   *
+   */
+  readonly meta_error_code?: string | null;
+};
+
+/**
+ * Where one language stands, without its content: content lives under a version, read that for it. An object rather than a bare status string, so detail beyond status can arrive later as a sibling property instead of a breaking change.
+ *
+ */
+export type WhatsAppTemplateLanguageState = {
+  /**
+   * On a template, where this language stands on the version currently in service. On a version, what that version's submission did with this language. Absent on a draft, which has not been submitted.
+   *
+   */
+  status?: WhatsAppTemplateLanguageStatus;
+  /**
+   * When this language's content was last submitted to Meta. Null on a draft, which has not been submitted, and null for a built-in template's language, shipped already approved rather than submitted on your behalf.
+   *
+   */
+  readonly submitted_at?: string | null;
+  /**
+   * The next time you can edit this language, if Meta's one-edit-per-day limit on an approved language is currently spent. Null when an edit is allowed right now, though Meta also caps an approved language at ten edits per rolling 30 days: a null here does not guarantee an edit will succeed if you are close to that limit too.
+   *
+   */
+  readonly editable_at?: string | null;
+  /**
+   * Why Meta refused this content, present when `status` is `rejected`. Absent otherwise.
+   *
+   */
+  rejection?: WhatsAppTemplateRejection;
+  /**
+   * Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   *
+   */
+  error?: WhatsAppTemplateSubmissionError;
+};
+
+export type WhatsAppTemplateVersionId = string;
+
+/**
+ * A message template: one identity holding a copy of the message per language. Each language is reviewed, priced and paused by Meta on its own, so the template's own status is an aggregate and the per-language detail is in `languages`. A version contains the content.
+ *
+ */
+export type WhatsAppTemplate = {
+  /**
+   * Stable Bird identifier for the template.
+   */
+  readonly id: WhatsAppTemplateId;
+  /**
+   * The template's handle, editable before the first submission. Address it by this handle, and reference it when sending. Handles beginning with `bird_` are reserved for our built-in templates.
+   *
+   */
+  readonly slug: TemplateSlug;
+  /**
+   * Whether the slug can still be changed. False after the first submission and for built-in templates.
+   */
+  readonly slug_editable: boolean;
+  /**
+   * A display name for the template. Nothing resolves through it, so it is safe to show wherever a human reads the template.
+   *
+   */
+  name: string;
+  /**
+   * What the template is for. Null when unset.
+   */
+  description: string | null;
+  scope: TemplateScope;
+  /**
+   * The WhatsApp Business Account that holds this template's languages at Meta. Absent on a built-in template: those live on a WABA that Bird manages centrally rather than on your account, so it is not yours to reconcile against and is not disclosed.
+   *
+   */
+  readonly waba?: string;
+  /**
+   * The category you declared for the template. It is fixed once the template exists. Meta applies its own category per language and may move one, which is what messages are priced at. Read the language for that.
+   *
+   */
+  category: WhatsAppTemplateCategory;
+  /**
+   * The template's lifecycle, aggregated over its languages.
+   */
+  status: TemplateStatus;
+  /**
+   * The language a send is served in when it names none, whichever `on_missing_language` is set. A template that sets `language_source_required` refuses such a send instead. Under `fallback` it is also the last hop for a language that is not in `available_languages`, whether the template holds no copy in it or holds one WhatsApp has not approved. The template is required to hold this default, and it must itself be in `available_languages` for a send to resolve here.
+   *
+   */
+  default_language: LanguageTag;
+  /**
+   * What a send does when the language it asks for has no approved copy. Defaults to `fail` on WhatsApp, because every language is separately approved and separately priced: falling back silently would send content the recipient did not expect at a rate the sender did not choose.
+   *
+   */
+  readonly on_missing_language: TemplateOnMissingLanguage;
+  /**
+   * When true, a send must name a language explicitly rather than letting the template resolve one.
+   *
+   */
+  language_source_required: boolean;
+  /**
+   * The languages a send can resolve right now: approved and not held back by Meta. It shrinks for reasons you did not cause: Meta pauses, disables, archives or limits a language and it leaves the set with nobody having edited anything. Read `languages` to see which languages exist and why one is missing.
+   *
+   */
+  readonly available_languages: Array<LanguageTag>;
+  /**
+   * Where each of the template's languages stands, keyed by BCP-47 language tag. This is the summary of the version currently in service, so a template reading `active` can still hold a rejected or paused language: the aggregate says something is sendable, and this says which. Content is not here; it lives under a version.
+   *
+   */
+  readonly languages: {
+    [key in LanguageTag]?: WhatsAppTemplateLanguageState;
+  };
+  /**
+   * The open draft, or null when nobody is editing. Non-null is the answer to whether this template has unsubmitted work: a draft exists only because someone opened one.
+   *
+   */
+  readonly draft_version_id: WhatsAppTemplateVersionId | null;
+  /**
+   * The version Meta is serving. A version goes live as a unit the moment any of its languages is approved, superseding the one before it. Null until a first approval.
+   *
+   */
+  readonly live_version_id: WhatsAppTemplateVersionId | null;
+  /**
+   * A submitted version still awaiting verdicts: what to poll. It stays set while any language is unresolved, including after a sibling's approval took the version live. Null when nothing is outstanding.
+   *
+   */
+  readonly pending_version_id: WhatsAppTemplateVersionId | null;
+  /**
+   * When this template was last submitted. Null for a pre-approved built-in template.
+   *
+   */
+  readonly last_submitted_at: string | null;
+  /**
+   * When the template was created. Null for a built-in template, which Bird ships rather than stores.
+   */
+  readonly created_at: string | null;
+  /**
+   * When the template was last modified. Null for a built-in template, which Bird ships rather than stores.
+   */
+  readonly updated_at: string | null;
+  /**
+   * What to do next with this template, given the state it is in. Each entry names one
+   * action and says why it is worth taking, so you can act on this response without
+   * working out the order yourself. Present on reads that compute it: an empty list
+   * means there is nothing to do, and the field is absent entirely on responses that
+   * do not report next actions.
+   *
+   * A `draft` template routes to opening its draft, a `pending` one to the version
+   * under review, and a `rejected` or `inactive` one to a fresh draft. The template's
+   * `status` is the aggregate over its languages, so an entry may send you to the
+   * version to see where each language actually stands.
+   *
+   */
+  readonly next?: Array<NextAction>;
+};
+
+export type WhatsAppTemplateList = {
+  /**
+   * Page of templates available to your workspace.
+   */
+  data: Array<WhatsAppTemplate>;
+} & ListEnvelope;
+
+/**
+ * A write counter, incremented every time the content it belongs to changes. It sits at 1 on content that has never been written through this API.
+ *
+ */
+export type WhatsAppTemplateRevision = number;
+
+/**
+ * One version of a template, without its content. A version holds a full copy of every language it was submitted with. Listing versions therefore names the languages and what became of each without carrying their content. Read a single version for its content. Read its shallow language collection for content hashes.
+ *
+ */
+export type WhatsAppTemplateVersionSummary = {
+  /**
+   * Stable Bird identifier for the version.
+   */
+  readonly id: WhatsAppTemplateVersionId;
+  /**
+   * The template this version belongs to.
+   */
+  readonly template_id: WhatsAppTemplateId;
+  /**
+   * The version's sequence number, assigned when it is submitted. Null on a draft, which has not been submitted and has no place in the sequence yet.
+   *
+   */
+  readonly version_number?: number | null;
+  /**
+   * When this version was submitted to Meta. Null on a draft, which has not been submitted, and null for a built-in template's version, which Bird ships already approved rather than submitting on your behalf.
+   *
+   */
+  readonly submitted_at: string | null;
+  /**
+   * What this version's submission did with each language it holds, keyed by BCP-47 language tag. Content is not here: read the version for that.
+   *
+   */
+  languages: {
+    [key in LanguageTag]?: WhatsAppTemplateLanguageState;
+  };
+  /**
+   * When the version was opened. Null for a built-in template's version, which Bird ships rather than stores.
+   *
+   */
+  readonly created_at: string | null;
+  /**
+   * What to do next with this version, given whether it has been submitted. Present on
+   * reads that compute it: an empty list means there is nothing to do, and the field is
+   * absent entirely on responses that do not report next actions.
+   *
+   * A version with no `version_number` is the open draft, and routes to writing its
+   * languages and checking it. One that carries a number is frozen, so it routes to
+   * reading the verdicts it holds. `submitted_at` does not separate the two, because
+   * it is also null on a built-in template's version.
+   *
+   */
+  readonly next?: Array<NextAction>;
+};
+
+export type WhatsAppTemplateVersionList = {
+  /**
+   * Page of the template's versions, newest first.
+   */
+  data: Array<WhatsAppTemplateVersionSummary>;
+} & ListEnvelope;
+
+/**
+ * One language's content in one version, and what that submission did with it.
+ */
+export type WhatsAppTemplateVersionLanguage = {
+  /**
+   * This language's content in this version, in display order.
+   */
+  components: Array<WhatsAppTemplateComponent>;
+  /**
+   * What this submission did with this language. Absent on a draft, which has not been submitted. Whether the language can be sent right now is a different question, answered by the template's `languages` summary.
+   *
+   */
+  status?: WhatsAppTemplateLanguageStatus;
+  /**
+   * Why Meta refused this content, present when `status` is `rejected`. Absent otherwise.
+   *
+   */
+  rejection?: WhatsAppTemplateRejection;
+  /**
+   * Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   *
+   */
+  error?: WhatsAppTemplateSubmissionError;
+};
+
+/**
+ * One version of a template: the content of every language it holds, frozen when it was submitted, alongside what Meta made of each. A draft is a version too: a mutable one, with no number and no submission date.
+ *
+ */
+export type WhatsAppTemplateVersion = {
+  /**
+   * Stable Bird identifier for the version.
+   */
+  readonly id: WhatsAppTemplateVersionId;
+  /**
+   * The template this version belongs to.
+   */
+  readonly template_id: WhatsAppTemplateId;
+  /**
+   * The version's sequence number, assigned when it is submitted. Null on a draft, which has not been submitted and has no place in the sequence yet.
+   *
+   */
+  readonly version_number?: number | null;
+  /**
+   * When this version was submitted to Meta. Null on a draft, which has not been submitted, and null for a built-in template's version, which Bird ships already approved rather than submitting on your behalf.
+   *
+   */
+  readonly submitted_at: string | null;
+  /**
+   * This version's content, keyed by BCP-47 language tag, with what its submission did with each language.
+   *
+   */
+  languages: {
+    [key in LanguageTag]?: WhatsAppTemplateVersionLanguage;
+  };
+  /**
+   * When the version was opened. Null for a built-in template's version, which Bird ships rather than stores.
+   *
+   */
+  readonly created_at: string | null;
+};
+
+/**
+ * One language of a version without its content. Fetch the language itself for the content.
+ *
+ */
+export type WhatsAppTemplateLanguageSummary = {
+  /**
+   * The canonical tag this language is addressed by.
+   */
+  language: LanguageTag;
+  /**
+   * What this version's submission did with this language. Absent on a draft.
+   */
+  status?: WhatsAppTemplateLanguageStatus;
+  /**
+   * This language's write counter, incremented every time its content changes.
+   */
+  readonly revision: WhatsAppTemplateRevision;
+  /**
+   * A hash over the serialized `components` this API surfaces, for telling whether a language differs without fetching it. It is comparable only within one version of this API: adding a field to the component shape changes every hash without the underlying content changing.
+   *
+   */
+  readonly content_hash: string;
+  /**
+   * What to do next about this language, given the verdict it carries. Present on reads
+   * that compute it: an empty list means there is nothing to do, and the field is absent
+   * entirely on responses that do not report next actions.
+   *
+   * Approval is per language, so this is where a rejection, a pause, or a reclaimed
+   * language is answered. The template's own next actions cannot say, because they read
+   * the aggregate.
+   *
+   */
+  readonly next?: Array<NextAction>;
+};
+
+export type WhatsAppTemplateLanguageList = {
+  /**
+   * Every language this version holds, without content.
+   */
+  data: Array<WhatsAppTemplateLanguageSummary>;
+};
+
+/**
+ * A hash over the serialized `components` this API surfaces, prefixed with the algorithm that produced it (`sha256:`) so the algorithm can change without the field becoming ambiguous. It tells you whether a language differs without transferring its content. Compare hashes only within one version of this API. Adding a field to the component shape changes every hash even when the underlying content is unchanged. Email's field of the same name carries bare hex and predates this form.
+ *
+ */
+export type WhatsAppTemplateContentHash = string;
+
+/**
+ * Meta's quality rating for one language of a template, derived from how recipients respond to messages sent from it. The `red` score is the leading indicator of a pause. Reaching Meta's lowest rating pauses sending from that language for three hours; a second time pauses it for six, and a third disables it. The `unknown` score is a value Meta reports. When Meta has not rated the language, the rating object is absent. This is an open enum. Accept unrecognized values.
+ *
+ */
+export type WhatsAppTemplateQualityScore =
+  "green" | "yellow" | "red" | "unknown" | (string & {});
+
+/**
+ * Meta's quality rating for one language, with the rating it moved from and when it moved. Present only once Meta has rated the language, and only on the version currently in service. A superseded version's content carries no rating.
+ *
+ */
+export type WhatsAppTemplateQuality = {
+  /**
+   * Meta's rating for this language as of `updated_at`.
+   */
+  current_score: WhatsAppTemplateQualityScore;
+  /**
+   * The rating this language held before the most recent change. Absent when Meta has rated it only once. Usually differs from `current_score`, but Meta sometimes reports both as the same value, so compare timestamps rather than assuming a transition.
+   *
+   */
+  previous_score?: WhatsAppTemplateQualityScore;
+  /**
+   * When the rating last changed. A re-evaluation that lands on the same rating does not move it, so this answers how long the language has held its current rating.
+   *
+   */
+  readonly updated_at: string;
+};
+
+/**
+ * One language of one version: its content, what the submission carrying it did with it, and everything Meta holds about it.
+ *
+ */
+export type WhatsAppTemplateLanguage = {
+  /**
+   * The canonical tag this language is addressed by.
+   */
+  language: LanguageTag;
+  /**
+   * This language's content blocks, in display order, exactly as submitted or as they stand in the draft.
+   */
+  components: Array<WhatsAppTemplateComponent>;
+  /**
+   * What this submission did with this language. Absent on a draft, which has not been submitted. On a superseded version this is history: how that submission went. It does not report whether the language is sendable now.
+   *
+   */
+  status?: WhatsAppTemplateLanguageStatus;
+  /**
+   * This language's write counter, incremented every time its content changes. It sits at 1 on content that has never been written through this API, which is every built-in template's language.
+   *
+   */
+  readonly revision: WhatsAppTemplateRevision;
+  readonly content_hash: WhatsAppTemplateContentHash;
+  /**
+   * The category Meta is applying to this language, which is what messages from it are priced at.
+   */
+  category?: WhatsAppTemplateCategory;
+  /**
+   * The category this language held before Meta moved it.
+   */
+  previous_category?: WhatsAppTemplateCategory;
+  /**
+   * Meta's quality rating for this language. Present only on the version currently in service, and only once Meta has rated it.
+   *
+   */
+  quality?: WhatsAppTemplateQuality;
+  /**
+   * Why Meta refused this content, present when `status` is `rejected`. Absent otherwise.
+   *
+   */
+  rejection?: WhatsAppTemplateRejection;
+  /**
+   * Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   *
+   */
+  error?: WhatsAppTemplateSubmissionError;
+  /**
+   * When this content was submitted to Meta. Null on a draft, which has not been submitted, and null for a built-in template's language, which Bird ships already approved rather than submitting on your behalf.
+   *
+   */
+  readonly submitted_at: string | null;
+  /**
+   * When Meta approved this exact content. It is a permanent mark on the content rather than a status, so a later pause or archival does not clear it. Null for a built-in template's language, whose approval predates Bird holding a date for it.
+   *
+   */
+  readonly approved_at?: string | null;
+  /**
+   * When this language last changed. Null for a built-in template's language, which Bird ships rather than stores.
+   *
+   */
+  readonly updated_at: string | null;
+  /**
+   * The workspace member who last wrote this language. Always null for a built-in template's language: nobody in the workspace authored it.
+   *
+   */
+  readonly updated_by?: UserId | null;
 };
 
 export type NumbersDedicatedAllocationId = string;
@@ -11012,69 +11663,9 @@ export type EventWhatsAppAccepted = {
 export type EventWhatsAppDeliveredData = EventWhatsAppBase;
 
 /**
- * The message was delivered to the recipient's device.
- */
-export type EventWhatsAppDelivered = {
-  /**
-   * Event type.
-   */
-  type: "whatsapp.delivered";
-  /**
-   * Time the message was delivered to the recipient's device.
-   */
-  timestamp: string;
-  data: EventWhatsAppDeliveredData;
-};
-
-/**
- * Payload of the whatsapp.failed event.
- */
-export type EventWhatsAppFailedData = EventWhatsAppBase & {
-  /**
-   * Why the message terminally failed.
-   */
-  error: WhatsAppError;
-};
-
-/**
- * Message delivery failed permanently.
- */
-export type EventWhatsAppFailed = {
-  /**
-   * Event type.
-   */
-  type: "whatsapp.failed";
-  /**
-   * Time the failure was recorded.
-   */
-  timestamp: string;
-  data: EventWhatsAppFailedData;
-};
-
-/**
  * Payload of the whatsapp.read event.
  */
 export type EventWhatsAppReadData = EventWhatsAppBase;
-
-/**
- * The recipient read the message.
- */
-export type EventWhatsAppRead = {
-  /**
-   * Event type.
-   */
-  type: "whatsapp.read";
-  /**
-   * Time the recipient read the message.
-   */
-  timestamp: string;
-  data: EventWhatsAppReadData;
-};
-
-/**
- * Event type.
- */
-export type WhatsAppReceivedEventType = "whatsapp.received";
 
 /**
  * Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back.
@@ -11127,6 +11718,71 @@ export type EventWhatsAppReceivedData = EventWhatsAppBase & {
 };
 
 /**
+ * Payload of the whatsapp.sent event.
+ */
+export type EventWhatsAppSentData = EventWhatsAppBase;
+
+/**
+ * The message was delivered to the recipient's device.
+ */
+export type EventWhatsAppDelivered = {
+  /**
+   * Event type.
+   */
+  type: "whatsapp.delivered";
+  /**
+   * Time the message was delivered to the recipient's device.
+   */
+  timestamp: string;
+  data: EventWhatsAppDeliveredData;
+};
+
+/**
+ * Payload of the whatsapp.failed event.
+ */
+export type EventWhatsAppFailedData = EventWhatsAppBase & {
+  /**
+   * Why the message terminally failed.
+   */
+  error: WhatsAppError;
+};
+
+/**
+ * Message delivery failed permanently.
+ */
+export type EventWhatsAppFailed = {
+  /**
+   * Event type.
+   */
+  type: "whatsapp.failed";
+  /**
+   * Time the failure was recorded.
+   */
+  timestamp: string;
+  data: EventWhatsAppFailedData;
+};
+
+/**
+ * The recipient read the message.
+ */
+export type EventWhatsAppRead = {
+  /**
+   * Event type.
+   */
+  type: "whatsapp.read";
+  /**
+   * Time the recipient read the message.
+   */
+  timestamp: string;
+  data: EventWhatsAppReadData;
+};
+
+/**
+ * Event type.
+ */
+export type WhatsAppReceivedEventType = "whatsapp.received";
+
+/**
  * A contact sent the business a WhatsApp message.
  */
 export type EventWhatsAppReceived = {
@@ -11162,11 +11818,6 @@ export type EventWhatsAppRejected = {
   timestamp: string;
   data: EventWhatsAppRejectedData;
 };
-
-/**
- * Payload of the whatsapp.sent event.
- */
-export type EventWhatsAppSentData = EventWhatsAppBase;
 
 /**
  * The API handed the message to Meta for delivery.
@@ -12853,6 +13504,218 @@ export type WhatsAppEventListWritable = {
 };
 
 /**
+ * Why Meta refused a language's content, and what it says about fixing it. Present when `status` is `rejected`.
+ *
+ */
+export type WhatsAppTemplateRejectionWritable = {
+  /**
+   * Meta's own classification of the refusal.
+   */
+  category?: WhatsAppTemplateRejectionCategory;
+};
+
+/**
+ * Where one language stands, without its content: content lives under a version, read that for it. An object rather than a bare status string, so detail beyond status can arrive later as a sibling property instead of a breaking change.
+ *
+ */
+export type WhatsAppTemplateLanguageStateWritable = {
+  /**
+   * On a template, where this language stands on the version currently in service. On a version, what that version's submission did with this language. Absent on a draft, which has not been submitted.
+   *
+   */
+  status?: WhatsAppTemplateLanguageStatus;
+  /**
+   * Why Meta refused this content, present when `status` is `rejected`. Absent otherwise.
+   *
+   */
+  rejection?: WhatsAppTemplateRejectionWritable;
+  /**
+   * Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   *
+   */
+  error?: unknown;
+};
+
+/**
+ * A message template: one identity holding a copy of the message per language. Each language is reviewed, priced and paused by Meta on its own, so the template's own status is an aggregate and the per-language detail is in `languages`. A version contains the content.
+ *
+ */
+export type WhatsAppTemplateWritable = {
+  /**
+   * A display name for the template. Nothing resolves through it, so it is safe to show wherever a human reads the template.
+   *
+   */
+  name: string;
+  /**
+   * What the template is for. Null when unset.
+   */
+  description: string | null;
+  /**
+   * The category you declared for the template. It is fixed once the template exists. Meta applies its own category per language and may move one, which is what messages are priced at. Read the language for that.
+   *
+   */
+  category: WhatsAppTemplateCategory;
+  /**
+   * The language a send is served in when it names none, whichever `on_missing_language` is set. A template that sets `language_source_required` refuses such a send instead. Under `fallback` it is also the last hop for a language that is not in `available_languages`, whether the template holds no copy in it or holds one WhatsApp has not approved. The template is required to hold this default, and it must itself be in `available_languages` for a send to resolve here.
+   *
+   */
+  default_language: LanguageTag;
+  /**
+   * When true, a send must name a language explicitly rather than letting the template resolve one.
+   *
+   */
+  language_source_required: boolean;
+};
+
+export type WhatsAppTemplateListWritable = {
+  /**
+   * Page of templates available to your workspace.
+   */
+  data: Array<WhatsAppTemplateWritable>;
+} & ListEnvelope;
+
+/**
+ * One version of a template, without its content. A version holds a full copy of every language it was submitted with. Listing versions therefore names the languages and what became of each without carrying their content. Read a single version for its content. Read its shallow language collection for content hashes.
+ *
+ */
+export type WhatsAppTemplateVersionSummaryWritable = {
+  /**
+   * What this version's submission did with each language it holds, keyed by BCP-47 language tag. Content is not here: read the version for that.
+   *
+   */
+  languages: {
+    [key in LanguageTag]?: WhatsAppTemplateLanguageStateWritable;
+  };
+};
+
+export type WhatsAppTemplateVersionListWritable = {
+  /**
+   * Page of the template's versions, newest first.
+   */
+  data: Array<WhatsAppTemplateVersionSummaryWritable>;
+} & ListEnvelope;
+
+/**
+ * One language's content in one version, and what that submission did with it.
+ */
+export type WhatsAppTemplateVersionLanguageWritable = {
+  /**
+   * This language's content in this version, in display order.
+   */
+  components: Array<unknown>;
+  /**
+   * What this submission did with this language. Absent on a draft, which has not been submitted. Whether the language can be sent right now is a different question, answered by the template's `languages` summary.
+   *
+   */
+  status?: WhatsAppTemplateLanguageStatus;
+  /**
+   * Why Meta refused this content, present when `status` is `rejected`. Absent otherwise.
+   *
+   */
+  rejection?: WhatsAppTemplateRejectionWritable;
+  /**
+   * Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   *
+   */
+  error?: unknown;
+};
+
+/**
+ * One version of a template: the content of every language it holds, frozen when it was submitted, alongside what Meta made of each. A draft is a version too: a mutable one, with no number and no submission date.
+ *
+ */
+export type WhatsAppTemplateVersionWritable = {
+  /**
+   * This version's content, keyed by BCP-47 language tag, with what its submission did with each language.
+   *
+   */
+  languages: {
+    [key in LanguageTag]?: WhatsAppTemplateVersionLanguageWritable;
+  };
+};
+
+/**
+ * One language of a version without its content. Fetch the language itself for the content.
+ *
+ */
+export type WhatsAppTemplateLanguageSummaryWritable = {
+  /**
+   * The canonical tag this language is addressed by.
+   */
+  language: LanguageTag;
+  /**
+   * What this version's submission did with this language. Absent on a draft.
+   */
+  status?: WhatsAppTemplateLanguageStatus;
+};
+
+export type WhatsAppTemplateLanguageListWritable = {
+  /**
+   * Every language this version holds, without content.
+   */
+  data: Array<WhatsAppTemplateLanguageSummaryWritable>;
+};
+
+/**
+ * Meta's quality rating for one language, with the rating it moved from and when it moved. Present only once Meta has rated the language, and only on the version currently in service. A superseded version's content carries no rating.
+ *
+ */
+export type WhatsAppTemplateQualityWritable = {
+  /**
+   * Meta's rating for this language as of `updated_at`.
+   */
+  current_score: WhatsAppTemplateQualityScore;
+  /**
+   * The rating this language held before the most recent change. Absent when Meta has rated it only once. Usually differs from `current_score`, but Meta sometimes reports both as the same value, so compare timestamps rather than assuming a transition.
+   *
+   */
+  previous_score?: WhatsAppTemplateQualityScore;
+};
+
+/**
+ * One language of one version: its content, what the submission carrying it did with it, and everything Meta holds about it.
+ *
+ */
+export type WhatsAppTemplateLanguageWritable = {
+  /**
+   * The canonical tag this language is addressed by.
+   */
+  language: LanguageTag;
+  /**
+   * This language's content blocks, in display order, exactly as submitted or as they stand in the draft.
+   */
+  components: Array<unknown>;
+  /**
+   * What this submission did with this language. Absent on a draft, which has not been submitted. On a superseded version this is history: how that submission went. It does not report whether the language is sendable now.
+   *
+   */
+  status?: WhatsAppTemplateLanguageStatus;
+  /**
+   * The category Meta is applying to this language, which is what messages from it are priced at.
+   */
+  category?: WhatsAppTemplateCategory;
+  /**
+   * The category this language held before Meta moved it.
+   */
+  previous_category?: WhatsAppTemplateCategory;
+  /**
+   * Meta's quality rating for this language. Present only on the version currently in service, and only once Meta has rated it.
+   *
+   */
+  quality?: WhatsAppTemplateQualityWritable;
+  /**
+   * Why Meta refused this content, present when `status` is `rejected`. Absent otherwise.
+   *
+   */
+  rejection?: WhatsAppTemplateRejectionWritable;
+  /**
+   * Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   *
+   */
+  error?: unknown;
+};
+
+/**
  * Latency percentiles (p50, p95, p99) in milliseconds for the bucket. On the summary endpoint these are computed across the whole period rather than per bucket. Three families are reported:
  *
  * - `processing`: Time from accepting the send to handing the message off for delivery. Measured per processed recipient; null when no recipient in the bucket has reached the processed stage.
@@ -13917,31 +14780,6 @@ export type EventSmsUndeliveredWritable = {
 };
 
 /**
- * Payload of the whatsapp.failed event.
- */
-export type EventWhatsAppFailedDataWritable = EventWhatsAppBase & {
-  /**
-   * Why the message terminally failed.
-   */
-  error: WhatsAppErrorWritable;
-};
-
-/**
- * Message delivery failed permanently.
- */
-export type EventWhatsAppFailedWritable = {
-  /**
-   * Event type.
-   */
-  type: "whatsapp.failed";
-  /**
-   * Time the failure was recorded.
-   */
-  timestamp: string;
-  data: EventWhatsAppFailedDataWritable;
-};
-
-/**
  * Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back.
  *
  */
@@ -13989,6 +14827,31 @@ export type EventWhatsAppReceivedDataWritable = EventWhatsAppBase & {
    *
    */
   unsupported?: WhatsAppUnsupported;
+};
+
+/**
+ * Payload of the whatsapp.failed event.
+ */
+export type EventWhatsAppFailedDataWritable = EventWhatsAppBase & {
+  /**
+   * Why the message terminally failed.
+   */
+  error: WhatsAppErrorWritable;
+};
+
+/**
+ * Message delivery failed permanently.
+ */
+export type EventWhatsAppFailedWritable = {
+  /**
+   * Event type.
+   */
+  type: "whatsapp.failed";
+  /**
+   * Time the failure was recorded.
+   */
+  timestamp: string;
+  data: EventWhatsAppFailedDataWritable;
 };
 
 /**
@@ -14131,21 +14994,6 @@ export type VoiceCallListWritable = {
 } & ListEnvelope;
 
 /**
- * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
- *
- * Two distinct 409 errors signal misuse:
- *
- * - `request_in_progress` (E01004): The same key is currently being
- * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
- * - `idempotency_key_reuse` (E01005): The same key has already completed
- * against a different request body or method. Generate a new key.
- *
- * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
- *
- */
-export type IdempotencyKey = string;
-
-/**
  * Maximum number of items to return per page.
  */
 export type PaginationLimit = number;
@@ -14170,6 +15018,21 @@ export type IncludeTotal = boolean;
  *
  */
 export type OrderDesc = "asc" | "desc";
+
+/**
+ * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+ *
+ * Two distinct 409 errors signal misuse:
+ *
+ * - `request_in_progress` (E01004): The same key is currently being
+ * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+ * - `idempotency_key_reuse` (E01005): The same key has already completed
+ * against a different request body or method. Generate a new key.
+ *
+ * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+ *
+ */
+export type IdempotencyKey = string;
 
 /**
  * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
@@ -19985,6 +20848,383 @@ export type GetWhatsAppMessageMediaErrors = {
 
 export type GetWhatsAppMessageMediaError =
   GetWhatsAppMessageMediaErrors[keyof GetWhatsAppMessageMediaErrors];
+
+export type ListWhatsAppTemplatesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Filter to a single WhatsApp Business Account by its Meta WABA ID: the same value each template reports in its own `waba` field. Our built-in templates belong to no account and are never returned when this is set, and an account your workspace does not hold returns an empty page.
+     */
+    waba?: string;
+    /**
+     * Filter by lifecycle status. Repeat the parameter to match any of several. Our built-in templates are always `active`.
+     */
+    status?: Array<TemplateStatus>;
+    /**
+     * Filter by ownership tier: `system` for the built-in, Meta-approved template catalog, or `workspace` for the workspace's own templates. Omit to return both.
+     */
+    scope?: TemplateScope;
+    /**
+     * Filter by template category.
+     */
+    category?: WhatsAppTemplateCategory;
+    /**
+     * A case-insensitive substring search across the template's slug, name, and description.
+     */
+    q?: string;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/templates";
+};
+
+export type ListWhatsAppTemplatesErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppTemplatesError =
+  ListWhatsAppTemplatesErrors[keyof ListWhatsAppTemplatesErrors];
+
+export type ListWhatsAppTemplatesResponses = {
+  /**
+   * The message templates available to your workspace.
+   */
+  200: WhatsAppTemplateList;
+};
+
+export type ListWhatsAppTemplatesResponse =
+  ListWhatsAppTemplatesResponses[keyof ListWhatsAppTemplatesResponses];
+
+export type GetWhatsAppTemplateData = {
+  body?: never;
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+  };
+  query?: never;
+  url: "/v1/whatsapp/templates/{template_ref}";
+};
+
+export type GetWhatsAppTemplateErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWhatsAppTemplateError =
+  GetWhatsAppTemplateErrors[keyof GetWhatsAppTemplateErrors];
+
+export type GetWhatsAppTemplateResponses = {
+  /**
+   * The requested template.
+   */
+  200: WhatsAppTemplate;
+};
+
+export type GetWhatsAppTemplateResponse =
+  GetWhatsAppTemplateResponses[keyof GetWhatsAppTemplateResponses];
+
+export type ListWhatsAppTemplateVersionsData = {
+  body?: never;
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+  };
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/templates/{template_ref}/versions";
+};
+
+export type ListWhatsAppTemplateVersionsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppTemplateVersionsError =
+  ListWhatsAppTemplateVersionsErrors[keyof ListWhatsAppTemplateVersionsErrors];
+
+export type ListWhatsAppTemplateVersionsResponses = {
+  /**
+   * The template's versions.
+   */
+  200: WhatsAppTemplateVersionList;
+};
+
+export type ListWhatsAppTemplateVersionsResponse =
+  ListWhatsAppTemplateVersionsResponses[keyof ListWhatsAppTemplateVersionsResponses];
+
+export type GetWhatsAppTemplateVersionData = {
+  body?: never;
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+    /**
+     * ID of the template version (`wav_` prefix), as returned by the version list.
+     */
+    version_id: WhatsAppTemplateVersionId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}";
+};
+
+export type GetWhatsAppTemplateVersionErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWhatsAppTemplateVersionError =
+  GetWhatsAppTemplateVersionErrors[keyof GetWhatsAppTemplateVersionErrors];
+
+export type GetWhatsAppTemplateVersionResponses = {
+  /**
+   * The requested version.
+   */
+  200: WhatsAppTemplateVersion;
+};
+
+export type GetWhatsAppTemplateVersionResponse =
+  GetWhatsAppTemplateVersionResponses[keyof GetWhatsAppTemplateVersionResponses];
+
+export type ListWhatsAppTemplateVersionLanguagesData = {
+  body?: never;
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+    /**
+     * ID of the template version (`wav_` prefix), as returned by the version list.
+     */
+    version_id: WhatsAppTemplateVersionId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/languages";
+};
+
+export type ListWhatsAppTemplateVersionLanguagesErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppTemplateVersionLanguagesError =
+  ListWhatsAppTemplateVersionLanguagesErrors[keyof ListWhatsAppTemplateVersionLanguagesErrors];
+
+export type ListWhatsAppTemplateVersionLanguagesResponses = {
+  /**
+   * The version's languages.
+   */
+  200: WhatsAppTemplateLanguageList;
+};
+
+export type ListWhatsAppTemplateVersionLanguagesResponse =
+  ListWhatsAppTemplateVersionLanguagesResponses[keyof ListWhatsAppTemplateVersionLanguagesResponses];
+
+export type GetWhatsAppTemplateVersionLanguageData = {
+  body?: never;
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+    /**
+     * ID of the template version (`wav_` prefix), as returned by the version list.
+     */
+    version_id: WhatsAppTemplateVersionId;
+    /**
+     * The language, as a BCP-47 tag. Case and separator variance is accepted and normalised, and the canonical form is returned.
+     *
+     */
+    language: LanguageTag;
+  };
+  query?: never;
+  url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/languages/{language}";
+};
+
+export type GetWhatsAppTemplateVersionLanguageErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWhatsAppTemplateVersionLanguageError =
+  GetWhatsAppTemplateVersionLanguageErrors[keyof GetWhatsAppTemplateVersionLanguageErrors];
+
+export type GetWhatsAppTemplateVersionLanguageResponses = {
+  /**
+   * The requested language.
+   */
+  200: WhatsAppTemplateLanguage;
+};
+
+export type GetWhatsAppTemplateVersionLanguageResponse =
+  GetWhatsAppTemplateVersionLanguageResponses[keyof GetWhatsAppTemplateVersionLanguageResponses];
 
 export type GetEmailStatsDailyData = {
   body?: never;

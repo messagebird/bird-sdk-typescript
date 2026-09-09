@@ -240,6 +240,13 @@ export const WebhookEventSchema = {
   },
 } as const;
 
+export const WorkspaceIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^ws_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const ErrorDetailSchema = {
   type: "object",
   additionalProperties: false,
@@ -407,12 +414,11 @@ export const ErrorSchema = {
   },
 } as const;
 
-export const RegionSchema = {
+export const UserIDSchema = {
   type: "string",
   minLength: 1,
-  enum: ["us1", "eu1"],
-  description: "Deployment region identifier.",
-  example: "us1",
+  pattern: "^usr_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const OrganizationIDSchema = {
@@ -420,13 +426,6 @@ export const OrganizationIDSchema = {
   minLength: 1,
   pattern: "^org_[0-9a-hjkmnp-tv-z]{26}$",
   example: "org_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const WorkspaceIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^ws_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "ws_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const _ListEnvelopeSchema = {
@@ -474,6 +473,14 @@ export const _ListEnvelopeWithTotalSchema = {
       },
     },
   ],
+} as const;
+
+export const RegionSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["us1", "eu1"],
+  description: "Deployment region identifier.",
+  example: "us1",
 } as const;
 
 export const DocsSearchResultSchema = {
@@ -4517,7 +4524,7 @@ export const TemplateScopeSchema = {
   readOnly: true,
   enum: ["system", "workspace"],
   description:
-    "Whether the template is one of our built-in templates (`system`) or one your workspace created (`workspace`). Every SMS template is `system`.\n",
+    "Whether the template is one of our built-in templates (`system`) or one your workspace created (`workspace`).\n",
 } as const;
 
 export const TemplateStatusSchema = {
@@ -4690,7 +4697,16 @@ export const SMSTemplateSchema = {
       example: "One-time passcode verification",
     },
     scope: {
-      $ref: "#/components/schemas/TemplateScope",
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateScope",
+        },
+      ],
+      description:
+        "Whether the template is one of our built-in templates (`system`) or one your workspace created (`workspace`). Every SMS template is `system`.\n",
     },
     status: {
       $ref: "#/components/schemas/TemplateStatus",
@@ -8016,7 +8032,7 @@ export const WhatsAppMessageTemplateSchema = {
       ],
       readOnly: true,
       description:
-        "Content classification applied to messages sent from this template.",
+        "The category this message was priced at, recorded as it stood when the message was sent. For a template you authored this is the category Meta applies to the language the send resolved to, which can differ from the category declared on the template: Meta categorizes each language separately and may move one. A built-in `bird_` template is priced at the single category the built-in declares, the same in every language.\n",
     },
     language: {
       allOf: [
@@ -9220,7 +9236,7 @@ export const WhatsAppTemplateSendSchema = {
         },
       ],
       description:
-        "Which of the template's languages to send, as a BCP-47 tag (for example `en` or `pt-BR`); Meta's underscore form (`pt_BR`) is accepted and normalized. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not carry the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected. The accepted message echoes the canonical BCP-47 form of the language it resolved to.\n",
+        "Which of the template's languages to send, as a BCP-47 tag (for example `en` or `pt-BR`); Meta's underscore form (`pt_BR`) is accepted and normalized. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not carry the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected. The accepted message echoes the canonical BCP-47 form of the language it resolved to, which is the language it is priced at: Meta categorizes each language separately, so a send served by a different language than the one you asked for is priced at that language's category.\n",
       example: "pt-BR",
     },
     components: {
@@ -10810,6 +10826,1068 @@ export const WhatsAppEventListSchema = {
       },
     },
   },
+} as const;
+
+export const WhatsAppTemplateExampleParameterSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateParameterType",
+        },
+      ],
+      readOnly: true,
+      description: "The kind of value this parameter accepts.",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "An example value for a text parameter. Present when `type` is `text`.",
+      example: "123456",
+    },
+    url: {
+      type: "string",
+      format: "uri",
+      readOnly: true,
+      description:
+        "The address of the file a media header shows, as it was given when the header was authored rather than WhatsApp's copy of it. Present when `type` is `image`, `video`, `gif` or `document`.\n",
+      example: "https://www.example.com/holiday/banner.jpg",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The named placeholder this example fills. Present whenever the template declares named parameters, which is what a send must name; absent only for a positional template, whose values go in `{{n}}` order.\n",
+      example: "first_name",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateButtonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": [
+        "url",
+        "quick_reply",
+        "phone_number",
+        "otp",
+        "copy_code",
+        "request_contact_info",
+      ],
+      description:
+        "The button's behavior.\n\n- `url`: opens a link.\n- `quick_reply`: sends its own label back to you as an inbound message.\n- `phone_number`: dials the number it carries.\n- `otp`: copies a one-time passcode. It belongs only on an authentication\n  template, and that template takes no other button type.\n- `copy_code`: copies a coupon code to the recipient's clipboard. It\n  belongs only on a marketing template, which takes at most one.\n- `request_contact_info`: asks the recipient to share the phone number\n  their WhatsApp account carries. It belongs only on a utility or\n  marketing template, as that template's only button.\n\nThis is an open enum. Accept unrecognized values.\n",
+      example: "url",
+    },
+    otp_type: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": ["copy_code"],
+      description:
+        "How the recipient receives the one-time passcode. Present on authentication-template OTP buttons.",
+      example: "copy_code",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The button's label. Absent on an authentication template's passcode button until the language has been submitted, since WhatsApp writes that label itself. Absent on a `request_contact_info` draft for a related reason: WhatsApp fixes that label, so a draft that carried it reads back without it. Once the language is submitted, this carries the label WhatsApp wrote, which is `Share Contact Info` in every language today.\n",
+      example: "Copy code",
+    },
+    url: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The address the button opens, with any variable placeholder shown inline. Present on link buttons.",
+      example: "https://www.example.com/orders/{{1}}",
+    },
+    phone_number: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The number the button dials. Present on dial buttons.",
+      example: "+14155550100",
+    },
+    example_parameters: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Example values for this button's variables, in placeholder order. Present when the button address has variables, and on a `copy_code` button, where the single value is the sample coupon code WhatsApp reviewed.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateExampleParameter",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateCardComponentSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  description: "One content block inside a carousel card.",
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": ["header", "body", "buttons"],
+      description: "The card block's type.",
+      example: "header",
+    },
+    format: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": ["image", "video"],
+      description:
+        "The card header's content type. Present on a card's header block.",
+      example: "image",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The block's text content, with any variable placeholders shown inline.",
+      example: "Chronograph, brown leather",
+    },
+    example_parameters: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Example values for this block's variables, in placeholder order.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateExampleParameter",
+      },
+    },
+    buttons: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The buttons this card carries. Present on a card's buttons block.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateButton",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateCardSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["components"],
+  description: "One card in a carousel.",
+  properties: {
+    components: {
+      type: "array",
+      readOnly: true,
+      description: "This card's content blocks, in display order.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateCardComponent",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateComponentSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": ["header", "body", "footer", "buttons", "carousel"],
+      description: "The content block's type within the template.",
+      example: "body",
+    },
+    format: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": [
+        "text",
+        "image",
+        "video",
+        "gif",
+        "document",
+        "location",
+      ],
+      description:
+        "The header block's content type. Present on a header block. A `text` header carries a line of copy. The `image`, `video`, `gif`, and `document` formats each show a file whose address is in the block's `example_parameters`. The `location` format shows a map. It carries no content because the coordinates belong to the message rather than the template.\n",
+      example: "text",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The block's text content, with any variable placeholders shown inline. Present when the block carries text. An authentication template's body and footer are written by WhatsApp from the two settings below rather than by you, so their text is absent until the language has been submitted and WhatsApp has supplied it.\n",
+      example: "Your verification code is {{1}}.",
+    },
+    add_security_recommendation: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this authentication template's body ends with WhatsApp's advice not to share the code. Present on an authentication template's body block.\n",
+    },
+    code_expiration_minutes: {
+      type: "integer",
+      readOnly: true,
+      description:
+        "How long the passcode stays valid, which WhatsApp states in this footer. Present on an authentication template's footer block. Omitting it on a write leaves the footer off entirely.\n",
+      example: 60,
+    },
+    example_parameters: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Example values for this block's variables, in placeholder order (one per `{{n}}`). Use them to see what a filled message looks like. Present when the block has variables.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateExampleParameter",
+      },
+    },
+    buttons: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The buttons attached to this block. Present when the block carries buttons.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateButton",
+      },
+    },
+    cards: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The cards this block scrolls through, in display order. Present on a `carousel` block.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateCard",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateLanguageStatusSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "approved",
+    "pending",
+    "rejected",
+    "paused",
+    "disabled",
+    "in_appeal",
+    "pending_deletion",
+    "limit_exceeded",
+    "archived",
+    "deleted",
+    "submit_failed",
+    "outcome_unknown",
+  ],
+  description:
+    "Language review and health status:\n\n- `approved`: Passed review and can be sent.\n- `pending`: Under review.\n- `rejected`: Failed review.\n- `paused` or `disabled`: Sending is suspended.\n- `in_appeal`: A decision is being appealed.\n- `pending_deletion`: Scheduled for deletion by Meta.\n- `limit_exceeded`: Sending is blocked by a limit.\n- `archived`: Reclaimed after 12 months without use; recoverable for 28 days.\n- `deleted`: Permanently deleted.\n- `submit_failed`: A submission or a deletion did not complete and will not be retried. `error.description` says why, and `error.meta_error_code` is set only where WhatsApp itself refused.\n- `outcome_unknown`: A create or an edit reached WhatsApp but no response came back, so the outcome is still being resolved against WhatsApp. An unanswered deletion is retried instead of landing here. `error.description` says so, and `error.meta_error_code` is absent, since nothing was refused.\n\nThis is an open enum. Accept unrecognized values.\n",
+} as const;
+
+export const WhatsAppTemplateRejectionCategorySchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "abusive_content",
+    "incorrect_category",
+    "invalid_format",
+    "scam",
+    "tag_content_mismatch",
+  ],
+  description:
+    "Why Meta refused a language's content, in Meta's own vocabulary, lowercased. Read it with `reason`, which carries Meta's human-written detail, and `recommendation`, which carries its suggested fix. This is an open enum. Accept unrecognized values.\n",
+  example: "invalid_format",
+} as const;
+
+export const WhatsAppTemplateRejectionSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Why Meta refused a language's content, and what it says about fixing it. Present when `status` is `rejected`.\n",
+  properties: {
+    category: {
+      $ref: "#/components/schemas/WhatsAppTemplateRejectionCategory",
+      description: "Meta's own classification of the refusal.",
+    },
+    reason: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "Meta's detail about the refusal, passed through unmodified.",
+      example: "Parameters are adjacent.",
+    },
+    recommendation: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "Meta's suggested fix, the only thing it says about how to make the content acceptable. Meta sends it for some refusals and not others.\n",
+      example: "Add text between the two parameters.",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateSubmissionErrorSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["description"],
+  description:
+    "Why the submission itself did not complete. Distinct from `rejection`, which is Meta refusing the content it was given.\n",
+  properties: {
+    description: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Human-readable explanation of why the submission did not complete.",
+      example: "component of type HEADER is missing expected field(s)",
+    },
+    meta_error_code: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "WhatsApp's most specific code for the refusal: its error subcode when it sent one, otherwise its top-level code. Opaque, treat it as a string. Absent when the failure was Bird's own verdict rather than a WhatsApp refusal.\n",
+      example: "2388043",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateLanguageStateSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateLanguageStatus",
+        },
+      ],
+      description:
+        "On a template, where this language stands on the version currently in service. On a version, what that version's submission did with this language. Absent on a draft, which has not been submitted.\n",
+    },
+    submitted_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this language's content was last submitted to Meta. Null on a draft, which has not been submitted, and null for a built-in template's language, shipped already approved rather than submitted on your behalf.\n",
+      example: "2026-07-26T16:40:00Z",
+    },
+    editable_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "The next time you can edit this language, if Meta's one-edit-per-day limit on an approved language is currently spent. Null when an edit is allowed right now, though Meta also caps an approved language at ten edits per rolling 30 days: a null here does not guarantee an edit will succeed if you are close to that limit too.\n",
+      example: "2026-07-27T16:40:00Z",
+    },
+    rejection: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateRejection",
+        },
+      ],
+      description:
+        "Why Meta refused this content, present when `status` is `rejected`. Absent otherwise.\n",
+    },
+    error: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateSubmissionError",
+        },
+      ],
+      description:
+        "Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+    },
+  },
+  description:
+    "Where one language stands, without its content: content lives under a version, read that for it. An object rather than a bare status string, so detail beyond status can arrive later as a sibling property instead of a breaking change.\n",
+} as const;
+
+export const WhatsAppTemplateVersionIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^wav_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "wav_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppTemplateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "slug",
+    "slug_editable",
+    "name",
+    "scope",
+    "description",
+    "category",
+    "status",
+    "default_language",
+    "on_missing_language",
+    "language_source_required",
+    "available_languages",
+    "languages",
+    "draft_version_id",
+    "live_version_id",
+    "pending_version_id",
+    "last_submitted_at",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/WhatsAppTemplateID",
+      readOnly: true,
+      description: "Stable Bird identifier for the template.",
+    },
+    slug: {
+      example: "bird_otp",
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The template's handle, editable before the first submission. Address it by this handle, and reference it when sending. Handles beginning with `bird_` are reserved for our built-in templates.\n",
+    },
+    slug_editable: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether the slug can still be changed. False after the first submission and for built-in templates.",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "A display name for the template. Nothing resolves through it, so it is safe to show wherever a human reads the template.\n",
+      example: "Order update",
+    },
+    description: {
+      type: ["string", "null"],
+      maxLength: 1000,
+      description: "What the template is for. Null when unset.",
+      example: "Sent when an order ships.",
+    },
+    scope: {
+      $ref: "#/components/schemas/TemplateScope",
+    },
+    waba: {
+      type: "string",
+      readOnly: true,
+      description:
+        "The WhatsApp Business Account that holds this template's languages at Meta. Absent on a built-in template: those live on a WABA that Bird manages centrally rather than on your account, so it is not yours to reconcile against and is not disclosed.\n",
+      example: "102290129340398",
+    },
+    category: {
+      $ref: "#/components/schemas/WhatsAppTemplateCategory",
+      description:
+        "The category you declared for the template. It is fixed once the template exists. Meta applies its own category per language and may move one, which is what messages are priced at. Read the language for that.\n",
+    },
+    status: {
+      $ref: "#/components/schemas/TemplateStatus",
+      description: "The template's lifecycle, aggregated over its languages.",
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description:
+        "The language a send is served in when it names none, whichever `on_missing_language` is set. A template that sets `language_source_required` refuses such a send instead. Under `fallback` it is also the last hop for a language that is not in `available_languages`, whether the template holds no copy in it or holds one WhatsApp has not approved. The template is required to hold this default, and it must itself be in `available_languages` for a send to resolve here.\n",
+    },
+    on_missing_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateOnMissingLanguage",
+        },
+      ],
+      readOnly: true,
+      description:
+        "What a send does when the language it asks for has no approved copy. Defaults to `fail` on WhatsApp, because every language is separately approved and separately priced: falling back silently would send content the recipient did not expect at a rate the sender did not choose.\n",
+    },
+    language_source_required: {
+      type: "boolean",
+      description:
+        "When true, a send must name a language explicitly rather than letting the template resolve one.\n",
+      example: false,
+    },
+    available_languages: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The languages a send can resolve right now: approved and not held back by Meta. It shrinks for reasons you did not cause: Meta pauses, disables, archives or limits a language and it leaves the set with nobody having edited anything. Read `languages` to see which languages exist and why one is missing.\n",
+      items: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+    },
+    languages: {
+      type: "object",
+      example: {
+        en: {
+          status: "approved",
+        },
+      },
+      readOnly: true,
+      description:
+        "Where each of the template's languages stands, keyed by BCP-47 language tag. This is the summary of the version currently in service, so a template reading `active` can still hold a rejected or paused language: the aggregate says something is sendable, and this says which. Content is not here; it lives under a version.\n",
+      propertyNames: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/WhatsAppTemplateLanguageState",
+      },
+    },
+    draft_version_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The open draft, or null when nobody is editing. Non-null is the answer to whether this template has unsubmitted work: a draft exists only because someone opened one.\n",
+    },
+    live_version_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The version Meta is serving. A version goes live as a unit the moment any of its languages is approved, superseding the one before it. Null until a first approval.\n",
+    },
+    pending_version_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "A submitted version still awaiting verdicts: what to poll. It stays set while any language is unresolved, including after a sibling's approval took the version live. Null when nothing is outstanding.\n",
+    },
+    last_submitted_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this template was last submitted. Null for a pre-approved built-in template.\n",
+      example: "2026-07-26T16:40:00Z",
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was created. Null for a built-in template, which Bird ships rather than stores.",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was last modified. Null for a built-in template, which Bird ships rather than stores.",
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next with this template, given the state it is in. Each entry names one\naction and says why it is worth taking, so you can act on this response without\nworking out the order yourself. Present on reads that compute it: an empty list\nmeans there is nothing to do, and the field is absent entirely on responses that\ndo not report next actions.\n\nA `draft` template routes to opening its draft, a `pending` one to the version\nunder review, and a `rejected` or `inactive` one to a fresh draft. The template's\n`status` is the aggregate over its languages, so an entry may send you to the\nversion to see where each language actually stands.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+  },
+  description:
+    "A message template: one identity holding a copy of the message per language. Each language is reviewed, priced and paused by Meta on its own, so the template's own status is an aggregate and the per-language detail is in `languages`. A version contains the content.\n",
+} as const;
+
+export const WhatsAppTemplateListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of templates available to your workspace.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppTemplate",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppTemplateRevisionSchema = {
+  type: "integer",
+  minimum: 1,
+  description:
+    "A write counter, incremented every time the content it belongs to changes. It sits at 1 on content that has never been written through this API.\n",
+  example: 4,
+} as const;
+
+export const WhatsAppTemplateVersionSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "template_id", "languages", "submitted_at", "created_at"],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/WhatsAppTemplateVersionID",
+      readOnly: true,
+      description: "Stable Bird identifier for the version.",
+    },
+    template_id: {
+      $ref: "#/components/schemas/WhatsAppTemplateID",
+      readOnly: true,
+      description: "The template this version belongs to.",
+    },
+    version_number: {
+      type: ["integer", "null"],
+      minimum: 1,
+      readOnly: true,
+      description:
+        "The version's sequence number, assigned when it is submitted. Null on a draft, which has not been submitted and has no place in the sequence yet.\n",
+      example: 4,
+    },
+    submitted_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this version was submitted to Meta. Null on a draft, which has not been submitted, and null for a built-in template's version, which Bird ships already approved rather than submitting on your behalf.\n",
+      example: "2026-07-20T11:04:00Z",
+    },
+    languages: {
+      type: "object",
+      example: {
+        en: {
+          status: "approved",
+        },
+      },
+      description:
+        "What this version's submission did with each language it holds, keyed by BCP-47 language tag. Content is not here: read the version for that.\n",
+      propertyNames: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/WhatsAppTemplateLanguageState",
+      },
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the version was opened. Null for a built-in template's version, which Bird ships rather than stores.\n",
+      example: "2026-07-20T10:31:00Z",
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next with this version, given whether it has been submitted. Present on\nreads that compute it: an empty list means there is nothing to do, and the field is\nabsent entirely on responses that do not report next actions.\n\nA version with no `version_number` is the open draft, and routes to writing its\nlanguages and checking it. One that carries a number is frozen, so it routes to\nreading the verdicts it holds. `submitted_at` does not separate the two, because\nit is also null on a built-in template's version.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+  },
+  description:
+    "One version of a template, without its content. A version holds a full copy of every language it was submitted with. Listing versions therefore names the languages and what became of each without carrying their content. Read a single version for its content. Read its shallow language collection for content hashes.\n",
+} as const;
+
+export const WhatsAppTemplateVersionListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of the template's versions, newest first.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppTemplateVersionSummary",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppTemplateVersionLanguageSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["components"],
+  properties: {
+    components: {
+      type: "array",
+      description: "This language's content in this version, in display order.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateComponent",
+      },
+    },
+    status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateLanguageStatus",
+        },
+      ],
+      description:
+        "What this submission did with this language. Absent on a draft, which has not been submitted. Whether the language can be sent right now is a different question, answered by the template's `languages` summary.\n",
+    },
+    rejection: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateRejection",
+        },
+      ],
+      description:
+        "Why Meta refused this content, present when `status` is `rejected`. Absent otherwise.\n",
+    },
+    error: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateSubmissionError",
+        },
+      ],
+      description:
+        "Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+    },
+  },
+  description:
+    "One language's content in one version, and what that submission did with it.",
+} as const;
+
+export const WhatsAppTemplateVersionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "template_id", "languages", "submitted_at", "created_at"],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/WhatsAppTemplateVersionID",
+      readOnly: true,
+      description: "Stable Bird identifier for the version.",
+    },
+    template_id: {
+      $ref: "#/components/schemas/WhatsAppTemplateID",
+      readOnly: true,
+      description: "The template this version belongs to.",
+    },
+    version_number: {
+      type: ["integer", "null"],
+      minimum: 1,
+      readOnly: true,
+      description:
+        "The version's sequence number, assigned when it is submitted. Null on a draft, which has not been submitted and has no place in the sequence yet.\n",
+      example: 4,
+    },
+    submitted_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this version was submitted to Meta. Null on a draft, which has not been submitted, and null for a built-in template's version, which Bird ships already approved rather than submitting on your behalf.\n",
+      example: "2026-07-20T11:04:00Z",
+    },
+    languages: {
+      type: "object",
+      example: {
+        en: {
+          status: "approved",
+          components: [
+            {
+              type: "body",
+              text: "Your verification code is {{1}}.",
+              example_parameters: [
+                {
+                  type: "text",
+                  text: "123456",
+                },
+              ],
+            },
+          ],
+        },
+      },
+      description:
+        "This version's content, keyed by BCP-47 language tag, with what its submission did with each language.\n",
+      propertyNames: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/WhatsAppTemplateVersionLanguage",
+      },
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the version was opened. Null for a built-in template's version, which Bird ships rather than stores.\n",
+      example: "2026-07-20T10:31:00Z",
+    },
+  },
+  description:
+    "One version of a template: the content of every language it holds, frozen when it was submitted, alongside what Meta made of each. A draft is a version too: a mutable one, with no number and no submission date.\n",
+} as const;
+
+export const WhatsAppTemplateLanguageSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["language", "revision", "content_hash"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description: "The canonical tag this language is addressed by.",
+    },
+    status: {
+      $ref: "#/components/schemas/WhatsAppTemplateLanguageStatus",
+      description:
+        "What this version's submission did with this language. Absent on a draft.",
+    },
+    revision: {
+      $ref: "#/components/schemas/WhatsAppTemplateRevision",
+      readOnly: true,
+      description:
+        "This language's write counter, incremented every time its content changes.",
+    },
+    content_hash: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "A hash over the serialized `components` this API surfaces, for telling whether a language differs without fetching it. It is comparable only within one version of this API: adding a field to the component shape changes every hash without the underlying content changing.\n",
+      example:
+        "sha256:9f2c4e1a7b03d85fbc6e29d417a05e8c3b1d9f76a2e4c018d53b7f9a6c2e18d4",
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next about this language, given the verdict it carries. Present on reads\nthat compute it: an empty list means there is nothing to do, and the field is absent\nentirely on responses that do not report next actions.\n\nApproval is per language, so this is where a rejection, a pause, or a reclaimed\nlanguage is answered. The template's own next actions cannot say, because they read\nthe aggregate.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+  },
+  description:
+    "One language of a version without its content. Fetch the language itself for the content.\n",
+} as const;
+
+export const WhatsAppTemplateLanguageListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      description: "Every language this version holds, without content.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateLanguageSummary",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateContentHashSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "A hash over the serialized `components` this API surfaces, prefixed with the algorithm that produced it (`sha256:`) so the algorithm can change without the field becoming ambiguous. It tells you whether a language differs without transferring its content. Compare hashes only within one version of this API. Adding a field to the component shape changes every hash even when the underlying content is unchanged. Email's field of the same name carries bare hex and predates this form.\n",
+  example:
+    "sha256:9f2c4e1a7b03d85fbc6e29d417a05e8c3b1d9f76a2e4c018d53b7f9a6c2e18d4",
+} as const;
+
+export const WhatsAppTemplateQualityScoreSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["green", "yellow", "red", "unknown"],
+  description:
+    "Meta's quality rating for one language of a template, derived from how recipients respond to messages sent from it. The `red` score is the leading indicator of a pause. Reaching Meta's lowest rating pauses sending from that language for three hours; a second time pauses it for six, and a third disables it. The `unknown` score is a value Meta reports. When Meta has not rated the language, the rating object is absent. This is an open enum. Accept unrecognized values.\n",
+  example: "green",
+} as const;
+
+export const WhatsAppTemplateQualitySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["current_score", "updated_at"],
+  properties: {
+    current_score: {
+      $ref: "#/components/schemas/WhatsAppTemplateQualityScore",
+      description: "Meta's rating for this language as of `updated_at`.",
+    },
+    previous_score: {
+      $ref: "#/components/schemas/WhatsAppTemplateQualityScore",
+      description:
+        "The rating this language held before the most recent change. Absent when Meta has rated it only once. Usually differs from `current_score`, but Meta sometimes reports both as the same value, so compare timestamps rather than assuming a transition.\n",
+    },
+    updated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the rating last changed. A re-evaluation that lands on the same rating does not move it, so this answers how long the language has held its current rating.\n",
+      example: "2026-07-26T16:41:00Z",
+    },
+  },
+  description:
+    "Meta's quality rating for one language, with the rating it moved from and when it moved. Present only once Meta has rated the language, and only on the version currently in service. A superseded version's content carries no rating.\n",
+} as const;
+
+export const WhatsAppTemplateLanguageSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "language",
+    "components",
+    "revision",
+    "content_hash",
+    "submitted_at",
+    "updated_at",
+  ],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description: "The canonical tag this language is addressed by.",
+    },
+    components: {
+      type: "array",
+      description:
+        "This language's content blocks, in display order, exactly as submitted or as they stand in the draft.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateComponent",
+      },
+    },
+    status: {
+      $ref: "#/components/schemas/WhatsAppTemplateLanguageStatus",
+      description:
+        "What this submission did with this language. Absent on a draft, which has not been submitted. On a superseded version this is history: how that submission went. It does not report whether the language is sendable now.\n",
+    },
+    revision: {
+      $ref: "#/components/schemas/WhatsAppTemplateRevision",
+      readOnly: true,
+      description:
+        "This language's write counter, incremented every time its content changes. It sits at 1 on content that has never been written through this API, which is every built-in template's language.\n",
+    },
+    content_hash: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateContentHash",
+        },
+      ],
+      readOnly: true,
+    },
+    category: {
+      $ref: "#/components/schemas/WhatsAppTemplateCategory",
+      description:
+        "The category Meta is applying to this language, which is what messages from it are priced at.",
+    },
+    previous_category: {
+      $ref: "#/components/schemas/WhatsAppTemplateCategory",
+      description: "The category this language held before Meta moved it.",
+    },
+    quality: {
+      $ref: "#/components/schemas/WhatsAppTemplateQuality",
+      description:
+        "Meta's quality rating for this language. Present only on the version currently in service, and only once Meta has rated it.\n",
+    },
+    rejection: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateRejection",
+        },
+      ],
+      description:
+        "Why Meta refused this content, present when `status` is `rejected`. Absent otherwise.\n",
+    },
+    error: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateSubmissionError",
+        },
+      ],
+      description:
+        "Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+    },
+    submitted_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this content was submitted to Meta. Null on a draft, which has not been submitted, and null for a built-in template's language, which Bird ships already approved rather than submitting on your behalf.\n",
+      example: "2026-07-26T16:40:00Z",
+    },
+    approved_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When Meta approved this exact content. It is a permanent mark on the content rather than a status, so a later pause or archival does not clear it. Null for a built-in template's language, whose approval predates Bird holding a date for it.\n",
+      example: "2026-07-21T08:15:00Z",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this language last changed. Null for a built-in template's language, which Bird ships rather than stores.\n",
+      example: "2026-07-26T16:41:00Z",
+    },
+    updated_by: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/UserID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The workspace member who last wrote this language. Always null for a built-in template's language: nobody in the workspace authored it.\n",
+    },
+  },
+  description:
+    "One language of one version: its content, what the submission carrying it did with it, and everything Meta holds about it.\n",
 } as const;
 
 export const NumbersDedicatedAllocationIDSchema = {
@@ -19718,78 +20796,6 @@ export const EventWhatsAppDeliveredDataSchema = {
   ],
 } as const;
 
-export const EventWhatsAppDeliveredSchema = {
-  type: "object",
-  additionalProperties: false,
-  description: "The message was delivered to the recipient's device.",
-  required: ["type", "timestamp", "data"],
-  properties: {
-    type: {
-      type: "string",
-      minLength: 1,
-      enum: ["whatsapp.delivered"],
-      description: "Event type.",
-      example: "whatsapp.delivered",
-    },
-    timestamp: {
-      type: "string",
-      minLength: 1,
-      format: "date-time",
-      description: "Time the message was delivered to the recipient's device.",
-      example: "2026-07-16T12:00:00Z",
-    },
-    data: {
-      $ref: "#/components/schemas/EventWhatsAppDeliveredData",
-    },
-  },
-} as const;
-
-export const EventWhatsAppFailedDataSchema = {
-  type: "object",
-  description: "Payload of the whatsapp.failed event.",
-  allOf: [
-    {
-      $ref: "#/components/schemas/EventWhatsAppBase",
-    },
-    {
-      type: "object",
-      required: ["error"],
-      properties: {
-        error: {
-          $ref: "#/components/schemas/WhatsAppError",
-          description: "Why the message terminally failed.",
-        },
-      },
-    },
-  ],
-} as const;
-
-export const EventWhatsAppFailedSchema = {
-  type: "object",
-  additionalProperties: false,
-  description: "Message delivery failed permanently.",
-  required: ["type", "timestamp", "data"],
-  properties: {
-    type: {
-      type: "string",
-      minLength: 1,
-      enum: ["whatsapp.failed"],
-      description: "Event type.",
-      example: "whatsapp.failed",
-    },
-    timestamp: {
-      type: "string",
-      minLength: 1,
-      format: "date-time",
-      description: "Time the failure was recorded.",
-      example: "2026-07-16T12:00:00Z",
-    },
-    data: {
-      $ref: "#/components/schemas/EventWhatsAppFailedData",
-    },
-  },
-} as const;
-
 export const EventWhatsAppReadDataSchema = {
   type: "object",
   description: "Payload of the whatsapp.read event.",
@@ -19798,40 +20804,6 @@ export const EventWhatsAppReadDataSchema = {
       $ref: "#/components/schemas/EventWhatsAppBase",
     },
   ],
-} as const;
-
-export const EventWhatsAppReadSchema = {
-  type: "object",
-  additionalProperties: false,
-  description: "The recipient read the message.",
-  required: ["type", "timestamp", "data"],
-  properties: {
-    type: {
-      type: "string",
-      minLength: 1,
-      enum: ["whatsapp.read"],
-      description: "Event type.",
-      example: "whatsapp.read",
-    },
-    timestamp: {
-      type: "string",
-      minLength: 1,
-      format: "date-time",
-      description: "Time the recipient read the message.",
-      example: "2026-07-16T12:00:00Z",
-    },
-    data: {
-      $ref: "#/components/schemas/EventWhatsAppReadData",
-    },
-  },
-} as const;
-
-export const WhatsAppReceivedEventTypeSchema = {
-  type: "string",
-  minLength: 1,
-  enum: ["whatsapp.received"],
-  description: "Event type.",
-  example: "whatsapp.received",
 } as const;
 
 export const EventWhatsAppReceivedDataSchema = {
@@ -19932,6 +20904,122 @@ export const EventWhatsAppReceivedDataSchema = {
   ],
 } as const;
 
+export const EventWhatsAppSentDataSchema = {
+  type: "object",
+  description: "Payload of the whatsapp.sent event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventWhatsAppBase",
+    },
+  ],
+} as const;
+
+export const EventWhatsAppDeliveredSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "The message was delivered to the recipient's device.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["whatsapp.delivered"],
+      description: "Event type.",
+      example: "whatsapp.delivered",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the message was delivered to the recipient's device.",
+      example: "2026-07-16T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventWhatsAppDeliveredData",
+    },
+  },
+} as const;
+
+export const EventWhatsAppFailedDataSchema = {
+  type: "object",
+  description: "Payload of the whatsapp.failed event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventWhatsAppBase",
+    },
+    {
+      type: "object",
+      required: ["error"],
+      properties: {
+        error: {
+          $ref: "#/components/schemas/WhatsAppError",
+          description: "Why the message terminally failed.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EventWhatsAppFailedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Message delivery failed permanently.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["whatsapp.failed"],
+      description: "Event type.",
+      example: "whatsapp.failed",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the failure was recorded.",
+      example: "2026-07-16T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventWhatsAppFailedData",
+    },
+  },
+} as const;
+
+export const EventWhatsAppReadSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "The recipient read the message.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["whatsapp.read"],
+      description: "Event type.",
+      example: "whatsapp.read",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the recipient read the message.",
+      example: "2026-07-16T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventWhatsAppReadData",
+    },
+  },
+} as const;
+
+export const WhatsAppReceivedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["whatsapp.received"],
+  description: "Event type.",
+  example: "whatsapp.received",
+} as const;
+
 export const EventWhatsAppReceivedSchema = {
   type: "object",
   additionalProperties: false,
@@ -20000,16 +21088,6 @@ export const EventWhatsAppRejectedSchema = {
       $ref: "#/components/schemas/EventWhatsAppRejectedData",
     },
   },
-} as const;
-
-export const EventWhatsAppSentDataSchema = {
-  type: "object",
-  description: "Payload of the whatsapp.sent event.",
-  allOf: [
-    {
-      $ref: "#/components/schemas/EventWhatsAppBase",
-    },
-  ],
 } as const;
 
 export const EventWhatsAppSentSchema = {
@@ -22822,6 +23900,343 @@ export const WhatsAppEventListWritableSchema = {
   },
 } as const;
 
+export const WhatsAppTemplateRejectionWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Why Meta refused a language's content, and what it says about fixing it. Present when `status` is `rejected`.\n",
+  properties: {
+    category: {
+      $ref: "#/components/schemas/WhatsAppTemplateRejectionCategory",
+      description: "Meta's own classification of the refusal.",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateLanguageStateWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateLanguageStatus",
+        },
+      ],
+      description:
+        "On a template, where this language stands on the version currently in service. On a version, what that version's submission did with this language. Absent on a draft, which has not been submitted.\n",
+    },
+    rejection: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateRejectionWritable",
+        },
+      ],
+      description:
+        "Why Meta refused this content, present when `status` is `rejected`. Absent otherwise.\n",
+    },
+    error: {
+      description:
+        "Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+    },
+  },
+  description:
+    "Where one language stands, without its content: content lives under a version, read that for it. An object rather than a bare status string, so detail beyond status can arrive later as a sibling property instead of a breaking change.\n",
+} as const;
+
+export const WhatsAppTemplateWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "name",
+    "description",
+    "category",
+    "default_language",
+    "language_source_required",
+  ],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "A display name for the template. Nothing resolves through it, so it is safe to show wherever a human reads the template.\n",
+      example: "Order update",
+    },
+    description: {
+      type: ["string", "null"],
+      maxLength: 1000,
+      description: "What the template is for. Null when unset.",
+      example: "Sent when an order ships.",
+    },
+    category: {
+      $ref: "#/components/schemas/WhatsAppTemplateCategory",
+      description:
+        "The category you declared for the template. It is fixed once the template exists. Meta applies its own category per language and may move one, which is what messages are priced at. Read the language for that.\n",
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description:
+        "The language a send is served in when it names none, whichever `on_missing_language` is set. A template that sets `language_source_required` refuses such a send instead. Under `fallback` it is also the last hop for a language that is not in `available_languages`, whether the template holds no copy in it or holds one WhatsApp has not approved. The template is required to hold this default, and it must itself be in `available_languages` for a send to resolve here.\n",
+    },
+    language_source_required: {
+      type: "boolean",
+      description:
+        "When true, a send must name a language explicitly rather than letting the template resolve one.\n",
+      example: false,
+    },
+  },
+  description:
+    "A message template: one identity holding a copy of the message per language. Each language is reviewed, priced and paused by Meta on its own, so the template's own status is an aggregate and the per-language detail is in `languages`. A version contains the content.\n",
+} as const;
+
+export const WhatsAppTemplateListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of templates available to your workspace.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppTemplateWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppTemplateVersionSummaryWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["languages"],
+  properties: {
+    languages: {
+      type: "object",
+      example: {
+        en: {
+          status: "approved",
+        },
+      },
+      description:
+        "What this version's submission did with each language it holds, keyed by BCP-47 language tag. Content is not here: read the version for that.\n",
+      propertyNames: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/WhatsAppTemplateLanguageStateWritable",
+      },
+    },
+  },
+  description:
+    "One version of a template, without its content. A version holds a full copy of every language it was submitted with. Listing versions therefore names the languages and what became of each without carrying their content. Read a single version for its content. Read its shallow language collection for content hashes.\n",
+} as const;
+
+export const WhatsAppTemplateVersionListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of the template's versions, newest first.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppTemplateVersionSummaryWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppTemplateVersionLanguageWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["components"],
+  properties: {
+    components: {
+      type: "array",
+      description: "This language's content in this version, in display order.",
+    },
+    status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateLanguageStatus",
+        },
+      ],
+      description:
+        "What this submission did with this language. Absent on a draft, which has not been submitted. Whether the language can be sent right now is a different question, answered by the template's `languages` summary.\n",
+    },
+    rejection: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateRejectionWritable",
+        },
+      ],
+      description:
+        "Why Meta refused this content, present when `status` is `rejected`. Absent otherwise.\n",
+    },
+    error: {
+      description:
+        "Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+    },
+  },
+  description:
+    "One language's content in one version, and what that submission did with it.",
+} as const;
+
+export const WhatsAppTemplateVersionWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["languages"],
+  properties: {
+    languages: {
+      type: "object",
+      example: {
+        en: {
+          status: "approved",
+          components: [
+            {
+              type: "body",
+              text: "Your verification code is {{1}}.",
+              example_parameters: [
+                {
+                  type: "text",
+                  text: "123456",
+                },
+              ],
+            },
+          ],
+        },
+      },
+      description:
+        "This version's content, keyed by BCP-47 language tag, with what its submission did with each language.\n",
+      propertyNames: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/WhatsAppTemplateVersionLanguageWritable",
+      },
+    },
+  },
+  description:
+    "One version of a template: the content of every language it holds, frozen when it was submitted, alongside what Meta made of each. A draft is a version too: a mutable one, with no number and no submission date.\n",
+} as const;
+
+export const WhatsAppTemplateLanguageSummaryWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["language"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description: "The canonical tag this language is addressed by.",
+    },
+    status: {
+      $ref: "#/components/schemas/WhatsAppTemplateLanguageStatus",
+      description:
+        "What this version's submission did with this language. Absent on a draft.",
+    },
+  },
+  description:
+    "One language of a version without its content. Fetch the language itself for the content.\n",
+} as const;
+
+export const WhatsAppTemplateLanguageListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      description: "Every language this version holds, without content.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateLanguageSummaryWritable",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateQualityWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["current_score"],
+  properties: {
+    current_score: {
+      $ref: "#/components/schemas/WhatsAppTemplateQualityScore",
+      description: "Meta's rating for this language as of `updated_at`.",
+    },
+    previous_score: {
+      $ref: "#/components/schemas/WhatsAppTemplateQualityScore",
+      description:
+        "The rating this language held before the most recent change. Absent when Meta has rated it only once. Usually differs from `current_score`, but Meta sometimes reports both as the same value, so compare timestamps rather than assuming a transition.\n",
+    },
+  },
+  description:
+    "Meta's quality rating for one language, with the rating it moved from and when it moved. Present only once Meta has rated the language, and only on the version currently in service. A superseded version's content carries no rating.\n",
+} as const;
+
+export const WhatsAppTemplateLanguageWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["language", "components"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description: "The canonical tag this language is addressed by.",
+    },
+    components: {
+      type: "array",
+      description:
+        "This language's content blocks, in display order, exactly as submitted or as they stand in the draft.",
+    },
+    status: {
+      $ref: "#/components/schemas/WhatsAppTemplateLanguageStatus",
+      description:
+        "What this submission did with this language. Absent on a draft, which has not been submitted. On a superseded version this is history: how that submission went. It does not report whether the language is sendable now.\n",
+    },
+    category: {
+      $ref: "#/components/schemas/WhatsAppTemplateCategory",
+      description:
+        "The category Meta is applying to this language, which is what messages from it are priced at.",
+    },
+    previous_category: {
+      $ref: "#/components/schemas/WhatsAppTemplateCategory",
+      description: "The category this language held before Meta moved it.",
+    },
+    quality: {
+      $ref: "#/components/schemas/WhatsAppTemplateQualityWritable",
+      description:
+        "Meta's quality rating for this language. Present only on the version currently in service, and only once Meta has rated it.\n",
+    },
+    rejection: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateRejectionWritable",
+        },
+      ],
+      description:
+        "Why Meta refused this content, present when `status` is `rejected`. Absent otherwise.\n",
+    },
+    error: {
+      description:
+        "Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+    },
+  },
+  description:
+    "One language of one version: its content, what the submission carrying it did with it, and everything Meta holds about it.\n",
+} as const;
+
 export const EmailLatencyStatsWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -24505,52 +25920,6 @@ export const EventSMSUndeliveredWritableSchema = {
   },
 } as const;
 
-export const EventWhatsAppFailedDataWritableSchema = {
-  type: "object",
-  description: "Payload of the whatsapp.failed event.",
-  allOf: [
-    {
-      $ref: "#/components/schemas/EventWhatsAppBase",
-    },
-    {
-      type: "object",
-      required: ["error"],
-      properties: {
-        error: {
-          $ref: "#/components/schemas/WhatsAppErrorWritable",
-          description: "Why the message terminally failed.",
-        },
-      },
-    },
-  ],
-} as const;
-
-export const EventWhatsAppFailedWritableSchema = {
-  type: "object",
-  additionalProperties: false,
-  description: "Message delivery failed permanently.",
-  required: ["type", "timestamp", "data"],
-  properties: {
-    type: {
-      type: "string",
-      minLength: 1,
-      enum: ["whatsapp.failed"],
-      description: "Event type.",
-      example: "whatsapp.failed",
-    },
-    timestamp: {
-      type: "string",
-      minLength: 1,
-      format: "date-time",
-      description: "Time the failure was recorded.",
-      example: "2026-07-16T12:00:00Z",
-    },
-    data: {
-      $ref: "#/components/schemas/EventWhatsAppFailedDataWritable",
-    },
-  },
-} as const;
-
 export const EventWhatsAppReceivedDataWritableSchema = {
   type: "object",
   description:
@@ -24647,6 +26016,52 @@ export const EventWhatsAppReceivedDataWritableSchema = {
       },
     },
   ],
+} as const;
+
+export const EventWhatsAppFailedDataWritableSchema = {
+  type: "object",
+  description: "Payload of the whatsapp.failed event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventWhatsAppBase",
+    },
+    {
+      type: "object",
+      required: ["error"],
+      properties: {
+        error: {
+          $ref: "#/components/schemas/WhatsAppErrorWritable",
+          description: "Why the message terminally failed.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EventWhatsAppFailedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Message delivery failed permanently.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["whatsapp.failed"],
+      description: "Event type.",
+      example: "whatsapp.failed",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the failure was recorded.",
+      example: "2026-07-16T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventWhatsAppFailedDataWritable",
+    },
+  },
 } as const;
 
 export const EventWhatsAppReceivedWritableSchema = {

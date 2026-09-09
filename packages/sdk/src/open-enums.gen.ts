@@ -456,6 +456,29 @@ export const WhatsAppTemplateCategory = {
 export type WhatsAppTemplateCategoryValue = (typeof WhatsAppTemplateCategory)[keyof typeof WhatsAppTemplateCategory];
 
 /**
+ * Values of WhatsAppTemplateLanguageStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppTemplateLanguageStatus = {
+  Approved: "approved",
+  Archived: "archived",
+  Deleted: "deleted",
+  Disabled: "disabled",
+  InAppeal: "in_appeal",
+  LimitExceeded: "limit_exceeded",
+  OutcomeUnknown: "outcome_unknown",
+  Paused: "paused",
+  Pending: "pending",
+  PendingDeletion: "pending_deletion",
+  Rejected: "rejected",
+  SubmitFailed: "submit_failed",
+} as const;
+
+/** A known WhatsAppTemplateLanguageStatus value. */
+export type WhatsAppTemplateLanguageStatusValue = (typeof WhatsAppTemplateLanguageStatus)[keyof typeof WhatsAppTemplateLanguageStatus];
+
+/**
  * Values of WhatsAppTemplateParameterType known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -471,3 +494,34 @@ export const WhatsAppTemplateParameterType = {
 
 /** A known WhatsAppTemplateParameterType value. */
 export type WhatsAppTemplateParameterTypeValue = (typeof WhatsAppTemplateParameterType)[keyof typeof WhatsAppTemplateParameterType];
+
+/**
+ * Values of WhatsAppTemplateQualityScore known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppTemplateQualityScore = {
+  Green: "green",
+  Red: "red",
+  Unknown: "unknown",
+  Yellow: "yellow",
+} as const;
+
+/** A known WhatsAppTemplateQualityScore value. */
+export type WhatsAppTemplateQualityScoreValue = (typeof WhatsAppTemplateQualityScore)[keyof typeof WhatsAppTemplateQualityScore];
+
+/**
+ * Values of WhatsAppTemplateRejectionCategory known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppTemplateRejectionCategory = {
+  AbusiveContent: "abusive_content",
+  IncorrectCategory: "incorrect_category",
+  InvalidFormat: "invalid_format",
+  Scam: "scam",
+  TagContentMismatch: "tag_content_mismatch",
+} as const;
+
+/** A known WhatsAppTemplateRejectionCategory value. */
+export type WhatsAppTemplateRejectionCategoryValue = (typeof WhatsAppTemplateRejectionCategory)[keyof typeof WhatsAppTemplateRejectionCategory];
