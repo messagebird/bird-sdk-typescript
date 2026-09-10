@@ -26,6 +26,30 @@ export async function whatsappListEvents() {
   for (const event of data) console.log(event.type, event.occurred_at);
 }
 
+export async function whatsappMarkRead() {
+  const ack = await bird.whatsapp.markRead("wam_01krdgeqcxet5s7t44vh8rt9mg", {
+    typing_indicator: true,
+  });
+  ack.typing_indicator; // true
+}
+
+export async function whatsappReactionSet() {
+  const reaction = await bird.whatsapp.reaction.set("wam_01krdgeqcxet5s7t44vh8rt9mg", {
+    emoji: "\u{1F44D}",
+  });
+  console.log(reaction.id, reaction.emoji);
+}
+
+export async function whatsappReactionRemove() {
+  await bird.whatsapp.reaction.remove("wam_01krdgeqcxet5s7t44vh8rt9mg");
+}
+
+export async function whatsappReactionListEvents() {
+  for await (const event of bird.whatsapp.reaction.listEvents("wam_01krdgeqcxet5s7t44vh8rt9mg")) {
+    console.log(event.id, event.emoji, event.status);
+  }
+}
+
 export async function whatsappTemplatesList() {
   for await (const tpl of bird.whatsapp.templates.list()) {
     console.log(tpl.slug, tpl.status, tpl.available_languages);

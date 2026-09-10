@@ -8,6 +8,7 @@ import type {
 } from "../generated/types.gen.js";
 import { WhatsappResourceBase } from "./whatsapp.gen.js";
 import { WhatsappMessagesResource } from "./whatsappMessages.js";
+import { WhatsappReactionResource } from "./whatsappReaction.gen.js";
 import { WhatsappTemplatesResource } from "./whatsappTemplates.js";
 import { Resource } from "./base.js";
 import type { APIPromise, RequestOptions } from "../core/result.js";
@@ -22,6 +23,8 @@ export class WhatsappResource extends WhatsappResourceBase {
   /** The workspace's template registry — `bird.whatsapp.templates.list(...)`. */
   readonly templates: WhatsappTemplatesResource;
 
+  readonly reaction: WhatsappReactionResource;
+
   constructor(
     core: ConstructorParameters<typeof Resource>[0],
     client: ConstructorParameters<typeof Resource>[1],
@@ -29,6 +32,7 @@ export class WhatsappResource extends WhatsappResourceBase {
     super(core, client);
     this.messages = new WhatsappMessagesResource(core, client);
     this.templates = new WhatsappTemplatesResource(core, client);
+    this.reaction = new WhatsappReactionResource(core, client);
   }
 
   /**

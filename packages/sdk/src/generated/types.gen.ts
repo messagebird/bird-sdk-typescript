@@ -158,6 +158,9 @@ export type WebhookEvent =
       type: "whatsapp.failed";
     } & EventWhatsAppFailed)
   | ({
+      type: "whatsapp.reacted";
+    } & EventWhatsAppReacted)
+  | ({
       type: "whatsapp.read";
     } & EventWhatsAppRead)
   | ({
@@ -1194,7 +1197,7 @@ export type EmailMessageSendRequest = {
     [key: string]: unknown;
   };
   /**
-   * Parameter values used to personalize inline content. A parameter is a single word, and a token in the subject or body (for example `{{ animal }}`) is replaced with the value of that name at send time. Shared across all recipients of this send. A token with no matching key renders empty. Cap: 16 KB serialized. When sending a stored `template`, put the values in `template.parameters` instead.
+   * Parameter values used to personalize inline content, shared across all recipients of this send. Tokens such as `{{ animal }}` are replaced with matching values; missing values render empty. Include this object, even as `{}`, to use Liquid, or omit it to leave tokens unchanged. Use single-word names other than `bird`. Cap: 16 KB serialized. For a stored template, use `template.parameters` instead. See [inline personalization](https://bird.com/docs/guides/email/sending-email#content) for validation and URL encoding examples.
    *
    */
   parameters?: {
@@ -4267,6 +4270,12 @@ export type EmailLookup = {
   readonly did_you_mean?: string;
 };
 
+/**
+ * The channel a passcode is delivered over. Open enum: new channels may be added over time, so treat any unrecognized value as a future channel rather than an error.
+ */
+export type VerificationChannel =
+  "email" | "sms" | "whatsapp" | "telegram" | "voice" | (string & {});
+
 export type VerificationId = string;
 
 /**
@@ -4289,12 +4298,6 @@ export type VerificationTo = {
    */
   phone_number?: string;
 };
-
-/**
- * The channel a passcode is delivered over. Open enum: new channels may be added over time, so treat any unrecognized value as a future channel rather than an error.
- */
-export type VerificationChannel =
-  "email" | "sms" | "whatsapp" | "telegram" | "voice" | (string & {});
 
 export type VerificationChannelEntry = {
   channel: VerificationChannel;
@@ -4476,7 +4479,9 @@ export type DomainId = string;
  * - `scheduled`: Reserved and not returned.
  * - `canceled`: Reserved and not returned.
  *
- * Read receipts appear in `read_at` and `whatsapp.read` events.
+ * Read receipts appear in `read_at` and `whatsapp.read` events, in both
+ * directions: the recipient opening an outbound message, and the business
+ * acknowledging an inbound one.
  *
  */
 export type WhatsAppMessageStatus =
@@ -5176,6 +5181,23 @@ export type WhatsAppUnsupported = {
 };
 
 /**
+ * An emoji reaction standing on a message. One entry per sender: reacting again replaces that sender's entry rather than adding one, and removing a reaction drops it from the list. A one-to-one message therefore carries at most two, one for the contact and one for your business number. This is the folded current state, so it names no single change; the message's reaction log is what records how each one arrived.
+ *
+ */
+export type WhatsAppReaction = {
+  /**
+   * The emoji, as WhatsApp sent it. It is not normalized, so two emoji that render identically can differ byte for byte and compare unequal.
+   *
+   */
+  readonly emoji: string;
+  /**
+   * Who reacted. On a group message this is what tells one participant's reaction from another's. On a one-to-one message it is your business number on a reaction you placed and the contact on one they placed, which is why it is here rather than inferred from the message's `direction`.
+   *
+   */
+  readonly from: WhatsAppAddress;
+};
+
+/**
  * Standardized failure reason:
  *
  * - `insufficient_balance`: The workspace wallet could not fund the send.
@@ -5295,6 +5317,11 @@ export type WhatsAppMessage = {
    *
    */
   readonly unsupported?: WhatsAppUnsupported;
+  /**
+   * Emoji reactions standing on this message right now, one per sender. Absent when the message has none. A reaction that was replaced by a different emoji, or taken back, is not listed; the message's reaction log keeps that history. WhatsApp accepts a reaction on a message up to 30 days old, and we keep provider ids for 15, so a reaction placed on a message older than that cannot be matched to it and does not appear here.
+   *
+   */
+  readonly reactions?: Array<WhatsAppReaction>;
   readonly status: WhatsAppMessageStatus;
   /**
    * Failure detail for a message that did not reach the recipient. Present only when the message failed or was rejected.
@@ -5313,7 +5340,8 @@ export type WhatsAppMessage = {
    */
   readonly delivered_at?: string | null;
   /**
-   * When the message was read by the recipient. Null until then.
+   * When the message was read. On an outbound message this is the recipient opening it. On an inbound one it is when Bird acknowledged the message to WhatsApp for the business, which a read receipt sets. Null until then.
+   *
    */
   readonly read_at?: string | null;
   /**
@@ -5986,12 +6014,37 @@ export type WhatsAppMessageSendRequest = {
 };
 
 /**
+ * What to acknowledge on the inbound message. An absent body and `{}` mean the same thing: mark the message read and show nothing.
+ *
+ */
+export type WhatsAppReadReceiptRequest = {
+  /**
+   * Show a typing indicator to the contact as well as marking the message read. WhatsApp clears it when you send your next message, or after 25 seconds, whichever comes first. Only ask for one if you are about to reply.
+   *
+   */
+  typing_indicator?: boolean;
+};
+
+/**
+ * The acknowledgement Bird accepted. There is no status to poll afterwards: WhatsApp reports nothing about a read receipt.
+ *
+ */
+export type WhatsAppReadReceipt = {
+  /**
+   * Whether a typing indicator was requested alongside the read receipt.
+   */
+  typing_indicator: boolean;
+};
+
+/**
  * Message timeline event type:
  *
  * - `whatsapp.accepted`: The API accepted the request.
  * - `whatsapp.sent`: The message reached the WhatsApp network.
  * - `whatsapp.delivered`: Delivery to the recipient's device was confirmed.
- * - `whatsapp.read`: The recipient opened the message.
+ * - `whatsapp.read`: The message was read. On an outbound message the recipient
+ * opened it; on an inbound one Bird acknowledged it to WhatsApp for the
+ * business, which is what a read receipt records.
  * - `whatsapp.failed`: Delivery failed permanently.
  * - `whatsapp.rejected`: The message was refused before sending and not charged.
  * - `whatsapp.received`: An inbound message arrived from the contact.
@@ -6033,6 +6086,91 @@ export type WhatsAppEventList = {
    */
   data: Array<WhatsAppEvent>;
 };
+
+export type WhatsAppReactionUpsert = {
+  /**
+   * The emoji to place, as the character itself. Replaces your existing reaction on this message if you have one. To take a reaction back entirely, delete it rather than sending an empty value. WhatsApp takes exactly one emoji, so a value carrying more than one is refused with a `422` rather than sent. The length cap is generous because a single joined emoji is many code points: a couple-kissing one carrying two skin tones is ten, which is why the cap alone cannot express the limit.
+   *
+   */
+  emoji: string;
+};
+
+export type WhatsAppReactionEventId = string;
+
+/**
+ * A reaction as accepted, which WhatsApp has not applied yet and may still refuse. It names the reaction-log entry the request created, so a caller that places two changes on one message can tell which entry is which; read the message's `reactions` for what currently stands, or its reaction log for what became of this one.
+ *
+ */
+export type WhatsAppReactionAccepted = {
+  /**
+   * ID of the reaction-log entry this request created, matching the `id` that entry carries in [List reaction events for a WhatsApp message](/docs/api/reference/list-whatsapp-message-reaction-events).
+   *
+   */
+  id: WhatsAppReactionEventId;
+  /**
+   * The emoji as accepted, echoing the one the request carried.
+   */
+  emoji: string;
+};
+
+/**
+ * What became of one reaction change:
+ *
+ * - `received` means the contact placed or removed the reaction and WhatsApp
+ * told us about it. Every inbound entry carries this.
+ * - `sent` means your reaction reached WhatsApp. Reactions have no delivery or
+ * read receipt, so this is as far as an outbound entry gets.
+ * - `failed` means WhatsApp refused it. `error` says why, most often because the
+ * contact deleted the message. The grounds we can check for ourselves (a
+ * message you sent, one that is itself a reaction, one over 30 days old) are
+ * refused when you ask, so they do not reach here.
+ * - `rejected` means we refused it before it reached WhatsApp, so nothing was
+ * sent. `error` says why.
+ *
+ * Only `received` and `sent` entries change what stands on the message, so those
+ * are the ones the message's `reactions` are folded from.
+ *
+ */
+export type WhatsAppReactionEventStatus =
+  "received" | "sent" | "failed" | "rejected";
+
+/**
+ * One change to a reaction on a message: a reaction placed, replaced by a different emoji, or taken back. Entries are never edited, so a sender who reacts twice and then removes it leaves three of them.
+ *
+ */
+export type WhatsAppReactionEvent = {
+  /**
+   * ID of this entry, unique within the message's reaction log.
+   */
+  readonly id: WhatsAppReactionEventId;
+  /**
+   * The emoji this entry placed, as WhatsApp sent it and not normalized. Null when the entry took a reaction back rather than placing one. Always present, so null is the removal itself rather than a value we are missing.
+   *
+   */
+  readonly emoji: string | null;
+  readonly status: WhatsAppReactionEventStatus;
+  /**
+   * Who made the change. Your business number on a reaction you placed, the contact on one they placed.
+   *
+   */
+  readonly from: WhatsAppAddress;
+  /**
+   * Why the change did not take effect. Always carried by a `failed` or `rejected` entry, and never by any other, so a failure always says what went wrong. Absent rather than null on the entries that did take effect. The schema leaves it optional because that is a conditional the generators do not express.
+   *
+   */
+  readonly error?: WhatsAppError;
+  /**
+   * When the change was made.
+   */
+  readonly occurred_at: string;
+};
+
+export type WhatsAppReactionEventList = {
+  /**
+   * Changes to this message's reactions, newest first.
+   */
+  data: Array<WhatsAppReactionEvent>;
+} & ListEnvelope;
 
 export type WhatsAppTemplateExampleParameter = {
   /**
@@ -9764,6 +9902,7 @@ export type WebhookEventType =
   | "whatsapp.accepted"
   | "whatsapp.delivered"
   | "whatsapp.failed"
+  | "whatsapp.reacted"
   | "whatsapp.read"
   | "whatsapp.received"
   | "whatsapp.rejected"
@@ -11763,6 +11902,53 @@ export type EventWhatsAppFailed = {
 };
 
 /**
+ * Always `whatsapp.reacted` for this event.
+ */
+export type WhatsAppReactedEventType = "whatsapp.reacted";
+
+/**
+ * Payload of the whatsapp.reacted event. Names the message the contact reacted to, not the reaction, because a reaction is an annotation on a message rather than a message of its own.
+ *
+ */
+export type EventWhatsAppReactedData = {
+  /**
+   * The message the contact reacted to. WhatsApp accepts a reaction on a message up to 30 days old, and we keep provider ids for 15, so a reaction placed on a message older than that cannot be matched to it and raises no event at all.
+   *
+   */
+  whatsapp_id: WhatsAppMessageId;
+  /**
+   * The emoji the contact placed, as WhatsApp sent it and not normalized. Null when they took their reaction back rather than placing one. Always present, so null is the removal itself rather than a value we are missing.
+   *
+   */
+  emoji: string | null;
+  /**
+   * The contact who reacted, as WhatsApp identified them.
+   */
+  from: WhatsAppAddress;
+  /**
+   * Your WhatsApp number, the business side of the conversation.
+   */
+  to: WhatsAppAddress;
+  /**
+   * ID of the workspace that owns this event.
+   */
+  workspace_id: WorkspaceId;
+};
+
+/**
+ * A contact placed, changed or took back a reaction on a message.
+ */
+export type EventWhatsAppReacted = {
+  type: WhatsAppReactedEventType;
+  /**
+   * When the contact reacted, as reported by WhatsApp. Meta reports this to the second, so a contact who changes or withdraws a reaction quickly can produce two events sharing one timestamp. Sorting reactions on one message by this field cannot order those, and neither can delivery order, which retries make unreliable. Act on the reaction each event carries, as the change it describes; do not reconstruct the sequence from the events or treat the last one to arrive as the message's standing reaction. Read the message back for the reactions that stand: `getWhatsAppMessage` (`GET /v1/whatsapp/messages/{message_id}`) returns one entry per sender in `reactions`, and `listWhatsAppMessageReactionEvents` has every change.
+   *
+   */
+  timestamp: string;
+  data: EventWhatsAppReactedData;
+};
+
+/**
  * The recipient read the message.
  */
 export type EventWhatsAppRead = {
@@ -12189,36 +12375,38 @@ export type VoiceCallRouteType = "reject" | "trunk" | "forward" | "voicemail";
 export type VoiceInboundForwardAs = "dialed_number" | "calling_number";
 
 /**
- * Why we refused the call before dialing a carrier. Every refusal is signalled
- * to your PBX as `503`, so `sip_response_code` alone cannot tell these causes
- * apart. This field is where the cause lives.
+ * Why we rejected the call. Use `rejection_reason` to identify the cause;
+ * `sip_response_code` alone cannot distinguish these reasons.
  *
- * Most of them you can fix yourself:
+ * You can resolve these issues:
  *
  * - `source_not_allowed`: The call came from an IP address that is not in the
  * trunk's allowed-address list. Add the address your PBX sends from.
  * - `caller_id_not_verified`: The number in the `From` header is not a verified
- * caller ID for this workspace. Verify it, or present a number you have
- * already verified.
- * - `number_ownership_not_verified`: You bought this number, but the country that
- * issued it has not yet accepted the documents proving your workspace owns it.
- * Open the number under Numbers and complete its ownership requirements, then
- * place the call again.
- * - `destination_not_enabled`: You have not turned on calling to this
- * destination country. Enable it in your voice destination settings.
- * - `insufficient_balance`: Your wallet did not cover the call. Top up, or turn
- * on automatic top-ups.
- * - `daily_spend_exceeded`: The call would have passed your organization's daily
- * voice spend limit. The limit resets at the start of the next UTC day.
+ * caller ID for this workspace. Verify it or use a verified caller ID.
+ * - `number_ownership_not_verified`: The ownership documents for this purchased
+ * number have not yet been accepted under its country's requirements. We
+ * block outgoing and incoming calls on the number until verification is
+ * complete. Blocked incoming calls never reach your PBX, and their route type
+ * is `reject` regardless of the number's configuration. Open the number
+ * under **Numbers** and complete its ownership requirements, then retry
+ * the call.
+ * - `destination_not_enabled`: Calling to this destination country is disabled.
+ * Enable it in your voice destination settings.
+ * - `insufficient_balance`: Your wallet balance was too low for the call.
+ * Top up or enable automatic top-ups.
+ * - `daily_spend_exceeded`: The call would exceed your organization's daily
+ * voice spend limit. Retry after the limit resets at the start of the next
+ * UTC day.
  * - `concurrent_calls_exceeded`: You already have as many calls in progress as
- * your account allows. Wait for one to end, or ask support to raise the limit.
+ * your account allows. Wait for one to end or ask support to raise the limit.
  * - `calls_per_second_exceeded`: You placed calls faster than your account
- * allows. Slow the rate you dial at, then retry.
+ * allows. Reduce your dialing rate and retry.
  *
  * For all other reasons, contact support and provide the call `id`:
  *
- * - `routing_not_configured`: No dial plan is attached to this trunk yet.
- * Expected on a new trunk.
+ * - `routing_not_configured`: This trunk has no dial plan, which can happen on
+ * a new trunk.
  * - `no_route_found`: A dial plan is attached, but no rule in it covers this
  * destination.
  * - `destination_blocked`: The destination is blocked by our routing
@@ -12278,14 +12466,9 @@ export type VoiceCallInboundRouteForward = {
 };
 
 /**
- * Which answer the dialled number gave an incoming call, as it was acted on. The
- * type selects the shape: "reject" turned the call away, "trunk" delivered it to
- * one of your SIP trunks, and "forward" placed a call to another of your numbers
- * and connected the two.
- *
- * It says what the number was set to do, not that it worked. A "trunk" route on a
- * call that never connected is a number pointed at a trunk that did not take it;
- * the call's status is what carries the outcome.
+ * The routing choice recorded for an incoming call. A recorded route does not
+ * guarantee that the call connected. Check `status` for the outcome and
+ * `rejection_reason` for the cause when present.
  *
  */
 export type VoiceCallInboundRoute =
@@ -12393,7 +12576,14 @@ export type VoiceCall = {
    */
   readonly sip_response_code?: number | null;
   /**
-   * Why we refused the call before dialing a carrier. Absent whenever the refusal was not ours: a call that connected, a call the carrier or the far end turned down (`sip_response_code` carries their answer, and a 6xx decline reads as `rejected` rather than `failed`), and an incoming call turned away by the number it dialed, which fails no check of ours and so names no reason. `route` says what that number was set to do.
+   * Why we rejected the call. Absent on connected calls and calls rejected
+   * by the carrier or recipient. For carrier or recipient rejections, see
+   * `sip_response_code`; a `6xx` decline gives the call a `rejected` status.
+   *
+   * Read alongside `route` when present. A refusal caused by the number's
+   * configuration has no rejection reason; the route records that
+   * configuration.
+   *
    */
   readonly rejection_reason?: VoiceCallRejectionReason;
   /**
@@ -12592,6 +12782,9 @@ export type WebhookEventWritable =
   | ({
       type: "whatsapp.failed";
     } & EventWhatsAppFailedWritable)
+  | ({
+      type: "whatsapp.reacted";
+    } & EventWhatsAppReacted)
   | ({
       type: "whatsapp.read";
     } & EventWhatsAppRead)
@@ -13459,6 +13652,14 @@ export type WhatsAppDocumentWritable = WhatsAppMediaWritable & {
 };
 
 /**
+ * An emoji reaction standing on a message. One entry per sender: reacting again replaces that sender's entry rather than adding one, and removing a reaction drops it from the list. A one-to-one message therefore carries at most two, one for the contact and one for your business number. This is the folded current state, so it names no single change; the message's reaction log is what records how each one arrived.
+ *
+ */
+export type WhatsAppReactionWritable = {
+  [key: string]: never;
+};
+
+/**
  * Failure detail for a message that could not be delivered or was rejected.
  */
 export type WhatsAppErrorWritable = {
@@ -13502,6 +13703,37 @@ export type WhatsAppEventListWritable = {
    */
   data: Array<WhatsAppEventWritable>;
 };
+
+/**
+ * A reaction as accepted, which WhatsApp has not applied yet and may still refuse. It names the reaction-log entry the request created, so a caller that places two changes on one message can tell which entry is which; read the message's `reactions` for what currently stands, or its reaction log for what became of this one.
+ *
+ */
+export type WhatsAppReactionAcceptedWritable = {
+  /**
+   * ID of the reaction-log entry this request created, matching the `id` that entry carries in [List reaction events for a WhatsApp message](/docs/api/reference/list-whatsapp-message-reaction-events).
+   *
+   */
+  id: WhatsAppReactionEventId;
+  /**
+   * The emoji as accepted, echoing the one the request carried.
+   */
+  emoji: string;
+};
+
+/**
+ * One change to a reaction on a message: a reaction placed, replaced by a different emoji, or taken back. Entries are never edited, so a sender who reacts twice and then removes it leaves three of them.
+ *
+ */
+export type WhatsAppReactionEventWritable = {
+  [key: string]: never;
+};
+
+export type WhatsAppReactionEventListWritable = {
+  /**
+   * Changes to this message's reactions, newest first.
+   */
+  data: Array<WhatsAppReactionEventWritable>;
+} & ListEnvelope;
 
 /**
  * Why Meta refused a language's content, and what it says about fixing it. Present when `status` is `rejected`.
@@ -15020,7 +15252,17 @@ export type IncludeTotal = boolean;
 export type OrderDesc = "asc" | "desc";
 
 /**
- * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+ * Client-supplied key. On operations supporting request deduplication, a retained
+ * response is replayed for duplicate requests with the same key within the
+ * idempotency window (3 hours by default). This protection requires a workspace,
+ * organization, or staff-account scope. User-only and unauthenticated operations,
+ * streams, and operations with a separate replay contract do not use this
+ * response replay.
+ *
+ * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+ * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+ * backoff using the same key and request. An operation that takes effect before
+ * its response is retained can still execute again on retry.
  *
  * Two distinct 409 errors signal misuse:
  *
@@ -15123,7 +15365,17 @@ export type PublishRealtimeAppEventData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -15177,6 +15429,11 @@ export type PublishRealtimeAppEventErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type PublishRealtimeAppEventError =
@@ -15200,7 +15457,17 @@ export type PublishRealtimeAppBatchData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -15254,6 +15521,11 @@ export type PublishRealtimeAppBatchErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type PublishRealtimeAppBatchError =
@@ -15488,7 +15760,17 @@ export type DisconnectRealtimeAppMemberData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -15546,6 +15828,11 @@ export type DisconnectRealtimeAppMemberErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type DisconnectRealtimeAppMemberError =
@@ -15569,7 +15856,17 @@ export type SendRealtimeAppMemberEventData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -15627,6 +15924,11 @@ export type SendRealtimeAppMemberEventErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type SendRealtimeAppMemberEventError =
@@ -15734,7 +16036,17 @@ export type CreateEmailMessageData = {
   body: EmailMessageSendRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -15787,6 +16099,11 @@ export type CreateEmailMessageErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateEmailMessageError =
@@ -15806,7 +16123,17 @@ export type CreateEmailMessageBatchData = {
   body: EmailMessageBatchRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -15859,6 +16186,11 @@ export type CreateEmailMessageBatchErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateEmailMessageBatchError =
@@ -15931,7 +16263,17 @@ export type CancelEmailMessageData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -15985,6 +16327,11 @@ export type CancelEmailMessageErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CancelEmailMessageError =
@@ -16084,7 +16431,17 @@ export type CreateContactData = {
   body: ContactCreateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -16133,6 +16490,11 @@ export type CreateContactErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateContactError = CreateContactErrors[keyof CreateContactErrors];
@@ -16151,7 +16513,17 @@ export type CreateContactBatchData = {
   body: ContactUpsertRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -16196,6 +16568,11 @@ export type CreateContactBatchErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateContactBatchError =
@@ -16215,7 +16592,17 @@ export type DeleteContactData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -16265,6 +16652,11 @@ export type DeleteContactErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type DeleteContactError = DeleteContactErrors[keyof DeleteContactErrors];
@@ -16334,7 +16726,17 @@ export type UpdateContactData = {
   body: ContactUpdateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -16392,6 +16794,11 @@ export type UpdateContactErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type UpdateContactError = UpdateContactErrors[keyof UpdateContactErrors];
@@ -16542,7 +16949,17 @@ export type CreatePreferenceData = {
   body: PreferenceCreate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -16587,6 +17004,11 @@ export type CreatePreferenceErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreatePreferenceError =
@@ -16610,7 +17032,17 @@ export type DeletePreferenceData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -16661,6 +17093,11 @@ export type DeletePreferenceErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type DeletePreferenceError =
@@ -16790,7 +17227,17 @@ export type CreateContactPropertyData = {
   body: ContactPropertyCreateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -16839,6 +17286,11 @@ export type CreateContactPropertyErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateContactPropertyError =
@@ -16911,7 +17363,17 @@ export type UpdateContactPropertyData = {
   body: ContactPropertyUpdateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -16965,6 +17427,11 @@ export type UpdateContactPropertyErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type UpdateContactPropertyError =
@@ -16984,7 +17451,17 @@ export type ArchiveContactPropertyData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -17038,6 +17515,11 @@ export type ArchiveContactPropertyErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type ArchiveContactPropertyError =
@@ -17057,7 +17539,17 @@ export type UnarchiveContactPropertyData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -17111,6 +17603,11 @@ export type UnarchiveContactPropertyErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type UnarchiveContactPropertyError =
@@ -17190,7 +17687,17 @@ export type CreateAudienceData = {
   body: AudienceCreateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -17235,6 +17742,11 @@ export type CreateAudienceErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateAudienceError =
@@ -17254,7 +17766,17 @@ export type DeleteAudienceData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -17308,6 +17830,11 @@ export type DeleteAudienceErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type DeleteAudienceError =
@@ -17379,7 +17906,17 @@ export type UpdateAudienceData = {
   body: AudienceUpdateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -17433,6 +17970,11 @@ export type UpdateAudienceErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type UpdateAudienceError =
@@ -17522,7 +18064,17 @@ export type AssignAudienceContactsData = {
   body: AudienceContactsAddRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -17576,6 +18128,11 @@ export type AssignAudienceContactsErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type AssignAudienceContactsError =
@@ -17595,7 +18152,17 @@ export type UnassignAudienceContactsData = {
   body: AudienceContactsRemoveRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -17649,6 +18216,11 @@ export type UnassignAudienceContactsErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type UnassignAudienceContactsError =
@@ -17668,7 +18240,17 @@ export type UnassignAudienceContactData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -17722,6 +18304,11 @@ export type UnassignAudienceContactErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type UnassignAudienceContactError =
@@ -17819,7 +18406,7 @@ export type ListSmsMessagesErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -17842,7 +18429,17 @@ export type CreateSmsMessageData = {
   body: SmsMessageSendRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -17891,6 +18488,11 @@ export type CreateSmsMessageErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateSmsMessageError =
@@ -17910,7 +18512,17 @@ export type CreateSmsMessageBatchData = {
   body: SmsMessageBatchRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -17959,6 +18571,11 @@ export type CreateSmsMessageBatchErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateSmsMessageBatchError =
@@ -18013,7 +18630,7 @@ export type GetSmsMessageErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -18075,7 +18692,7 @@ export type ListSmsMessageEventsErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -18286,7 +18903,17 @@ export type CreateSmsSuppressionData = {
   body: SmsSuppressionCreate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -18331,6 +18958,11 @@ export type CreateSmsSuppressionErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateSmsSuppressionError =
@@ -18354,7 +18986,17 @@ export type DeleteSmsSuppressionData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -18405,6 +19047,11 @@ export type DeleteSmsSuppressionErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type DeleteSmsSuppressionError =
@@ -18557,7 +19204,17 @@ export type CreateSmsKeywordRuleData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -18606,6 +19263,11 @@ export type CreateSmsKeywordRuleErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateSmsKeywordRuleError =
@@ -18629,7 +19291,17 @@ export type DeleteSmsKeywordRuleData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -18679,6 +19351,11 @@ export type DeleteSmsKeywordRuleErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type DeleteSmsKeywordRuleError =
@@ -18761,7 +19438,17 @@ export type UpdateSmsKeywordRuleData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -18819,6 +19506,11 @@ export type UpdateSmsKeywordRuleErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type UpdateSmsKeywordRuleError =
@@ -18909,7 +19601,7 @@ export type GetSmsStatsSummaryErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -18996,7 +19688,7 @@ export type GetSmsStatsDailyErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -19083,7 +19775,7 @@ export type GetSmsStatsHourlyErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -19168,7 +19860,7 @@ export type GetSmsStatsByOriginatorErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -19253,7 +19945,7 @@ export type GetSmsStatsByCountryErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -19338,7 +20030,7 @@ export type GetSmsStatsByCategoryErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -19423,7 +20115,7 @@ export type GetSmsStatsByErrorCodeErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -19508,7 +20200,7 @@ export type GetSmsStatsByCarrierErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -19593,7 +20285,7 @@ export type GetSmsStatsByTagErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -19660,7 +20352,7 @@ export type GetSmsStatsByStatusErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -19734,7 +20426,7 @@ export type GetSmsInboundStatsSummaryErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -19801,7 +20493,7 @@ export type GetSmsInboundStatsDailyErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -19868,7 +20560,7 @@ export type GetSmsInboundStatsHourlyErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -19939,7 +20631,7 @@ export type GetSmsInboundStatsByCountryErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -20010,7 +20702,7 @@ export type GetSmsInboundStatsByOperatorErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -20081,7 +20773,7 @@ export type GetSmsInboundStatsByNumberErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -20108,7 +20800,17 @@ export type CreatePhoneNumberLookupData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -20158,7 +20860,7 @@ export type CreatePhoneNumberLookupErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -20185,7 +20887,17 @@ export type CreateEmailLookupData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -20235,7 +20947,7 @@ export type CreateEmailLookupErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -20262,7 +20974,17 @@ export type CreateVerificationData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -20312,7 +21034,7 @@ export type CreateVerificationErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -20339,7 +21061,17 @@ export type CreateVerificationCheckData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -20389,7 +21121,7 @@ export type CreateVerificationCheckErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -20416,7 +21148,17 @@ export type CreateVerificationNextChannelData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -20470,7 +21212,7 @@ export type CreateVerificationNextChannelErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -20580,7 +21322,7 @@ export type ListWhatsAppMessagesErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -20603,7 +21345,17 @@ export type CreateWhatsAppMessageData = {
   body: WhatsAppMessageSendRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -20657,7 +21409,7 @@ export type CreateWhatsAppMessageErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -20715,7 +21467,7 @@ export type GetWhatsAppMessageErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -20733,6 +21485,94 @@ export type GetWhatsAppMessageResponses = {
 
 export type GetWhatsAppMessageResponse =
   GetWhatsAppMessageResponses[keyof GetWhatsAppMessageResponses];
+
+export type SendWhatsAppReadReceiptData = {
+  body?: WhatsAppReadReceiptRequest;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the inbound message to acknowledge.
+     */
+    message_id: WhatsAppMessageId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/messages/{message_id}/read";
+};
+
+export type SendWhatsAppReadReceiptErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type SendWhatsAppReadReceiptError =
+  SendWhatsAppReadReceiptErrors[keyof SendWhatsAppReadReceiptErrors];
+
+export type SendWhatsAppReadReceiptResponses = {
+  /**
+   * Acknowledgement accepted for asynchronous delivery.
+   */
+  202: WhatsAppReadReceipt;
+};
+
+export type SendWhatsAppReadReceiptResponse =
+  SendWhatsAppReadReceiptResponses[keyof SendWhatsAppReadReceiptResponses];
 
 export type ListWhatsAppMessageEventsData = {
   body?: never;
@@ -20779,7 +21619,7 @@ export type ListWhatsAppMessageEventsErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -20848,6 +21688,250 @@ export type GetWhatsAppMessageMediaErrors = {
 
 export type GetWhatsAppMessageMediaError =
   GetWhatsAppMessageMediaErrors[keyof GetWhatsAppMessageMediaErrors];
+
+export type DeleteWhatsAppMessageReactionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the message to take your reaction off, as returned in the `id` field of the message.
+     *
+     */
+    message_id: WhatsAppMessageId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/messages/{message_id}/reaction";
+};
+
+export type DeleteWhatsAppMessageReactionErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteWhatsAppMessageReactionError =
+  DeleteWhatsAppMessageReactionErrors[keyof DeleteWhatsAppMessageReactionErrors];
+
+export type DeleteWhatsAppMessageReactionResponses = {
+  /**
+   * Removal accepted. No body: the reaction is still standing at this point, and on a message this workspace never reacted to there is nothing to return. Read the message's `reactions` to see it go.
+   *
+   */
+  202: unknown;
+};
+
+export type UpsertWhatsAppMessageReactionData = {
+  body: WhatsAppReactionUpsert;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the message to react to, as returned in the `id` field of the message. Must be a message this workspace received.
+     *
+     */
+    message_id: WhatsAppMessageId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/messages/{message_id}/reaction";
+};
+
+export type UpsertWhatsAppMessageReactionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpsertWhatsAppMessageReactionError =
+  UpsertWhatsAppMessageReactionErrors[keyof UpsertWhatsAppMessageReactionErrors];
+
+export type UpsertWhatsAppMessageReactionResponses = {
+  /**
+   * Reaction accepted; WhatsApp applies it asynchronously.
+   */
+  202: WhatsAppReactionAccepted;
+};
+
+export type UpsertWhatsAppMessageReactionResponse =
+  UpsertWhatsAppMessageReactionResponses[keyof UpsertWhatsAppMessageReactionResponses];
+
+export type ListWhatsAppMessageReactionEventsData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the message whose reactions to read, as returned in the `id` field of the message.
+     *
+     */
+    message_id: WhatsAppMessageId;
+  };
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/messages/{message_id}/reaction-events";
+};
+
+export type ListWhatsAppMessageReactionEventsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ListWhatsAppMessageReactionEventsError =
+  ListWhatsAppMessageReactionEventsErrors[keyof ListWhatsAppMessageReactionEventsErrors];
+
+export type ListWhatsAppMessageReactionEventsResponses = {
+  /**
+   * Paginated list of reaction changes for this WhatsApp message.
+   */
+  200: WhatsAppReactionEventList;
+};
+
+export type ListWhatsAppMessageReactionEventsResponse =
+  ListWhatsAppMessageReactionEventsResponses[keyof ListWhatsAppMessageReactionEventsResponses];
 
 export type ListWhatsAppTemplatesData = {
   body?: never;
@@ -21303,7 +22387,7 @@ export type GetEmailStatsDailyErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -21399,7 +22483,7 @@ export type GetEmailStatsHourlyErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -21488,7 +22572,7 @@ export type GetEmailStatsByTagErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -21591,7 +22675,7 @@ export type GetEmailStatsSummaryErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -21697,7 +22781,7 @@ export type GetEmailStatsBySendingIpErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -21786,7 +22870,7 @@ export type GetEmailStatsBySendingDomainErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -21871,7 +22955,7 @@ export type GetEmailStatsByCategoryErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -21960,7 +23044,7 @@ export type GetEmailStatsByMailboxProviderErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -22049,7 +23133,7 @@ export type GetEmailStatsByMailboxProviderRegionErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -22138,7 +23222,7 @@ export type GetEmailStatsByRecipientDomainErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -22227,7 +23311,7 @@ export type GetEmailStatsByTemplateErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -22312,7 +23396,7 @@ export type GetEmailStatsByLocationErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -22397,7 +23481,7 @@ export type GetEmailStatsByClientErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -22483,7 +23567,7 @@ export type GetEmailStatsByBounceCodeErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -22563,7 +23647,7 @@ export type GetEmailStatsByComplaintTypeErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -22638,7 +23722,7 @@ export type GetEmailStatsByBroadcastErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -22734,7 +23818,17 @@ export type CreateDomainData = {
   body: DomainCreate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -22783,6 +23877,11 @@ export type CreateDomainErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateDomainError = CreateDomainErrors[keyof CreateDomainErrors];
@@ -22801,7 +23900,17 @@ export type DeleteDomainData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -22855,6 +23964,11 @@ export type DeleteDomainErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type DeleteDomainError = DeleteDomainErrors[keyof DeleteDomainErrors];
@@ -22924,7 +24038,17 @@ export type UpdateDomainData = {
   body: DomainUpdate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -22982,6 +24106,11 @@ export type UpdateDomainErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type UpdateDomainError = UpdateDomainErrors[keyof UpdateDomainErrors];
@@ -23000,7 +24129,17 @@ export type VerifyDomainData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -23050,6 +24189,11 @@ export type VerifyDomainErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type VerifyDomainError = VerifyDomainErrors[keyof VerifyDomainErrors];
@@ -23221,7 +24365,17 @@ export type CreateMailboxData = {
   body: MailboxCreate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -23274,6 +24428,11 @@ export type CreateMailboxErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateMailboxError = CreateMailboxErrors[keyof CreateMailboxErrors];
@@ -23292,7 +24451,17 @@ export type DeleteMailboxData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -23346,6 +24515,11 @@ export type DeleteMailboxErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type DeleteMailboxError = DeleteMailboxErrors[keyof DeleteMailboxErrors];
@@ -23415,7 +24589,17 @@ export type UpdateMailboxData = {
   body: MailboxUpdate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -23482,6 +24666,11 @@ export type UpdateMailboxErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type UpdateMailboxError = UpdateMailboxErrors[keyof UpdateMailboxErrors];
@@ -23500,7 +24689,17 @@ export type RestoreMailboxData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -23554,6 +24753,11 @@ export type RestoreMailboxErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type RestoreMailboxError =
@@ -23633,7 +24837,7 @@ export type GetMailboxStatsErrors = {
    */
   500: Error;
   /**
-   * The service is temporarily unavailable. The request is safe to retry after the delay in the `Retry-After` header.
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
    *
    */
   503: Error;
@@ -23656,7 +24860,17 @@ export type ResumeMailboxData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -23710,6 +24924,11 @@ export type ResumeMailboxErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type ResumeMailboxError = ResumeMailboxErrors[keyof ResumeMailboxErrors];
@@ -23798,7 +25017,17 @@ export type CreateMailboxReceiveRuleData = {
   body: ReceiveRuleCreate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -23856,6 +25085,11 @@ export type CreateMailboxReceiveRuleErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateMailboxReceiveRuleError =
@@ -23875,7 +25109,17 @@ export type DeleteMailboxReceiveRuleData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -23929,6 +25173,11 @@ export type DeleteMailboxReceiveRuleErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type DeleteMailboxReceiveRuleError =
@@ -24039,7 +25288,17 @@ export type DeleteEmailThreadData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -24098,6 +25357,11 @@ export type DeleteEmailThreadErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type DeleteEmailThreadError =
@@ -24174,7 +25438,17 @@ export type UpdateEmailThreadData = {
   body: EmailThreadUpdateRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -24232,6 +25506,11 @@ export type UpdateEmailThreadErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type UpdateEmailThreadError =
@@ -24517,7 +25796,17 @@ export type ReplyEmailThreadMessageData = {
   body: EmailThreadMessageReplyRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -24587,6 +25876,11 @@ export type ReplyEmailThreadMessageErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type ReplyEmailThreadMessageError =
@@ -24606,7 +25900,17 @@ export type CreateMailboxMessageData = {
   body: EmailMailboxComposeRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -24668,6 +25972,11 @@ export type CreateMailboxMessageErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateMailboxMessageError =
@@ -24806,7 +26115,17 @@ export type CreateWebhookData = {
   body: WebhookEndpointCreate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -24851,6 +26170,11 @@ export type CreateWebhookErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateWebhookError = CreateWebhookErrors[keyof CreateWebhookErrors];
@@ -24869,7 +26193,17 @@ export type DeleteWebhookData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -24919,6 +26253,11 @@ export type DeleteWebhookErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type DeleteWebhookError = DeleteWebhookErrors[keyof DeleteWebhookErrors];
@@ -24988,7 +26327,17 @@ export type UpdateWebhookData = {
   body: WebhookEndpointUpdate;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -25042,6 +26391,11 @@ export type UpdateWebhookErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type UpdateWebhookError = UpdateWebhookErrors[keyof UpdateWebhookErrors];
@@ -25060,7 +26414,17 @@ export type RotateWebhookSecretData = {
   body?: never;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -25110,6 +26474,11 @@ export type RotateWebhookSecretErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type RotateWebhookSecretError =
@@ -25129,7 +26498,17 @@ export type TestWebhookData = {
   body?: WebhookTestRequest;
   headers?: {
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -25187,6 +26566,11 @@ export type TestWebhookErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type TestWebhookError = TestWebhookErrors[keyof TestWebhookErrors];
@@ -25563,7 +26947,17 @@ export type CreateNumbersOrderData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -25620,6 +27014,11 @@ export type CreateNumbersOrderErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type CreateNumbersOrderError =
@@ -25706,7 +27105,17 @@ export type ReleaseWorkspaceNumberData = {
      */
     "X-Workspace-Id"?: string;
     /**
-     * Client-supplied deduplication key. When present, the original response is replayed for any duplicate request with the same key, within the idempotency window (3 hours by default).
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
      *
      * Two distinct 409 errors signal misuse:
      *
@@ -25760,6 +27169,11 @@ export type ReleaseWorkspaceNumberErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type ReleaseWorkspaceNumberError =

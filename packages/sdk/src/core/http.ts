@@ -179,7 +179,7 @@ export class BirdHTTPClient {
 }
 
 function isMutation(method: string): boolean {
-  return ["POST", "PATCH", "DELETE"].includes(method.toUpperCase());
+  return ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase());
 }
 
 // Retry network failures, per-attempt timeouts, and transient statuses. 409 is a

@@ -149,6 +149,9 @@ export const WebhookEventSchema = {
       $ref: "#/components/schemas/EventWhatsAppFailed",
     },
     {
+      $ref: "#/components/schemas/EventWhatsAppReacted",
+    },
+    {
       $ref: "#/components/schemas/EventWhatsAppRead",
     },
     {
@@ -230,6 +233,7 @@ export const WebhookEventSchema = {
       "whatsapp.accepted": "#/components/schemas/EventWhatsAppAccepted",
       "whatsapp.delivered": "#/components/schemas/EventWhatsAppDelivered",
       "whatsapp.failed": "#/components/schemas/EventWhatsAppFailed",
+      "whatsapp.reacted": "#/components/schemas/EventWhatsAppReacted",
       "whatsapp.read": "#/components/schemas/EventWhatsAppRead",
       "whatsapp.received": "#/components/schemas/EventWhatsAppReceived",
       "whatsapp.rejected": "#/components/schemas/EventWhatsAppRejected",
@@ -2095,7 +2099,7 @@ export const EmailMessageSendRequestSchema = {
     parameters: {
       type: "object",
       description:
-        "Parameter values used to personalize inline content. A parameter is a single word, and a token in the subject or body (for example `{{ animal }}`) is replaced with the value of that name at send time. Shared across all recipients of this send. A token with no matching key renders empty. Cap: 16 KB serialized. When sending a stored `template`, put the values in `template.parameters` instead.\n",
+        "Parameter values used to personalize inline content, shared across all recipients of this send. Tokens such as `{{ animal }}` are replaced with matching values; missing values render empty. Include this object, even as `{}`, to use Liquid, or omit it to leave tokens unchanged. Use single-word names other than `bird`. Cap: 16 KB serialized. For a stored template, use `template.parameters` instead. See [inline personalization](https://bird.com/docs/guides/email/sending-email#content) for validation and URL encoding examples.\n",
       additionalProperties: true,
     },
     template: {
@@ -7445,6 +7449,14 @@ export const EmailLookupSchema = {
   },
 } as const;
 
+export const VerificationChannelSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["email", "sms", "whatsapp", "telegram", "voice"],
+  description:
+    "The channel a passcode is delivered over. Open enum: new channels may be added over time, so treat any unrecognized value as a future channel rather than an error.",
+} as const;
+
 export const VerificationIDSchema = {
   type: "string",
   minLength: 1,
@@ -7483,14 +7495,6 @@ export const VerificationToSchema = {
       example: "+15551234567",
     },
   },
-} as const;
-
-export const VerificationChannelSchema = {
-  type: "string",
-  minLength: 1,
-  "x-extensible-enum": ["email", "sms", "whatsapp", "telegram", "voice"],
-  description:
-    "The channel a passcode is delivered over. Open enum: new channels may be added over time, so treat any unrecognized value as a future channel rather than an error.",
 } as const;
 
 export const VerificationChannelEntrySchema = {
@@ -7781,7 +7785,7 @@ export const WhatsAppMessageStatusSchema = {
     "received",
   ],
   description:
-    "Delivery status:\n\n- `accepted`: Accepted and queued for sending.\n- `sent`: Handed to the WhatsApp network.\n- `delivered`: Confirmed as delivered to the recipient's device.\n- `failed`: Permanently failed.\n- `rejected`: Refused before sending and not charged.\n- `received`: Received as an inbound message.\n- `scheduled`: Reserved and not returned.\n- `canceled`: Reserved and not returned.\n\nRead receipts appear in `read_at` and `whatsapp.read` events.\n",
+    "Delivery status:\n\n- `accepted`: Accepted and queued for sending.\n- `sent`: Handed to the WhatsApp network.\n- `delivered`: Confirmed as delivered to the recipient's device.\n- `failed`: Permanently failed.\n- `rejected`: Refused before sending and not charged.\n- `received`: Received as an inbound message.\n- `scheduled`: Reserved and not returned.\n- `canceled`: Reserved and not returned.\n\nRead receipts appear in `read_at` and `whatsapp.read` events, in both\ndirections: the recipient opening an outbound message, and the business\nacknowledging an inbound one.\n",
 } as const;
 
 export const WhatsAppMessageIDSchema = {
@@ -8898,6 +8902,34 @@ export const WhatsAppUnsupportedSchema = {
   },
 } as const;
 
+export const WhatsAppReactionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["emoji", "from"],
+  description:
+    "An emoji reaction standing on a message. One entry per sender: reacting again replaces that sender's entry rather than adding one, and removing a reaction drops it from the list. A one-to-one message therefore carries at most two, one for the contact and one for your business number. This is the folded current state, so it names no single change; the message's reaction log is what records how each one arrived.\n",
+  properties: {
+    emoji: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The emoji, as WhatsApp sent it. It is not normalized, so two emoji that render identically can differ byte for byte and compare unequal.\n",
+      example: "👍",
+    },
+    from: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppAddress",
+        },
+      ],
+      description:
+        "Who reacted. On a group message this is what tells one participant's reaction from another's. On a one-to-one message it is your business number on a reaction you placed and the contact on one they placed, which is why it is here rather than inferred from the message's `direction`.\n",
+    },
+  },
+} as const;
+
 export const WhatsAppErrorCodeSchema = {
   type: "string",
   minLength: 1,
@@ -9111,6 +9143,15 @@ export const WhatsAppMessageSchema = {
       description:
         "Set when the contact sent content we do not model, naming the WhatsApp content type so the message is not silently empty. Inbound only.\n",
     },
+    reactions: {
+      readOnly: true,
+      type: "array",
+      description:
+        "Emoji reactions standing on this message right now, one per sender. Absent when the message has none. A reaction that was replaced by a different emoji, or taken back, is not listed; the message's reaction log keeps that history. WhatsApp accepts a reaction on a message up to 30 days old, and we keep provider ids for 15, so a reaction placed on a message older than that cannot be matched to it and does not appear here.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppReaction",
+      },
+    },
     status: {
       readOnly: true,
       allOf: [
@@ -9149,7 +9190,7 @@ export const WhatsAppMessageSchema = {
       format: "date-time",
       readOnly: true,
       description:
-        "When the message was read by the recipient. Null until then.",
+        "When the message was read. On an outbound message this is the recipient opening it. On an inbound one it is when Bird acknowledged the message to WhatsApp for the business, which a read receipt sets. Null until then.\n",
     },
     cost: {
       readOnly: true,
@@ -10759,11 +10800,43 @@ export const WhatsAppMessageSendRequestSchema = {
   },
 } as const;
 
+export const WhatsAppReadReceiptRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "What to acknowledge on the inbound message. An absent body and `{}` mean the same thing: mark the message read and show nothing.\n",
+  properties: {
+    typing_indicator: {
+      type: "boolean",
+      default: false,
+      example: true,
+      description:
+        "Show a typing indicator to the contact as well as marking the message read. WhatsApp clears it when you send your next message, or after 25 seconds, whichever comes first. Only ask for one if you are about to reply.\n",
+    },
+  },
+} as const;
+
+export const WhatsAppReadReceiptSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["typing_indicator"],
+  description:
+    "The acknowledgement Bird accepted. There is no status to poll afterwards: WhatsApp reports nothing about a read receipt.\n",
+  properties: {
+    typing_indicator: {
+      type: "boolean",
+      description:
+        "Whether a typing indicator was requested alongside the read receipt.",
+      example: true,
+    },
+  },
+} as const;
+
 export const WhatsAppEventTypeSchema = {
   type: "string",
   minLength: 1,
   description:
-    "Message timeline event type:\n\n- `whatsapp.accepted`: The API accepted the request.\n- `whatsapp.sent`: The message reached the WhatsApp network.\n- `whatsapp.delivered`: Delivery to the recipient's device was confirmed.\n- `whatsapp.read`: The recipient opened the message.\n- `whatsapp.failed`: Delivery failed permanently.\n- `whatsapp.rejected`: The message was refused before sending and not charged.\n- `whatsapp.received`: An inbound message arrived from the contact.\n\nThis is an open enum. Accept unrecognized values.\n",
+    "Message timeline event type:\n\n- `whatsapp.accepted`: The API accepted the request.\n- `whatsapp.sent`: The message reached the WhatsApp network.\n- `whatsapp.delivered`: Delivery to the recipient's device was confirmed.\n- `whatsapp.read`: The message was read. On an outbound message the recipient\n  opened it; on an inbound one Bird acknowledged it to WhatsApp for the\n  business, which is what a read receipt records.\n- `whatsapp.failed`: Delivery failed permanently.\n- `whatsapp.rejected`: The message was refused before sending and not charged.\n- `whatsapp.received`: An inbound message arrived from the contact.\n\nThis is an open enum. Accept unrecognized values.\n",
   "x-extensible-enum": [
     "whatsapp.accepted",
     "whatsapp.delivered",
@@ -10826,6 +10899,137 @@ export const WhatsAppEventListSchema = {
       },
     },
   },
+} as const;
+
+export const WhatsAppReactionUpsertSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["emoji"],
+  properties: {
+    emoji: {
+      type: "string",
+      minLength: 1,
+      maxLength: 64,
+      description:
+        "The emoji to place, as the character itself. Replaces your existing reaction on this message if you have one. To take a reaction back entirely, delete it rather than sending an empty value. WhatsApp takes exactly one emoji, so a value carrying more than one is refused with a `422` rather than sent. The length cap is generous because a single joined emoji is many code points: a couple-kissing one carrying two skin tones is ten, which is why the cap alone cannot express the limit.\n",
+      example: "👍",
+    },
+  },
+} as const;
+
+export const WhatsAppReactionEventIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^war_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "war_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppReactionAcceptedSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["id", "emoji"],
+  description:
+    "A reaction as accepted, which WhatsApp has not applied yet and may still refuse. It names the reaction-log entry the request created, so a caller that places two changes on one message can tell which entry is which; read the message's `reactions` for what currently stands, or its reaction log for what became of this one.\n",
+  properties: {
+    id: {
+      $ref: "#/components/schemas/WhatsAppReactionEventID",
+      description:
+        "ID of the reaction-log entry this request created, matching the `id` that entry carries in [List reaction events for a WhatsApp message](/docs/api/reference/list-whatsapp-message-reaction-events).\n",
+    },
+    emoji: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The emoji as accepted, echoing the one the request carried.",
+      example: "👍",
+    },
+  },
+} as const;
+
+export const WhatsAppReactionEventStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["received", "sent", "failed", "rejected"],
+  description:
+    "What became of one reaction change:\n\n- `received` means the contact placed or removed the reaction and WhatsApp\n  told us about it. Every inbound entry carries this.\n- `sent` means your reaction reached WhatsApp. Reactions have no delivery or\n  read receipt, so this is as far as an outbound entry gets.\n- `failed` means WhatsApp refused it. `error` says why, most often because the\n  contact deleted the message. The grounds we can check for ourselves (a\n  message you sent, one that is itself a reaction, one over 30 days old) are\n  refused when you ask, so they do not reach here.\n- `rejected` means we refused it before it reached WhatsApp, so nothing was\n  sent. `error` says why.\n\nOnly `received` and `sent` entries change what stands on the message, so those\nare the ones the message's `reactions` are folded from.\n",
+  example: "received",
+} as const;
+
+export const WhatsAppReactionEventSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "emoji", "status", "from", "occurred_at"],
+  description:
+    "One change to a reaction on a message: a reaction placed, replaced by a different emoji, or taken back. Entries are never edited, so a sender who reacts twice and then removes it leaves three of them.\n",
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/WhatsAppReactionEventID",
+      description:
+        "ID of this entry, unique within the message's reaction log.",
+    },
+    emoji: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "The emoji this entry placed, as WhatsApp sent it and not normalized. Null when the entry took a reaction back rather than placing one. Always present, so null is the removal itself rather than a value we are missing.\n",
+      example: "👍",
+    },
+    status: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppReactionEventStatus",
+        },
+      ],
+    },
+    from: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppAddress",
+        },
+      ],
+      description:
+        "Who made the change. Your business number on a reaction you placed, the contact on one they placed.\n",
+    },
+    error: {
+      readOnly: true,
+      $ref: "#/components/schemas/WhatsAppError",
+      description:
+        "Why the change did not take effect. Always carried by a `failed` or `rejected` entry, and never by any other, so a failure always says what went wrong. Absent rather than null on the entries that did take effect. The schema leaves it optional because that is a conditional the generators do not express.\n",
+    },
+    occurred_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the change was made.",
+      example: "2026-08-28T19:01:10Z",
+    },
+  },
+} as const;
+
+export const WhatsAppReactionEventListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Changes to this message's reactions, newest first.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppReactionEvent",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
 } as const;
 
 export const WhatsAppTemplateExampleParameterSchema = {
@@ -17506,6 +17710,7 @@ export const WebhookEventTypeSchema = {
     "whatsapp.accepted",
     "whatsapp.delivered",
     "whatsapp.failed",
+    "whatsapp.reacted",
     "whatsapp.read",
     "whatsapp.received",
     "whatsapp.rejected",
@@ -20986,6 +21191,80 @@ export const EventWhatsAppFailedSchema = {
   },
 } as const;
 
+export const WhatsAppReactedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["whatsapp.reacted"],
+  description: "Always `whatsapp.reacted` for this event.",
+  example: "whatsapp.reacted",
+} as const;
+
+export const EventWhatsAppReactedDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Payload of the whatsapp.reacted event. Names the message the contact reacted to, not the reaction, because a reaction is an annotation on a message rather than a message of its own.\n",
+  required: ["whatsapp_id", "emoji", "from", "to", "workspace_id"],
+  properties: {
+    whatsapp_id: {
+      $ref: "#/components/schemas/WhatsAppMessageID",
+      description:
+        "The message the contact reacted to. WhatsApp accepts a reaction on a message up to 30 days old, and we keep provider ids for 15, so a reaction placed on a message older than that cannot be matched to it and raises no event at all.\n",
+    },
+    emoji: {
+      type: ["string", "null"],
+      description:
+        "The emoji the contact placed, as WhatsApp sent it and not normalized. Null when they took their reaction back rather than placing one. Always present, so null is the removal itself rather than a value we are missing.\n",
+      example: "👍",
+    },
+    from: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppAddress",
+        },
+      ],
+      description: "The contact who reacted, as WhatsApp identified them.",
+    },
+    to: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppAddress",
+        },
+      ],
+      description:
+        "Your WhatsApp number, the business side of the conversation.",
+    },
+    workspace_id: {
+      $ref: "#/components/schemas/WorkspaceID",
+      description: "ID of the workspace that owns this event.",
+    },
+  },
+} as const;
+
+export const EventWhatsAppReactedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A contact placed, changed or took back a reaction on a message.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/WhatsAppReactedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When the contact reacted, as reported by WhatsApp. Meta reports this to the second, so a contact who changes or withdraws a reaction quickly can produce two events sharing one timestamp. Sorting reactions on one message by this field cannot order those, and neither can delivery order, which retries make unreliable. Act on the reaction each event carries, as the change it describes; do not reconstruct the sequence from the events or treat the last one to arrive as the message's standing reaction. Read the message back for the reactions that stand: `getWhatsAppMessage` (`GET /v1/whatsapp/messages/{message_id}`) returns one entry per sender in `reactions`, and `listWhatsAppMessageReactionEvents` has every change.\n",
+      example: "2026-08-28T19:01:10Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventWhatsAppReactedData",
+    },
+  },
+} as const;
+
 export const EventWhatsAppReadSchema = {
   type: "object",
   additionalProperties: false,
@@ -21792,7 +22071,7 @@ export const VoiceCallRejectionReasonSchema = {
     "VoiceCallRejectionReasonNumberOwnershipNotVerified",
   ],
   description:
-    "Why we refused the call before dialing a carrier. Every refusal is signalled\nto your PBX as `503`, so `sip_response_code` alone cannot tell these causes\napart. This field is where the cause lives.\n\nMost of them you can fix yourself:\n\n- `source_not_allowed`: The call came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it, or present a number you have\n  already verified.\n- `number_ownership_not_verified`: You bought this number, but the country that\n  issued it has not yet accepted the documents proving your workspace owns it.\n  Open the number under Numbers and complete its ownership requirements, then\n  place the call again.\n- `destination_not_enabled`: You have not turned on calling to this\n  destination country. Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet did not cover the call. Top up, or turn\n  on automatic top-ups.\n- `daily_spend_exceeded`: The call would have passed your organization's daily\n  voice spend limit. The limit resets at the start of the next UTC day.\n- `concurrent_calls_exceeded`: You already have as many calls in progress as\n  your account allows. Wait for one to end, or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed calls faster than your account\n  allows. Slow the rate you dial at, then retry.\n\nFor all other reasons, contact support and provide the call `id`:\n\n- `routing_not_configured`: No dial plan is attached to this trunk yet.\n  Expected on a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The call could not be priced for your account.\n",
+    "Why we rejected the call. Use `rejection_reason` to identify the cause;\n`sip_response_code` alone cannot distinguish these reasons.\n\nYou can resolve these issues:\n\n- `source_not_allowed`: The call came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it or use a verified caller ID.\n- `number_ownership_not_verified`: The ownership documents for this purchased\n  number have not yet been accepted under its country's requirements. We\n  block outgoing and incoming calls on the number until verification is\n  complete. Blocked incoming calls never reach your PBX, and their route type\n  is `reject` regardless of the number's configuration. Open the number\n  under **Numbers** and complete its ownership requirements, then retry\n  the call.\n- `destination_not_enabled`: Calling to this destination country is disabled.\n  Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet balance was too low for the call.\n  Top up or enable automatic top-ups.\n- `daily_spend_exceeded`: The call would exceed your organization's daily\n  voice spend limit. Retry after the limit resets at the start of the next\n  UTC day.\n- `concurrent_calls_exceeded`: You already have as many calls in progress as\n  your account allows. Wait for one to end or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed calls faster than your account\n  allows. Reduce your dialing rate and retry.\n\nFor all other reasons, contact support and provide the call `id`:\n\n- `routing_not_configured`: This trunk has no dial plan, which can happen on\n  a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The call could not be priced for your account.\n",
   example: "destination_not_enabled",
 } as const;
 
@@ -21872,7 +22151,7 @@ export const VoiceCallInboundRouteForwardSchema = {
 
 export const VoiceCallInboundRouteSchema = {
   description:
-    'Which answer the dialled number gave an incoming call, as it was acted on. The\ntype selects the shape: "reject" turned the call away, "trunk" delivered it to\none of your SIP trunks, and "forward" placed a call to another of your numbers\nand connected the two.\n\nIt says what the number was set to do, not that it worked. A "trunk" route on a\ncall that never connected is a number pointed at a trunk that did not take it;\nthe call\'s status is what carries the outcome.\n',
+    "The routing choice recorded for an incoming call. A recorded route does not\nguarantee that the call connected. Check `status` for the outcome and\n`rejection_reason` for the cause when present.\n",
   oneOf: [
     {
       $ref: "#/components/schemas/VoiceCallInboundRouteReject",
@@ -22107,7 +22386,7 @@ export const VoiceCallSchema = {
         },
       ],
       description:
-        "Why we refused the call before dialing a carrier. Absent whenever the refusal was not ours: a call that connected, a call the carrier or the far end turned down (`sip_response_code` carries their answer, and a 6xx decline reads as `rejected` rather than `failed`), and an incoming call turned away by the number it dialed, which fails no check of ours and so names no reason. `route` says what that number was set to do.",
+        "Why we rejected the call. Absent on connected calls and calls rejected\nby the carrier or recipient. For carrier or recipient rejections, see\n`sip_response_code`; a `6xx` decline gives the call a `rejected` status.\n\nRead alongside `route` when present. A refusal caused by the number's\nconfiguration has no rejection reason; the route records that\nconfiguration.\n",
     },
     route: {
       readOnly: true,
@@ -22356,6 +22635,9 @@ export const WebhookEventWritableSchema = {
       $ref: "#/components/schemas/EventWhatsAppFailedWritable",
     },
     {
+      $ref: "#/components/schemas/EventWhatsAppReacted",
+    },
+    {
       $ref: "#/components/schemas/EventWhatsAppRead",
     },
     {
@@ -22437,6 +22719,7 @@ export const WebhookEventWritableSchema = {
       "whatsapp.accepted": "#/components/schemas/EventWhatsAppAccepted",
       "whatsapp.delivered": "#/components/schemas/EventWhatsAppDelivered",
       "whatsapp.failed": "#/components/schemas/EventWhatsAppFailedWritable",
+      "whatsapp.reacted": "#/components/schemas/EventWhatsAppReacted",
       "whatsapp.read": "#/components/schemas/EventWhatsAppRead",
       "whatsapp.received": "#/components/schemas/EventWhatsAppReceivedWritable",
       "whatsapp.rejected": "#/components/schemas/EventWhatsAppRejectedWritable",
@@ -23812,6 +24095,13 @@ export const WhatsAppDocumentWritableSchema = {
   ],
 } as const;
 
+export const WhatsAppReactionWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An emoji reaction standing on a message. One entry per sender: reacting again replaces that sender's entry rather than adding one, and removing a reaction drops it from the list. A one-to-one message therefore carries at most two, one for the contact and one for your business number. This is the folded current state, so it names no single change; the message's reaction log is what records how each one arrived.\n",
+} as const;
+
 export const WhatsAppErrorWritableSchema = {
   type: ["object", "null"],
   additionalProperties: false,
@@ -23898,6 +24188,57 @@ export const WhatsAppEventListWritableSchema = {
       },
     },
   },
+} as const;
+
+export const WhatsAppReactionAcceptedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["id", "emoji"],
+  description:
+    "A reaction as accepted, which WhatsApp has not applied yet and may still refuse. It names the reaction-log entry the request created, so a caller that places two changes on one message can tell which entry is which; read the message's `reactions` for what currently stands, or its reaction log for what became of this one.\n",
+  properties: {
+    id: {
+      $ref: "#/components/schemas/WhatsAppReactionEventID",
+      description:
+        "ID of the reaction-log entry this request created, matching the `id` that entry carries in [List reaction events for a WhatsApp message](/docs/api/reference/list-whatsapp-message-reaction-events).\n",
+    },
+    emoji: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The emoji as accepted, echoing the one the request carried.",
+      example: "👍",
+    },
+  },
+} as const;
+
+export const WhatsAppReactionEventWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One change to a reaction on a message: a reaction placed, replaced by a different emoji, or taken back. Entries are never edited, so a sender who reacts twice and then removes it leaves three of them.\n",
+} as const;
+
+export const WhatsAppReactionEventListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Changes to this message's reactions, newest first.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppReactionEventWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
 } as const;
 
 export const WhatsAppTemplateRejectionWritableSchema = {

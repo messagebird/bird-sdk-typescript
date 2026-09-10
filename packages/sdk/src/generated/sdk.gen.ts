@@ -117,6 +117,9 @@ import type {
   DeleteWebhookData,
   DeleteWebhookErrors,
   DeleteWebhookResponses,
+  DeleteWhatsAppMessageReactionData,
+  DeleteWhatsAppMessageReactionErrors,
+  DeleteWhatsAppMessageReactionResponses,
   DisconnectRealtimeAppMemberData,
   DisconnectRealtimeAppMemberErrors,
   DisconnectRealtimeAppMemberResponses,
@@ -380,6 +383,9 @@ import type {
   ListWhatsAppMessageEventsData,
   ListWhatsAppMessageEventsErrors,
   ListWhatsAppMessageEventsResponses,
+  ListWhatsAppMessageReactionEventsData,
+  ListWhatsAppMessageReactionEventsErrors,
+  ListWhatsAppMessageReactionEventsResponses,
   ListWhatsAppMessagesData,
   ListWhatsAppMessagesErrors,
   ListWhatsAppMessagesResponses,
@@ -419,6 +425,9 @@ import type {
   SendRealtimeAppMemberEventData,
   SendRealtimeAppMemberEventErrors,
   SendRealtimeAppMemberEventResponses,
+  SendWhatsAppReadReceiptData,
+  SendWhatsAppReadReceiptErrors,
+  SendWhatsAppReadReceiptResponses,
   TestWebhookData,
   TestWebhookErrors,
   TestWebhookResponses,
@@ -455,6 +464,9 @@ import type {
   UpdateWebhookData,
   UpdateWebhookErrors,
   UpdateWebhookResponses,
+  UpsertWhatsAppMessageReactionData,
+  UpsertWhatsAppMessageReactionErrors,
+  UpsertWhatsAppMessageReactionResponses,
   VerifyDomainData,
   VerifyDomainErrors,
   VerifyDomainResponses,
@@ -3194,6 +3206,61 @@ export const getWhatsAppMessage = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Mark a WhatsApp message as read
+ *
+ * Marks an inbound WhatsApp message as read, showing the contact the blue
+ * ticks. WhatsApp also marks every earlier message in that conversation read.
+ *
+ * Pass `typing_indicator: true` to show a typing indicator as well. WhatsApp
+ * clears it when you send your next message, or after 25 seconds, whichever
+ * comes first, and there is no call to clear it early, so ask for one only
+ * when you are about to reply. WhatsApp cannot show a typing indicator without
+ * a read receipt, so both arrive together.
+ *
+ * The acknowledgement is sent asynchronously: a `202` means Bird accepted the
+ * request, not that WhatsApp has shown it. Nothing reports back, because
+ * WhatsApp publishes no delivery, status or failure callback for an
+ * acknowledgement, so there is nothing to poll and no webhook event.
+ * Repeating the call is safe, and each call restarts the 25-second typing
+ * window. To refresh the indicator, send a fresh `Idempotency-Key` or none at
+ * all: a replayed key answers from the stored response without acknowledging
+ * anything again.
+ *
+ * Only an inbound message can be marked read. WhatsApp allows this for 30
+ * days after receipt, but Bird keeps the provider id a receipt needs for 15
+ * days, so a message older than that answers `404`. A message Bird sent, or
+ * one that never reached WhatsApp, answers `422`.
+ *
+ */
+export const sendWhatsAppReadReceipt = <ThrowOnError extends boolean = false>(
+  options: Options<SendWhatsAppReadReceiptData, ThrowOnError>,
+): RequestResult<
+  SendWhatsAppReadReceiptResponses,
+  SendWhatsAppReadReceiptErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    SendWhatsAppReadReceiptResponses,
+    SendWhatsAppReadReceiptErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/messages/{message_id}/read",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * List events for a WhatsApp message
  *
  * Returns a WhatsApp message's lifecycle events in chronological order, one entry per delivery transition (`whatsapp.accepted`, `whatsapp.sent`, `whatsapp.delivered`, `whatsapp.read`, `whatsapp.failed`). The timeline is bounded and returned in full, so this list is not paginated; an unknown message ID returns `404`. For the message's current state in a single field, use [Get a WhatsApp message](/docs/api/reference/get-whatsapp-message) instead.
@@ -3264,6 +3331,170 @@ export const getWhatsAppMessageMedia = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/whatsapp/messages/{message_id}/media/{media_id}",
+    ...options,
+  });
+
+/**
+ * Remove your reaction from a WhatsApp message
+ *
+ * Takes back the reaction this workspace placed on a message, the same way
+ * tapping your own reaction in WhatsApp does. Only your own reaction can be
+ * removed; one the contact placed is theirs to take back.
+ *
+ * Removing a reaction from a message you have not reacted to changes nothing
+ * and still answers `202`, so a repeated call is safe.
+ *
+ * A removal travels the same path as placing a reaction, so it is refused on
+ * the same grounds. A message this workspace sent returns a `422`: it could
+ * never have carried a reaction of ours to remove, since placing one there is
+ * not supported either.
+ *
+ * A message Bird can no longer resolve returns a `404` instead, on the same
+ * 15-day retention a placement is bounded by.
+ *
+ * The `202` is the removal accepted rather than applied. The reaction stays in
+ * the message's `reactions` until WhatsApp confirms the removal and then drops
+ * out, so one on its way off reads as still standing rather than disappearing
+ * before it is gone.
+ *
+ */
+export const deleteWhatsAppMessageReaction = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<DeleteWhatsAppMessageReactionData, ThrowOnError>,
+): RequestResult<
+  DeleteWhatsAppMessageReactionResponses,
+  DeleteWhatsAppMessageReactionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteWhatsAppMessageReactionResponses,
+    DeleteWhatsAppMessageReactionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/messages/{message_id}/reaction",
+    ...options,
+  });
+
+/**
+ * React to a WhatsApp message
+ *
+ * Places an emoji reaction on a message this workspace received, the same way
+ * tapping and holding a message in WhatsApp does.
+ *
+ * You hold at most one reaction per message, so this replaces your existing
+ * one rather than adding another. To take a reaction back entirely, delete it.
+ *
+ * The `202` means the reaction was accepted, not that WhatsApp applied it.
+ * Reactions carry no delivery or read receipt, so the furthest one gets is
+ * sent. Read the message's `reactions` for what currently stands, or
+ * [List reaction events for a WhatsApp message](/docs/api/reference/list-whatsapp-message-reaction-events)
+ * for what became of each change, including one WhatsApp refused.
+ *
+ * Each of these returns a `422`:
+ *
+ * - A message this workspace sent. This endpoint places reactions on messages
+ * the contact sent; reacting to your own outbound message is not supported.
+ * - More than one emoji, since WhatsApp takes exactly one.
+ *
+ * A message Bird can no longer resolve returns a `404` instead. WhatsApp
+ * accepts a reaction on a message up to 30 days old, but Bird keeps the
+ * provider id a reaction needs for **15 days**, so that is the practical age
+ * limit. The message and its reaction log stay readable for 30; only the id
+ * a placement needs is gone.
+ *
+ * Reactions are not charged for.
+ *
+ */
+export const upsertWhatsAppMessageReaction = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<UpsertWhatsAppMessageReactionData, ThrowOnError>,
+): RequestResult<
+  UpsertWhatsAppMessageReactionResponses,
+  UpsertWhatsAppMessageReactionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).put<
+    UpsertWhatsAppMessageReactionResponses,
+    UpsertWhatsAppMessageReactionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/messages/{message_id}/reaction",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List reaction events for a WhatsApp message
+ *
+ * Returns the changes made to this message's reactions as a cursor-paginated
+ * list, newest first: each emoji placed, each one replaced by a different
+ * emoji, and each one taken back. Entries are never edited, so a contact who
+ * reacts, changes their mind and then removes it leaves three of them.
+ *
+ * One case is missing rather than recorded. A reaction is matched to the
+ * message it was placed on through a provider id we keep for 15 days, while
+ * WhatsApp accepts a reaction on a message up to 30 days old, so one placed on
+ * a message older than that cannot be matched and is recorded nowhere: not
+ * here, and not in the message's `reactions`.
+ *
+ * Use this to show who reacted and when, or to find out what became of a
+ * reaction that never appeared: a `failed` or `rejected` entry carries the
+ * reason on `error`. For what currently stands on the message, read its
+ * `reactions`, which folds this log down to one entry per sender.
+ *
+ * Pass the response's `next_cursor` back as `starting_after` to fetch the next
+ * page.
+ *
+ * Reaction events are kept for **30 days**, counted from when the message they
+ * belong to was accepted rather than from the reaction itself. They therefore
+ * go at about the same time as the message, not 30 days after the last
+ * reaction on it.
+ *
+ */
+export const listWhatsAppMessageReactionEvents = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListWhatsAppMessageReactionEventsData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppMessageReactionEventsResponses,
+  ListWhatsAppMessageReactionEventsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListWhatsAppMessageReactionEventsResponses,
+    ListWhatsAppMessageReactionEventsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/messages/{message_id}/reaction-events",
     ...options,
   });
 
