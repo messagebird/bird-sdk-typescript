@@ -91,3 +91,101 @@ export async function whatsappTemplatesVersionsLanguagesGet() {
   );
   for (const component of language.components) console.log(component.type);
 }
+
+
+export async function whatsappStatsSummary() {
+  const summary = await bird.whatsapp.stats.summary({
+    from: "2026-08-01",
+    to: "2026-08-31",
+    timezone: "Europe/Amsterdam",
+  });
+  console.log(summary.delivery, summary.latency);
+}
+
+export async function whatsappStatsDaily() {
+  const stats = await bird.whatsapp.stats.daily({ from: "2026-08-01", to: "2026-08-31" });
+  for (const point of stats.data ?? []) {
+    console.log(point.bucket, point.delivery);
+  }
+}
+
+export async function whatsappStatsHourly() {
+  const stats = await bird.whatsapp.stats.hourly({
+    from: "2026-08-30T00:00:00Z",
+    to: "2026-08-31T00:00:00Z",
+  });
+  for (const point of stats.data ?? []) {
+    console.log(point.bucket, point.delivery);
+  }
+}
+
+export async function whatsappStatsByErrorCode() {
+  const stats = await bird.whatsapp.stats.byErrorCode({ from: "2026-08-01", to: "2026-08-31" });
+  for (const row of stats.data ?? []) {
+    console.log(row.error_code, row.count);
+  }
+}
+
+export async function whatsappStatsByTemplate() {
+  const stats = await bird.whatsapp.stats.byTemplate({ from: "2026-08-01", to: "2026-08-31" });
+  for (const row of stats.data ?? []) {
+    console.log(row.template_id, row.delivery);
+  }
+}
+
+export async function whatsappStatsByTemplateCategory() {
+  const stats = await bird.whatsapp.stats.byTemplateCategory({ from: "2026-08-01", to: "2026-08-31" });
+  for (const row of stats.data ?? []) {
+    console.log(row.category, row.delivery);
+  }
+}
+
+export async function whatsappStatsByTag() {
+  const stats = await bird.whatsapp.stats.byTag({ from: "2026-08-01", to: "2026-08-31" });
+  for (const row of stats.data ?? []) {
+    console.log(row.tag, row.delivery);
+  }
+}
+
+export async function whatsappStatsByPhoneNumber() {
+  const stats = await bird.whatsapp.stats.byPhoneNumber({ from: "2026-08-01", to: "2026-08-31" });
+  for (const row of stats.data ?? []) {
+    console.log(row.phone_number, row.delivery);
+  }
+}
+
+export async function whatsappStatsByCountry() {
+  const stats = await bird.whatsapp.stats.byCountry({ from: "2026-08-01", to: "2026-08-31" });
+  for (const row of stats.data ?? []) {
+    console.log(row.country, row.delivery);
+  }
+}
+
+export async function whatsappStatsInboundSummary() {
+  const summary = await bird.whatsapp.stats.inbound.summary({ from: "2026-05-01", to: "2026-05-31" });
+  console.log(summary.received);
+}
+
+export async function whatsappStatsInboundDaily() {
+  const stats = await bird.whatsapp.stats.inbound.daily({ from: "2026-05-01", to: "2026-05-31" });
+  for (const point of stats.data ?? []) {
+    console.log(point.bucket, point.received);
+  }
+}
+
+export async function whatsappStatsInboundHourly() {
+  const stats = await bird.whatsapp.stats.inbound.hourly({
+    from: "2026-05-30T00:00:00Z",
+    to: "2026-05-31T00:00:00Z",
+  });
+  for (const point of stats.data ?? []) {
+    console.log(point.bucket, point.received);
+  }
+}
+
+export async function whatsappStatsInboundByPhoneNumber() {
+  const stats = await bird.whatsapp.stats.inbound.byPhoneNumber({ from: "2026-05-01", to: "2026-05-31" });
+  for (const row of stats.data ?? []) {
+    console.log(row.phone_number, row.received);
+  }
+}

@@ -1106,17 +1106,114 @@ console.log(msg.id, msg.status);
 }
 
 export async function _ex_155() {
+const stats = await bird.whatsapp.stats.byCountry({ from: "2026-08-01", to: "2026-08-31" });
+for (const row of stats.data ?? []) {
+  console.log(row.country, row.delivery);
+}
+}
+
+export async function _ex_156() {
+const stats = await bird.whatsapp.stats.byErrorCode({ from: "2026-08-01", to: "2026-08-31" });
+for (const row of stats.data ?? []) {
+  console.log(row.error_code, row.count);
+}
+}
+
+export async function _ex_157() {
+const stats = await bird.whatsapp.stats.byPhoneNumber({ from: "2026-08-01", to: "2026-08-31" });
+for (const row of stats.data ?? []) {
+  console.log(row.phone_number, row.delivery);
+}
+}
+
+export async function _ex_158() {
+const stats = await bird.whatsapp.stats.byTag({ from: "2026-08-01", to: "2026-08-31" });
+for (const row of stats.data ?? []) {
+  console.log(row.tag, row.delivery);
+}
+}
+
+export async function _ex_159() {
+const stats = await bird.whatsapp.stats.byTemplate({ from: "2026-08-01", to: "2026-08-31" });
+for (const row of stats.data ?? []) {
+  console.log(row.template_id, row.delivery);
+}
+}
+
+export async function _ex_160() {
+const stats = await bird.whatsapp.stats.byTemplateCategory({ from: "2026-08-01", to: "2026-08-31" });
+for (const row of stats.data ?? []) {
+  console.log(row.category, row.delivery);
+}
+}
+
+export async function _ex_161() {
+const stats = await bird.whatsapp.stats.daily({ from: "2026-08-01", to: "2026-08-31" });
+for (const point of stats.data ?? []) {
+  console.log(point.bucket, point.delivery);
+}
+}
+
+export async function _ex_162() {
+const stats = await bird.whatsapp.stats.hourly({
+  from: "2026-08-30T00:00:00Z",
+  to: "2026-08-31T00:00:00Z",
+});
+for (const point of stats.data ?? []) {
+  console.log(point.bucket, point.delivery);
+}
+}
+
+export async function _ex_163() {
+const stats = await bird.whatsapp.stats.inbound.byPhoneNumber({ from: "2026-05-01", to: "2026-05-31" });
+for (const row of stats.data ?? []) {
+  console.log(row.phone_number, row.received);
+}
+}
+
+export async function _ex_164() {
+const stats = await bird.whatsapp.stats.inbound.daily({ from: "2026-05-01", to: "2026-05-31" });
+for (const point of stats.data ?? []) {
+  console.log(point.bucket, point.received);
+}
+}
+
+export async function _ex_165() {
+const stats = await bird.whatsapp.stats.inbound.hourly({
+  from: "2026-05-30T00:00:00Z",
+  to: "2026-05-31T00:00:00Z",
+});
+for (const point of stats.data ?? []) {
+  console.log(point.bucket, point.received);
+}
+}
+
+export async function _ex_166() {
+const summary = await bird.whatsapp.stats.inbound.summary({ from: "2026-05-01", to: "2026-05-31" });
+console.log(summary.received);
+}
+
+export async function _ex_167() {
+const summary = await bird.whatsapp.stats.summary({
+  from: "2026-08-01",
+  to: "2026-08-31",
+  timezone: "Europe/Amsterdam",
+});
+console.log(summary.delivery, summary.latency);
+}
+
+export async function _ex_168() {
 const tpl = await bird.whatsapp.templates.get("bird_otp");
 console.log(tpl.default_language, tpl.live_version_id);
 }
 
-export async function _ex_156() {
+export async function _ex_169() {
 for await (const tpl of bird.whatsapp.templates.list()) {
   console.log(tpl.slug, tpl.status, tpl.available_languages);
 }
 }
 
-export async function _ex_157() {
+export async function _ex_170() {
 const version = await bird.whatsapp.templates.versions.get(
   "bird_otp",
   "wav_01ky4x8e4genzb7way45txfkm1",
@@ -1124,7 +1221,7 @@ const version = await bird.whatsapp.templates.versions.get(
 console.log(version.id, Object.keys(version.languages));
 }
 
-export async function _ex_158() {
+export async function _ex_171() {
 const language = await bird.whatsapp.templates.versions.languages.get(
   "bird_otp",
   "wav_01ky4x8e4genzb7way45txfkm1",
@@ -1133,7 +1230,7 @@ const language = await bird.whatsapp.templates.versions.languages.get(
 for (const component of language.components) console.log(component.type);
 }
 
-export async function _ex_159() {
+export async function _ex_172() {
 const { data } = await bird.whatsapp.templates.versions.languages.list(
   "bird_otp",
   "wav_01ky4x8e4genzb7way45txfkm1",
@@ -1141,13 +1238,13 @@ const { data } = await bird.whatsapp.templates.versions.languages.list(
 for (const language of data) console.log(language.language, language.status);
 }
 
-export async function _ex_160() {
+export async function _ex_173() {
 for await (const version of bird.whatsapp.templates.versions.list("bird_otp")) {
   console.log(version.id, version.version_number);
 }
 }
 
-export async function _ex_161() {
+export async function _ex_174() {
 const workspace = await bird.workspace.get();
 console.log(workspace.id, workspace.name); // "ws_…" "Production"
 }

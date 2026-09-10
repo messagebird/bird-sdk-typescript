@@ -282,11 +282,50 @@ import type {
   GetWebhookData,
   GetWebhookErrors,
   GetWebhookResponses,
+  GetWhatsAppInboundStatsByPhoneNumberData,
+  GetWhatsAppInboundStatsByPhoneNumberErrors,
+  GetWhatsAppInboundStatsByPhoneNumberResponses,
+  GetWhatsAppInboundStatsDailyData,
+  GetWhatsAppInboundStatsDailyErrors,
+  GetWhatsAppInboundStatsDailyResponses,
+  GetWhatsAppInboundStatsHourlyData,
+  GetWhatsAppInboundStatsHourlyErrors,
+  GetWhatsAppInboundStatsHourlyResponses,
+  GetWhatsAppInboundStatsSummaryData,
+  GetWhatsAppInboundStatsSummaryErrors,
+  GetWhatsAppInboundStatsSummaryResponses,
   GetWhatsAppMessageData,
   GetWhatsAppMessageErrors,
   GetWhatsAppMessageMediaData,
   GetWhatsAppMessageMediaErrors,
   GetWhatsAppMessageResponses,
+  GetWhatsAppStatsByCountryData,
+  GetWhatsAppStatsByCountryErrors,
+  GetWhatsAppStatsByCountryResponses,
+  GetWhatsAppStatsByErrorCodeData,
+  GetWhatsAppStatsByErrorCodeErrors,
+  GetWhatsAppStatsByErrorCodeResponses,
+  GetWhatsAppStatsByPhoneNumberData,
+  GetWhatsAppStatsByPhoneNumberErrors,
+  GetWhatsAppStatsByPhoneNumberResponses,
+  GetWhatsAppStatsByTagData,
+  GetWhatsAppStatsByTagErrors,
+  GetWhatsAppStatsByTagResponses,
+  GetWhatsAppStatsByTemplateCategoryData,
+  GetWhatsAppStatsByTemplateCategoryErrors,
+  GetWhatsAppStatsByTemplateCategoryResponses,
+  GetWhatsAppStatsByTemplateData,
+  GetWhatsAppStatsByTemplateErrors,
+  GetWhatsAppStatsByTemplateResponses,
+  GetWhatsAppStatsDailyData,
+  GetWhatsAppStatsDailyErrors,
+  GetWhatsAppStatsDailyResponses,
+  GetWhatsAppStatsHourlyData,
+  GetWhatsAppStatsHourlyErrors,
+  GetWhatsAppStatsHourlyResponses,
+  GetWhatsAppStatsSummaryData,
+  GetWhatsAppStatsSummaryErrors,
+  GetWhatsAppStatsSummaryResponses,
   GetWhatsAppTemplateData,
   GetWhatsAppTemplateErrors,
   GetWhatsAppTemplateResponses,
@@ -3683,6 +3722,470 @@ export const getWhatsAppTemplateVersionLanguage = <
       },
     ],
     url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/languages/{language}",
+    ...options,
+  });
+
+/**
+ * Get aggregate outbound WhatsApp statistics
+ *
+ * Returns one aggregate row for the requested period. It includes WhatsApp lifecycle counts, delivery and failure rates, and processing, delivery, and total latency percentiles (`p50`, `p95`, and `p99`). Rows use send-time attribution, so recent periods can under-report `delivered` while delivery reports arrive.
+ *
+ * Rate fields are `null` when their denominator is zero. `from` and `to` must both be calendar days or RFC 3339 instants. Day windows cover up to 365 whole days. Instant bounds round down to the hour, remain inclusive, and may span up to 720 hours. Mixing the forms returns `422`. Set `timezone` for local boundaries.
+ *
+ * Set one dimension filter at most; more than one returns `422`. Use `compare=previous_period` to include the preceding equal-length window and each metric's change.
+ *
+ */
+export const getWhatsAppStatsSummary = <ThrowOnError extends boolean = false>(
+  options?: Options<GetWhatsAppStatsSummaryData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppStatsSummaryResponses,
+  GetWhatsAppStatsSummaryErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetWhatsAppStatsSummaryResponses,
+    GetWhatsAppStatsSummaryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/stats/summary",
+    ...options,
+  });
+
+/**
+ * Get daily outbound WhatsApp statistics
+ *
+ * Returns one row of aggregate WhatsApp statistics per calendar day for the workspace. Rows use send-time attribution, so a delivery confirmation received on Wednesday for a message accepted the prior Monday is counted in Monday's row. Recent rows can under-report `delivered` while delivery reports arrive. Days with no activity are included with zero counts.
+ *
+ * Each row carries lifecycle counts (accepted, sent, delivered, read, failed) and its own latency percentiles; delivery, failure, and read rates are whole-window aggregates available from the summary endpoint instead. `from` and `to` are optional calendar days (YYYY-MM-DD), defaulting to the trailing 30 days. The maximum window is 365 days; a longer range returns `422`. Set `timezone` to report rows by your local calendar day.
+ *
+ * Set at most one dimension filter (`template`, `category`, `phone_number`, `tag`) to restrict the statistics to that dimension's value; setting more than one returns 422.
+ *
+ */
+export const getWhatsAppStatsDaily = <ThrowOnError extends boolean = false>(
+  options?: Options<GetWhatsAppStatsDailyData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppStatsDailyResponses,
+  GetWhatsAppStatsDailyErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetWhatsAppStatsDailyResponses,
+    GetWhatsAppStatsDailyErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/stats/daily",
+    ...options,
+  });
+
+/**
+ * Get hourly outbound WhatsApp statistics
+ *
+ * Returns one row of WhatsApp lifecycle counts per hour. Rows use send-time attribution, so a delivery confirmation is counted in the hour when its message was accepted. Recent rows can under-report `delivered` while delivery reports arrive. Set `timezone` for local hours instead of UTC, including zones with sub-hour offsets.
+ *
+ * Each row includes its own latency percentiles; delivery, failure, and read rates are whole-window aggregates available from the summary endpoint instead. `from` and `to` are optional RFC 3339 instants, defaulting to the trailing 168 hours; each bound rounds down to the hour and remains inclusive. A request may span up to 30 days (720 rows). An excessive or reversed window returns `422`.
+ *
+ * Set one dimension filter at most; more than one returns `422`.
+ *
+ */
+export const getWhatsAppStatsHourly = <ThrowOnError extends boolean = false>(
+  options?: Options<GetWhatsAppStatsHourlyData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppStatsHourlyResponses,
+  GetWhatsAppStatsHourlyErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetWhatsAppStatsHourlyResponses,
+    GetWhatsAppStatsHourlyErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/stats/hourly",
+    ...options,
+  });
+
+/**
+ * Get outbound WhatsApp statistics by error code
+ *
+ * Returns the count of failed WhatsApp messages grouped by normalized failure reason for the requested period. Rows are ranked by failure count descending and capped at the requested `limit` (default 50, max 200). Rows use send-time attribution, so a failure reported during the period for a message accepted earlier counts against the earlier period. A recent period therefore under-reports failures while reports are still arriving, and its counts grow as they land. The maximum window is 365 days; a longer range returns 422. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single template, category, phone number or tag, use the summary, daily or hourly statistics instead.
+ *
+ */
+export const getWhatsAppStatsByErrorCode = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetWhatsAppStatsByErrorCodeData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppStatsByErrorCodeResponses,
+  GetWhatsAppStatsByErrorCodeErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetWhatsAppStatsByErrorCodeResponses,
+    GetWhatsAppStatsByErrorCodeErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/stats/error-codes",
+    ...options,
+  });
+
+/**
+ * Get outbound WhatsApp statistics by template
+ *
+ * Returns lifecycle counts and delivery rates for WhatsApp messages grouped by the template they were sent from, for the requested period. Rows are keyed by `template_id`, matching the email template breakdown, so a renamed template stays one row. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Rows use send-time attribution. A delivery confirmed during the period for a message accepted earlier counts against the earlier period. A recent period therefore under-reports `delivered` while delivery reports are still arriving, and its counts grow as reports arrive. The maximum window is 365 days; a longer range returns 422. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single template, category, phone number or tag, use the summary, daily or hourly statistics instead. For the coarser split across Meta's marketing, utility, and authentication categories, use the template-categories breakdown instead. Each row also carries the same three latency families as the summary: `processing`, `delivery` and `total`. `delivery` is measured from a best-effort handoff timestamp that a fast delivery callback can beat, so it can be absent for a row whose other two families are present.
+ *
+ */
+export const getWhatsAppStatsByTemplate = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetWhatsAppStatsByTemplateData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppStatsByTemplateResponses,
+  GetWhatsAppStatsByTemplateErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetWhatsAppStatsByTemplateResponses,
+    GetWhatsAppStatsByTemplateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/stats/templates",
+    ...options,
+  });
+
+/**
+ * Get outbound WhatsApp statistics by template category
+ *
+ * Returns lifecycle counts and delivery rates for WhatsApp messages grouped by template category for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Rows use send-time attribution. A delivery confirmed during the period for a message accepted earlier counts against the earlier period. A recent period therefore under-reports `delivered` while delivery reports are still arriving, and its counts grow as reports arrive. The maximum window is 365 days; a longer range returns 422. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single template, category, phone number or tag, use the summary, daily or hourly statistics instead. Each row also carries the same three latency families as the summary: `processing`, `delivery` and `total`. `delivery` is measured from a best-effort handoff timestamp that a fast delivery callback can beat, so it can be absent for a row whose other two families are present.
+ *
+ */
+export const getWhatsAppStatsByTemplateCategory = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetWhatsAppStatsByTemplateCategoryData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppStatsByTemplateCategoryResponses,
+  GetWhatsAppStatsByTemplateCategoryErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetWhatsAppStatsByTemplateCategoryResponses,
+    GetWhatsAppStatsByTemplateCategoryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/stats/template-categories",
+    ...options,
+  });
+
+/**
+ * Get outbound WhatsApp statistics by tag
+ *
+ * Returns lifecycle counts and delivery rates for WhatsApp messages grouped by tag (`name:value`) for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Rows use send-time attribution. A delivery confirmed during the period for a message accepted earlier counts against the earlier period. A recent period therefore under-reports `delivered` while delivery reports are still arriving, and its counts grow as reports arrive. The maximum window is 365 days; a longer range returns 422. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single template, category, phone number or tag, use the summary, daily or hourly statistics instead. Each row also carries the same three latency families as the summary: `processing`, `delivery` and `total`. `delivery` is measured from a best-effort handoff timestamp that a fast delivery callback can beat, so it can be absent for a row whose other two families are present.
+ *
+ */
+export const getWhatsAppStatsByTag = <ThrowOnError extends boolean = false>(
+  options?: Options<GetWhatsAppStatsByTagData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppStatsByTagResponses,
+  GetWhatsAppStatsByTagErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetWhatsAppStatsByTagResponses,
+    GetWhatsAppStatsByTagErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/stats/tags",
+    ...options,
+  });
+
+/**
+ * Get outbound WhatsApp statistics by phone number
+ *
+ * Returns delivery counts grouped by business phone number, including whether each is platform-managed or customer-owned. Rows use send-time attribution, rank by accepted volume, and are capped by `limit` (default 50, maximum 200). A recent period under-reports `delivered` while delivery reports are still arriving. The maximum window is 365 days; a longer range returns `422`. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single template, category, phone number or tag, use the summary, daily or hourly statistics instead. Each row also carries the same three latency families as the summary: `processing`, `delivery` and `total`. `delivery` is measured from a best-effort handoff timestamp that a fast delivery callback can beat, so it can be absent for a row whose other two families are present.
+ *
+ */
+export const getWhatsAppStatsByPhoneNumber = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetWhatsAppStatsByPhoneNumberData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppStatsByPhoneNumberResponses,
+  GetWhatsAppStatsByPhoneNumberErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetWhatsAppStatsByPhoneNumberResponses,
+    GetWhatsAppStatsByPhoneNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/stats/phone-numbers",
+    ...options,
+  });
+
+/**
+ * Get outbound WhatsApp statistics by country
+ *
+ * Returns delivery counts, read engagement and latency grouped by the recipient's destination
+ * country. Rows use send-time attribution, rank by accepted volume, and are capped by `limit`
+ * (default 50, maximum 200). A recent period under-reports `delivered` while delivery reports
+ * are still arriving. The maximum window is 365 days; a longer range returns `422`.
+ *
+ * A country row covers messages addressed to a single recipient. A recipient whose country
+ * cannot be resolved (a number shaped like a phone number that belongs to no country, or a
+ * non-geographic range such as freephone) is counted under `ZZ` rather than dropped,
+ * matching the SMS country breakdown. Group sends are omitted entirely: one spans
+ * up to eight recipients in as many countries, so no single destination country describes
+ * it. These rows therefore sum to the summary less that group volume. A window reaching before this
+ * breakdown shipped falls short by more than that: history was seeded only where the
+ * recipient's country could be recovered from stored data, so a phone-addressed send
+ * accepted before the cutover has no `accepted` leg here. Two cases follow, and they read
+ * differently. Acceptance days more than 14 days before the cutover are a plain shortfall
+ * and never change. In the 14 days immediately before it, a `delivered`, `read` or `failed`
+ * callback arriving after the cutover does carry a country and is attributed to its original
+ * acceptance day, so a row there can report deliveries with `accepted` at zero. Its
+ * `delivery_rate` and `failure_rate` are then null for want of a denominator while
+ * `read_rate` still computes and looks healthy. The 14 days are the status recording window,
+ * after which a callback is dropped. All of this is confined to pre-cutover acceptance days
+ * and gone once the requested window starts after the cutover date.
+ *
+ * Latency reports the same three families as the summary: `processing`, `delivery` and
+ * `total`. The delivery family depends on a best-effort handoff timestamp that a fast
+ * delivery callback can beat, so it can be absent for a country whose other two families
+ * are present.
+ *
+ * A breakdown is already a single-dimension view and takes no dimension filter; to restrict
+ * statistics to a single template, category, phone number or tag, use the summary, daily or
+ * hourly statistics instead.
+ *
+ */
+export const getWhatsAppStatsByCountry = <ThrowOnError extends boolean = false>(
+  options?: Options<GetWhatsAppStatsByCountryData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppStatsByCountryResponses,
+  GetWhatsAppStatsByCountryErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetWhatsAppStatsByCountryResponses,
+    GetWhatsAppStatsByCountryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/stats/countries",
+    ...options,
+  });
+
+/**
+ * Get aggregate inbound WhatsApp statistics
+ *
+ * Returns the total number of WhatsApp messages your business numbers received over the period, using the time each message reached your number.
+ *
+ * The response contains only a count because a received message has one state. Use the send statistics endpoints for delivery rates and latency data about messages you send.
+ *
+ * The maximum window is 365 days for a day-grain range, or 720 hours for an hour-grain range; a longer range returns 422. Set `timezone` to resolve the period against your local calendar instead of UTC.
+ *
+ */
+export const getWhatsAppInboundStatsSummary = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetWhatsAppInboundStatsSummaryData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppInboundStatsSummaryResponses,
+  GetWhatsAppInboundStatsSummaryErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetWhatsAppInboundStatsSummaryResponses,
+    GetWhatsAppInboundStatsSummaryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/stats/inbound/summary",
+    ...options,
+  });
+
+/**
+ * Get daily inbound WhatsApp statistics
+ *
+ * Returns the number of WhatsApp messages your business numbers received, one row per calendar day. Rows use the time each message reached your number, and days with no messages contain a zero count.
+ *
+ * Each row contains only a count because a received message has one state. Use the send statistics endpoints for lifecycle and delivery-latency data about messages you send.
+ *
+ * `from` and `to` are optional calendar days (YYYY-MM-DD), defaulting to the trailing 30 days. The maximum window is 365 days; requesting a longer range returns 422. Set `timezone` to bucket rows by your local calendar day instead of UTC.
+ *
+ */
+export const getWhatsAppInboundStatsDaily = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetWhatsAppInboundStatsDailyData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppInboundStatsDailyResponses,
+  GetWhatsAppInboundStatsDailyErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetWhatsAppInboundStatsDailyResponses,
+    GetWhatsAppInboundStatsDailyErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/stats/inbound/daily",
+    ...options,
+  });
+
+/**
+ * Get hourly inbound WhatsApp statistics
+ *
+ * Returns the number of WhatsApp messages your business numbers received, one row per hour. Rows use the time each message reached your number, in UTC by default or local time when you set `timezone`. Hours with no messages contain a zero count.
+ *
+ * Each row contains only a count because a received message has one state. Use the send statistics endpoints for lifecycle and delivery-latency data about messages you send.
+ *
+ * `from` and `to` are optional RFC 3339 instants defaulting to the trailing 168 hours, rounded down to the enclosing hour and echoed back in `period`, both bounds inclusive. A single request may span at most 30 days (720 hourly rows); for longer ranges use the daily endpoint. Requesting an hourly window longer than 30 days, or a `from` after `to`, returns 422.
+ *
+ */
+export const getWhatsAppInboundStatsHourly = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetWhatsAppInboundStatsHourlyData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppInboundStatsHourlyResponses,
+  GetWhatsAppInboundStatsHourlyErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetWhatsAppInboundStatsHourlyResponses,
+    GetWhatsAppInboundStatsHourlyErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/stats/inbound/hourly",
+    ...options,
+  });
+
+/**
+ * Get inbound WhatsApp statistics by phone number
+ *
+ * Returns how many WhatsApp messages each of your business phone numbers received. Rows are ranked by volume descending and capped at the requested `limit` (default 50, max 200), counted by the time each message reached the number.
+ *
+ * Each row contains only a count because a received message has one state. Lifecycle and delivery-latency data do not apply to received messages.
+ *
+ * The maximum window is 365 days; a longer range returns 422. Set `timezone` to resolve the period against your local calendar instead of UTC.
+ *
+ */
+export const getWhatsAppInboundStatsByPhoneNumber = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetWhatsAppInboundStatsByPhoneNumberData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppInboundStatsByPhoneNumberResponses,
+  GetWhatsAppInboundStatsByPhoneNumberErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetWhatsAppInboundStatsByPhoneNumberResponses,
+    GetWhatsAppInboundStatsByPhoneNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/stats/inbound/phone-numbers",
     ...options,
   });
 

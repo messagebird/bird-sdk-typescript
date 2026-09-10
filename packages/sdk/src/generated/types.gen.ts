@@ -6155,7 +6155,7 @@ export type WhatsAppReactionEvent = {
    */
   readonly from: WhatsAppAddress;
   /**
-   * Why the change did not take effect. Always carried by a `failed` or `rejected` entry, and never by any other, so a failure always says what went wrong. Absent rather than null on the entries that did take effect. The schema leaves it optional because that is a conditional the generators do not express.
+   * Why the change did not take effect. Always carried by a `failed` or `rejected` entry, and never by any other, so a failure always says what went wrong. Absent rather than null on the entries that did take effect. The schema leaves it optional because that is a conditional the generators do not express. `code` is drawn from the vocabulary a message send shares, less its two billing codes: a reaction is never charged, so neither `insufficient_balance` nor `price_not_found` appears here.
    *
    */
   readonly error?: WhatsAppError;
@@ -6814,6 +6814,573 @@ export type WhatsAppTemplateLanguage = {
    *
    */
   readonly updated_by?: UserId | null;
+};
+
+/**
+ * The window the server actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants on the hour). The grain of `from` and `to` mirrors the grain of the request's bounds.
+ *
+ */
+export type WhatsAppStatsSummaryPeriod = {
+  /**
+   * Inclusive start of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.
+   */
+  readonly from: string;
+  /**
+   * Inclusive end of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.
+   */
+  readonly to: string;
+  /**
+   * Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.
+   *
+   */
+  readonly data_as_of?: string | null;
+};
+
+/**
+ * WhatsApp lifecycle counts and rates for the requested period, attributed by send time, so a later delivery stays attributed to the period in which its message was accepted, and a recent period under-reports `delivered` while delivery reports are still arriving. The sibling `engagement` block reports read counts and rates. Rates are null when their denominator is zero. Very large counts are close estimates rather than exact tallies.
+ *
+ */
+export type WhatsAppDeliveryStats = {
+  /**
+   * Distinct messages accepted for sending after admission checks. This is the denominator for `delivery_rate` and `failure_rate`.
+   */
+  readonly accepted: number;
+  /**
+   * Distinct messages handed off for delivery.
+   */
+  readonly sent: number;
+  /**
+   * Distinct messages confirmed delivered to the recipient's device.
+   */
+  readonly delivered: number;
+  /**
+   * Distinct messages that failed during sending or delivery.
+   */
+  readonly failed: number;
+  /**
+   * Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, or the wallet could not fund the send. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.
+   */
+  readonly rejected: number;
+  /**
+   * Share of accepted messages that were delivered, computed as `delivered / accepted`. Null when no messages were accepted in scope.
+   *
+   */
+  readonly delivery_rate: number | null;
+  /**
+   * Share of accepted messages that ultimately failed, computed as `failed / accepted`. Null when no messages were accepted in scope.
+   *
+   */
+  readonly failure_rate: number | null;
+};
+
+/**
+ * WhatsApp engagement counts and the derived read rate for the scope of the containing row (the whole requested period or a breakdown dimension). The `read` field is the number of distinct messages confirmed read by the recipient. Send time determines attribution; the instant the read receipt arrived does not. A read is counted in the period its message was accepted in, alongside that message's own delivery when one arrived. The read rate divides reads by messages delivered in the same scope and is null when its denominator is zero. Very large counts are close estimates rather than exact tallies.
+ *
+ */
+export type WhatsAppEngagementStats = {
+  /**
+   * Distinct messages confirmed read by the recipient.
+   */
+  readonly read: number;
+  /**
+   * Distinct messages read relative to messages delivered in the same scope, computed as `read / delivery.delivered`. Both counts are attributed by send time, so a read is counted alongside its own message's delivery. The rate can exceed 1 where a read receipt arrived for a message whose delivery receipt did not, or, at high volume, because the counts are close estimates. Null when `delivery.delivered` is zero.
+   *
+   */
+  readonly read_rate: number | null;
+};
+
+/**
+ * Approximate p50, p95, and p99 latency percentiles in milliseconds for one latency family. All three are null when no qualifying event contributed a measurement.
+ *
+ */
+export type WhatsAppLatencyQuantiles = {
+  /**
+   * Median (50th percentile) latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p50_ms: number | null;
+  /**
+   * 95th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p95_ms: number | null;
+  /**
+   * 99th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p99_ms: number | null;
+};
+
+/**
+ * Latency percentiles in milliseconds for the requested scope:
+ *
+ * - `processing`: From acceptance to WhatsApp handoff.
+ * - `delivery`: From WhatsApp handoff to delivery confirmation.
+ * - `total`: From acceptance to delivery confirmation.
+ *
+ * Each family is omitted when no qualifying message contributes a measurement.
+ * Individual percentiles can also be null. `delivery` is measured on a best-effort basis, so
+ * it can be absent for a scope whose `processing` and `total` are present.
+ *
+ */
+export type WhatsAppLatencyStats = {
+  processing?: WhatsAppLatencyQuantiles;
+  delivery?: WhatsAppLatencyQuantiles;
+  total?: WhatsAppLatencyQuantiles;
+};
+
+/**
+ * Changes from the previous period. A `*_pct_change` value is the signed relative change `(current - previous) / previous` and is null when the previous count is zero. A `*_rate_pp` value is the signed difference between rate fractions and is null when either rate is undefined.
+ *
+ */
+export type WhatsAppStatsComparisonDelta = {
+  /**
+   * Relative change in accepted messages (`delivery.accepted`) versus the previous period, as a signed fraction. Null when the previous period accepted none.
+   */
+  readonly accepted_pct_change: number | null;
+  /**
+   * Relative change in sent messages (`delivery.sent`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly sent_pct_change: number | null;
+  /**
+   * Relative change in delivered messages (`delivery.delivered`) versus the previous period, as a signed fraction. Null when the previous period delivered none.
+   */
+  readonly delivered_pct_change: number | null;
+  /**
+   * Relative change in failed messages (`delivery.failed`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly failed_pct_change: number | null;
+  /**
+   * Relative change in rejected messages (`delivery.rejected`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly rejected_pct_change: number | null;
+  /**
+   * Relative change in messages read (`engagement.read`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly read_pct_change: number | null;
+  /**
+   * Signed difference between this period's and the previous period's delivery rate, both fractions in [0,1] (multiply by 100 for percentage points). Null when either period's delivery rate is undefined.
+   */
+  readonly delivery_rate_pp: number | null;
+  /**
+   * Signed difference between this period's and the previous period's failure rate, both fractions in [0,1] (multiply by 100 for percentage points). Null when either period's failure rate is undefined.
+   */
+  readonly failure_rate_pp: number | null;
+  /**
+   * Signed difference between the current and previous read-rate fractions. Multiply by 100 for percentage points. The value can fall outside `[-1, 1]` because a read receipt can arrive for a message whose delivery receipt did not, and high-volume counts are approximate. Null when either rate is undefined.
+   *
+   */
+  readonly read_rate_pp: number | null;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type WhatsAppStatsComparison = {
+  /**
+   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows). For a request covering 2026-05-01 to 2026-05-25, this is 2026-04-06 to 2026-04-30, both inclusive.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  readonly delivery: WhatsAppDeliveryStats;
+  readonly engagement: WhatsAppEngagementStats;
+  readonly latency: WhatsAppLatencyStats;
+  readonly delta: WhatsAppStatsComparisonDelta;
+};
+
+/**
+ * WhatsApp lifecycle counts, rates, engagement, and latency percentiles for the full requested period. Counts aggregate the time buckets. Latency percentiles cover the whole period. Rates are null when their denominator is zero.
+ *
+ */
+export type WhatsAppStatsSummary = {
+  /**
+   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  readonly delivery: WhatsAppDeliveryStats;
+  readonly engagement: WhatsAppEngagementStats;
+  readonly latency: WhatsAppLatencyStats;
+  readonly comparison?: WhatsAppStatsComparison;
+};
+
+/**
+ * The window and bucket grain the response covers, echoed from the request, plus the freshness boundary the data is current to.
+ *
+ */
+export type WhatsAppStatsSeriesPeriod = {
+  /**
+   * Inclusive start of the window. A calendar day (YYYY-MM-DD) on the day grain, an RFC 3339 instant on the hour grain.
+   */
+  readonly from: string;
+  /**
+   * Inclusive end of the window. A calendar day (YYYY-MM-DD) on the day grain, an RFC 3339 instant on the hour grain.
+   */
+  readonly to: string;
+  readonly grain: StatsGrain;
+  /**
+   * Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.
+   *
+   */
+  readonly data_as_of?: string | null;
+};
+
+/**
+ * WhatsApp lifecycle counts for a time bucket, attributed by send time. A message accepted on Monday and delivered on Tuesday counts in Monday's bucket. The sibling `engagement` block reports read counts. Rates are available only for the whole period. Very large counts are close estimates rather than exact tallies.
+ *
+ */
+export type WhatsAppDeliveryCounts = {
+  /**
+   * Distinct messages accepted for sending after admission checks.
+   */
+  readonly accepted: number;
+  /**
+   * Distinct messages handed off for delivery.
+   */
+  readonly sent: number;
+  /**
+   * Distinct messages confirmed delivered to the recipient's device.
+   */
+  readonly delivered: number;
+  /**
+   * Distinct messages that failed during sending or delivery.
+   */
+  readonly failed: number;
+  /**
+   * Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, or the wallet could not fund the send. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.
+   */
+  readonly rejected: number;
+};
+
+/**
+ * WhatsApp engagement counts for a time bucket, attributed by send time. A message accepted on Monday and read on Tuesday counts in Monday's bucket. Read rates are available only for the whole period. Very large counts are close estimates rather than exact tallies.
+ *
+ */
+export type WhatsAppEngagementCounts = {
+  /**
+   * Distinct messages confirmed read by the recipient.
+   */
+  readonly read: number;
+};
+
+/**
+ * WhatsApp lifecycle counts, engagement, and latency percentiles for one time bucket (a calendar day or hour), bucketed by send time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. Rates apply to the whole window rather than individual buckets.
+ *
+ */
+export type WhatsAppStatsPoint = {
+  /**
+   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.
+   */
+  readonly bucket: string;
+  readonly delivery: WhatsAppDeliveryCounts;
+  readonly engagement: WhatsAppEngagementCounts;
+  readonly latency: WhatsAppLatencyStats;
+};
+
+/**
+ * Time-series stats payload. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
+ *
+ */
+export type WhatsAppStatsResponse = {
+  period: WhatsAppStatsSeriesPeriod;
+  /**
+   * One row per day or hour in chronological order. Buckets with no activity contain zero counts.
+   */
+  readonly data: Array<WhatsAppStatsPoint>;
+};
+
+/**
+ * Number of failed messages for a single normalized failure reason over the requested period.
+ */
+export type WhatsAppErrorCodeStatsPoint = {
+  /**
+   * The normalized failure reason this row aggregates, matching the `last_error.code` reported on an individual failed message.
+   */
+  readonly error_code: WhatsAppErrorCode;
+  /**
+   * Distinct messages that failed with this reason in scope.
+   */
+  readonly count: number;
+};
+
+/**
+ * Per-error-code failure breakdown for the requested period, ranked by failure count descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByErrorCodeResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Error-code rows ranked by failure count descending. Empty when no failures occurred in the period.
+   */
+  readonly data: Array<WhatsAppErrorCodeStatsPoint>;
+  /**
+   * Total distinct error codes with failures in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Lifecycle counts, derived rates, engagement and latency for a single WhatsApp template over the requested period.
+ */
+export type WhatsAppTemplateStatsPoint = {
+  /**
+   * The template these messages were sent from, using the same `id` the WhatsApp template endpoints return. A send that resolved no template does not appear in this breakdown. A template renamed after it was used to send still reports under this one `id`, and a template deleted after sending keeps its row rather than dropping the messages.
+   *
+   */
+  readonly template_id: WhatsAppTemplateId;
+  readonly delivery: WhatsAppDeliveryStats;
+  readonly engagement: WhatsAppEngagementStats;
+  readonly latency: WhatsAppLatencyStats;
+};
+
+/**
+ * Per-template breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByTemplateResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Template rows ranked by accepted volume descending.
+   */
+  readonly data: Array<WhatsAppTemplateStatsPoint>;
+  /**
+   * Total distinct templates with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Lifecycle counts, derived rates, and engagement for a single WhatsApp template category over the requested period.
+ */
+export type WhatsAppTemplateCategoryStatsPoint = {
+  /**
+   * The template category this row aggregates.
+   */
+  readonly category: WhatsAppTemplateCategory;
+  readonly delivery: WhatsAppDeliveryStats;
+  readonly engagement: WhatsAppEngagementStats;
+  readonly latency: WhatsAppLatencyStats;
+};
+
+/**
+ * Per-template-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByTemplateCategoryResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Category rows ranked by accepted volume descending.
+   */
+  readonly data: Array<WhatsAppTemplateCategoryStatsPoint>;
+  /**
+   * Total distinct categories with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Lifecycle counts, derived rates, and engagement for a single tag (name:value) over the requested period.
+ */
+export type WhatsAppTagStatsPoint = {
+  /**
+   * The tag this row aggregates, in `name:value` form.
+   */
+  readonly tag: string;
+  readonly delivery: WhatsAppDeliveryStats;
+  readonly engagement: WhatsAppEngagementStats;
+  readonly latency: WhatsAppLatencyStats;
+};
+
+/**
+ * Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByTagResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Tag rows ranked by accepted volume descending.
+   */
+  readonly data: Array<WhatsAppTagStatsPoint>;
+  /**
+   * Total distinct tags with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Lifecycle counts, rates, and engagement for one business phone number over the requested period, including whether the number is shared.
+ */
+export type WhatsAppPhoneNumberStatsPoint = {
+  /**
+   * The business sender phone number in E.164 form.
+   */
+  readonly phone_number: string;
+  /**
+   * `true` for a shared Bird-managed number; `false` for a number owned by your workspace.
+   *
+   */
+  readonly shared: boolean;
+  readonly delivery: WhatsAppDeliveryStats;
+  readonly engagement: WhatsAppEngagementStats;
+  readonly latency: WhatsAppLatencyStats;
+};
+
+/**
+ * Per-phone-number breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByPhoneNumberResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Phone-number rows ranked by accepted volume descending.
+   */
+  readonly data: Array<WhatsAppPhoneNumberStatsPoint>;
+  /**
+   * Total distinct phone numbers with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Lifecycle counts, derived rates, engagement and latency for a single destination country over the requested period.
+ */
+export type WhatsAppCountryStatsPoint = {
+  /**
+   * The destination country this row aggregates, as an ISO 3166-1 alpha-2 code. `ZZ` collects recipients whose country could not be resolved.
+   */
+  readonly country: CountryCode;
+  readonly delivery: WhatsAppDeliveryStats;
+  readonly engagement: WhatsAppEngagementStats;
+  readonly latency: WhatsAppLatencyStats;
+};
+
+/**
+ * Per-country breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ *
+ */
+export type WhatsAppStatsByCountryResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Country rows ranked by accepted volume descending. Empty when no eligible activity occurred in the period; rows sum to the summary less group-send volume, and less any pre-cutover phone-addressed sends still inside the window.
+   *
+   */
+  readonly data: Array<WhatsAppCountryStatsPoint>;
+  /**
+   * Total distinct countries with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * The change from the preceding period to the requested one. The `received_pct_change` field is a signed relative change, computed as `(current - previous) / previous`. A value of `0.5` means 50% higher, and `-0.2` means 20% lower. The field is null when the previous period received none.
+ *
+ */
+export type WhatsAppInboundStatsComparisonDelta = {
+  /**
+   * Relative change in received messages versus the previous period, as a signed fraction. Null when the previous period received none.
+   */
+  readonly received_pct_change: number | null;
+};
+
+/**
+ * The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type WhatsAppInboundStatsComparison = {
+  /**
+   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows). For a request covering 2026-05-01 to 2026-05-25, this is 2026-04-06 to 2026-04-30, both inclusive.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Distinct messages received in the preceding period.
+   */
+  readonly received: number;
+  readonly delta: WhatsAppInboundStatsComparisonDelta;
+};
+
+/**
+ * Total received messages for the requested period.
+ *
+ */
+export type WhatsAppInboundStatsSummaryResponse = {
+  /**
+   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Distinct messages received in the period, counted by the time each message reached your number. Computed across the whole window rather than summed from the daily or hourly series, so it can sit slightly below the sum of those rows.
+   */
+  readonly received: number;
+  readonly comparison?: WhatsAppInboundStatsComparison;
+};
+
+/**
+ * Received-message count for one time bucket (a calendar day or hour), bucketed by the time each message reached your number.
+ *
+ */
+export type WhatsAppInboundStatsPoint = {
+  /**
+   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the request's grain.
+   */
+  readonly bucket: string;
+  /**
+   * Distinct messages received in this bucket.
+   */
+  readonly received: number;
+};
+
+/**
+ * Received-message time series. `period` echoes the range the server computed against; `data` is one row per bucket in chronological order.
+ *
+ */
+export type WhatsAppInboundStatsResponse = {
+  period: WhatsAppStatsSeriesPeriod;
+  /**
+   * One row per bucket (day or hour, matching the request) in the period, in chronological order. Buckets with no activity are included with a count of zero, so the series charts continuously without client-side gap handling.
+   */
+  readonly data: Array<WhatsAppInboundStatsPoint>;
+};
+
+/**
+ * Received-message count for a single business phone number over the requested period.
+ */
+export type WhatsAppInboundPhoneNumberStatsPoint = {
+  /**
+   * The business phone number that received the messages, in E.164 form.
+   */
+  readonly phone_number: string;
+  /**
+   * Distinct messages the number received in the period.
+   */
+  readonly received: number;
+};
+
+/**
+ * Per-phone-number breakdown of received messages for the requested period, ranked by volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppInboundStatsByPhoneNumberResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Phone-number rows ranked by received-message volume descending, capped at the requested `limit`. A number with no messages in the period is absent rather than zero-filled, because unlike a time bucket it is not part of a continuous axis.
+   *
+   */
+  readonly data: Array<WhatsAppInboundPhoneNumberStatsPoint>;
+  /**
+   * Total distinct phone numbers with received messages in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   */
+  readonly total: number;
 };
 
 export type NumbersDedicatedAllocationId = string;
@@ -13948,6 +14515,163 @@ export type WhatsAppTemplateLanguageWritable = {
 };
 
 /**
+ * Latency percentiles in milliseconds for the requested scope:
+ *
+ * - `processing`: From acceptance to WhatsApp handoff.
+ * - `delivery`: From WhatsApp handoff to delivery confirmation.
+ * - `total`: From acceptance to delivery confirmation.
+ *
+ * Each family is omitted when no qualifying message contributes a measurement.
+ * Individual percentiles can also be null. `delivery` is measured on a best-effort basis, so
+ * it can be absent for a scope whose `processing` and `total` are present.
+ *
+ */
+export type WhatsAppLatencyStatsWritable = {
+  [key: string]: never;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type WhatsAppStatsComparisonWritable = {
+  [key: string]: never;
+};
+
+/**
+ * WhatsApp lifecycle counts, rates, engagement, and latency percentiles for the full requested period. Counts aggregate the time buckets. Latency percentiles cover the whole period. Rates are null when their denominator is zero.
+ *
+ */
+export type WhatsAppStatsSummaryWritable = {
+  [key: string]: never;
+};
+
+/**
+ * WhatsApp lifecycle counts, engagement, and latency percentiles for one time bucket (a calendar day or hour), bucketed by send time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. Rates apply to the whole window rather than individual buckets.
+ *
+ */
+export type WhatsAppStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Time-series stats payload. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
+ *
+ */
+export type WhatsAppStatsResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-error-code failure breakdown for the requested period, ranked by failure count descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByErrorCodeResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Lifecycle counts, derived rates, engagement and latency for a single WhatsApp template over the requested period.
+ */
+export type WhatsAppTemplateStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-template breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByTemplateResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Lifecycle counts, derived rates, and engagement for a single WhatsApp template category over the requested period.
+ */
+export type WhatsAppTemplateCategoryStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-template-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByTemplateCategoryResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Lifecycle counts, derived rates, and engagement for a single tag (name:value) over the requested period.
+ */
+export type WhatsAppTagStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByTagResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Lifecycle counts, rates, and engagement for one business phone number over the requested period, including whether the number is shared.
+ */
+export type WhatsAppPhoneNumberStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-phone-number breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByPhoneNumberResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Lifecycle counts, derived rates, engagement and latency for a single destination country over the requested period.
+ */
+export type WhatsAppCountryStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-country breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ *
+ */
+export type WhatsAppStatsByCountryResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type WhatsAppInboundStatsComparisonWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Total received messages for the requested period.
+ *
+ */
+export type WhatsAppInboundStatsSummaryResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Received-message time series. `period` echoes the range the server computed against; `data` is one row per bucket in chronological order.
+ *
+ */
+export type WhatsAppInboundStatsResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-phone-number breakdown of received messages for the requested period, ranked by volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppInboundStatsByPhoneNumberResponseWritable = {
+  [key: string]: never;
+};
+
+/**
  * Latency percentiles (p50, p95, p99) in milliseconds for the bucket. On the summary endpoint these are computed across the whole period rather than per bucket. Three families are reported:
  *
  * - `processing`: Time from accepting the send to handing the message off for delivery. Measured per processed recipient; null when no recipient in the bucket has reached the processed stage.
@@ -15302,6 +16026,12 @@ export type TagFilter = Array<string>;
  *
  */
 export type StatsTimezone = string;
+
+/**
+ * Restricts the statistics to one template, identified by its ID (`wat_…`) or slug. Mutually exclusive with the other dimension filters (`category`, `phone_number`, `tag`); only one may be set per request. An ID matches the `template_id` key on a row of the per-template breakdown; a slug is accepted for callers that predate that key and resolves to the same messages.
+ *
+ */
+export type WhatsAppStatsTemplateFilter = string;
 
 /**
  * Restricts the statistics to one template, identified by its ID (`emt_…`) or name. This parameter is mutually exclusive with other dimension filters.
@@ -22309,6 +23039,979 @@ export type GetWhatsAppTemplateVersionLanguageResponses = {
 
 export type GetWhatsAppTemplateVersionLanguageResponse =
   GetWhatsAppTemplateVersionLanguageResponses[keyof GetWhatsAppTemplateVersionLanguageResponses];
+
+export type GetWhatsAppStatsSummaryData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window: a calendar day (YYYY-MM-DD) or an RFC 3339 instant rounded down to the hour. The `timezone` parameter makes a calendar day local and rounds an instant down to the local hour. Omit `timezone` to use UTC. When `timezone` is set, a numeric UTC offset such as `+05:45` is rejected; use a calendar day or a `Z` (UTC) instant. This value must use the same form as `to`. When omitted, it defaults to 30 days before `to` for day windows or 168 hours (7 days) before `to` for hour windows.
+     *
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window: a calendar day (YYYY-MM-DD) or an RFC 3339 instant rounded down to the hour. The `timezone` parameter makes a calendar day local and rounds an instant down to the local hour. Omit `timezone` to use UTC. When `timezone` is set, a numeric UTC offset is rejected; use a calendar day or a `Z` (UTC) instant. This value must use the same form as `from`. When omitted, it defaults to today for day windows or the current hour for hour windows in that timezone. Day windows may not exceed 365 days; hour windows may not exceed 720 hours (30 days).
+     *
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Restricts the statistics to one template, identified by its ID (`wat_…`) or slug. Mutually exclusive with the other dimension filters (`category`, `phone_number`, `tag`); only one may be set per request. An ID matches the `template_id` key on a row of the per-template breakdown; a slug is accepted for callers that predate that key and resolves to the same messages.
+     *
+     */
+    template?: string;
+    /**
+     * Restrict the statistics to a single template category. Mutually exclusive with the other dimension filters (`template`, `phone_number`, `tag`); only one may be set per request. Matches the `category` key on a row of the per-category breakdown.
+     *
+     */
+    category?: WhatsAppTemplateCategory;
+    /**
+     * Restrict the statistics to a single business sender phone number, in E.164 form. Mutually exclusive with the other dimension filters (`template`, `category`, `tag`); only one may be set per request. Matches the `phone_number` key on a row of the per-phone-number breakdown.
+     *
+     */
+    phone_number?: string;
+    /**
+     * Restrict the statistics to a single tag. Use `name` to match any value of a tag, or `name:value` for a specific pair (for example `campaign:spring_launch`). Mutually exclusive with the other dimension filters (`template`, `category`, `phone_number`); only one may be set per request. A row of the per-tag breakdown carries the same pair in its single `tag` key.
+     *
+     */
+    tag?: string;
+    /**
+     * Set to `previous_period` to also include the same statistics for the immediately preceding window of equal length, plus the change between the two, so you can show "+X% vs last period" without a second request. The comparison window carries any dimension filter set on the request, so a filtered comparison compares like with like.
+     *
+     */
+    compare?: StatsComparePeriod;
+  };
+  url: "/v1/whatsapp/stats/summary";
+};
+
+export type GetWhatsAppStatsSummaryErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppStatsSummaryError =
+  GetWhatsAppStatsSummaryErrors[keyof GetWhatsAppStatsSummaryErrors];
+
+export type GetWhatsAppStatsSummaryResponses = {
+  /**
+   * Aggregate summary for the requested period.
+   */
+  200: WhatsAppStatsSummary;
+};
+
+export type GetWhatsAppStatsSummaryResponse =
+  GetWhatsAppStatsSummaryResponses[keyof GetWhatsAppStatsSummaryResponses];
+
+export type GetWhatsAppStatsDailyData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Start date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). The window may not exceed 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * End date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). The window may not exceed 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Restricts the statistics to one template, identified by its ID (`wat_…`) or slug. Mutually exclusive with the other dimension filters (`category`, `phone_number`, `tag`); only one may be set per request. An ID matches the `template_id` key on a row of the per-template breakdown; a slug is accepted for callers that predate that key and resolves to the same messages.
+     *
+     */
+    template?: string;
+    /**
+     * Restrict the statistics to a single template category. Mutually exclusive with the other dimension filters (`template`, `phone_number`, `tag`); only one may be set per request. Matches the `category` key on a row of the per-category breakdown.
+     *
+     */
+    category?: WhatsAppTemplateCategory;
+    /**
+     * Restrict the statistics to a single business sender phone number, in E.164 form. Mutually exclusive with the other dimension filters (`template`, `category`, `tag`); only one may be set per request. Matches the `phone_number` key on a row of the per-phone-number breakdown.
+     *
+     */
+    phone_number?: string;
+    /**
+     * Restrict the statistics to a single tag. Use `name` to match any value of a tag, or `name:value` for a specific pair (for example `campaign:spring_launch`). Mutually exclusive with the other dimension filters (`template`, `category`, `phone_number`); only one may be set per request. A row of the per-tag breakdown carries the same pair in its single `tag` key.
+     *
+     */
+    tag?: string;
+  };
+  url: "/v1/whatsapp/stats/daily";
+};
+
+export type GetWhatsAppStatsDailyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppStatsDailyError =
+  GetWhatsAppStatsDailyErrors[keyof GetWhatsAppStatsDailyErrors];
+
+export type GetWhatsAppStatsDailyResponses = {
+  /**
+   * Daily aggregate stats for the requested period.
+   */
+  200: WhatsAppStatsResponse;
+};
+
+export type GetWhatsAppStatsDailyResponse =
+  GetWhatsAppStatsDailyResponses[keyof GetWhatsAppStatsDailyResponses];
+
+export type GetWhatsAppStatsHourlyData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Start of the window (RFC 3339 instant), rounded down to the start of its hour and included. The boundary uses the local hour when `timezone` is set and the UTC hour otherwise. The window may not exceed 30 days (720 hours). Defaults to 168 hours (7 days) before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * End of the window (RFC 3339 instant), rounded down to the start of its hour and included. The boundary uses the local hour when `timezone` is set and the UTC hour otherwise, so both bounds are inclusive. The window may not exceed 30 days (720 hours). Defaults to the current hour when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Restricts the statistics to one template, identified by its ID (`wat_…`) or slug. Mutually exclusive with the other dimension filters (`category`, `phone_number`, `tag`); only one may be set per request. An ID matches the `template_id` key on a row of the per-template breakdown; a slug is accepted for callers that predate that key and resolves to the same messages.
+     *
+     */
+    template?: string;
+    /**
+     * Restrict the statistics to a single template category. Mutually exclusive with the other dimension filters (`template`, `phone_number`, `tag`); only one may be set per request. Matches the `category` key on a row of the per-category breakdown.
+     *
+     */
+    category?: WhatsAppTemplateCategory;
+    /**
+     * Restrict the statistics to a single business sender phone number, in E.164 form. Mutually exclusive with the other dimension filters (`template`, `category`, `tag`); only one may be set per request. Matches the `phone_number` key on a row of the per-phone-number breakdown.
+     *
+     */
+    phone_number?: string;
+    /**
+     * Restrict the statistics to a single tag. Use `name` to match any value of a tag, or `name:value` for a specific pair (for example `campaign:spring_launch`). Mutually exclusive with the other dimension filters (`template`, `category`, `phone_number`); only one may be set per request. A row of the per-tag breakdown carries the same pair in its single `tag` key.
+     *
+     */
+    tag?: string;
+  };
+  url: "/v1/whatsapp/stats/hourly";
+};
+
+export type GetWhatsAppStatsHourlyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppStatsHourlyError =
+  GetWhatsAppStatsHourlyErrors[keyof GetWhatsAppStatsHourlyErrors];
+
+export type GetWhatsAppStatsHourlyResponses = {
+  /**
+   * Hourly aggregate stats for the requested period.
+   */
+  200: WhatsAppStatsResponse;
+};
+
+export type GetWhatsAppStatsHourlyResponse =
+  GetWhatsAppStatsHourlyResponses[keyof GetWhatsAppStatsHourlyResponses];
+
+export type GetWhatsAppStatsByErrorCodeData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of error-code rows to return, ranked by failure count descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/whatsapp/stats/error-codes";
+};
+
+export type GetWhatsAppStatsByErrorCodeErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppStatsByErrorCodeError =
+  GetWhatsAppStatsByErrorCodeErrors[keyof GetWhatsAppStatsByErrorCodeErrors];
+
+export type GetWhatsAppStatsByErrorCodeResponses = {
+  /**
+   * Per-error-code failure breakdown for the requested period.
+   */
+  200: WhatsAppStatsByErrorCodeResponse;
+};
+
+export type GetWhatsAppStatsByErrorCodeResponse =
+  GetWhatsAppStatsByErrorCodeResponses[keyof GetWhatsAppStatsByErrorCodeResponses];
+
+export type GetWhatsAppStatsByTemplateData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of template rows to return, ranked by accepted volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/whatsapp/stats/templates";
+};
+
+export type GetWhatsAppStatsByTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppStatsByTemplateError =
+  GetWhatsAppStatsByTemplateErrors[keyof GetWhatsAppStatsByTemplateErrors];
+
+export type GetWhatsAppStatsByTemplateResponses = {
+  /**
+   * Per-template breakdown for the requested period.
+   */
+  200: WhatsAppStatsByTemplateResponse;
+};
+
+export type GetWhatsAppStatsByTemplateResponse =
+  GetWhatsAppStatsByTemplateResponses[keyof GetWhatsAppStatsByTemplateResponses];
+
+export type GetWhatsAppStatsByTemplateCategoryData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of template-category rows to return, ranked by accepted volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/whatsapp/stats/template-categories";
+};
+
+export type GetWhatsAppStatsByTemplateCategoryErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppStatsByTemplateCategoryError =
+  GetWhatsAppStatsByTemplateCategoryErrors[keyof GetWhatsAppStatsByTemplateCategoryErrors];
+
+export type GetWhatsAppStatsByTemplateCategoryResponses = {
+  /**
+   * Per-template-category breakdown for the requested period.
+   */
+  200: WhatsAppStatsByTemplateCategoryResponse;
+};
+
+export type GetWhatsAppStatsByTemplateCategoryResponse =
+  GetWhatsAppStatsByTemplateCategoryResponses[keyof GetWhatsAppStatsByTemplateCategoryResponses];
+
+export type GetWhatsAppStatsByTagData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of tag rows to return, ranked by accepted volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/whatsapp/stats/tags";
+};
+
+export type GetWhatsAppStatsByTagErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppStatsByTagError =
+  GetWhatsAppStatsByTagErrors[keyof GetWhatsAppStatsByTagErrors];
+
+export type GetWhatsAppStatsByTagResponses = {
+  /**
+   * Per-tag breakdown for the requested period.
+   */
+  200: WhatsAppStatsByTagResponse;
+};
+
+export type GetWhatsAppStatsByTagResponse =
+  GetWhatsAppStatsByTagResponses[keyof GetWhatsAppStatsByTagResponses];
+
+export type GetWhatsAppStatsByPhoneNumberData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of phone-number rows to return, ranked by accepted volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/whatsapp/stats/phone-numbers";
+};
+
+export type GetWhatsAppStatsByPhoneNumberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppStatsByPhoneNumberError =
+  GetWhatsAppStatsByPhoneNumberErrors[keyof GetWhatsAppStatsByPhoneNumberErrors];
+
+export type GetWhatsAppStatsByPhoneNumberResponses = {
+  /**
+   * Per-phone-number breakdown for the requested period.
+   */
+  200: WhatsAppStatsByPhoneNumberResponse;
+};
+
+export type GetWhatsAppStatsByPhoneNumberResponse =
+  GetWhatsAppStatsByPhoneNumberResponses[keyof GetWhatsAppStatsByPhoneNumberResponses];
+
+export type GetWhatsAppStatsByCountryData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of country rows to return, ranked by accepted volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/whatsapp/stats/countries";
+};
+
+export type GetWhatsAppStatsByCountryErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppStatsByCountryError =
+  GetWhatsAppStatsByCountryErrors[keyof GetWhatsAppStatsByCountryErrors];
+
+export type GetWhatsAppStatsByCountryResponses = {
+  /**
+   * Per-country breakdown for the requested period.
+   */
+  200: WhatsAppStatsByCountryResponse;
+};
+
+export type GetWhatsAppStatsByCountryResponse =
+  GetWhatsAppStatsByCountryResponses[keyof GetWhatsAppStatsByCountryResponses];
+
+export type GetWhatsAppInboundStatsSummaryData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, either a calendar day (YYYY-MM-DD) or an RFC 3339 instant rounded down to the hour. The form you use selects the grain the total is resolved at. Interpreted in `timezone`, or in UTC when `timezone` is omitted. Must use the same form as `to`. A numeric UTC offset (for example `+05:45`) is rejected when `timezone` is set; pass a calendar day or a `Z` instant instead. Defaults to 30 days before `to` for day windows, or 168 hours before `to` for hour windows.
+     *
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, in the same form as `from`. Defaults to today, or the current hour for an hour window. A day window may not exceed 365 days and an hour window 720 hours.
+     *
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Set to `previous_period` to include the received-message count for the immediately preceding window of equal length. The response also includes the change between the two, so you can show "+X% vs last period" without a second request.
+     *
+     */
+    compare?: StatsComparePeriod;
+  };
+  url: "/v1/whatsapp/stats/inbound/summary";
+};
+
+export type GetWhatsAppInboundStatsSummaryErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppInboundStatsSummaryError =
+  GetWhatsAppInboundStatsSummaryErrors[keyof GetWhatsAppInboundStatsSummaryErrors];
+
+export type GetWhatsAppInboundStatsSummaryResponses = {
+  /**
+   * Total received messages for the requested period.
+   */
+  200: WhatsAppInboundStatsSummaryResponse;
+};
+
+export type GetWhatsAppInboundStatsSummaryResponse =
+  GetWhatsAppInboundStatsSummaryResponses[keyof GetWhatsAppInboundStatsSummaryResponses];
+
+export type GetWhatsAppInboundStatsDailyData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Start date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). The window may not exceed 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * End date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). The window may not exceed 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+  };
+  url: "/v1/whatsapp/stats/inbound/daily";
+};
+
+export type GetWhatsAppInboundStatsDailyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppInboundStatsDailyError =
+  GetWhatsAppInboundStatsDailyErrors[keyof GetWhatsAppInboundStatsDailyErrors];
+
+export type GetWhatsAppInboundStatsDailyResponses = {
+  /**
+   * Daily received-message counts for the requested period.
+   */
+  200: WhatsAppInboundStatsResponse;
+};
+
+export type GetWhatsAppInboundStatsDailyResponse =
+  GetWhatsAppInboundStatsDailyResponses[keyof GetWhatsAppInboundStatsDailyResponses];
+
+export type GetWhatsAppInboundStatsHourlyData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Start of the window (RFC 3339 instant). Rounded down to the start of its hour (the local hour when `timezone` is set, otherwise the UTC hour), and that hour is included. The window may not exceed 30 days (720 hours). Defaults to 168 hours (7 days) before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * End of the window (RFC 3339 instant). Rounded down to the start of its hour (the local hour when `timezone` is set, otherwise the UTC hour), and that hour is included (both bounds inclusive). The window may not exceed 30 days (720 hours). Defaults to the current hour when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+  };
+  url: "/v1/whatsapp/stats/inbound/hourly";
+};
+
+export type GetWhatsAppInboundStatsHourlyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppInboundStatsHourlyError =
+  GetWhatsAppInboundStatsHourlyErrors[keyof GetWhatsAppInboundStatsHourlyErrors];
+
+export type GetWhatsAppInboundStatsHourlyResponses = {
+  /**
+   * Hourly received-message counts for the requested period.
+   */
+  200: WhatsAppInboundStatsResponse;
+};
+
+export type GetWhatsAppInboundStatsHourlyResponse =
+  GetWhatsAppInboundStatsHourlyResponses[keyof GetWhatsAppInboundStatsHourlyResponses];
+
+export type GetWhatsAppInboundStatsByPhoneNumberData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of phone-number rows to return, ranked by received-message volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/whatsapp/stats/inbound/phone-numbers";
+};
+
+export type GetWhatsAppInboundStatsByPhoneNumberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppInboundStatsByPhoneNumberError =
+  GetWhatsAppInboundStatsByPhoneNumberErrors[keyof GetWhatsAppInboundStatsByPhoneNumberErrors];
+
+export type GetWhatsAppInboundStatsByPhoneNumberResponses = {
+  /**
+   * Per-phone-number breakdown of received messages for the requested period.
+   */
+  200: WhatsAppInboundStatsByPhoneNumberResponse;
+};
+
+export type GetWhatsAppInboundStatsByPhoneNumberResponse =
+  GetWhatsAppInboundStatsByPhoneNumberResponses[keyof GetWhatsAppInboundStatsByPhoneNumberResponses];
 
 export type GetEmailStatsDailyData = {
   body?: never;

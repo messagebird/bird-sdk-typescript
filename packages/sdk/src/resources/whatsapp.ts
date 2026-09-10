@@ -6,17 +6,20 @@ import type {
   WhatsAppMessageSendRequest,
   WhatsAppMessage,
 } from "../generated/types.gen.js";
+import { Resource } from "./base.js";
 import { WhatsappResourceBase } from "./whatsapp.gen.js";
+import { WhatsappStatsResource } from "./whatsappStats.js";
 import { WhatsappMessagesResource } from "./whatsappMessages.js";
 import { WhatsappReactionResource } from "./whatsappReaction.gen.js";
 import { WhatsappTemplatesResource } from "./whatsappTemplates.js";
-import { Resource } from "./base.js";
 import type { APIPromise, RequestOptions } from "../core/result.js";
 
 /** Body for `bird.whatsapp.send` — a template send, or one free-form content arm. */
 export type WhatsappSendParams = WhatsAppMessageSendRequest;
 
 export class WhatsappResource extends WhatsappResourceBase {
+  /** Aggregate statistics over the workspace's WhatsApp traffic. */
+  readonly stats: WhatsappStatsResource;
   /** Subresources of one message — `bird.whatsapp.messages.media(...)`. */
   readonly messages: WhatsappMessagesResource;
 
@@ -30,6 +33,7 @@ export class WhatsappResource extends WhatsappResourceBase {
     client: ConstructorParameters<typeof Resource>[1],
   ) {
     super(core, client);
+    this.stats = new WhatsappStatsResource(core, client);
     this.messages = new WhatsappMessagesResource(core, client);
     this.templates = new WhatsappTemplatesResource(core, client);
     this.reaction = new WhatsappReactionResource(core, client);

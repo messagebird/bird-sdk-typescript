@@ -169,6 +169,34 @@ export type {
   WhatsAppTemplateLanguageList,
 } from "./resources/whatsappTemplatesVersionsLanguages.gen.js";
 export type {
+  WhatsAppStatsSummary,
+  WhatsAppStatsResponse,
+  WhatsAppStatsByErrorCodeResponse,
+  WhatsAppStatsByTemplateResponse,
+  WhatsAppStatsByTemplateCategoryResponse,
+  WhatsAppStatsByTagResponse,
+  WhatsAppStatsByPhoneNumberResponse,
+  WhatsAppStatsByCountryResponse,
+  WhatsappStatsSummaryQuery,
+  WhatsappStatsDailyQuery,
+  WhatsappStatsHourlyQuery,
+  WhatsappStatsByErrorCodeQuery,
+  WhatsappStatsByTemplateQuery,
+  WhatsappStatsByTemplateCategoryQuery,
+  WhatsappStatsByTagQuery,
+  WhatsappStatsByPhoneNumberQuery,
+  WhatsappStatsByCountryQuery,
+} from "./resources/whatsappStats.gen.js";
+export type {
+  WhatsAppInboundStatsSummaryResponse,
+  WhatsAppInboundStatsResponse,
+  WhatsAppInboundStatsByPhoneNumberResponse,
+  WhatsappStatsInboundSummaryQuery,
+  WhatsappStatsInboundDailyQuery,
+  WhatsappStatsInboundHourlyQuery,
+  WhatsappStatsInboundByPhoneNumberQuery,
+} from "./resources/whatsappStatsInbound.gen.js";
+export type {
   Verification,
   VerificationCheckResult,
   VerifyVerificationsCreateParams,
