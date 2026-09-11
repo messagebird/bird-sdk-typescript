@@ -6172,6 +6172,10 @@ export type WhatsAppReactionEventList = {
   data: Array<WhatsAppReactionEvent>;
 } & ListEnvelope;
 
+export type WhatsAppNumberId = string;
+
+export type WhatsAppBusinessAccountId = string;
+
 export type WhatsAppTemplateExampleParameter = {
   /**
    * The kind of value this parameter accepts.
@@ -7383,7 +7387,544 @@ export type WhatsAppInboundStatsByPhoneNumberResponse = {
   readonly total: number;
 };
 
+/**
+ * A country where WhatsApp can store a business phone number's message content at rest, as its two-letter ISO 3166 code.
+ *
+ */
+export type WhatsAppDataLocalizationRegion =
+  | "AU"
+  | "ID"
+  | "IN"
+  | "JP"
+  | "SG"
+  | "KR"
+  | "DE"
+  | "CH"
+  | "GB"
+  | "BR"
+  | "BH"
+  | "ZA"
+  | "AE"
+  | "CA";
+
+/**
+ * Operational state of a business phone number. The `preparing` status means the service is verifying a managed number. The `awaiting_signup` status means verification finished and you must complete signup. The `pending` status is WhatsApp's own token for a number it does not hold as registered, and is also returned when no WhatsApp status has been stored, including after setup completes. It does not by itself establish whether setup is complete. The `connected` status means registration completed. The `failed` status means connection was refused permanently. Other values are WhatsApp's own operational states for a number already connected. This is an open enum. Accept unrecognized values.
+ */
+export type WhatsAppNumberStatus =
+  | "awaiting_signup"
+  | "banned"
+  | "connected"
+  | "deleted"
+  | "disconnected"
+  | "failed"
+  | "flagged"
+  | "migrated"
+  | "pending"
+  | "preparing"
+  | "rate_limited"
+  | "restricted"
+  | (string & {});
+
+export type WhatsAppNumberScope = "system" | "workspace";
+
+/**
+ * Sortable fields for a WhatsApp number list.
+ */
+export type WhatsAppNumberSortField = "created_at";
+
+/**
+ * Standardized number-connection failure:
+ *
+ * - `registration_pin_rejected`: WhatsApp refused the two-step verification PIN.
+ * - `registration_pin_rate_limited`: Too many PIN attempts occurred recently.
+ * - `registration_attempts_exhausted`: Registration is blocked for 72 hours.
+ * - `number_verification_required`: WhatsApp requires the number to be verified again.
+ * - `number_not_registered`: WhatsApp does not hold the number as registered.
+ * - `number_already_linked`: Another WhatsApp integration uses the number.
+ * - `number_already_in_use`: WhatsApp cannot accept the number.
+ * - `verification_code_not_received`: The verification text did not arrive.
+ * - `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.
+ * - `business_account_locked`: WhatsApp locked the business account.
+ * - `credit_currency_mismatch`: WhatsApp bills the business account in a currency your organization is not billed in. Connect the number under a business account WhatsApp bills in that same currency, or one WhatsApp has set no currency on: an account's billing currency cannot be changed once WhatsApp sets it.
+ * - `permission_denied`: WhatsApp refused access to the account.
+ * - `invalid_request`: WhatsApp rejected the connection details.
+ * - `internal_error`: The service could not classify or resolve the failure.
+ *
+ * This is an open enum. Accept unrecognized values.
+ *
+ */
+export type WhatsAppNumberErrorCode =
+  | "registration_pin_rejected"
+  | "registration_pin_rate_limited"
+  | "registration_attempts_exhausted"
+  | "number_verification_required"
+  | "number_not_registered"
+  | "number_already_linked"
+  | "number_already_in_use"
+  | "verification_code_not_received"
+  | "verification_rate_limited"
+  | "business_account_locked"
+  | "credit_currency_mismatch"
+  | "permission_denied"
+  | "invalid_request"
+  | "internal_error"
+  | (string & {});
+
+/**
+ * Why a number's connection was refused for good. `code` is the standardized reason. `description` explains the failure where one was recorded, and `meta_error_code` carries WhatsApp's own code when available. It accompanies the `failed` status only; a number still being retried carries no error.
+ */
+export type WhatsAppNumberError = {
+  /**
+   * Standardized failure reason.
+   */
+  readonly code: WhatsAppNumberErrorCode;
+  /**
+   * Why the connection failed: WhatsApp's own words, in the language of the account it refused, when WhatsApp answered; our own explanation when the number was refused before WhatsApp was asked; a generic sentence when WhatsApp refused without giving a reason. Absent when the attempt failed without ever reaching WhatsApp, which leaves `code` as the only account of the failure. Show it to the person who owns the number; never match on its text.
+   */
+  readonly description?: string;
+  /**
+   * WhatsApp's most specific code for the refusal: its error subcode where it sent one, otherwise its top-level code. Null when WhatsApp did not provide a code. Treat it as an opaque string.
+   */
+  readonly meta_error_code?: string | null;
+};
+
+/**
+ * WhatsApp quality rating for a business phone number, based on recipient feedback. `green`, `yellow`, and `red` indicate decreasing quality; sustained `red` can restrict the number. `unknown` is itself a reported rating. This is separate from a template-language quality score. Accept unrecognized values.
+ */
+export type WhatsAppNumberQualityRating =
+  "green" | "yellow" | "red" | "unknown" | (string & {});
+
+/**
+ * How many unique WhatsApp users can be messaged outside a customer service window in a rolling 24 hours, as WhatsApp's own tier token. WhatsApp calculates this for the business portfolio, and every number in that portfolio shares it; it is not this number's private capacity, and one number can consume all of it. Values are WhatsApp's own tokens, lower-cased. Open enum: WhatsApp documents a 2,000 limit its published tier vocabulary has no token for, so treat an unrecognized value as a tier WhatsApp added.
+ */
+export type WhatsAppNumberMessagingLimit =
+  | "tier_50"
+  | "tier_250"
+  | "tier_1k"
+  | "tier_10k"
+  | "tier_100k"
+  | "tier_unlimited"
+  | (string & {});
+
+/**
+ * How fast WhatsApp lets this number send, as WhatsApp's own level token. `standard` is 80 messages per second; WhatsApp upgrades an eligible number to 1,000 per second automatically. Values are WhatsApp's own tokens, lower-cased. This enum is open because WhatsApp publishes no vocabulary for the field. The `standard` value is the only value Bird has measured. The upgraded level's token remains unknown until a number returns it.
+ */
+export type WhatsAppNumberThroughputLevel = "standard" | (string & {});
+
+export type WhatsAppNumber = {
+  /**
+   * Unique identifier for the connected number.
+   */
+  readonly id: WhatsAppNumberId;
+  /**
+   * The WhatsApp Business Account this number is connected under. Present only for a number your workspace connected itself.
+   *
+   */
+  readonly waba?: string;
+  /**
+   * The number in E.164 format. Null only while the number itself is not yet known: a number your workspace holds carries its E.164 from the moment setup starts, so a value here does not mean the number can send. `status` is what says that.
+   *
+   */
+  readonly phone_number: string | null;
+  /**
+   * The number you hold with us that this WhatsApp number was connected from, as its id in GET /v1/numbers. Absent for a number you brought yourself.
+   *
+   */
+  readonly number_id?: AllocatedNumberId;
+  /**
+   * Your workspace's own label for this number, given when it was connected and changeable afterwards. It has no bearing on what WhatsApp displays to people the number messages; `GET /v1/whatsapp/numbers/{number_id}/profile` returns that as `display_name`. For a number we operate on your behalf, this is our own label instead and cannot be changed.
+   *
+   */
+  readonly name: string;
+  /**
+   * Whether the number sends under a WhatsApp Business Account we operate on your behalf (`system`) or one your workspace connected itself (`workspace`).
+   *
+   */
+  readonly scope: WhatsAppNumberScope;
+  /**
+   * The country this number's message content is stored at rest in, as its two-letter ISO 3166 code. Absent when it uses WhatsApp's default storage. It can differ from the region requested at connection when WhatsApp requires a particular country for the number.
+   *
+   */
+  readonly data_localization_region?: WhatsAppDataLocalizationRegion;
+  /**
+   * WhatsApp's own state for this number as of `meta_synced_at`, except for the three states we answer ourselves because WhatsApp holds nothing to report. A connection we are still verifying reads `preparing`, one waiting for someone to finish signup reads `awaiting_signup`, and a permanently refused one reads `failed`, with `error` saying why. `pending` is WhatsApp's own token for a number it does not hold as registered, and is also what a number with no stored WhatsApp status reads, including after setup completes, so it does not by itself establish whether setup is complete. A number we operate on your behalf reads `connected` as our own assertion rather than a reading from WhatsApp for every number we ship today; that tier carries no `meta_synced_at`.
+   */
+  readonly status: WhatsAppNumberStatus;
+  /**
+   * What to do next about this number, given the state it is in. Each entry names one
+   * action and says why it is worth taking, so you can act on this response without
+   * working out the order yourself. Present on reads that compute it: an empty list
+   * means there is nothing to do, and the field is absent entirely on responses that
+   * do not report next actions.
+   *
+   * While `status` is `awaiting_signup` this carries the browser step that finishes
+   * the connection, because embedded signup sits behind an OAuth screen no API call
+   * can stand in for.
+   *
+   */
+  readonly next?: Array<NextAction>;
+  /**
+   * Why this number's connection was refused for good. Present only while `status` is `failed`. A retryable step records its cause on a still-`pending` number without setting this field, because that cause is not a refusal yet, so a connection you are still waiting on reports no error here.
+   */
+  readonly error?: WhatsAppNumberError;
+  /**
+   * Where a person finishes connecting this number, present only while `status` is `awaiting_signup`. Finishing means completing WhatsApp's embedded signup, which is a browser flow behind an OAuth screen: it cannot be done over the API, so open this link and have someone with access to the workspace complete it. The number is offered to them already verified. Once they finish, `status` moves on and this link is no longer returned.
+   */
+  readonly finish_setup_url?: string;
+  /**
+   * WhatsApp's quality rating for this number as of `meta_synced_at`. Absent until WhatsApp has reported one, and always absent for a number we operate on your behalf.
+   */
+  readonly quality_rating?: WhatsAppNumberQualityRating;
+  /**
+   * The messaging limit WhatsApp applied to this number's business portfolio as of `meta_synced_at`. Absent until WhatsApp has reported one, and always absent for a number we operate on your behalf.
+   */
+  readonly messaging_limit?: WhatsAppNumberMessagingLimit;
+  /**
+   * The send rate WhatsApp allowed this number as of `meta_synced_at`. Absent until WhatsApp has reported one, and always absent for a number we operate on your behalf.
+   */
+  readonly throughput_level?: WhatsAppNumberThroughputLevel;
+  /**
+   * Whether WhatsApp grants this number Official Business Account status as of `meta_synced_at`. Absent until WhatsApp has reported it, and always absent for a number we operate on your behalf. WhatsApp grants the status per number, so two numbers on one WhatsApp Business Account can differ. The status also decides whether a rename is possible here: a number that has it cannot be renamed through `PATCH /v1/whatsapp/numbers/{number_id}/profile` at all, and has to be renamed through WhatsApp support instead.
+   */
+  readonly is_official_business_account?: boolean;
+  /**
+   * When this number's state was last read from WhatsApp. `status`, `quality_rating`, `messaging_limit`, `throughput_level`, and `is_official_business_account` all belong to that reading rather than representing live values. We re-read roughly hourly, so a change at WhatsApp can be up to an hour old here. Absent for a number we have never read back and for a number we operate on your behalf.
+   */
+  readonly meta_synced_at?: string;
+  /**
+   * When we last asked WhatsApp to send this number a verification code, which we do only for a number your workspace connected itself from a number you hold with us. Absent for a number we operate on your behalf, and for one you connected through Embedded Signup with a code you read yourself. Wait a few hours after this before repairing a number whose verification failed: WhatsApp rotates the routes it verifies over during that period, and throttles a number asked repeatedly in a short window. Distinct from `updated_at`, which any change to the number moves.
+   */
+  readonly pre_verification_requested_at?: string;
+  /**
+   * When this number was submitted for connection.
+   */
+  readonly created_at: string;
+  /**
+   * When this number was last changed.
+   */
+  readonly updated_at: string;
+};
+
+export type WhatsAppNumberList = {
+  /**
+   * The WhatsApp numbers your workspace can send from.
+   */
+  data: Array<WhatsAppNumber>;
+} & ListEnvelope;
+
 export type NumbersDedicatedAllocationId = string;
+
+/**
+ * Sortable fields for a WhatsApp number's event list.
+ */
+export type WhatsAppNumberEventSortField = "created_at";
+
+export type WhatsAppNumberEventId = string;
+
+export type WhatsAppNumberEvent = {
+  /**
+   * Event ID.
+   */
+  readonly id: WhatsAppNumberEventId;
+  /**
+   * Type of number event. `whatsapp_number.messaging_limit_updated` and `whatsapp_number.profile_name_update` are reported by WhatsApp as they happen; `whatsapp_number.quality_rating_updated` is observed when Bird next reads the number, so it can lag the change by up to an hour. `whatsapp_number.status_changed` records every move of the `status` field on the number itself, whichever side caused it. Open enum: new event types may be added over time, so treat any unrecognized value as a future event rather than an error. The values below are the types known at this version.
+   */
+  type: string;
+  /**
+   * Human-readable summary of what changed.
+   */
+  summary: string;
+  /**
+   * Structured details for the event. `from` and `to` carry the values that changed, and `from` is absent when the number had no prior value to report. A status change into `failed` also carries the `reason`; a display-name decision carries `new_display_name`, `decision`, and, when WhatsApp named one for a rejection, `rejection_reason`. A messaging-limit change also carries the `trigger` WhatsApp named for it, such as `onboarding` or `throughput_upgrade`, when it named one. A `whatsapp_number.created` event carries the `source` the number came from, and its `phone_number` once one is known.
+   */
+  metadata: {
+    [key: string]: unknown;
+  };
+  /**
+   * When the event was recorded.
+   */
+  created_at: string;
+};
+
+export type WhatsAppNumberEventList = {
+  /**
+   * Page of number events, newest first by default.
+   */
+  data: Array<WhatsAppNumberEvent>;
+} & ListEnvelope;
+
+/**
+ * Where WhatsApp's review of the display name stands. `available_without_review` means the name met WhatsApp's criteria for immediate use without a review step, and `none` means no display name has been submitted yet. WhatsApp adds states over time, so a value outside this list can be returned.
+ */
+export type WhatsAppDisplayNameStatus =
+  | "approved"
+  | "available_without_review"
+  | "declined"
+  | "expired"
+  | "non_exists"
+  | "pending_review"
+  | "none"
+  | (string & {});
+
+/**
+ * Where the username stands with WhatsApp. WhatsApp adds states over time, so a value outside this list can be returned.
+ */
+export type WhatsAppUsernameStatus =
+  "approved" | "reserved" | "deleted" | (string & {});
+
+/**
+ * The industry WhatsApp shows on the business profile. WhatsApp adds categories over time, so a value outside this list can be returned.
+ */
+export type WhatsAppBusinessVertical =
+  | "other"
+  | "auto"
+  | "beauty"
+  | "apparel"
+  | "edu"
+  | "entertain"
+  | "event_plan"
+  | "finance"
+  | "grocery"
+  | "govt"
+  | "hotel"
+  | "health"
+  | "nonprofit"
+  | "prof_services"
+  | "retail"
+  | "travel"
+  | "restaurant"
+  | "alcohol"
+  | "online_gambling"
+  | "physical_gambling"
+  | "otc_drugs"
+  | (string & {});
+
+/**
+ * The business profile WhatsApp shows to people this number messages. It is read from WhatsApp on each request rather than from a stored copy, so it is always current and a WhatsApp outage makes it briefly unavailable.
+ */
+export type WhatsAppNumberProfile = {
+  /**
+   * The name WhatsApp verifies for this number. Once WhatsApp approves it, it appears at the top of a chat with this number; `display_name_status` is what says whether it has. Set when the number was connected, and changed from the dashboard or the CLI, as [WhatsApp phone numbers](/docs/guides/whatsapp/phone-number-setup) explains. This field still returns the current name until a requested change completes.
+   *
+   */
+  readonly display_name?: string;
+  /**
+   * Where WhatsApp's review of the display name stands. A name still under review is not yet shown at the top of a chat.
+   *
+   */
+  readonly display_name_status?: WhatsAppDisplayNameStatus;
+  /**
+   * The display name whose change has been requested, whether or not WhatsApp is reviewing it. Absent when no change is pending.
+   *
+   */
+  readonly new_display_name?: string;
+  /**
+   * Where the requested display name stands with WhatsApp, including whether it is being reviewed or was accepted for immediate use without a review. Absent when no change is pending. If WhatsApp accepts the name it becomes `display_name`. Every other outcome leaves the number on the name it already had: `declined` is WhatsApp refusing the name, and `expired` is a request that no longer stands and has to be made again.
+   *
+   */
+  readonly new_display_name_status?: WhatsAppDisplayNameStatus;
+  /**
+   * The username WhatsApp users can find this number by, without an `@`. Absent when the number has no username. Once set it cannot be removed through this API.
+   *
+   */
+  readonly username?: string;
+  /**
+   * Where the username stands with WhatsApp. Absent when the number has no username.
+   *
+   */
+  readonly username_status?: WhatsAppUsernameStatus;
+  /**
+   * The short line shown under the business name in a chat.
+   */
+  about?: string;
+  /**
+   * The business address shown on the profile.
+   */
+  address?: string;
+  /**
+   * The longer description shown on the profile.
+   */
+  description?: string;
+  /**
+   * The contact email shown on the profile.
+   */
+  email?: string;
+  /**
+   * The industry WhatsApp shows on the profile.
+   */
+  vertical?: WhatsAppBusinessVertical;
+  /**
+   * Up to two websites shown on the profile.
+   */
+  websites?: Array<string>;
+  /**
+   * A link to the profile picture WhatsApp currently shows. WhatsApp signs this link and it expires within days, so load it when you display it and never store it. It is served with permissive cross-origin headers, so a browser can load it directly.
+   */
+  readonly profile_picture_url?: string;
+};
+
+/**
+ * Sortable fields for a WhatsApp Business Account list.
+ */
+export type WhatsAppBusinessAccountSortField = "created_at";
+
+/**
+ * WhatsApp's own state for a WhatsApp Business Account. Values are WhatsApp's own tokens, lower-cased. This enum is open because WhatsApp documents the field in neither its API reference nor its machine-readable schema. The `active` value is the only value in WhatsApp's example response, so it is the only one Bird can name. Treat anything else as a state WhatsApp reports and this list has not caught up with.
+ */
+export type WhatsAppBusinessAccountStatus = "active" | (string & {});
+
+/**
+ * How far WhatsApp's own review of this WhatsApp Business Account has got. `deferred` is WhatsApp postponing the review rather than refusing it. Values are WhatsApp's own tokens, lower-cased. Open enum: treat an unrecognized value as a review state WhatsApp added rather than as an error.
+ */
+export type WhatsAppBusinessAccountReviewStatus =
+  "approved" | "deferred" | "pending" | "rejected" | (string & {});
+
+/**
+ * Whether Meta has verified the business behind this WhatsApp Business Account. Verification is one of the paths to a higher messaging limit, so a value other than `verified` is often the reason a limit has not moved. Values are Meta's own tokens, lower-cased. Open enum: treat an unrecognized value as a state Meta added rather than as an error.
+ */
+export type WhatsAppBusinessVerificationStatus =
+  | "expired"
+  | "failed"
+  | "ineligible"
+  | "not_verified"
+  | "pending"
+  | "pending_need_more_info"
+  | "pending_submission"
+  | "rejected"
+  | "revoked"
+  | "verified"
+  | (string & {});
+
+/**
+ * Whether this account can use WhatsApp's Marketing Messages API. `eligible` means WhatsApp would accept an onboarding request for it; `onboarded` means it has already been onboarded. Values are WhatsApp's own tokens, lower-cased. Open enum out of necessity. WhatsApp's onboarding guide names these two values and defers the rest to an API reference that does not document the field. Treat anything else as a state WhatsApp reports that this list has not caught up with.
+ */
+export type WhatsAppBusinessAccountMarketingMessagesStatus =
+  "eligible" | "onboarded" | (string & {});
+
+/**
+ * How far the business portfolio has got through Meta's Marketing Messages
+ * terms of service.
+ *
+ * - `not_started`: the portfolio has not begun the process.
+ * - `request_sent`: a request is in.
+ * - `term_of_service_signed`: the terms are accepted.
+ *
+ * A portfolio property, so every account the portfolio owns reports the same
+ * value. Distinct from the account's own marketing-messages status, which Meta
+ * confusingly gives the same name. Values are Meta's own tokens, lower-cased.
+ * Open enum: treat an unrecognized value as a state Meta added rather than as
+ * an error.
+ *
+ */
+export type WhatsAppBusinessPortfolioMarketingMessagesStatus =
+  "not_started" | "request_sent" | "term_of_service_signed" | (string & {});
+
+/**
+ * The Meta business portfolio that owns a WhatsApp Business Account. Bird holds no resource of its own for a portfolio, which is why the identifier is named `meta_id`: it is meaningful only against Meta's own tools, and it is not a Bird identifier.
+ */
+export type WhatsAppBusinessPortfolio = {
+  /**
+   * Meta's identifier for the portfolio. Treat it as an opaque string.
+   */
+  readonly meta_id: string;
+  /**
+   * The portfolio's name, as Meta reports it. Absent when Meta returned none.
+   */
+  readonly name?: string;
+  /**
+   * How far this portfolio has got through Meta's Marketing Messages terms of service. Absent until Meta has reported it. Distinct from the account's own `marketing_messages_onboarding_status`, which Meta gives the same field name but a different vocabulary: that one is the account's own eligibility, this one is the portfolio's Terms-of-Service progress.
+   */
+  readonly marketing_messages_onboarding_status?: WhatsAppBusinessPortfolioMarketingMessagesStatus;
+};
+
+/**
+ * Whether WhatsApp has disabled a WhatsApp Business Account or scheduled it to be
+ * disabled:
+ *
+ * - `disabled`: WhatsApp has disabled the account, and it cannot send.
+ * - `scheduled_for_disable`: WhatsApp has set a date to disable the account, which can
+ * still send until then.
+ *
+ * An account WhatsApp has reinstated reports no `ban` at all rather than a third value
+ * here.
+ *
+ */
+export type WhatsAppBusinessAccountBanState =
+  "disabled" | "scheduled_for_disable";
+
+/**
+ * WhatsApp's ban on this account, as WhatsApp announced it. Absent when there is no ban, and also when there is one WhatsApp announced before Bird began recording bans, or whose notification never reached Bird, since WhatsApp does not replay them. This is what WhatsApp announced rather than the account's current state, so it is never the field to read to decide whether an account can send.
+ */
+export type WhatsAppBusinessAccountBan = {
+  readonly state: WhatsAppBusinessAccountBanState;
+  /**
+   * When WhatsApp reported the ban, by WhatsApp's own clock. Bird can learn of a ban later than this, so it is not when Bird recorded it.
+   */
+  readonly occurred_at: string;
+  /**
+   * Where to appeal WhatsApp's decision with Meta Business Support, because neither Bird nor this API can lift one. Absent when Bird does not know the account's Meta business portfolio, since there is no support-home path to build without one.
+   */
+  readonly appeal_url?: string;
+};
+
+export type WhatsAppBusinessAccount = {
+  /**
+   * Unique identifier for the WhatsApp Business Account.
+   */
+  readonly id: WhatsAppBusinessAccountId;
+  /**
+   * Meta's own identifier for this WhatsApp Business Account. This is the value to send when creating a template on the account.
+   *
+   */
+  readonly waba: string;
+  /**
+   * The account's name, as WhatsApp reports it.
+   */
+  readonly name: string;
+  /**
+   * WhatsApp's own state for this account as of `meta_synced_at`. The status is `active` until WhatsApp reports otherwise. WhatsApp already considers an account usable if Bird could connect a number under it. The absence of a reading is therefore not evidence of another state.
+   */
+  readonly status: WhatsAppBusinessAccountStatus;
+  /**
+   * How far WhatsApp's review of this account had got as of `meta_synced_at`. Absent until WhatsApp has reported it.
+   */
+  readonly account_review_status?: WhatsAppBusinessAccountReviewStatus;
+  /**
+   * Whether Meta had verified the business behind this account as of `meta_synced_at`. Absent until Meta has reported it.
+   */
+  readonly business_verification_status?: WhatsAppBusinessVerificationStatus;
+  /**
+   * Whether this account can use WhatsApp's Marketing Messages API, as of `meta_synced_at`. Absent until WhatsApp has reported it. Distinct from the owning portfolio's `marketing_messages_onboarding_status` (`portfolio.marketing_messages_onboarding_status`), which Meta gives the same field name but a different vocabulary: this one is the account's own eligibility, that one is the portfolio's Terms-of-Service progress.
+   */
+  readonly marketing_messages_onboarding_status?: WhatsAppBusinessAccountMarketingMessagesStatus;
+  /**
+   * The Meta business portfolio that owns this account. Absent until Meta has reported it. The portfolio is where a messaging limit is set, so every account it owns shares one.
+   */
+  readonly portfolio?: WhatsAppBusinessPortfolio;
+  /**
+   * WhatsApp's ban on this account, absent unless Bird was told of one. `status` is what the account said when Bird last read it; this is what WhatsApp announced, which arrives only on the webhook that announces it and is never re-read.
+   */
+  readonly ban?: WhatsAppBusinessAccountBan;
+  /**
+   * When Bird last read this account's state from WhatsApp. `status`, `account_review_status`, `business_verification_status`, `marketing_messages_onboarding_status` and `portfolio` are all that reading rather than live values; Bird re-reads roughly hourly. Absent for an account Bird has never read back.
+   */
+  readonly meta_synced_at?: string;
+  /**
+   * When this account was connected.
+   */
+  readonly created_at: string;
+  /**
+   * When this account was last changed.
+   */
+  readonly updated_at: string;
+};
+
+export type WhatsAppBusinessAccountList = {
+  /**
+   * The WhatsApp Business Accounts your workspace has connected.
+   */
+  data: Array<WhatsAppBusinessAccount>;
+} & ListEnvelope;
 
 export type WhatsAppSuppressionId = string;
 
@@ -14670,6 +15211,82 @@ export type WhatsAppInboundStatsResponseWritable = {
 export type WhatsAppInboundStatsByPhoneNumberResponseWritable = {
   [key: string]: never;
 };
+
+export type WhatsAppNumberWritable = {
+  [key: string]: never;
+};
+
+export type WhatsAppNumberListWritable = {
+  /**
+   * The WhatsApp numbers your workspace can send from.
+   */
+  data: Array<WhatsAppNumberWritable>;
+} & ListEnvelope;
+
+export type WhatsAppNumberEventWritable = {
+  /**
+   * Type of number event. `whatsapp_number.messaging_limit_updated` and `whatsapp_number.profile_name_update` are reported by WhatsApp as they happen; `whatsapp_number.quality_rating_updated` is observed when Bird next reads the number, so it can lag the change by up to an hour. `whatsapp_number.status_changed` records every move of the `status` field on the number itself, whichever side caused it. Open enum: new event types may be added over time, so treat any unrecognized value as a future event rather than an error. The values below are the types known at this version.
+   */
+  type: string;
+  /**
+   * Human-readable summary of what changed.
+   */
+  summary: string;
+  /**
+   * Structured details for the event. `from` and `to` carry the values that changed, and `from` is absent when the number had no prior value to report. A status change into `failed` also carries the `reason`; a display-name decision carries `new_display_name`, `decision`, and, when WhatsApp named one for a rejection, `rejection_reason`. A messaging-limit change also carries the `trigger` WhatsApp named for it, such as `onboarding` or `throughput_upgrade`, when it named one. A `whatsapp_number.created` event carries the `source` the number came from, and its `phone_number` once one is known.
+   */
+  metadata: {
+    [key: string]: unknown;
+  };
+  /**
+   * When the event was recorded.
+   */
+  created_at: string;
+};
+
+export type WhatsAppNumberEventListWritable = {
+  /**
+   * Page of number events, newest first by default.
+   */
+  data: Array<WhatsAppNumberEventWritable>;
+} & ListEnvelope;
+
+/**
+ * The business profile WhatsApp shows to people this number messages. It is read from WhatsApp on each request rather than from a stored copy, so it is always current and a WhatsApp outage makes it briefly unavailable.
+ */
+export type WhatsAppNumberProfileWritable = {
+  /**
+   * The short line shown under the business name in a chat.
+   */
+  about?: string;
+  /**
+   * The business address shown on the profile.
+   */
+  address?: string;
+  /**
+   * The longer description shown on the profile.
+   */
+  description?: string;
+  /**
+   * The contact email shown on the profile.
+   */
+  email?: string;
+  /**
+   * The industry WhatsApp shows on the profile.
+   */
+  vertical?: WhatsAppBusinessVertical;
+  /**
+   * Up to two websites shown on the profile.
+   */
+  websites?: Array<string>;
+};
+
+export type WhatsAppBusinessAccountListWritable = {
+  /**
+   * The WhatsApp Business Accounts your workspace has connected.
+   */
+  data: Array<unknown>;
+} & ListEnvelope;
 
 /**
  * Latency percentiles (p50, p95, p99) in milliseconds for the bucket. On the summary endpoint these are computed across the whole period rather than per bucket. Three families are reported:
@@ -24012,6 +24629,398 @@ export type GetWhatsAppInboundStatsByPhoneNumberResponses = {
 
 export type GetWhatsAppInboundStatsByPhoneNumberResponse =
   GetWhatsAppInboundStatsByPhoneNumberResponses[keyof GetWhatsAppInboundStatsByPhoneNumberResponses];
+
+export type ListWhatsAppNumbersData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Filter to a single WhatsApp Business Account by its Meta-assigned ID. Use the `waba` of a connected WhatsApp Business Account, or the `waba` on a number this list returns. A platform-managed number belongs to no WhatsApp Business Account and is never returned when this is set, so pairing it with `scope=system` always returns an empty page. An account this workspace does not hold returns an empty page.
+     */
+    waba?: string;
+    /**
+     * Filter to a single number, given in E.164 format. The value is normalized before matching, so `+31612340001` and `+31 6 1234 0001` are the same filter. A value that cannot be normalized is matched exactly as given. A number this workspace cannot send from returns an empty page, rather than being rejected.
+     */
+    phone_number?: string;
+    /**
+     * Filter by the number's WhatsApp state: the `status` a number in this list carries. Every value matches that status exactly, so repeat the parameter for each state you want. `pending` covers both a number WhatsApp reports as not registered and one it has reported no state for at all, while the two states before that keep their own values: a number we are still verifying carries `preparing`, and one waiting for someone to finish signup carries `awaiting_signup`. Asking for all three reaches every connection that has not finished, plus any finished one WhatsApp has not reported on yet. `failed` matches a connection refused permanently. A value this vocabulary does not recognize matches nothing, rather than being rejected. Omit to return numbers in every state.
+     */
+    status?: Array<WhatsAppNumberStatus>;
+    /**
+     * Filter by ownership tier: `system` for platform-managed numbers and `workspace` for numbers your workspace connected. Omit to return both. A `system` number belongs to no WhatsApp Business Account, so pairing this with `waba` always returns an empty page.
+     */
+    scope?: WhatsAppNumberScope;
+    /**
+     * Field to sort by.
+     */
+    sort?: WhatsAppNumberSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: "asc" | "desc";
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/numbers";
+};
+
+export type ListWhatsAppNumbersErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppNumbersError =
+  ListWhatsAppNumbersErrors[keyof ListWhatsAppNumbersErrors];
+
+export type ListWhatsAppNumbersResponses = {
+  /**
+   * A page of the WhatsApp numbers your workspace can send from.
+   */
+  200: WhatsAppNumberList;
+};
+
+export type ListWhatsAppNumbersResponse =
+  ListWhatsAppNumbersResponses[keyof ListWhatsAppNumbersResponses];
+
+export type GetWhatsAppNumberData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the WhatsApp number (`wan_` prefix), as returned by the number list.
+     */
+    number_id: WhatsAppNumberId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/numbers/{number_id}";
+};
+
+export type GetWhatsAppNumberErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWhatsAppNumberError =
+  GetWhatsAppNumberErrors[keyof GetWhatsAppNumberErrors];
+
+export type GetWhatsAppNumberResponses = {
+  /**
+   * The WhatsApp number.
+   */
+  200: WhatsAppNumber;
+};
+
+export type GetWhatsAppNumberResponse =
+  GetWhatsAppNumberResponses[keyof GetWhatsAppNumberResponses];
+
+export type ListWhatsAppNumberEventsData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the WhatsApp number whose events to list.
+     */
+    number_id: WhatsAppNumberId;
+  };
+  query?: {
+    /**
+     * Field to sort by. Defaults to `created_at`.
+     */
+    sort?: WhatsAppNumberEventSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: "asc" | "desc";
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/numbers/{number_id}/events";
+};
+
+export type ListWhatsAppNumberEventsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppNumberEventsError =
+  ListWhatsAppNumberEventsErrors[keyof ListWhatsAppNumberEventsErrors];
+
+export type ListWhatsAppNumberEventsResponses = {
+  /**
+   * A page of number events.
+   */
+  200: WhatsAppNumberEventList;
+};
+
+export type ListWhatsAppNumberEventsResponse =
+  ListWhatsAppNumberEventsResponses[keyof ListWhatsAppNumberEventsResponses];
+
+export type GetWhatsAppNumberProfileData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the WhatsApp number (`wan_` prefix), as returned by the number list.
+     */
+    number_id: WhatsAppNumberId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/numbers/{number_id}/profile";
+};
+
+export type GetWhatsAppNumberProfileErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppNumberProfileError =
+  GetWhatsAppNumberProfileErrors[keyof GetWhatsAppNumberProfileErrors];
+
+export type GetWhatsAppNumberProfileResponses = {
+  /**
+   * The number's business profile.
+   */
+  200: WhatsAppNumberProfile;
+};
+
+export type GetWhatsAppNumberProfileResponse =
+  GetWhatsAppNumberProfileResponses[keyof GetWhatsAppNumberProfileResponses];
+
+export type ListWhatsAppBusinessAccountsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by.
+     */
+    sort?: WhatsAppBusinessAccountSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: "asc" | "desc";
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/business-accounts";
+};
+
+export type ListWhatsAppBusinessAccountsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppBusinessAccountsError =
+  ListWhatsAppBusinessAccountsErrors[keyof ListWhatsAppBusinessAccountsErrors];
+
+export type ListWhatsAppBusinessAccountsResponses = {
+  /**
+   * A page of the WhatsApp Business Accounts your workspace has connected.
+   */
+  200: WhatsAppBusinessAccountList;
+};
+
+export type ListWhatsAppBusinessAccountsResponse =
+  ListWhatsAppBusinessAccountsResponses[keyof ListWhatsAppBusinessAccountsResponses];
+
+export type GetWhatsAppBusinessAccountData = {
+  body?: never;
+  path: {
+    /**
+     * WhatsApp Business Account ID (`waa_` prefix) or the WhatsApp Business Account ID Meta reports in `waba`. A value that parses as a valid ID resolves by ID; any other value resolves as Meta's ID.
+     *
+     */
+    business_account_ref: string;
+  };
+  query?: never;
+  url: "/v1/whatsapp/business-accounts/{business_account_ref}";
+};
+
+export type GetWhatsAppBusinessAccountErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWhatsAppBusinessAccountError =
+  GetWhatsAppBusinessAccountErrors[keyof GetWhatsAppBusinessAccountErrors];
+
+export type GetWhatsAppBusinessAccountResponses = {
+  /**
+   * The WhatsApp Business Account.
+   */
+  200: WhatsAppBusinessAccount;
+};
+
+export type GetWhatsAppBusinessAccountResponse =
+  GetWhatsAppBusinessAccountResponses[keyof GetWhatsAppBusinessAccountResponses];
 
 export type GetEmailStatsDailyData = {
   body?: never;

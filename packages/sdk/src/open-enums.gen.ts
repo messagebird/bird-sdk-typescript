@@ -347,6 +347,131 @@ export const VerificationTerminalReason = {
 export type VerificationTerminalReasonValue = (typeof VerificationTerminalReason)[keyof typeof VerificationTerminalReason];
 
 /**
+ * Values of WhatsAppBusinessAccountMarketingMessagesStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppBusinessAccountMarketingMessagesStatus = {
+  Eligible: "eligible",
+  Onboarded: "onboarded",
+} as const;
+
+/** A known WhatsAppBusinessAccountMarketingMessagesStatus value. */
+export type WhatsAppBusinessAccountMarketingMessagesStatusValue = (typeof WhatsAppBusinessAccountMarketingMessagesStatus)[keyof typeof WhatsAppBusinessAccountMarketingMessagesStatus];
+
+/**
+ * Values of WhatsAppBusinessAccountReviewStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppBusinessAccountReviewStatus = {
+  Approved: "approved",
+  Deferred: "deferred",
+  Pending: "pending",
+  Rejected: "rejected",
+} as const;
+
+/** A known WhatsAppBusinessAccountReviewStatus value. */
+export type WhatsAppBusinessAccountReviewStatusValue = (typeof WhatsAppBusinessAccountReviewStatus)[keyof typeof WhatsAppBusinessAccountReviewStatus];
+
+/**
+ * Values of WhatsAppBusinessAccountStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppBusinessAccountStatus = {
+  Active: "active",
+} as const;
+
+/** A known WhatsAppBusinessAccountStatus value. */
+export type WhatsAppBusinessAccountStatusValue = (typeof WhatsAppBusinessAccountStatus)[keyof typeof WhatsAppBusinessAccountStatus];
+
+/**
+ * Values of WhatsAppBusinessPortfolioMarketingMessagesStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppBusinessPortfolioMarketingMessagesStatus = {
+  NotStarted: "not_started",
+  RequestSent: "request_sent",
+  TermOfServiceSigned: "term_of_service_signed",
+} as const;
+
+/** A known WhatsAppBusinessPortfolioMarketingMessagesStatus value. */
+export type WhatsAppBusinessPortfolioMarketingMessagesStatusValue = (typeof WhatsAppBusinessPortfolioMarketingMessagesStatus)[keyof typeof WhatsAppBusinessPortfolioMarketingMessagesStatus];
+
+/**
+ * Values of WhatsAppBusinessVerificationStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppBusinessVerificationStatus = {
+  Expired: "expired",
+  Failed: "failed",
+  Ineligible: "ineligible",
+  NotVerified: "not_verified",
+  Pending: "pending",
+  PendingNeedMoreInfo: "pending_need_more_info",
+  PendingSubmission: "pending_submission",
+  Rejected: "rejected",
+  Revoked: "revoked",
+  Verified: "verified",
+} as const;
+
+/** A known WhatsAppBusinessVerificationStatus value. */
+export type WhatsAppBusinessVerificationStatusValue = (typeof WhatsAppBusinessVerificationStatus)[keyof typeof WhatsAppBusinessVerificationStatus];
+
+/**
+ * Values of WhatsAppBusinessVertical known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppBusinessVertical = {
+  Alcohol: "alcohol",
+  Apparel: "apparel",
+  Auto: "auto",
+  Beauty: "beauty",
+  Edu: "edu",
+  Entertain: "entertain",
+  EventPlan: "event_plan",
+  Finance: "finance",
+  Govt: "govt",
+  Grocery: "grocery",
+  Health: "health",
+  Hotel: "hotel",
+  Nonprofit: "nonprofit",
+  OnlineGambling: "online_gambling",
+  OtcDrugs: "otc_drugs",
+  Other: "other",
+  PhysicalGambling: "physical_gambling",
+  ProfServices: "prof_services",
+  Restaurant: "restaurant",
+  Retail: "retail",
+  Travel: "travel",
+} as const;
+
+/** A known WhatsAppBusinessVertical value. */
+export type WhatsAppBusinessVerticalValue = (typeof WhatsAppBusinessVertical)[keyof typeof WhatsAppBusinessVertical];
+
+/**
+ * Values of WhatsAppDisplayNameStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppDisplayNameStatus = {
+  Approved: "approved",
+  AvailableWithoutReview: "available_without_review",
+  Declined: "declined",
+  Expired: "expired",
+  NonExists: "non_exists",
+  None: "none",
+  PendingReview: "pending_review",
+} as const;
+
+/** A known WhatsAppDisplayNameStatus value. */
+export type WhatsAppDisplayNameStatusValue = (typeof WhatsAppDisplayNameStatus)[keyof typeof WhatsAppDisplayNameStatus];
+
+/**
  * Values of WhatsAppErrorCode known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -442,6 +567,98 @@ export const WhatsAppInteractiveType = {
 export type WhatsAppInteractiveTypeValue = (typeof WhatsAppInteractiveType)[keyof typeof WhatsAppInteractiveType];
 
 /**
+ * Values of WhatsAppNumberErrorCode known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppNumberErrorCode = {
+  BusinessAccountLocked: "business_account_locked",
+  CreditCurrencyMismatch: "credit_currency_mismatch",
+  InternalError: "internal_error",
+  InvalidRequest: "invalid_request",
+  NumberAlreadyInUse: "number_already_in_use",
+  NumberAlreadyLinked: "number_already_linked",
+  NumberNotRegistered: "number_not_registered",
+  NumberVerificationRequired: "number_verification_required",
+  PermissionDenied: "permission_denied",
+  RegistrationAttemptsExhausted: "registration_attempts_exhausted",
+  RegistrationPinRateLimited: "registration_pin_rate_limited",
+  RegistrationPinRejected: "registration_pin_rejected",
+  VerificationCodeNotReceived: "verification_code_not_received",
+  VerificationRateLimited: "verification_rate_limited",
+} as const;
+
+/** A known WhatsAppNumberErrorCode value. */
+export type WhatsAppNumberErrorCodeValue = (typeof WhatsAppNumberErrorCode)[keyof typeof WhatsAppNumberErrorCode];
+
+/**
+ * Values of WhatsAppNumberMessagingLimit known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppNumberMessagingLimit = {
+  Tier100k: "tier_100k",
+  Tier10k: "tier_10k",
+  Tier1k: "tier_1k",
+  Tier250: "tier_250",
+  Tier50: "tier_50",
+  TierUnlimited: "tier_unlimited",
+} as const;
+
+/** A known WhatsAppNumberMessagingLimit value. */
+export type WhatsAppNumberMessagingLimitValue = (typeof WhatsAppNumberMessagingLimit)[keyof typeof WhatsAppNumberMessagingLimit];
+
+/**
+ * Values of WhatsAppNumberQualityRating known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppNumberQualityRating = {
+  Green: "green",
+  Red: "red",
+  Unknown: "unknown",
+  Yellow: "yellow",
+} as const;
+
+/** A known WhatsAppNumberQualityRating value. */
+export type WhatsAppNumberQualityRatingValue = (typeof WhatsAppNumberQualityRating)[keyof typeof WhatsAppNumberQualityRating];
+
+/**
+ * Values of WhatsAppNumberStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppNumberStatus = {
+  AwaitingSignup: "awaiting_signup",
+  Banned: "banned",
+  Connected: "connected",
+  Deleted: "deleted",
+  Disconnected: "disconnected",
+  Failed: "failed",
+  Flagged: "flagged",
+  Migrated: "migrated",
+  Pending: "pending",
+  Preparing: "preparing",
+  RateLimited: "rate_limited",
+  Restricted: "restricted",
+} as const;
+
+/** A known WhatsAppNumberStatus value. */
+export type WhatsAppNumberStatusValue = (typeof WhatsAppNumberStatus)[keyof typeof WhatsAppNumberStatus];
+
+/**
+ * Values of WhatsAppNumberThroughputLevel known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppNumberThroughputLevel = {
+  Standard: "standard",
+} as const;
+
+/** A known WhatsAppNumberThroughputLevel value. */
+export type WhatsAppNumberThroughputLevelValue = (typeof WhatsAppNumberThroughputLevel)[keyof typeof WhatsAppNumberThroughputLevel];
+
+/**
  * Values of WhatsAppTemplateCategory known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -525,3 +742,17 @@ export const WhatsAppTemplateRejectionCategory = {
 
 /** A known WhatsAppTemplateRejectionCategory value. */
 export type WhatsAppTemplateRejectionCategoryValue = (typeof WhatsAppTemplateRejectionCategory)[keyof typeof WhatsAppTemplateRejectionCategory];
+
+/**
+ * Values of WhatsAppUsernameStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppUsernameStatus = {
+  Approved: "approved",
+  Deleted: "deleted",
+  Reserved: "reserved",
+} as const;
+
+/** A known WhatsAppUsernameStatus value. */
+export type WhatsAppUsernameStatusValue = (typeof WhatsAppUsernameStatus)[keyof typeof WhatsAppUsernameStatus];

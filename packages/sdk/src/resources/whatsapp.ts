@@ -12,6 +12,8 @@ import { WhatsappStatsResource } from "./whatsappStats.js";
 import { WhatsappMessagesResource } from "./whatsappMessages.js";
 import { WhatsappReactionResource } from "./whatsappReaction.gen.js";
 import { WhatsappTemplatesResource } from "./whatsappTemplates.js";
+import { WhatsappNumbersResource } from "./whatsappNumbers.js";
+import { WhatsappBusinessAccountsResource } from "./whatsappBusinessAccounts.gen.js";
 import type { APIPromise, RequestOptions } from "../core/result.js";
 
 /** Body for `bird.whatsapp.send` — a template send, or one free-form content arm. */
@@ -28,6 +30,10 @@ export class WhatsappResource extends WhatsappResourceBase {
 
   readonly reaction: WhatsappReactionResource;
 
+  readonly numbers: WhatsappNumbersResource;
+
+  readonly businessAccounts: WhatsappBusinessAccountsResource;
+
   constructor(
     core: ConstructorParameters<typeof Resource>[0],
     client: ConstructorParameters<typeof Resource>[1],
@@ -37,6 +43,8 @@ export class WhatsappResource extends WhatsappResourceBase {
     this.messages = new WhatsappMessagesResource(core, client);
     this.templates = new WhatsappTemplatesResource(core, client);
     this.reaction = new WhatsappReactionResource(core, client);
+    this.numbers = new WhatsappNumbersResource(core, client);
+    this.businessAccounts = new WhatsappBusinessAccountsResource(core, client);
   }
 
   /**

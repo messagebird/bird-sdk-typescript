@@ -92,6 +92,40 @@ export async function whatsappTemplatesVersionsLanguagesGet() {
   for (const component of language.components) console.log(component.type);
 }
 
+export async function whatsappNumbersList() {
+  for await (const number of bird.whatsapp.numbers.list({ status: ["connected"] })) {
+    console.log(number.id, number.phone_number, number.status);
+  }
+}
+
+export async function whatsappNumbersGet() {
+  const number = await bird.whatsapp.numbers.get("wan_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(number.status, number.quality_rating, number.messaging_limit);
+}
+
+export async function whatsappNumbersProfileGet() {
+  const profile = await bird.whatsapp.numbers.profile.get("wan_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(profile.display_name, profile.description, profile.websites);
+}
+
+export async function whatsappNumbersListEvents() {
+  for await (const event of bird.whatsapp.numbers.listEvents(
+    "wan_01krdgeqcxet5s7t44vh8rt9mg",
+  )) {
+    console.log(event.created_at, event.type, event.summary);
+  }
+}
+
+export async function whatsappBusinessAccountsList() {
+  for await (const account of bird.whatsapp.businessAccounts.list()) {
+    console.log(account.id, account.name, account.status);
+  }
+}
+
+export async function whatsappBusinessAccountsGet() {
+  const account = await bird.whatsapp.businessAccounts.get("waa_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(account.account_review_status, account.business_verification_status);
+}
 
 export async function whatsappStatsSummary() {
   const summary = await bird.whatsapp.stats.summary({

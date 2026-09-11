@@ -282,6 +282,9 @@ import type {
   GetWebhookData,
   GetWebhookErrors,
   GetWebhookResponses,
+  GetWhatsAppBusinessAccountData,
+  GetWhatsAppBusinessAccountErrors,
+  GetWhatsAppBusinessAccountResponses,
   GetWhatsAppInboundStatsByPhoneNumberData,
   GetWhatsAppInboundStatsByPhoneNumberErrors,
   GetWhatsAppInboundStatsByPhoneNumberResponses,
@@ -299,6 +302,12 @@ import type {
   GetWhatsAppMessageMediaData,
   GetWhatsAppMessageMediaErrors,
   GetWhatsAppMessageResponses,
+  GetWhatsAppNumberData,
+  GetWhatsAppNumberErrors,
+  GetWhatsAppNumberProfileData,
+  GetWhatsAppNumberProfileErrors,
+  GetWhatsAppNumberProfileResponses,
+  GetWhatsAppNumberResponses,
   GetWhatsAppStatsByCountryData,
   GetWhatsAppStatsByCountryErrors,
   GetWhatsAppStatsByCountryResponses,
@@ -419,6 +428,9 @@ import type {
   ListWebhooksData,
   ListWebhooksErrors,
   ListWebhooksResponses,
+  ListWhatsAppBusinessAccountsData,
+  ListWhatsAppBusinessAccountsErrors,
+  ListWhatsAppBusinessAccountsResponses,
   ListWhatsAppMessageEventsData,
   ListWhatsAppMessageEventsErrors,
   ListWhatsAppMessageEventsResponses,
@@ -428,6 +440,12 @@ import type {
   ListWhatsAppMessagesData,
   ListWhatsAppMessagesErrors,
   ListWhatsAppMessagesResponses,
+  ListWhatsAppNumberEventsData,
+  ListWhatsAppNumberEventsErrors,
+  ListWhatsAppNumberEventsResponses,
+  ListWhatsAppNumbersData,
+  ListWhatsAppNumbersErrors,
+  ListWhatsAppNumbersResponses,
   ListWhatsAppTemplatesData,
   ListWhatsAppTemplatesErrors,
   ListWhatsAppTemplatesResponses,
@@ -4186,6 +4204,240 @@ export const getWhatsAppInboundStatsByPhoneNumber = <
       },
     ],
     url: "/v1/whatsapp/stats/inbound/phone-numbers",
+    ...options,
+  });
+
+/**
+ * List WhatsApp numbers
+ *
+ * Returns a paginated list of the WhatsApp numbers your workspace can send
+ * from. The list includes both platform-managed numbers and numbers on a
+ * WhatsApp Business Account you connected. Each item reports its WhatsApp
+ * status, quality rating, business portfolio messaging limit, allowed
+ * send rate, and Official Business Account status.
+ *
+ * Page through the full set with the response cursors. A cursor naming a
+ * platform-managed number is rejected once the active filters would exclude
+ * it, including a `scope=system` cursor for a number that is not
+ * platform-managed. Start again without `starting_after` or `ending_before`
+ * whenever you change `phone_number`, `waba`, `status`, or `scope`.
+ *
+ */
+export const listWhatsAppNumbers = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWhatsAppNumbersData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppNumbersResponses,
+  ListWhatsAppNumbersErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListWhatsAppNumbersResponses,
+    ListWhatsAppNumbersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/numbers",
+    ...options,
+  });
+
+/**
+ * Get a WhatsApp number
+ *
+ * Returns a WhatsApp number connected to the workspace and its state as of `meta_synced_at`. Poll this after completing embedded signup to follow the connection. The reported status can lag send availability by up to one hour.
+ *
+ * `pending` is WhatsApp's own token for a number it does not hold as registered, and is also what a number with no stored WhatsApp status reads, including after setup completes. Other WhatsApp states include `connected`, `disconnected`, and `flagged`. A `failed` status means connection setup ended permanently, and `error` says why; a failure still being retried leaves the number `pending` and sets no `error`.
+ *
+ */
+export const getWhatsAppNumber = <ThrowOnError extends boolean = false>(
+  options: Options<GetWhatsAppNumberData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppNumberResponses,
+  GetWhatsAppNumberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWhatsAppNumberResponses,
+    GetWhatsAppNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/numbers/{number_id}",
+    ...options,
+  });
+
+/**
+ * List WhatsApp number events
+ *
+ * Returns the number's activity history, newest first by default:
+ *
+ * - The number being added, and every change of its status.
+ * - A messaging-limit change reported by WhatsApp.
+ * - A display-name review decision.
+ * - A quality-rating change, observed when Bird next reads the number.
+ *
+ * Use it to see when and why a number's status, limit, name, or quality changed,
+ * rather than polling [Get a WhatsApp number](/docs/api/reference/get-whatsapp-number).
+ * A number ID that does not belong to the workspace, or no longer exists,
+ * returns `404`.
+ *
+ */
+export const listWhatsAppNumberEvents = <ThrowOnError extends boolean = false>(
+  options: Options<ListWhatsAppNumberEventsData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppNumberEventsResponses,
+  ListWhatsAppNumberEventsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListWhatsAppNumberEventsResponses,
+    ListWhatsAppNumberEventsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/numbers/{number_id}/events",
+    ...options,
+  });
+
+/**
+ * Get a WhatsApp number's business profile
+ *
+ * Returns the business profile WhatsApp shows to people this number messages, read from WhatsApp on each request rather than from a stored copy. Readable for a number your workspace connected itself and for one Bird operates on your behalf alike, since the profile is what everyone the number messages already sees; only the first can be changed. The response includes the display name WhatsApp shows for this number and the state of its review.
+ *
+ */
+export const getWhatsAppNumberProfile = <ThrowOnError extends boolean = false>(
+  options: Options<GetWhatsAppNumberProfileData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppNumberProfileResponses,
+  GetWhatsAppNumberProfileErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWhatsAppNumberProfileResponses,
+    GetWhatsAppNumberProfileErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/numbers/{number_id}/profile",
+    ...options,
+  });
+
+/**
+ * List WhatsApp Business Accounts
+ *
+ * Returns a paginated list of the WhatsApp Business Accounts your workspace has
+ * connected, so you can choose which one a template belongs to. Only accounts
+ * whose setup finished are listed: an account appears once WhatsApp has reported
+ * its name and at least one of its phone numbers has finished connecting. Page through the
+ * full set with the cursors the response returns.
+ *
+ * Each account also carries the state WhatsApp last reported for it. That covers
+ * its own status, how far WhatsApp's review of it has got, whether Meta has
+ * verified the business behind it, the Meta business portfolio that owns it, and
+ * `ban` on an account WhatsApp has banned. These are the same fields
+ * [Get a WhatsApp Business Account](/docs/api/reference/get-whatsapp-business-account)
+ * returns, and that operation documents them.
+ *
+ */
+export const listWhatsAppBusinessAccounts = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<ListWhatsAppBusinessAccountsData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppBusinessAccountsResponses,
+  ListWhatsAppBusinessAccountsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListWhatsAppBusinessAccountsResponses,
+    ListWhatsAppBusinessAccountsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/business-accounts",
+    ...options,
+  });
+
+/**
+ * Get a WhatsApp Business Account
+ *
+ * Returns one WhatsApp Business Account your workspace has connected, addressed
+ * by either the `id` the account list reports (`waa_` prefix) or the `waba` value
+ * WhatsApp reports for it. Both forms resolve to the same account.
+ *
+ * Only accounts whose setup finished can be read: an account is readable once
+ * WhatsApp has reported its name and at least one of its phone numbers has
+ * finished connecting. An account the list hides is `404` here too, in either form.
+ *
+ * The account carries the state WhatsApp last reported for it: its own status,
+ * how far WhatsApp's review of it has got, whether Meta has verified the
+ * business behind it, and the Meta business portfolio that owns it.
+ *
+ * An account WhatsApp has banned carries `ban`, with an `appeal_url` to Meta Business
+ * Support once Bird knows the account's portfolio. `ban` is what WhatsApp announced on
+ * its own notification, not part of the reading `meta_synced_at` dates, because WhatsApp
+ * reports a ban's state and timing nowhere else. It is absent on an account in good
+ * standing and on one whose ban Bird was never told about, so `status` is what says
+ * whether an account can send.
+ *
+ */
+export const getWhatsAppBusinessAccount = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetWhatsAppBusinessAccountData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppBusinessAccountResponses,
+  GetWhatsAppBusinessAccountErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWhatsAppBusinessAccountResponses,
+    GetWhatsAppBusinessAccountErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/business-accounts/{business_account_ref}",
     ...options,
   });
 

@@ -11032,6 +11032,20 @@ export const WhatsAppReactionEventListSchema = {
   ],
 } as const;
 
+export const WhatsAppNumberIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^wan_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "wan_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppBusinessAccountIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^waa_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "waa_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const WhatsAppTemplateExampleParameterSchema = {
   type: "object",
   additionalProperties: false,
@@ -13307,11 +13321,901 @@ export const WhatsAppInboundStatsByPhoneNumberResponseSchema = {
   },
 } as const;
 
+export const WhatsAppDataLocalizationRegionSchema = {
+  type: "string",
+  minLength: 2,
+  enum: [
+    "AU",
+    "ID",
+    "IN",
+    "JP",
+    "SG",
+    "KR",
+    "DE",
+    "CH",
+    "GB",
+    "BR",
+    "BH",
+    "ZA",
+    "AE",
+    "CA",
+  ],
+  description:
+    "A country where WhatsApp can store a business phone number's message content at rest, as its two-letter ISO 3166 code.\n",
+  example: "DE",
+} as const;
+
+export const WhatsAppNumberStatusSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "awaiting_signup",
+    "banned",
+    "connected",
+    "deleted",
+    "disconnected",
+    "failed",
+    "flagged",
+    "migrated",
+    "pending",
+    "preparing",
+    "rate_limited",
+    "restricted",
+  ],
+  description:
+    "Operational state of a business phone number. The `preparing` status means the service is verifying a managed number. The `awaiting_signup` status means verification finished and you must complete signup. The `pending` status is WhatsApp's own token for a number it does not hold as registered, and is also returned when no WhatsApp status has been stored, including after setup completes. It does not by itself establish whether setup is complete. The `connected` status means registration completed. The `failed` status means connection was refused permanently. Other values are WhatsApp's own operational states for a number already connected. This is an open enum. Accept unrecognized values.",
+  example: "connected",
+} as const;
+
+export const WhatsAppNumberScopeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["system", "workspace"],
+  example: "workspace",
+} as const;
+
+export const WhatsAppNumberSortFieldSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Sortable fields for a WhatsApp number list.",
+} as const;
+
+export const WhatsAppNumberErrorCodeSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "registration_pin_rejected",
+    "registration_pin_rate_limited",
+    "registration_attempts_exhausted",
+    "number_verification_required",
+    "number_not_registered",
+    "number_already_linked",
+    "number_already_in_use",
+    "verification_code_not_received",
+    "verification_rate_limited",
+    "business_account_locked",
+    "credit_currency_mismatch",
+    "permission_denied",
+    "invalid_request",
+    "internal_error",
+  ],
+  description:
+    "Standardized number-connection failure:\n\n- `registration_pin_rejected`: WhatsApp refused the two-step verification PIN.\n- `registration_pin_rate_limited`: Too many PIN attempts occurred recently.\n- `registration_attempts_exhausted`: Registration is blocked for 72 hours.\n- `number_verification_required`: WhatsApp requires the number to be verified again.\n- `number_not_registered`: WhatsApp does not hold the number as registered.\n- `number_already_linked`: Another WhatsApp integration uses the number.\n- `number_already_in_use`: WhatsApp cannot accept the number.\n- `verification_code_not_received`: The verification text did not arrive.\n- `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.\n- `business_account_locked`: WhatsApp locked the business account.\n- `credit_currency_mismatch`: WhatsApp bills the business account in a currency your organization is not billed in. Connect the number under a business account WhatsApp bills in that same currency, or one WhatsApp has set no currency on: an account's billing currency cannot be changed once WhatsApp sets it.\n- `permission_denied`: WhatsApp refused access to the account.\n- `invalid_request`: WhatsApp rejected the connection details.\n- `internal_error`: The service could not classify or resolve the failure.\n\nThis is an open enum. Accept unrecognized values.\n",
+  example: "registration_pin_rejected",
+} as const;
+
+export const WhatsAppNumberErrorSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["code"],
+  description:
+    "Why a number's connection was refused for good. `code` is the standardized reason. `description` explains the failure where one was recorded, and `meta_error_code` carries WhatsApp's own code when available. It accompanies the `failed` status only; a number still being retried carries no error.",
+  properties: {
+    code: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberErrorCode",
+        },
+      ],
+      readOnly: true,
+      description: "Standardized failure reason.",
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Why the connection failed: WhatsApp's own words, in the language of the account it refused, when WhatsApp answered; our own explanation when the number was refused before WhatsApp was asked; a generic sentence when WhatsApp refused without giving a reason. Absent when the attempt failed without ever reaching WhatsApp, which leaves `code` as the only account of the failure. Show it to the person who owns the number; never match on its text.",
+      example:
+        "Cannot Create Certificate: Please ensure two-factor authentication is disabled.",
+    },
+    meta_error_code: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "WhatsApp's most specific code for the refusal: its error subcode where it sent one, otherwise its top-level code. Null when WhatsApp did not provide a code. Treat it as an opaque string.",
+      example: "2388001",
+    },
+  },
+} as const;
+
+export const WhatsAppNumberQualityRatingSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["green", "yellow", "red", "unknown"],
+  description:
+    "WhatsApp quality rating for a business phone number, based on recipient feedback. `green`, `yellow`, and `red` indicate decreasing quality; sustained `red` can restrict the number. `unknown` is itself a reported rating. This is separate from a template-language quality score. Accept unrecognized values.",
+  example: "green",
+} as const;
+
+export const WhatsAppNumberMessagingLimitSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "tier_50",
+    "tier_250",
+    "tier_1k",
+    "tier_10k",
+    "tier_100k",
+    "tier_unlimited",
+  ],
+  description:
+    "How many unique WhatsApp users can be messaged outside a customer service window in a rolling 24 hours, as WhatsApp's own tier token. WhatsApp calculates this for the business portfolio, and every number in that portfolio shares it; it is not this number's private capacity, and one number can consume all of it. Values are WhatsApp's own tokens, lower-cased. Open enum: WhatsApp documents a 2,000 limit its published tier vocabulary has no token for, so treat an unrecognized value as a tier WhatsApp added.",
+  example: "tier_250",
+} as const;
+
+export const WhatsAppNumberThroughputLevelSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["standard"],
+  description:
+    "How fast WhatsApp lets this number send, as WhatsApp's own level token. `standard` is 80 messages per second; WhatsApp upgrades an eligible number to 1,000 per second automatically. Values are WhatsApp's own tokens, lower-cased. This enum is open because WhatsApp publishes no vocabulary for the field. The `standard` value is the only value Bird has measured. The upgraded level's token remains unknown until a number returns it.",
+  example: "standard",
+} as const;
+
+export const WhatsAppNumberSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "phone_number",
+    "name",
+    "scope",
+    "status",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberID",
+        },
+      ],
+      readOnly: true,
+      description: "Unique identifier for the connected number.",
+    },
+    waba: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The WhatsApp Business Account this number is connected under. Present only for a number your workspace connected itself.\n",
+      example: "102290129340398",
+    },
+    phone_number: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "The number in E.164 format. Null only while the number itself is not yet known: a number your workspace holds carries its E.164 from the moment setup starts, so a value here does not mean the number can send. `status` is what says that.\n",
+      example: "+15550001234",
+    },
+    number_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AllocatedNumberID",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The number you hold with us that this WhatsApp number was connected from, as its id in GET /v1/numbers. Absent for a number you brought yourself.\n",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      readOnly: true,
+      description:
+        "Your workspace's own label for this number, given when it was connected and changeable afterwards. It has no bearing on what WhatsApp displays to people the number messages; `GET /v1/whatsapp/numbers/{number_id}/profile` returns that as `display_name`. For a number we operate on your behalf, this is our own label instead and cannot be changed.\n",
+      example: "Sales EU",
+    },
+    scope: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberScope",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Whether the number sends under a WhatsApp Business Account we operate on your behalf (`system`) or one your workspace connected itself (`workspace`).\n",
+    },
+    data_localization_region: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppDataLocalizationRegion",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The country this number's message content is stored at rest in, as its two-letter ISO 3166 code. Absent when it uses WhatsApp's default storage. It can differ from the region requested at connection when WhatsApp requires a particular country for the number.\n",
+    },
+    status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "WhatsApp's own state for this number as of `meta_synced_at`, except for the three states we answer ourselves because WhatsApp holds nothing to report. A connection we are still verifying reads `preparing`, one waiting for someone to finish signup reads `awaiting_signup`, and a permanently refused one reads `failed`, with `error` saying why. `pending` is WhatsApp's own token for a number it does not hold as registered, and is also what a number with no stored WhatsApp status reads, including after setup completes, so it does not by itself establish whether setup is complete. A number we operate on your behalf reads `connected` as our own assertion rather than a reading from WhatsApp for every number we ship today; that tier carries no `meta_synced_at`.",
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next about this number, given the state it is in. Each entry names one\naction and says why it is worth taking, so you can act on this response without\nworking out the order yourself. Present on reads that compute it: an empty list\nmeans there is nothing to do, and the field is absent entirely on responses that\ndo not report next actions.\n\nWhile `status` is `awaiting_signup` this carries the browser step that finishes\nthe connection, because embedded signup sits behind an OAuth screen no API call\ncan stand in for.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+    error: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberError",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Why this number's connection was refused for good. Present only while `status` is `failed`. A retryable step records its cause on a still-`pending` number without setting this field, because that cause is not a refusal yet, so a connection you are still waiting on reports no error here.",
+    },
+    finish_setup_url: {
+      type: "string",
+      format: "uri",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Where a person finishes connecting this number, present only while `status` is `awaiting_signup`. Finishing means completing WhatsApp's embedded signup, which is a browser flow behind an OAuth screen: it cannot be done over the API, so open this link and have someone with access to the workspace complete it. The number is offered to them already verified. Once they finish, `status` moves on and this link is no longer returned.",
+      example:
+        "https://bird.com/dashboard/w/ws_01krdgeqcxet5s7t44vh8rt9mg/whatsapp/numbers?finish_setup_number=wan_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    quality_rating: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberQualityRating",
+        },
+      ],
+      readOnly: true,
+      description:
+        "WhatsApp's quality rating for this number as of `meta_synced_at`. Absent until WhatsApp has reported one, and always absent for a number we operate on your behalf.",
+    },
+    messaging_limit: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberMessagingLimit",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The messaging limit WhatsApp applied to this number's business portfolio as of `meta_synced_at`. Absent until WhatsApp has reported one, and always absent for a number we operate on your behalf.",
+    },
+    throughput_level: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberThroughputLevel",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The send rate WhatsApp allowed this number as of `meta_synced_at`. Absent until WhatsApp has reported one, and always absent for a number we operate on your behalf.",
+    },
+    is_official_business_account: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether WhatsApp grants this number Official Business Account status as of `meta_synced_at`. Absent until WhatsApp has reported it, and always absent for a number we operate on your behalf. WhatsApp grants the status per number, so two numbers on one WhatsApp Business Account can differ. The status also decides whether a rename is possible here: a number that has it cannot be renamed through `PATCH /v1/whatsapp/numbers/{number_id}/profile` at all, and has to be renamed through WhatsApp support instead.",
+    },
+    meta_synced_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When this number's state was last read from WhatsApp. `status`, `quality_rating`, `messaging_limit`, `throughput_level`, and `is_official_business_account` all belong to that reading rather than representing live values. We re-read roughly hourly, so a change at WhatsApp can be up to an hour old here. Absent for a number we have never read back and for a number we operate on your behalf.",
+    },
+    pre_verification_requested_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When we last asked WhatsApp to send this number a verification code, which we do only for a number your workspace connected itself from a number you hold with us. Absent for a number we operate on your behalf, and for one you connected through Embedded Signup with a code you read yourself. Wait a few hours after this before repairing a number whose verification failed: WhatsApp rotates the routes it verifies over during that period, and throttles a number asked repeatedly in a short window. Distinct from `updated_at`, which any change to the number moves.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When this number was submitted for connection.",
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When this number was last changed.",
+    },
+  },
+} as const;
+
+export const WhatsAppNumberListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "The WhatsApp numbers your workspace can send from.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppNumber",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
 export const NumbersDedicatedAllocationIDSchema = {
   type: "string",
   minLength: 1,
   pattern: "^nda_[0-9a-hjkmnp-tv-z]{26}$",
   example: "nda_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppNumberEventSortFieldSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Sortable fields for a WhatsApp number's event list.",
+} as const;
+
+export const WhatsAppNumberEventIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^wne_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "wne_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppNumberEventSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "type", "summary", "metadata", "created_at"],
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/WhatsAppNumberEventID",
+      description: "Event ID.",
+    },
+    type: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Type of number event. `whatsapp_number.messaging_limit_updated` and `whatsapp_number.profile_name_update` are reported by WhatsApp as they happen; `whatsapp_number.quality_rating_updated` is observed when Bird next reads the number, so it can lag the change by up to an hour. `whatsapp_number.status_changed` records every move of the `status` field on the number itself, whichever side caused it. Open enum: new event types may be added over time, so treat any unrecognized value as a future event rather than an error. The values below are the types known at this version.",
+      "x-extensible-enum": [
+        "whatsapp_number.created",
+        "whatsapp_number.messaging_limit_updated",
+        "whatsapp_number.profile_name_update",
+        "whatsapp_number.quality_rating_updated",
+        "whatsapp_number.status_changed",
+      ],
+      example: "whatsapp_number.quality_rating_updated",
+    },
+    summary: {
+      type: "string",
+      minLength: 1,
+      description: "Human-readable summary of what changed.",
+      example: "Quality rating dropped to medium.",
+    },
+    metadata: {
+      type: "object",
+      description:
+        "Structured details for the event. `from` and `to` carry the values that changed, and `from` is absent when the number had no prior value to report. A status change into `failed` also carries the `reason`; a display-name decision carries `new_display_name`, `decision`, and, when WhatsApp named one for a rejection, `rejection_reason`. A messaging-limit change also carries the `trigger` WhatsApp named for it, such as `onboarding` or `throughput_upgrade`, when it named one. A `whatsapp_number.created` event carries the `source` the number came from, and its `phone_number` once one is known.",
+      additionalProperties: true,
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When the event was recorded.",
+    },
+  },
+} as const;
+
+export const WhatsAppNumberEventListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of number events, newest first by default.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppNumberEvent",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppDisplayNameStatusSchema = {
+  type: "string",
+  description:
+    "Where WhatsApp's review of the display name stands. `available_without_review` means the name met WhatsApp's criteria for immediate use without a review step, and `none` means no display name has been submitted yet. WhatsApp adds states over time, so a value outside this list can be returned.",
+  "x-extensible-enum": [
+    "approved",
+    "available_without_review",
+    "declined",
+    "expired",
+    "non_exists",
+    "pending_review",
+    "none",
+  ],
+  example: "approved",
+} as const;
+
+export const WhatsAppUsernameStatusSchema = {
+  type: "string",
+  description:
+    "Where the username stands with WhatsApp. WhatsApp adds states over time, so a value outside this list can be returned.",
+  "x-extensible-enum": ["approved", "reserved", "deleted"],
+  example: "approved",
+} as const;
+
+export const WhatsAppBusinessVerticalSchema = {
+  type: "string",
+  description:
+    "The industry WhatsApp shows on the business profile. WhatsApp adds categories over time, so a value outside this list can be returned.",
+  "x-extensible-enum": [
+    "other",
+    "auto",
+    "beauty",
+    "apparel",
+    "edu",
+    "entertain",
+    "event_plan",
+    "finance",
+    "grocery",
+    "govt",
+    "hotel",
+    "health",
+    "nonprofit",
+    "prof_services",
+    "retail",
+    "travel",
+    "restaurant",
+    "alcohol",
+    "online_gambling",
+    "physical_gambling",
+    "otc_drugs",
+  ],
+  example: "retail",
+} as const;
+
+export const WhatsAppNumberProfileSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The business profile WhatsApp shows to people this number messages. It is read from WhatsApp on each request rather than from a stored copy, so it is always current and a WhatsApp outage makes it briefly unavailable.",
+  properties: {
+    display_name: {
+      type: "string",
+      readOnly: true,
+      description:
+        "The name WhatsApp verifies for this number. Once WhatsApp approves it, it appears at the top of a chat with this number; `display_name_status` is what says whether it has. Set when the number was connected, and changed from the dashboard or the CLI, as [WhatsApp phone numbers](/docs/guides/whatsapp/phone-number-setup) explains. This field still returns the current name until a requested change completes.\n",
+      example: "Lucky Shrub",
+    },
+    display_name_status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppDisplayNameStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Where WhatsApp's review of the display name stands. A name still under review is not yet shown at the top of a chat.\n",
+    },
+    new_display_name: {
+      type: "string",
+      readOnly: true,
+      description:
+        "The display name whose change has been requested, whether or not WhatsApp is reviewing it. Absent when no change is pending.\n",
+      example: "Lucky Shrub Garden Center",
+    },
+    new_display_name_status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppDisplayNameStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Where the requested display name stands with WhatsApp, including whether it is being reviewed or was accepted for immediate use without a review. Absent when no change is pending. If WhatsApp accepts the name it becomes `display_name`. Every other outcome leaves the number on the name it already had: `declined` is WhatsApp refusing the name, and `expired` is a request that no longer stands and has to be made again.\n",
+    },
+    username: {
+      type: "string",
+      readOnly: true,
+      description:
+        "The username WhatsApp users can find this number by, without an `@`. Absent when the number has no username. Once set it cannot be removed through this API.\n",
+      example: "goldcrest.support",
+    },
+    username_status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppUsernameStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Where the username stands with WhatsApp. Absent when the number has no username.\n",
+    },
+    about: {
+      type: "string",
+      maxLength: 139,
+      description: "The short line shown under the business name in a chat.",
+      example: "Open Monday to Friday, 9am to 6pm CET.",
+    },
+    address: {
+      type: "string",
+      maxLength: 256,
+      description: "The business address shown on the profile.",
+      example: "Trompenburgstraat 2C, 1079 TX Amsterdam",
+    },
+    description: {
+      type: "string",
+      maxLength: 256,
+      description: "The longer description shown on the profile.",
+      example: "Bird is the platform for messaging with your customers.",
+    },
+    email: {
+      type: "string",
+      format: "email",
+      maxLength: 128,
+      description: "The contact email shown on the profile.",
+      example: "hello@bird.com",
+    },
+    vertical: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppBusinessVertical",
+        },
+      ],
+      description: "The industry WhatsApp shows on the profile.",
+    },
+    websites: {
+      type: "array",
+      maxItems: 2,
+      items: {
+        type: "string",
+        maxLength: 256,
+      },
+      description: "Up to two websites shown on the profile.",
+      example: ["https://bird.com"],
+    },
+    profile_picture_url: {
+      type: "string",
+      readOnly: true,
+      description:
+        "A link to the profile picture WhatsApp currently shows. WhatsApp signs this link and it expires within days, so load it when you display it and never store it. It is served with permissive cross-origin headers, so a browser can load it directly.",
+      example:
+        "https://pps.whatsapp.net/v/t61.24694-24/643148303_1005107588793925.jpg",
+    },
+  },
+} as const;
+
+export const WhatsAppBusinessAccountSortFieldSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Sortable fields for a WhatsApp Business Account list.",
+} as const;
+
+export const WhatsAppBusinessAccountStatusSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["active"],
+  description:
+    "WhatsApp's own state for a WhatsApp Business Account. Values are WhatsApp's own tokens, lower-cased. This enum is open because WhatsApp documents the field in neither its API reference nor its machine-readable schema. The `active` value is the only value in WhatsApp's example response, so it is the only one Bird can name. Treat anything else as a state WhatsApp reports and this list has not caught up with.",
+  example: "active",
+} as const;
+
+export const WhatsAppBusinessAccountReviewStatusSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["approved", "deferred", "pending", "rejected"],
+  description:
+    "How far WhatsApp's own review of this WhatsApp Business Account has got. `deferred` is WhatsApp postponing the review rather than refusing it. Values are WhatsApp's own tokens, lower-cased. Open enum: treat an unrecognized value as a review state WhatsApp added rather than as an error.",
+  example: "approved",
+} as const;
+
+export const WhatsAppBusinessVerificationStatusSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "expired",
+    "failed",
+    "ineligible",
+    "not_verified",
+    "pending",
+    "pending_need_more_info",
+    "pending_submission",
+    "rejected",
+    "revoked",
+    "verified",
+  ],
+  description:
+    "Whether Meta has verified the business behind this WhatsApp Business Account. Verification is one of the paths to a higher messaging limit, so a value other than `verified` is often the reason a limit has not moved. Values are Meta's own tokens, lower-cased. Open enum: treat an unrecognized value as a state Meta added rather than as an error.",
+  example: "verified",
+} as const;
+
+export const WhatsAppBusinessAccountMarketingMessagesStatusSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["eligible", "onboarded"],
+  description:
+    "Whether this account can use WhatsApp's Marketing Messages API. `eligible` means WhatsApp would accept an onboarding request for it; `onboarded` means it has already been onboarded. Values are WhatsApp's own tokens, lower-cased. Open enum out of necessity. WhatsApp's onboarding guide names these two values and defers the rest to an API reference that does not document the field. Treat anything else as a state WhatsApp reports that this list has not caught up with.",
+  example: "onboarded",
+} as const;
+
+export const WhatsAppBusinessPortfolioMarketingMessagesStatusSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "not_started",
+    "request_sent",
+    "term_of_service_signed",
+  ],
+  description:
+    "How far the business portfolio has got through Meta's Marketing Messages\nterms of service.\n\n- `not_started`: the portfolio has not begun the process.\n- `request_sent`: a request is in.\n- `term_of_service_signed`: the terms are accepted.\n\nA portfolio property, so every account the portfolio owns reports the same\nvalue. Distinct from the account's own marketing-messages status, which Meta\nconfusingly gives the same name. Values are Meta's own tokens, lower-cased.\nOpen enum: treat an unrecognized value as a state Meta added rather than as\nan error.\n",
+  example: "not_started",
+} as const;
+
+export const WhatsAppBusinessPortfolioSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["meta_id"],
+  description:
+    "The Meta business portfolio that owns a WhatsApp Business Account. Bird holds no resource of its own for a portfolio, which is why the identifier is named `meta_id`: it is meaningful only against Meta's own tools, and it is not a Bird identifier.",
+  properties: {
+    meta_id: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Meta's identifier for the portfolio. Treat it as an opaque string.",
+      example: "178563218361309",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The portfolio's name, as Meta reports it. Absent when Meta returned none.",
+      example: "Acme Holdings",
+    },
+    marketing_messages_onboarding_status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppBusinessPortfolioMarketingMessagesStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "How far this portfolio has got through Meta's Marketing Messages terms of service. Absent until Meta has reported it. Distinct from the account's own `marketing_messages_onboarding_status`, which Meta gives the same field name but a different vocabulary: that one is the account's own eligibility, this one is the portfolio's Terms-of-Service progress.",
+    },
+  },
+} as const;
+
+export const WhatsAppBusinessAccountBanStateSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["disabled", "scheduled_for_disable"],
+  description:
+    "Whether WhatsApp has disabled a WhatsApp Business Account or scheduled it to be\ndisabled:\n\n- `disabled`: WhatsApp has disabled the account, and it cannot send.\n- `scheduled_for_disable`: WhatsApp has set a date to disable the account, which can\n  still send until then.\n\nAn account WhatsApp has reinstated reports no `ban` at all rather than a third value\nhere.\n",
+  example: "disabled",
+} as const;
+
+export const WhatsAppBusinessAccountBanSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["state", "occurred_at"],
+  description:
+    "WhatsApp's ban on this account, as WhatsApp announced it. Absent when there is no ban, and also when there is one WhatsApp announced before Bird began recording bans, or whose notification never reached Bird, since WhatsApp does not replay them. This is what WhatsApp announced rather than the account's current state, so it is never the field to read to decide whether an account can send.",
+  properties: {
+    state: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppBusinessAccountBanState",
+        },
+      ],
+      readOnly: true,
+    },
+    occurred_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When WhatsApp reported the ban, by WhatsApp's own clock. Bird can learn of a ban later than this, so it is not when Bird recorded it.",
+      example: "2026-04-10T09:12:00Z",
+    },
+    appeal_url: {
+      type: "string",
+      format: "uri",
+      readOnly: true,
+      description:
+        "Where to appeal WhatsApp's decision with Meta Business Support, because neither Bird nor this API can lift one. Absent when Bird does not know the account's Meta business portfolio, since there is no support-home path to build without one.",
+      example:
+        "https://business.facebook.com/business-support-home/178563218361309/102290129340398",
+    },
+  },
+} as const;
+
+export const WhatsAppBusinessAccountSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "waba", "name", "status", "created_at", "updated_at"],
+  properties: {
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppBusinessAccountID",
+        },
+      ],
+      readOnly: true,
+      description: "Unique identifier for the WhatsApp Business Account.",
+    },
+    waba: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Meta's own identifier for this WhatsApp Business Account. This is the value to send when creating a template on the account.\n",
+      example: "102290129340398",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The account's name, as WhatsApp reports it.",
+      example: "Acme Inc",
+    },
+    status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppBusinessAccountStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "WhatsApp's own state for this account as of `meta_synced_at`. The status is `active` until WhatsApp reports otherwise. WhatsApp already considers an account usable if Bird could connect a number under it. The absence of a reading is therefore not evidence of another state.",
+    },
+    account_review_status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppBusinessAccountReviewStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "How far WhatsApp's review of this account had got as of `meta_synced_at`. Absent until WhatsApp has reported it.",
+    },
+    business_verification_status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppBusinessVerificationStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Whether Meta had verified the business behind this account as of `meta_synced_at`. Absent until Meta has reported it.",
+    },
+    marketing_messages_onboarding_status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppBusinessAccountMarketingMessagesStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Whether this account can use WhatsApp's Marketing Messages API, as of `meta_synced_at`. Absent until WhatsApp has reported it. Distinct from the owning portfolio's `marketing_messages_onboarding_status` (`portfolio.marketing_messages_onboarding_status`), which Meta gives the same field name but a different vocabulary: this one is the account's own eligibility, that one is the portfolio's Terms-of-Service progress.",
+    },
+    portfolio: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppBusinessPortfolio",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The Meta business portfolio that owns this account. Absent until Meta has reported it. The portfolio is where a messaging limit is set, so every account it owns shares one.",
+    },
+    ban: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppBusinessAccountBan",
+        },
+      ],
+      readOnly: true,
+      description:
+        "WhatsApp's ban on this account, absent unless Bird was told of one. `status` is what the account said when Bird last read it; this is what WhatsApp announced, which arrives only on the webhook that announces it and is never re-read.",
+    },
+    meta_synced_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When Bird last read this account's state from WhatsApp. `status`, `account_review_status`, `business_verification_status`, `marketing_messages_onboarding_status` and `portfolio` are all that reading rather than live values; Bird re-reads roughly hourly. Absent for an account Bird has never read back.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When this account was connected.",
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When this account was last changed.",
+    },
+  },
+} as const;
+
+export const WhatsAppBusinessAccountListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "The WhatsApp Business Accounts your workspace has connected.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppBusinessAccount",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
 } as const;
 
 export const WhatsAppSuppressionIDSchema = {
@@ -25949,6 +26853,164 @@ export const WhatsAppInboundStatsByPhoneNumberResponseWritableSchema = {
   additionalProperties: false,
   description:
     "Per-phone-number breakdown of received messages for the requested period, ranked by volume descending and capped at the requested `limit` (default 50, max 200).",
+} as const;
+
+export const WhatsAppNumberWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
+export const WhatsAppNumberListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "The WhatsApp numbers your workspace can send from.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppNumberWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppNumberEventWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "summary", "metadata", "created_at"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Type of number event. `whatsapp_number.messaging_limit_updated` and `whatsapp_number.profile_name_update` are reported by WhatsApp as they happen; `whatsapp_number.quality_rating_updated` is observed when Bird next reads the number, so it can lag the change by up to an hour. `whatsapp_number.status_changed` records every move of the `status` field on the number itself, whichever side caused it. Open enum: new event types may be added over time, so treat any unrecognized value as a future event rather than an error. The values below are the types known at this version.",
+      "x-extensible-enum": [
+        "whatsapp_number.created",
+        "whatsapp_number.messaging_limit_updated",
+        "whatsapp_number.profile_name_update",
+        "whatsapp_number.quality_rating_updated",
+        "whatsapp_number.status_changed",
+      ],
+      example: "whatsapp_number.quality_rating_updated",
+    },
+    summary: {
+      type: "string",
+      minLength: 1,
+      description: "Human-readable summary of what changed.",
+      example: "Quality rating dropped to medium.",
+    },
+    metadata: {
+      type: "object",
+      description:
+        "Structured details for the event. `from` and `to` carry the values that changed, and `from` is absent when the number had no prior value to report. A status change into `failed` also carries the `reason`; a display-name decision carries `new_display_name`, `decision`, and, when WhatsApp named one for a rejection, `rejection_reason`. A messaging-limit change also carries the `trigger` WhatsApp named for it, such as `onboarding` or `throughput_upgrade`, when it named one. A `whatsapp_number.created` event carries the `source` the number came from, and its `phone_number` once one is known.",
+      additionalProperties: true,
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When the event was recorded.",
+    },
+  },
+} as const;
+
+export const WhatsAppNumberEventListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of number events, newest first by default.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppNumberEventWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppNumberProfileWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The business profile WhatsApp shows to people this number messages. It is read from WhatsApp on each request rather than from a stored copy, so it is always current and a WhatsApp outage makes it briefly unavailable.",
+  properties: {
+    about: {
+      type: "string",
+      maxLength: 139,
+      description: "The short line shown under the business name in a chat.",
+      example: "Open Monday to Friday, 9am to 6pm CET.",
+    },
+    address: {
+      type: "string",
+      maxLength: 256,
+      description: "The business address shown on the profile.",
+      example: "Trompenburgstraat 2C, 1079 TX Amsterdam",
+    },
+    description: {
+      type: "string",
+      maxLength: 256,
+      description: "The longer description shown on the profile.",
+      example: "Bird is the platform for messaging with your customers.",
+    },
+    email: {
+      type: "string",
+      format: "email",
+      maxLength: 128,
+      description: "The contact email shown on the profile.",
+      example: "hello@bird.com",
+    },
+    vertical: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppBusinessVertical",
+        },
+      ],
+      description: "The industry WhatsApp shows on the profile.",
+    },
+    websites: {
+      type: "array",
+      maxItems: 2,
+      items: {
+        type: "string",
+        maxLength: 256,
+      },
+      description: "Up to two websites shown on the profile.",
+      example: ["https://bird.com"],
+    },
+  },
+} as const;
+
+export const WhatsAppBusinessAccountListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "The WhatsApp Business Accounts your workspace has connected.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
 } as const;
 
 export const EmailLatencyStatsWritableSchema = {
