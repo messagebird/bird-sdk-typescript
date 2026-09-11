@@ -2726,6 +2726,23 @@ export const EmailMessageContentSchema = {
   },
 } as const;
 
+export const EmailBroadcastStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: [
+    "draft",
+    "scheduled",
+    "accepted",
+    "sending",
+    "sent",
+    "canceling",
+    "canceled",
+    "failed",
+  ],
+  description:
+    "Where the broadcast itself has got to. This is separate from what happened to individual recipients, which the broadcast's own `sent_count`, `delivered_count`, `bounced_count` and `complained_count` tell you. Those four are fields on the broadcast, not on everything that carries this status, and reading the broadcast's recipients or its events gives the same outcomes one recipient at a time.\n\n- `draft`: Created, and not sent or scheduled yet.\n- `scheduled`: Due to send at `scheduled_at`. You can still edit it, and you can still change the time, right up until sending starts.\n- `accepted`: Taken for immediate sending. Nothing has gone out yet.\n- `sending`: On its way. Some recipients have been sent to and some have not.\n- `sent`: Every recipient has been sent to.\n- `canceling`: A cancellation is under way and the remaining sends are stopping.\n- `canceled`: The cancellation finished. Anything already on its way to a recipient when you canceled cannot be pulled back.\n- `failed`: The broadcast could not be sent. Reading the broadcast gives `failure_reason`, which says why. If it had already started sending, the recipients it reached keep their delivery status and carry on producing events.\n\nA draft is deleted rather than canceled, because it was never sent.\n",
+} as const;
+
 export const AudienceIDSchema = {
   type: "string",
   minLength: 1,
@@ -2733,11 +2750,781 @@ export const AudienceIDSchema = {
   example: "adn_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const EmailBroadcastTemplateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id"],
+  description:
+    "The template a broadcast sends, and the exact version of it the broadcast is fixed to. The template cannot be one that requires every send to name a language, because a broadcast never names one, so a template that insists on it has nothing to work with.\n",
+  properties: {
+    id: {
+      $ref: "#/components/schemas/EmailTemplateID",
+      description:
+        "Which template the broadcast sends. Which version of it the send is fixed to is `version_id`.\n",
+    },
+    version_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The template version this broadcast is fixed to. It is chosen when the broadcast is prepared for sending, so publishing a new version while the broadcast is going out cannot change what the rest of the recipients get. Null until the broadcast is prepared.\n",
+    },
+  },
+} as const;
+
+export const EmailBroadcastSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "category",
+    "status",
+    "recipient_count",
+    "track_opens",
+    "track_clicks",
+    "created_at",
+    "sent_at",
+  ],
+  properties: {
+    id: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      pattern: "^eb_[0-9a-hjkmnp-tv-z]{26}$",
+      description: "Broadcast ID.",
+      example: "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    from: {
+      $ref: "#/components/schemas/EmailAddress",
+      description:
+        "The address this broadcast sends from. `name` is filled in when the broadcast was given a display name to send under. Left out on a draft that has not picked a sender yet.",
+    },
+    audience_id: {
+      $ref: "#/components/schemas/AudienceID",
+      description:
+        "The audience this broadcast sends to. When the send starts we turn the audience into a list of recipients, and you can read that list a page at a time with [List recipients of a broadcast](/docs/api/reference/list-email-broadcast-recipients). Left out on a draft that has not picked an audience yet.",
+    },
+    template: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastTemplate",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The template this broadcast sends. A broadcast sends the template's published version, and the exact version is fixed when the broadcast is prepared for sending, so publishing a new version afterwards does not change what this broadcast sends. Null on a draft that has not chosen a template yet.",
+    },
+    html_bytes: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      format: "int64",
+      example: 18432,
+      description:
+        "Size of the HTML body this broadcast sends, in bytes, or 0 when its content has no HTML part. Measured on the template version the broadcast sends, so this is the real body we send and differs per recipient only by that recipient's own merge values. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending or canceling one returns, none of which measure the content. Absent too when the broadcast has no template or its content can no longer be read.\n",
+    },
+    text_bytes: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      format: "int64",
+      example: 2104,
+      description:
+        "Size of the plain-text body this broadcast sends, in bytes, or 0 when its content has no plain-text part. Measured, and absent, the same way as `html_bytes`.\n",
+    },
+    category: {
+      type: "string",
+      minLength: 1,
+      enum: ["marketing", "transactional"],
+      description:
+        "What kind of email this is, which decides how suppressions apply to it. A `marketing` broadcast is held back from every suppressed address. A `transactional` one still goes to addresses suppressed for a complaint or an unsubscribe, because those suppressions are about marketing mail.",
+    },
+    ip_pool_id: {
+      type: "string",
+      pattern: "^ipp_([0-9a-hjkmnp-tv-z]{26}|shared)$",
+      description:
+        "The IP pool this broadcast sends from, or `ipp_shared` when it sends through the shared pool. Absent when it sends on your organization's default pool.",
+    },
+    reply_to: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailAddress",
+      },
+      maxItems: 25,
+      description:
+        "Where replies to this broadcast go, if you want them somewhere other than the `from` address. Absent when you have not set one.",
+    },
+    headers: {
+      type: "object",
+      additionalProperties: {
+        type: "string",
+      },
+      description:
+        "Any custom email headers set on the broadcast. Returned on a single broadcast read and on the broadcast that creating, updating, sending or canceling one returns, and absent from the list. The unsubscribe headers we add ourselves are not included.",
+    },
+    status: {
+      readOnly: true,
+      example: "sent",
+      description:
+        "Where the broadcast itself has got to, separate from what happened to individual recipients: for that, read `sent_count`, `delivered_count`, `bounced_count` and `complained_count` below. When it is `failed`, `failure_reason` says why.\n",
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastStatus",
+        },
+      ],
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next about this broadcast, given the state it is in. Each entry names one action and\nsays why it is worth taking. Present on reads that compute it: an empty list means there is\nnothing to do, and the field is absent entirely on responses that do not report next actions.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+    failure_reason: {
+      type: ["string", "null"],
+      readOnly: true,
+      enum: [
+        "empty_audience",
+        "audience_unavailable",
+        "content_invalid",
+        "insufficient_funds",
+        "quota_exceeded",
+        "internal_error",
+        null,
+      ],
+      example: null,
+      description:
+        "Why the broadcast failed. Set when `status` is `failed`, and `null` the rest of the time.\n\n- `empty_audience`: There was nobody to send to. Either the audience has no members, or every address in it is suppressed.\n- `audience_unavailable`: The audience no longer exists, so there was nothing to resolve.\n- `content_invalid`: The broadcast could not be set up to send. `failure_detail` says exactly what was wrong. It is one of these:\n  - The broadcast has no template, or its template has been deleted.\n  - The template has no published version, or no sendable content.\n  - The template uses a loop that a broadcast cannot fill.\n  - The template requires every send to name a language.\n  - The sending domain is no longer verified.\n  - The IP pool has nothing to send from.\n  - The message could not be handed off for delivery.\n- `insufficient_funds`: There was not enough in the workspace balance to pay for the send.\n- `quota_exceeded`: The send would have gone past your organization's daily or monthly email allowance, whichever runs out first. This can happen when the broadcast is being prepared, or partway through sending if the remaining recipients no longer fit. `failure_detail` gives you the count and the limit.\n- `internal_error`: Something went wrong on our side. Retry, and open a support ticket if it keeps happening.\n",
+    },
+    failure_detail: {
+      type: ["string", "null"],
+      readOnly: true,
+      example: null,
+      description:
+        "A sentence explaining the failure in more detail than `failure_reason` does, and `null` when the broadcast has not failed. Show it to the person using your app. Do not write code that reads it, because the wording can change. Branch on `failure_reason` instead.",
+    },
+    recipient_count: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      default: 0,
+      example: 4820,
+      description:
+        "Number of recipients after suppressed addresses are removed from the audience. This is 0 until sending starts and the audience becomes a recipient list.",
+    },
+    sent_count: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 4820,
+      description:
+        "How many recipients the broadcast has been sent to, counting every recipient whose status is `processed` or later. The number rises while the broadcast is `sending` and stops changing once the broadcast has finished. These counters are exact. The email stats endpoints report on the same sending but are approximate, so use these numbers when you need the precise count. Absent when the broadcast comes back from creating, updating, sending or canceling it, none of which read the counters. Absent from a list row for a broadcast that has no delivery events yet, such as a draft, where reading that one broadcast answers 0 instead. Absent too when the event store cannot be reached, which still returns 200. Read the broadcast again for the numbers.",
+    },
+    delivered_count: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 4712,
+      description:
+        "How many recipients' messages were accepted by their mail server. Absent when `sent_count` is.",
+    },
+    bounced_count: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 96,
+      description:
+        "How many recipients the message could not be delivered to at all. Absent when `sent_count` is.",
+    },
+    complained_count: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 12,
+      description:
+        "How many recipients marked the message as spam. Absent when `sent_count` is.",
+    },
+    open_count: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 3104,
+      description:
+        "How many times the message was opened, added up across every recipient. One recipient opening it twice counts twice. Absent when `sent_count` is.",
+    },
+    click_count: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 812,
+      description:
+        "How many times a link in the message was clicked, added up across every recipient. One recipient clicking twice counts twice. Absent when `sent_count` is.",
+    },
+    sending_ips: {
+      type: "array",
+      readOnly: true,
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      example: ["198.51.100.42"],
+      description:
+        "The IP addresses this broadcast's messages went out from, up to 100 of them. A broadcast is spread across every address in its pool, so more than one can appear. The receiving mail systems name the address when they deliver, bounce or defer a message, so this stays absent until the first of those comes back. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending or canceling one returns, none of which read them. For delivery and latency broken down per address, read the sending-IP stats.\n",
+    },
+    unique_opens_non_prefetched: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 2140,
+      description:
+        "How many distinct recipients opened the message at least once, excluding opens auto-fetched by inbox privacy features (such as Apple Mail Privacy Protection and the Gmail image proxy). A recipient who opened several times, or whose inbox prefetched the message, counts once. Absent when `sent_count` is.",
+    },
+    unique_clicks: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 693,
+      description:
+        "How many distinct recipients clicked a link in the message at least once. A recipient who clicked several times counts once. Absent when `sent_count` is.",
+    },
+    out_of_band_bounces: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 14,
+      description:
+        "How many recipients bounced after the message had already been accepted for delivery. A recipient who bounced this way more than once counts once. Absent when `sent_count` is.",
+    },
+    delivered_recipients: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 4724,
+      description:
+        "How many distinct recipients a delivery landed for. This is the denominator to measure `unique_opens_non_prefetched`, `unique_clicks` and `complained_count` against. It differs from `delivered_count`, which reports how many recipients are currently in the delivered state: a recipient who was delivered to and then complained moves to `complained_count` and leaves `delivered_count`, but stays here, because the message did reach them. Absent when `sent_count` is.",
+    },
+    tags: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      description:
+        "Labels on this broadcast, each one a `name` and a `value`, that you can filter and search broadcasts by. Use tags for anything you want to find broadcasts by later, and `metadata` for data you only want handed back to you.",
+    },
+    metadata: {
+      type: "object",
+      description:
+        "Any JSON you want to keep on the broadcast. We store it and hand it back in webhook payloads, and that is all it does. If you want to search or filter by it, use `tags` instead.",
+      additionalProperties: true,
+    },
+    track_opens: {
+      type: "boolean",
+      example: true,
+      description: "Whether opens are tracked for this broadcast.",
+    },
+    track_clicks: {
+      type: "boolean",
+      example: true,
+      description: "Whether link clicks are tracked for this broadcast.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      example: "2026-09-01T09:14:02.418Z",
+      description: "When the broadcast was created.",
+    },
+    scheduled_at: {
+      type: "string",
+      format: "date-time",
+      readOnly: true,
+      example: "2026-09-02T08:00:00Z",
+      description:
+        "When the broadcast is due to send, and absent when it is not scheduled.",
+    },
+    started_at: {
+      type: "string",
+      format: "date-time",
+      readOnly: true,
+      example: "2026-09-02T08:00:03.771Z",
+      description:
+        "When the broadcast started sending. Absent until then. Compare with `sent_at`, which is when the broadcast finished sending.",
+    },
+    sent_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      example: "2026-09-02T08:11:47.902Z",
+      description:
+        "When the last recipient was sent to and the broadcast became `sent`. Null until then. Compare with `started_at`, which is when the broadcast started sending.",
+    },
+    canceled_at: {
+      type: "string",
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the broadcast was canceled, and absent if it never was. This is when cancellation was requested, so it is set as soon as the status is `canceling` and does not move while the remaining sends stop and the status becomes `canceled`.",
+    },
+  },
+} as const;
+
+export const EmailBroadcastListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of broadcast objects.",
+          items: {
+            $ref: "#/components/schemas/EmailBroadcast",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EmailBroadcastCreateRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A broadcast sends one email to a whole audience. Every field here is optional, so you can create an empty draft and fill it in later. To actually send, a broadcast needs three things: a `from` address on a verified domain, an `audience_id`, and a `template`.\n\nLeave `send` false, which is the default, and you get a draft. Update it as often as you like, then send it when you are ready. Set `send` to true and the broadcast goes out as soon as it is created, or at `scheduled_at` if you set one.\n",
+  properties: {
+    from: {
+      $ref: "#/components/schemas/EmailAddressInput",
+      description:
+        "The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.",
+    },
+    audience_id: {
+      $ref: "#/components/schemas/AudienceID",
+      description:
+        "The audience this broadcast sends to. We take the audience's contacts as they stand when the send starts and drop any suppressed addresses, and what is left is who gets the email.",
+    },
+    template: {
+      $ref: "#/components/schemas/EmailBroadcastTemplate",
+      description:
+        "The template the broadcast sends. You can leave it out on a draft, but a broadcast cannot send without one. The template's published version is fixed when the broadcast is prepared for sending, and each recipient's contact properties are filled into the content as the email goes out.",
+    },
+    reply_to: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailAddressInput",
+      },
+      minItems: 1,
+      maxItems: 25,
+      description:
+        "Where replies to this broadcast should go. Give each address as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. You can list more than one.",
+    },
+    headers: {
+      type: "object",
+      maxProperties: 25,
+      additionalProperties: {
+        type: "string",
+        maxLength: 998,
+      },
+      description:
+        "Custom email headers to set on the broadcast, as name and value pairs. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.\n",
+    },
+    tags: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      maxItems: 20,
+      description:
+        "Labels on this broadcast, each one a `name` and a `value`, up to 20 of them. You can filter the broadcast list by a tag, break your stats down by one, and read them back off webhook payloads. Use tags for anything you want to find broadcasts by later, and `metadata` for data you only want handed back to you.",
+    },
+    metadata: {
+      type: "object",
+      description:
+        "Any JSON you want to keep on the broadcast. We store it, hand it back when you read the broadcast, and include it in webhook payloads, and you can break stats down by a path inside it such as `metadata.order_id`. It can be up to 2 KB once serialized.",
+      additionalProperties: true,
+    },
+    track_opens: {
+      type: "boolean",
+      default: true,
+      description: "Whether to track opens for this broadcast.",
+    },
+    track_clicks: {
+      type: "boolean",
+      default: true,
+      description: "Whether to track link clicks for this broadcast.",
+    },
+    ip_pool_id: {
+      type: "string",
+      pattern: "^ipp_([0-9a-hjkmnp-tv-z]{26}|shared)$",
+      description:
+        "The IP pool to send this broadcast from. Pass a pool ID, or `ipp_shared` to send through the shared pool on purpose. Leave it out and the broadcast uses your organization's default pool. A pool we do not recognize, or one with no IPs available to send from, is refused with a `422`.",
+    },
+    category: {
+      type: "string",
+      enum: ["marketing", "transactional"],
+      default: "marketing",
+      description:
+        "What kind of email this is. A broadcast sets this itself rather than taking it from its template, and it decides two things: which suppressions apply, and whether we add an unsubscribe header.\n\n`marketing`, the default, is held back from every suppressed address and has the one-click unsubscribe headers. `transactional` still goes to addresses suppressed for a complaint or an unsubscribe, and has no unsubscribe header. Only use `transactional` for genuine operational mail such as a terms-of-service update or a service outage notice. Marketing content sent this way still reaches people who have already unsubscribed from you.\n",
+    },
+    send: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether to send the broadcast as soon as it is created. Set it to true and the broadcast goes out immediately, or at `scheduled_at` if you set one. Leave it false, which is the default, and you get a draft you can update and send later.",
+    },
+    scheduled_at: {
+      type: "string",
+      format: "date-time",
+      description:
+        "When to send the broadcast. It has to be at least 30 seconds and at most 365 days from now. It requires `send` to be true, so a `scheduled_at` on its own is refused rather than saved on the draft.\n",
+    },
+  },
+  example: {
+    from: "newsletter@acme.com",
+    audience_id: "adn_01krdgeqcxet5s7t44vh8rt9mg",
+    template: {
+      id: "emt_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    category: "marketing",
+    tags: [
+      {
+        name: "campaign",
+        value: "spring_launch",
+      },
+    ],
+    metadata: {
+      campaign_id: "12345",
+    },
+  },
+} as const;
+
+export const EmailBroadcastUpdateRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Changes a broadcast that is still a draft or is scheduled. Whatever you send here is applied, and anything you leave out keeps the value it already had. Once a broadcast has started sending it can no longer be edited.\n",
+  properties: {
+    from: {
+      $ref: "#/components/schemas/EmailAddressInput",
+      description:
+        "The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.",
+    },
+    audience_id: {
+      $ref: "#/components/schemas/AudienceID",
+      description:
+        "The audience this broadcast sends to. We take the audience's contacts as they stand when the send starts and drop any suppressed addresses, and what is left is who gets the email.",
+    },
+    template: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastTemplate",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The template the broadcast sends. Its published version is fixed when the broadcast is prepared for sending. Set this to null to take the template off a draft, or leave it out to keep the one already set.",
+    },
+    reply_to: {
+      type: ["array", "null"],
+      items: {
+        $ref: "#/components/schemas/EmailAddressInput",
+      },
+      minItems: 1,
+      maxItems: 25,
+      description:
+        "Where replies to this broadcast should go. Set this to null to remove the addresses already set.",
+    },
+    headers: {
+      type: "object",
+      maxProperties: 25,
+      additionalProperties: {
+        type: "string",
+        maxLength: 998,
+      },
+      description:
+        "Custom email headers to set on the broadcast, as name and value pairs. What you send replaces the headers the draft already had rather than adding to them. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.\n",
+    },
+    tags: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      maxItems: 20,
+      description:
+        "Labels on this broadcast, each one a `name` and a `value`, that you can filter and search broadcasts by. What you send replaces the tags the draft already had rather than adding to them.",
+    },
+    metadata: {
+      type: "object",
+      description:
+        "Any JSON you want to keep on the broadcast, up to 2 KB once serialized. What you send replaces the metadata the draft already had rather than merging into it.",
+      additionalProperties: true,
+    },
+    track_opens: {
+      type: "boolean",
+      description: "Whether to track opens for this broadcast.",
+    },
+    track_clicks: {
+      type: "boolean",
+      description: "Whether to track link clicks for this broadcast.",
+    },
+    ip_pool_id: {
+      type: ["string", "null"],
+      pattern: "^ipp_([0-9a-hjkmnp-tv-z]{26}|shared)$",
+      description:
+        "The IP pool to send this broadcast from. Pass a pool ID, or `ipp_shared` to send through the shared pool on purpose. Set it to null to fall back to your organization's default pool.",
+    },
+    category: {
+      type: "string",
+      enum: ["marketing", "transactional"],
+      description:
+        "What kind of email this is. It decides two things: which suppressions apply, and whether we add an unsubscribe header.\n\n`marketing` is held back from every suppressed address and has the one-click unsubscribe headers. `transactional` still goes to addresses suppressed for a complaint or an unsubscribe, and has no unsubscribe header. Only use `transactional` for genuine operational mail such as a terms-of-service update or a service outage notice. Marketing content sent this way reaches people who have already unsubscribed from you.\n",
+    },
+  },
+  example: {
+    category: "marketing",
+    template: {
+      id: "emt_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+  },
+} as const;
+
 export const EmailBroadcastIDSchema = {
   type: "string",
   minLength: 1,
   pattern: "^eb_[0-9a-hjkmnp-tv-z]{26}$",
   example: "eb_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EmailBroadcastCountsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["broadcast_id", "status", "total", "addressable", "sendable"],
+  description:
+    "How many people a broadcast would reach right now, narrowing from everyone in the audience down to the ones it could actually be sent to.\n\nThese are live numbers, worked out at the moment you ask. Audience membership and suppressions change, so they can drift between now and when the broadcast sends.\n\n**They are about the audience, not about delivery, and sending does not change them.** Once the broadcast has sent, its own `recipient_count` is the number that actually went out, and what each of those recipients did with the message is in [the broadcast's recipients](/docs/api/reference/list-email-broadcast-recipients) and [its events](/docs/api/reference/list-email-broadcast-events). `status` is here so you can tell which question these numbers are answering, and `broadcast_id` names what they are about.\n",
+  properties: {
+    broadcast_id: {
+      readOnly: true,
+      description: "The broadcast these counts are for.",
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastID",
+        },
+      ],
+    },
+    status: {
+      readOnly: true,
+      example: "draft",
+      description:
+        "Where the broadcast is in its lifecycle, so the counts read in context. Anything past `draft` or `scheduled` means these numbers describe an audience the broadcast has already been sent to, not one it is about to reach.\n",
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastStatus",
+        },
+      ],
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next, given where the broadcast is. On a broadcast that has already sent this names\nthe reads that carry delivery outcomes, which these counts never do. An empty list means there\nis nothing to do; the field is absent entirely on responses that do not report next actions.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+    total: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 13000,
+      description: "How many contacts are in the audience.",
+    },
+    addressable: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 12500,
+      description:
+        "How many of those contacts have an email address. A contact with no address is not counted. This is never higher than `total`.",
+    },
+    sendable: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 12000,
+      description:
+        "How many of the addressable contacts are not suppressed for this broadcast's category, which is who the email would actually go to. This is never higher than `addressable`. Which suppressions apply depends on the category, so the same audience can give a higher number for a transactional broadcast than for a marketing one. A transactional broadcast still reaches people who unsubscribed from or complained about marketing mail, and a marketing broadcast does not.\n",
+    },
+  },
+} as const;
+
+export const EmailSendAllowanceWindowSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["none", "monthly", "daily"],
+  description:
+    "Which of the organization's email send allowances stops a send from reaching its whole audience.\n\n- `none`: every recipient is covered.\n- `monthly`: the allowance that runs with the billing period.\n- `daily`: the allowance that resets at the end of each UTC day.\n\nWhen both apply, the tighter of the two is reported.\n",
+} as const;
+
+export const EmailBroadcastSendQuotaSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["recipients", "allowed", "limited_by"],
+  description:
+    "How much of a broadcast the organization's email send allowance covers, read before the broadcast is sent. The allowance is shared with every other email the organization sends, so `allowed` moves as those sends land, and `recipients` moves as audience membership and suppressions change. Treat both as a live estimate rather than a promise: a broadcast whose recipients all fit today can still run into the allowance if other sends consume it first.\n",
+  properties: {
+    recipients: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 12000,
+      description:
+        "Number of contacts the broadcast would send to right now, after contacts without an email address and contacts suppressed for the broadcast's category are dropped. The same number the broadcast's audience counts report as sendable.\n",
+    },
+    allowed: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 5000,
+      description:
+        "Number of those recipients the organization's email send allowance covers. Equal to `recipients` when nothing limits the send, and lower when part of the audience runs past what is left of it. A part-covered send goes out in whole batches, so this is cut back to a batch boundary rather than to the exact number of emails left: it can sit below `remaining` rather than matching it, and should be read rather than worked out from `limit` and `remaining`. 0 means none of them would go out, either because the audience is larger than the whole allowance, which is refused rather than sent in part, or because too little of the allowance is left to carry any of it.\n",
+    },
+    limited_by: {
+      readOnly: true,
+      example: "monthly",
+      $ref: "#/components/schemas/EmailSendAllowanceWindow",
+    },
+    limit: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 50000,
+      description:
+        "Size of the allowance named by `limited_by`, in emails. Omitted when nothing limits the send.\n",
+    },
+    remaining: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 7000,
+      description:
+        "How much of that allowance is left in the current window, in emails. Omitted when nothing limits the send.\n",
+    },
+  },
+} as const;
+
+export const EmailBroadcastClickedLinkSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["url", "name", "click_count", "recipient_count"],
+  description:
+    "One destination URL a broadcast's recipients clicked, with its exact click and recipient totals. Grouped over every click event the broadcast has, not a sample.\n",
+  properties: {
+    url: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      example: "https://acme.com/whats-new/faster-exports",
+      description: "The clicked URL.",
+    },
+    name: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What the link said, resolved by the name used by the most clicks that carried one. Null when no click through this URL ever carried a name.\n",
+      example: "Faster exports, docs",
+    },
+    click_count: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 431,
+      description:
+        "Total clicks through this URL, including clicks that carried no link name.",
+    },
+    recipient_count: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      example: 388,
+      description:
+        "Number of distinct recipients who clicked this URL at least once.",
+    },
+  },
+} as const;
+
+export const EmailBroadcastClickedLinkListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data", "total"],
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "The broadcast's clicked URLs, most-clicked first, capped at 100 rows.",
+      items: {
+        $ref: "#/components/schemas/EmailBroadcastClickedLink",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total number of distinct URLs the broadcast's recipients clicked, regardless of the cap on `data`. When it exceeds the number of rows returned, the list was capped at the 100 most-clicked URLs.\n",
+      example: 57,
+    },
+  },
+} as const;
+
+export const EmailBroadcastSendNowRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    scheduled_at: {
+      type: "string",
+      format: "date-time",
+      description:
+        "When to send the broadcast. It has to be at least 30 seconds and at most 365 days from now. Leave it out to send straight away.",
+    },
+  },
+  example: {
+    scheduled_at: "2026-12-01T09:00:00Z",
+  },
 } as const;
 
 export const ContactIdentifierFilterSchema = {
@@ -17376,12 +18163,19 @@ export const EmailTemplateSourceSchema = {
     "The authoring format the template is written in, fixed at creation. `html` is finished markup you provide, optionally personalized with Liquid.",
 } as const;
 
+export const EmailTemplateThemeFilterSchema = {
+  type: "string",
+  enum: ["arcane", "barebone", "matte", "protocol", "studio"],
+  description:
+    "Filter by the visual theme a built-in template is designed in. Only built-in `system` templates have a theme, so naming one returns built-ins alone.",
+} as const;
+
 export const EmailTemplateThemeSchema = {
   type: "string",
   minLength: 1,
-  enum: ["arcane", "barebone", "matte", "protocol", "studio"],
+  "x-extensible-enum": ["arcane", "barebone", "matte", "protocol", "studio"],
   description:
-    "The visual theme a built-in template is designed in. Each of the catalog's five themes ships its own set of eight emails, and the sets overlap only partly, so the theme is what you choose between once you know which email you want. Only built-in `system` templates have one.",
+    "The visual theme a built-in template is designed in. Each of the catalog's five themes ships its own set of eight emails, and the sets overlap only partly, so the theme is what you choose between once you know which email you want. Only our built-in `system` templates have one.",
 } as const;
 
 export const EmailTemplateLanguageStateSchema = {
@@ -17472,6 +18266,7 @@ export const EmailTemplateSummarySchema = {
         "What the template is for, in your own words. Null if you have not set one.",
     },
     scope: {
+      example: "workspace",
       $ref: "#/components/schemas/TemplateScope",
     },
     status: {
@@ -17487,6 +18282,7 @@ export const EmailTemplateSummarySchema = {
       readOnly: true,
       description:
         "The visual theme a built-in template is designed in, or null for a template your workspace authored (which has no theme).",
+      example: null,
       oneOf: [
         {
           $ref: "#/components/schemas/EmailTemplateTheme",
@@ -17624,6 +18420,848 @@ export const EmailTemplateListSchema = {
   ],
 } as const;
 
+export const EmailTemplateSourceWriteSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["html"],
+  "x-enum-varnames": ["EmailTemplateSourceWriteHtml"],
+  description:
+    "The authoring format to create the template in. `html` is finished markup you provide, optionally personalized with Liquid; a format the API cannot author yet is refused.",
+} as const;
+
+export const EmailTemplateLanguageContentSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One language's content for an email template. Each language carries its own subject, preview text and bodies, so a translation can differ in wording and length from every other language without affecting them.\n",
+  properties: {
+    subject: {
+      type: "string",
+      maxLength: 998,
+      description: "The email subject line for this language.",
+      example: "Welcome to Acme, {{ bird.contact.first_name }}!",
+    },
+    preview_text: {
+      type: "string",
+      maxLength: 255,
+      description:
+        "The line an inbox shows after the subject in the message list, for this language. Leave it out and the inbox shows the opening words of the body instead. A mail client only reads it from the message body, so publishing folds it into the top of the HTML, hidden from view once the message is open; write it here rather than hiding your own copy in the body.\n",
+      example: "{{ bird.contact.first_name }}, your order is on its way",
+    },
+    html: {
+      type: "string",
+      maxLength: 524288,
+      description: "The HTML body for this language.",
+      example: "<h1>Hi {{ bird.contact.first_name }}</h1>",
+    },
+    text: {
+      type: "string",
+      maxLength: 524288,
+      description:
+        "The plain-text body for this language. Omit it and a plain-text alternative is derived from the HTML when you submit.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Parameters for creating an email template and its initial draft.",
+  required: ["slug", "category", "source"],
+  properties: {
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      description:
+        "The template's workspace-unique handle, and a stable alternative to the template ID when sending by template. It can contain lowercase letters, numbers, hyphens, and underscores. It is fixed at creation, so pick it deliberately. Two prefixes are rejected: `bird_`, reserved for our built-in templates, and `emt_`, the template ID format, which a slug could never be distinguished from.\n",
+      example: "welcome-email",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The template's display name, shown wherever the template is listed. You can change it any time. It defaults to the slug if you do not set one.\n",
+      example: "Welcome email",
+    },
+    description: {
+      type: "string",
+      description: "What the template is for, in your own words.",
+      example: "Sent to new customers after signup.",
+    },
+    category: {
+      $ref: "#/components/schemas/EmailTemplateCategory",
+    },
+    source: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateSourceWrite",
+        },
+      ],
+      description:
+        "The authoring format the template is written in, fixed at creation.\n`html` is finished markup you provide, optionally personalized with\nLiquid. Liquid supports variables, filters, and control flow such\nas `{% if %}` conditionals and `{% for %}` loops. A few constructs are\nrejected when you submit, and the error names exactly what to change:\n\n- Partial includes (`{% include %}`, `{% render %}`).\n- The `increment`, `decrement`, and `ifchanged` tags.\n- The `money`, `format_date`, `format_time`, `json`, `inspect`, and `type` filters.\n- Comparing against `empty`/`blank` (use `.size == 0` instead).\n- Blocks nested far deeper than real email markup needs.\n\nA broadcast's template additionally cannot use a `{% for %}` loop,\nbecause a broadcast supplies one value per contact property, so there\nis nothing to iterate. Send with the messages API instead if the\ntemplate needs one.\n",
+    },
+    languages: {
+      type: "object",
+      maxProperties: 25,
+      propertyNames: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/EmailTemplateLanguageContent",
+      },
+      description:
+        "The initial draft's content, keyed by language tag in BCP-47 form such as\n`en` or `pt-BR`. A template holds up to 25 languages, and a send picks one\nof them.\n\nOmit this to create an empty draft and add content later.\n",
+      example: {
+        en: {
+          subject: "Welcome to Acme, {{ bird.contact.first_name }}!",
+          html: "<h1>Hi {{ bird.contact.first_name }}</h1>",
+        },
+      },
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      example: "en",
+      description:
+        "The language a send uses when it does not name one, and the last resort when a requested language is not available. It has to be one of the languages you supply. If you leave it out, we default to `en`, unless you supply exactly one language, in which case we use that one instead. So if you supply two or more languages and `en` is not among them, you have to set this yourself.\n",
+    },
+    on_missing_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateOnMissingLanguage",
+        },
+      ],
+      default: "fallback",
+      description:
+        "What a send does when it asks for a language this template does not carry. Defaults to `fallback` on email.\n",
+    },
+    language_source_required: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether a send has to name a language. Set it to true to reject a send that names none instead of serving the default language. Pair it with `on_missing_language: fail` when every send must pick a language deliberately: on its own, `fail` is bypassed by naming no language at all. A template with this set cannot be used for a broadcast, which has no way to name one. Defaults to false.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "workspace_id",
+    "slug",
+    "name",
+    "scope",
+    "status",
+    "category",
+    "source",
+    "theme",
+    "draft_version_id",
+    "live_version_id",
+    "published_version_id",
+    "revision",
+    "languages",
+    "default_language",
+    "available_languages",
+    "on_missing_language",
+    "language_source_required",
+    "description",
+    "last_submitted_at",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      description: "Template ID.",
+      $ref: "#/components/schemas/EmailTemplateID",
+    },
+    workspace_id: {
+      readOnly: true,
+      description:
+        "The workspace that owns the template. Null for a built-in `system` template, which no workspace owns.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WorkspaceID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The name you send the template by. You can use either the slug or the id when you send. It never changes after the template is created. A built-in `system` template's slug always starts with `bird_`.",
+      example: "welcome-email",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The template's display name, shown wherever the template is listed. You can change it any time. It defaults to the slug if you do not set one.",
+      example: "Welcome email",
+    },
+    description: {
+      type: ["string", "null"],
+      description:
+        "What the template is for, in your own words. Null if you have not set one.",
+    },
+    scope: {
+      example: "workspace",
+      $ref: "#/components/schemas/TemplateScope",
+    },
+    status: {
+      $ref: "#/components/schemas/TemplateStatus",
+    },
+    category: {
+      $ref: "#/components/schemas/EmailTemplateCategory",
+    },
+    source: {
+      $ref: "#/components/schemas/EmailTemplateSource",
+    },
+    theme: {
+      readOnly: true,
+      description:
+        "The visual theme a built-in template is designed in, or null for a template your workspace authored (which has no theme).",
+      example: null,
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateTheme",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    draft_version_id: {
+      readOnly: true,
+      description:
+        "The current editable draft version. Null for a built-in `system` template, which has no draft.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    live_version_id: {
+      readOnly: true,
+      description:
+        "The version a send resolves to, or null if the template has never been published.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    published_version_id: {
+      readOnly: true,
+      deprecated: true,
+      description:
+        "Deprecated: use `live_version_id` instead, which carries the same value.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    revision: {
+      type: ["integer", "null"],
+      readOnly: true,
+      minimum: 0,
+      description:
+        "The draft's revision counter. Send it back on the next update to detect concurrent edits. Null for a built-in `system` template, which is unversioned.",
+    },
+    languages: {
+      type: "object",
+      readOnly: true,
+      propertyNames: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/EmailTemplateLanguageState",
+      },
+      description:
+        "Every language this template has, keyed by language tag in BCP-47 form\nsuch as `en` or `pt-BR`, each with its state. One read tells you which\nlanguages are live and which have unpublished edits, without fetching any\ncontent.\n\nContent is not here: read a version's languages for that, one language at\na time.\n",
+      example: {
+        en: {
+          status: "live",
+        },
+        "pt-BR": {
+          status: "live",
+          draft: true,
+        },
+        de: {
+          status: "draft",
+        },
+      },
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description:
+        "The language the draft defaults to. This is the language `languages` is\nkeyed against while you edit, and the language used by sends once you\nsubmit this draft.\n\nUntil then sends keep using the live version's default, so this can\ndiffer from what is being sent right now. `available_languages` describes\nthe live version for the same reason; read a version to see the default a\nsend currently uses.\n",
+    },
+    available_languages: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      description:
+        "The languages this template currently supports for sending, as BCP-47 tags. Empty until the template is published, because sends serve published content. The set may shrink for reasons other than editing, so read it rather than assuming it matches what was published. A built-in `system` template has no publish step and always reports its one language.\n",
+      example: ["en"],
+    },
+    on_missing_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateOnMissingLanguage",
+        },
+      ],
+      readOnly: true,
+      description:
+        "What a send does when it asks for a language this template does not carry. Defaults to `fallback` on email.\n",
+    },
+    language_source_required: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether a send has to name a language. When true, a send that names none is rejected instead of being served the default language, and the template cannot be used for a broadcast, which has no way to name one.\n",
+    },
+    last_submitted_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this template was last submitted. Null if it never has been. Submitting is the only thing that moves this timestamp: rolling back changes which version is live without counting as a submit, so this keeps reporting the last real submit. Read it alongside `languages`, which says where each language stands.\n",
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was created. Null for a built-in `system` template.",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was last modified. Null for a built-in `system` template.",
+    },
+  },
+} as const;
+
+export const EmailTemplateDraftRevisionSchema = {
+  type: "integer",
+  minimum: 0,
+  description:
+    "The draft revision you last read (from the template's `revision` field). A stale value returns a conflict so you can reload and retry.\n",
+  example: 3,
+} as const;
+
+export const EmailTemplateUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Partial update of a template's metadata and draft settings. Only the fields you send are changed. The rest are left as-is. Include the draft `revision` you last read so concurrent edits are detected. Content is not here: save a language on the draft version to change what the template says.\n",
+  required: ["revision"],
+  properties: {
+    revision: {
+      $ref: "#/components/schemas/EmailTemplateDraftRevision",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "New display name, in free text. The slug stays fixed at creation, so renaming the template does not break whatever refers to it by slug or id.\n",
+    },
+    description: {
+      type: ["string", "null"],
+      description:
+        "What the template is for, in your own words. Send `null` to clear it.",
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description:
+        "New default language for the draft. Must be one of the languages the draft already has, so add the language first if it is not there yet.\n",
+    },
+    on_missing_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateOnMissingLanguage",
+        },
+      ],
+      description:
+        "What a send does when it asks for a language this template does not carry.\n",
+    },
+    language_source_required: {
+      type: "boolean",
+      description:
+        "Whether a send has to name a language. Turning it on rejects a send that names none instead of serving the default language, and makes the template unusable for a broadcast, which has no way to name one.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateDuplicateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Optional parameters when duplicating an email template. The body may be omitted entirely to accept the defaults.\n",
+  properties: {
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      description:
+        "The copy's workspace-unique handle, and the stable alternative to the template ID when sending by template. It can contain lowercase letters, numbers, hyphens, and underscores. Omit it to derive one from the source (for example, `welcome-email-copy`), with a numeric suffix if that slug is already taken. Two prefixes are rejected: `bird_`, reserved for our built-in templates, and `emt_`, the template ID format, which a slug could never be distinguished from. If you supply a slug that is already in use in the workspace, the request returns a conflict.\n",
+      example: "welcome-email-copy",
+    },
+  },
+} as const;
+
+export const EmailTemplatePreviewContentSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Content to render instead of the template's stored draft. Give it the subject and bodies you have in hand and they are rendered exactly as the draft would be, so an editor can show what a change looks like before it is saved.\n",
+  properties: {
+    subject: {
+      type: "string",
+      maxLength: 998,
+      description: "The subject line to render.",
+      example: "Welcome to Acme, {{ bird.contact.first_name }}!",
+    },
+    preview_text: {
+      type: "string",
+      maxLength: 255,
+      description:
+        "The preview text to render. It is folded into the top of the HTML the same way publishing folds it, so the rendered body carries the hidden preheader a recipient's inbox would read.\n",
+      example: "{{ bird.contact.first_name }}, your order is on its way",
+    },
+    html: {
+      type: "string",
+      maxLength: 524288,
+      description: "The HTML body to render.",
+      example: "<h1>Hi {{ bird.contact.first_name }}</h1>",
+    },
+    text: {
+      type: "string",
+      maxLength: 524288,
+      description:
+        "The plain-text body to render. Omit it and a plain-text alternative is derived from the HTML, the same way it is derived when you publish.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplatePreviewRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Sample values and options for rendering a template preview. Omit the body entirely to preview the current draft: `bird.contact.` tokens then fill from stand-in values, and a parameter you give no value for renders as empty.\n",
+  properties: {
+    content: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplatePreviewContent",
+        },
+      ],
+      description:
+        "Render this content rather than the template's stored draft. It is what an editor uses to show a change as it is made, since nothing has to be saved first.\n\nThe content is treated exactly as a draft would be: personalization is filled in the same way, a plain-text body is derived from the HTML when you omit it, and content that could not be published is refused with the same error. `version` asks for a published version's own content, so the two cannot be combined.\n",
+    },
+    parameters: {
+      type: "object",
+      additionalProperties: true,
+      description:
+        'Sample values for the variables the template uses, for this one preview only. A variable takes its value under its own name. A `bird.` value nests to match the token, so `{"bird": {"contact": {"first_name": "Ada"}}}` fills `{{ bird.contact.first_name }}`.\n\nA preview is more forgiving than a send: a parameter you leave out renders as empty here rather than being rejected. `parameters` is capped at 16 KB once serialized.\n',
+      example: {
+        bird: {
+          contact: {
+            first_name: "Ada",
+          },
+        },
+        animal: "otter",
+      },
+    },
+    contact: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ContactID",
+        },
+      ],
+      description:
+        "Render the template the way this contact would receive it. Every `{{ bird.contact.… }}` token takes its value from the contact's record, narrowed to the attributes the template reads and filled from each property's `fallback_value` where the contact holds no value: the same values a broadcast to this contact would send.\n\nValues are read as the contact stands right now, so a preview reflects an edit to their record as soon as you make it. A `bird.contact.…` value you also pass in `parameters` wins for that one attribute, so you can preview a contact with one field changed without editing them.\n",
+    },
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description:
+        "Which of the template's languages to render. Omit it to render the default language. When the template does not have the language you ask for, its own `on_missing_language` setting decides whether a close match is rendered instead or the request is rejected. It is the same choice the send makes.\n",
+    },
+    version: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateVersionID",
+        },
+      ],
+      description:
+        "Preview a specific published version by its id, instead of the current draft.\n",
+    },
+  },
+} as const;
+
+export const EmailCompatibilityReportSeveritySchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  enum: ["problem", "warning", "none"],
+  "x-enum-varnames": [
+    "EmailCompatibilityReportSeverityProblem",
+    "EmailCompatibilityReportSeverityWarning",
+    "EmailCompatibilityReportSeverityNone",
+  ],
+  description:
+    "The worst severity across every finding the response was computed from, which\nis the authoritative reading: a response that caps how many findings it lists\nstill accounts here for the ones it left out. Each response's `compatibility`\nsays which content it covered.\n\n- `problem`: at least one finding is a `problem`.\n- `warning`: every finding is a `warning`.\n- `none`: there are no findings.\n",
+  example: "warning",
+} as const;
+
+export const EmailCompatibilityRuleIDSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  description:
+    'Which rule produced a finding.\n\n- `html_script`: a `<script>` tag.\n- `html_event_handlers`: a JavaScript event-handler attribute such as `onclick`.\n- `html_embedded_content`: an `<iframe>`, `<embed>`, or `<object>`.\n- `html_linked_stylesheet`: a `<link rel="stylesheet">`.\n- `css_at_import`: an `@import` rule.\n- `html_form`: a `<form>`, `<input>`, `<select>`, or `<textarea>`.\n- `html_svg`: an inline `<svg>`.\n- `html_media`: a `<video>` or `<audio>` element.\n- `css_display_flex_grid`: `display: flex` or `display: grid`, and their `inline-` forms.\n- `css_position_fixed_sticky`: `position: fixed` or `position: sticky`.\n- `css_variables_no_fallback`: a `var()` with no fallback value.\n- `css_viewport_units`: a `vh` or `vw` length.\n- `html_button`: a `<button>` element.\n- `css_math_functions`: `clamp()`, `min()`, or `max()`.\n- `css_modern_color`: `oklch()`, `oklab()`, `lch()`, or `lab()`.\n- `html_web_page_markup`: markup a web framework left behind, such as a `data-reactroot` attribute or a `__next` element id.\n',
+  "x-extensible-enum": [
+    "html_script",
+    "html_event_handlers",
+    "html_embedded_content",
+    "html_linked_stylesheet",
+    "css_at_import",
+    "html_form",
+    "html_svg",
+    "html_media",
+    "css_display_flex_grid",
+    "css_position_fixed_sticky",
+    "css_variables_no_fallback",
+    "css_viewport_units",
+    "html_button",
+    "css_math_functions",
+    "css_modern_color",
+    "html_web_page_markup",
+  ],
+  example: "css_display_flex_grid",
+} as const;
+
+export const EmailCompatibilitySeveritySchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  enum: ["problem", "warning"],
+  "x-enum-varnames": [
+    "EmailCompatibilitySeverityProblem",
+    "EmailCompatibilitySeverityWarning",
+  ],
+  description:
+    "What a finding costs you.\n\n- `problem`: the pattern does nothing at all. The client removes the markup, never loads the stylesheet carrying it, or will not operate the control. Where a finding names clients, that is what happens in those clients.\n- `warning`: it does something, but not what you wrote.\n\nNeither one refuses a save, a submit, or a send.\n",
+  example: "warning",
+} as const;
+
+export const EmailClientFamilySchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  description:
+    "Which mail client a finding applies to. A finding's `message` names at most\nApple Mail, Gmail, Outlook, and Yahoo; its `unsupported_clients` and\n`partial_clients` name every client affected.\n\n- `gmail`: Gmail\n- `outlook`: Outlook\n- `yahoo`: Yahoo\n- `apple_mail`: Apple Mail\n- `aol`: AOL\n- `thunderbird`: Mozilla Thunderbird\n- `samsung_email`: Samsung Email\n- `sfr`: SFR\n- `orange`: Orange\n- `protonmail`: ProtonMail\n- `hey`: HEY\n- `mail_ru`: Mail.ru\n- `fastmail`: Fastmail\n- `laposte`: LaPoste.net\n- `gmx`: GMX\n- `web_de`: WEB.DE\n- `ionos_1and1`: 1&1\n- `wp_pl`: WP.pl\n",
+  "x-extensible-enum": [
+    "gmail",
+    "outlook",
+    "yahoo",
+    "apple_mail",
+    "aol",
+    "thunderbird",
+    "samsung_email",
+    "sfr",
+    "orange",
+    "protonmail",
+    "hey",
+    "mail_ru",
+    "fastmail",
+    "laposte",
+    "gmx",
+    "web_de",
+    "ionos_1and1",
+    "wp_pl",
+  ],
+  example: "outlook",
+} as const;
+
+export const EmailClientPlatformSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  description:
+    "Which build of a client family a finding applies to. A family can support a\nfeature in one build and not another, so Gmail on iOS is tracked separately\nfrom Gmail on the web.\n\n- `desktop_webmail`: Desktop Webmail\n- `mobile_webmail`: Mobile Webmail\n- `ios`: iOS\n- `android`: Android\n- `windows`: Windows\n- `macos`: macOS\n- `windows_mail`: Windows Mail\n- `outlook_com`: Outlook.com\n",
+  "x-extensible-enum": [
+    "desktop_webmail",
+    "mobile_webmail",
+    "ios",
+    "android",
+    "windows",
+    "macos",
+    "windows_mail",
+    "outlook_com",
+  ],
+  example: "windows",
+} as const;
+
+export const EmailClientSupportSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One mail client family a finding applies to, and which of that family's platforms.\n",
+  required: ["family", "platforms"],
+  properties: {
+    family: {
+      readOnly: true,
+      $ref: "#/components/schemas/EmailClientFamily",
+    },
+    platforms: {
+      type: "array",
+      minItems: 1,
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/EmailClientPlatform",
+      },
+      description:
+        "Which of the family's platforms this applies to, in alphabetical order.\n",
+      example: ["windows", "windows_mail"],
+    },
+  },
+} as const;
+
+export const EmailCompatibilityFindingSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One pattern in the HTML that mail clients remove, ignore, or render inconsistently.\n",
+  required: [
+    "rule_id",
+    "severity",
+    "language",
+    "field",
+    "message",
+    "fix",
+    "partial",
+    "line",
+    "column",
+    "match",
+    "unsupported_clients",
+    "partial_clients",
+  ],
+  properties: {
+    rule_id: {
+      readOnly: true,
+      description: "The rule that produced this finding.",
+      $ref: "#/components/schemas/EmailCompatibilityRuleID",
+    },
+    severity: {
+      readOnly: true,
+      $ref: "#/components/schemas/EmailCompatibilitySeverity",
+    },
+    language: {
+      readOnly: true,
+      description:
+        "Which language's content this finding is in. Null when the call covered a single language.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    field: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Which field of that language the finding is in. Always `html`; the subject and the plain-text body are not checked.\n",
+      example: "html",
+    },
+    message: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "What is wrong and which clients it affects, worded to show to whoever is authoring the template. It covers the rule's whole category rather than the exact text that matched, so a rule covering `<video>` and `<audio>` names both whichever one is on the line. Show `fix` and then `partial` after it.\n",
+      example:
+        "`display: flex` and `grid` don't work in Outlook (Windows/Windows Mail).",
+    },
+    fix: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "What to use instead. Null when there is no drop-in alternative and the fix is a restructure.\n",
+      example: "Use tables for layout.",
+    },
+    partial: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Which clients support the feature only partly. Null when no client's support is partial.\n",
+      example:
+        "Partial support for `display: flex` and `grid` in Gmail (iOS/Android).",
+    },
+    line: {
+      type: "integer",
+      minimum: 1,
+      readOnly: true,
+      description:
+        "The 1-based line the pattern is on, in the HTML the containing response's `compatibility` says it covered.\n",
+      example: 14,
+    },
+    column: {
+      type: "integer",
+      minimum: 1,
+      readOnly: true,
+      description: "The 1-based column the pattern starts at, on that line.",
+      example: 6,
+    },
+    match: {
+      type: "string",
+      minLength: 1,
+      maxLength: 256,
+      readOnly: true,
+      description:
+        "The source text that matched, starting at `line` and `column`: the smallest span that identifies what is wrong. Never the enclosing line. For a finding on a whole element, the span runs from the opening tag through the close tag, because the client drops the element's content along with its markup. Cut at 256 characters, so an element holding a long body is quoted from its start rather than in full.\n",
+      example: "display: flex",
+    },
+    unsupported_clients: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/EmailClientSupport",
+      },
+      description:
+        "Every client family that does not support the feature at all, in alphabetical order by each entry's `family`. Empty on a finding whose `message`, `fix`, and `partial` name no client. `message` names at most four families; this names all of them.\n",
+    },
+    partial_clients: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/EmailClientSupport",
+      },
+      description:
+        "Every client family that renders something other than what you wrote, in alphabetical order by each entry's `family`. Empty when no client's support is partial, which is also when `partial` is null. `partial` names at most four families; this names all of them.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplatePreviewSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A rendered preview of an email template: its subject, HTML, and plain-text bodies with the supplied sample values filled in, ready to display.\n",
+  required: [
+    "subject",
+    "html",
+    "text",
+    "variables",
+    "language",
+    "compatibility",
+    "compatibility_severity",
+  ],
+  properties: {
+    subject: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "The rendered subject line. Null when the template has no subject.",
+    },
+    html: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "The rendered HTML body. Null when the template has no HTML body.",
+    },
+    text: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "The rendered plain-text body. Derived from the HTML when the template has no separate plain-text body, and null when it has neither.\n",
+    },
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description:
+        "The language this preview rendered. It differs from the language you asked for when the template does not have that one and a close match was served instead.\n",
+    },
+    variables: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The variables you can fill in with `parameters`. This list covers only the\nlanguage named by `language`. A version read combines the variables from\nevery language the version holds. Preview each language separately to see\nits own variables.\n\nVariables under the reserved `bird.` namespace are not listed here. We\nsupply those values, but you can nest sample values under `bird` in\n`parameters` to preview them.\n",
+      items: {
+        $ref: "#/components/schemas/TemplateVariable",
+      },
+    },
+    compatibility_severity: {
+      readOnly: true,
+      $ref: "#/components/schemas/EmailCompatibilityReportSeverity",
+    },
+    compatibility: {
+      type: "array",
+      readOnly: true,
+      maxItems: 200,
+      items: {
+        $ref: "#/components/schemas/EmailCompatibilityFinding",
+      },
+      description:
+        "What the previewed HTML uses that mail clients remove, ignore, or render inconsistently, in the order the patterns appear. Empty when nothing is worth reporting. Line and column count in the `content.html` you supplied, or in the template's own HTML when you supplied none, so they address the source rather than the rendered output. Previewing a published `version` is the exception: where the stored version keeps no authored copy of a language the publish step rewrote, the positions count in that rewritten body, which no response returns. A preview renders either way. At most 200 findings come back, the first 200 in source order; `compatibility_severity` is derived from every finding the HTML produced, including any beyond those 200.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateVersionStatusSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  enum: ["draft", "published", "archived"],
+  "x-enum-varnames": [
+    "EmailTemplateVersionStatusDraft",
+    "EmailTemplateVersionStatusPublished",
+    "EmailTemplateVersionStatusArchived",
+  ],
+  description:
+    "Whether this version is still being edited or has been published. It records\nthe version's publication history: a version that a later one replaced stays\n`published`. The template's `live_version_id` names the version a send\nresolves to now.\n\n`archived` is reserved and no version carries it yet. Version retirement will\nproduce it, so it is declared here ahead of that feature: a client written\nagainst this list today keeps working when the first archived version arrives,\nrather than the value's arrival being a breaking change.\n",
+  example: "published",
+} as const;
+
 export const ActorSchema = {
   type: "object",
   additionalProperties: false,
@@ -17655,6 +19293,742 @@ export const ActorSchema = {
       readOnly: true,
       description:
         "The label the actor is shown under: typically a member's name or email address, or the API key's name. Null when it could not be resolved.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateVersionSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One version of a template, without its content. Version history lists every version a template has ever had, and each one has a full copy of the content in every language it was published with. The listing describes the versions; read a single version to get what it holds.\n",
+  required: [
+    "id",
+    "template_id",
+    "status",
+    "revision",
+    "variables",
+    "default_language",
+    "available_languages",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      description: "Template version ID.",
+      $ref: "#/components/schemas/EmailTemplateVersionID",
+    },
+    template_id: {
+      readOnly: true,
+      description: "The template this version belongs to.",
+      $ref: "#/components/schemas/EmailTemplateID",
+    },
+    version_number: {
+      type: ["integer", "null"],
+      minimum: 1,
+      readOnly: true,
+      description:
+        "Sequential published-version number (1, 2, 3…). Null while the version is a draft.",
+    },
+    status: {
+      $ref: "#/components/schemas/EmailTemplateVersionStatus",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "The version's revision counter.",
+    },
+    variables: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/TemplateVariable",
+      },
+      description:
+        "Every variable this version's content uses. You supply a value for each of them when you send.\n\nThe list combines all the languages, because languages do not have to use the same variables: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. Send a value for every variable in the list rather than only the ones you expect the language you are sending to use. A language that does not use a variable ignores the value you sent for it, and a variable the sent language does use but you left out is rejected with a `422` naming it.\n\nVariables under the reserved `bird.` namespace are not listed here. We fill those in ourselves from the recipient's contact record.\n",
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description:
+        "The language this version treats as its default: the one a send uses when it names none, and the last resort when a requested language is not available.\n",
+    },
+    available_languages: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      description:
+        "The languages this version holds, as BCP-47 tags: the keys its `languages` map would return, without the content itself.\n",
+      example: ["en", "pt-BR"],
+    },
+    created_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      readOnly: true,
+      description: "When this version was created.",
+    },
+    published_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this version was published, or null if it has not been published.",
+    },
+    updated_by: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Actor",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Who last saved this version: a member's own session, an OAuth token delegated from one, or a workspace API key. Publishing freezes a version, so on a published one this is whoever published it. Null means no actor is on record: a built-in template, which is code-defined rather than stored, or a version last saved by an API key before this field existed. Every other version has one, even when its display_name could not be resolved (a member whose account is gone, say).\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateVersionListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "One page of the template's versions, newest first. Each entry describes a version and which languages it holds. Read a single version if you want its actual content.\n",
+          items: {
+            $ref: "#/components/schemas/EmailTemplateVersionSummary",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EmailTemplateBroadcastSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One broadcast that blocks deleting this template.",
+  required: ["id", "status", "created_at"],
+  properties: {
+    id: {
+      readOnly: true,
+      description: "Broadcast ID.",
+      $ref: "#/components/schemas/EmailBroadcastID",
+    },
+    status: {
+      readOnly: true,
+      description:
+        "Where the broadcast has got to. Only `scheduled` and `accepted` appear here: those are the two that have not pinned their content yet, so they are the ones blocking the delete. This list carries the status alone; the per-recipient totals live on the broadcast itself.\n",
+      example: "scheduled",
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastStatus",
+        },
+      ],
+    },
+    scheduled_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the broadcast is due to send, or null when it is not scheduled.",
+      example: "2026-07-03T09:00:00Z",
+    },
+    created_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      readOnly: true,
+      description: "When the broadcast was created.",
+      example: "2026-07-01T00:00:00Z",
+    },
+  },
+} as const;
+
+export const EmailTemplateBroadcastListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "Page of broadcasts blocking a delete of the template, newest first.",
+          items: {
+            $ref: "#/components/schemas/EmailTemplateBroadcastSummary",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EmailTemplateVersionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "template_id",
+    "status",
+    "revision",
+    "variables",
+    "languages",
+    "default_language",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      description: "Template version ID.",
+      $ref: "#/components/schemas/EmailTemplateVersionID",
+    },
+    template_id: {
+      readOnly: true,
+      description: "The template this version belongs to.",
+      $ref: "#/components/schemas/EmailTemplateID",
+    },
+    version_number: {
+      type: ["integer", "null"],
+      minimum: 1,
+      readOnly: true,
+      description:
+        "Sequential published-version number (1, 2, 3…). Null while the version is a draft.",
+    },
+    status: {
+      $ref: "#/components/schemas/EmailTemplateVersionStatus",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "The version's revision counter.",
+    },
+    variables: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/TemplateVariable",
+      },
+      description:
+        "Every variable this version's content uses. You supply a value for each of them when you send.\n\nThe list combines all the languages, because languages do not have to use the same variables: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. Send a value for every variable in the list rather than only the ones you expect the language you are sending to use. A language that does not use a variable ignores the value you sent for it, and a variable the sent language does use but you left out is rejected with a `422` naming it.\n\nVariables under the reserved `bird.` namespace are not listed here. We fill those in ourselves from the recipient's contact record.\n",
+    },
+    languages: {
+      type: "object",
+      readOnly: true,
+      propertyNames: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/EmailTemplateLanguageContent",
+      },
+      description:
+        "The content this version holds, keyed by language tag in BCP-47 form such as `en` or `pt-BR`. Publishing freezes every language together, so a version shows exactly what it would send in each of them. On a published version this is the send content.\n",
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description:
+        "The language this version treats as its default: the one a send uses when it names none, and the last resort when a requested language is not available.\n",
+    },
+    created_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      readOnly: true,
+      description: "When this version was created.",
+    },
+    published_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this version was published, or null if it has not been published.",
+    },
+    updated_by: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Actor",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Who last saved this version: a member's own session, an OAuth token delegated from one, or a workspace API key. Publishing freezes a version, so on a published one this is whoever published it. Null means no actor is on record: a built-in template, which is code-defined rather than stored, or a version last saved by an API key before this field existed. Every other version has one, even when its display_name could not be resolved (a member whose account is gone, say).\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateLanguageSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One language of a template version, without its content: enough to list what a version holds and how big each language is. Read a single language to get its content and its compatibility report.\n",
+  required: ["language", "revision"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description: "The language, in its canonical form.",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "This language's revision counter, to send back when you save it. It counts only this language's own changes.\n",
+    },
+    content_hash: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "A hash over this language's content, prefixed with the algorithm that produced it (`sha256:`), so the algorithm can change without the field becoming ambiguous. It tells you whether a language differs without transferring the content, and is comparable only within one version of this API. Null for a language saved before fingerprints were recorded.\n",
+      example:
+        "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this language was last saved. Null if that is not recorded.",
+    },
+    has_html: {
+      type: "boolean",
+      readOnly: true,
+      description: "Whether this language has an HTML body.",
+    },
+    has_text: {
+      type: "boolean",
+      readOnly: true,
+      description: "Whether this language has a plain-text body.",
+    },
+  },
+} as const;
+
+export const EmailTemplateLanguageListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "Every language the version holds, ordered by language tag, without their content. Read a single language to get its content.\n",
+      items: {
+        $ref: "#/components/schemas/EmailTemplateLanguageSummary",
+      },
+    },
+  },
+} as const;
+
+export const EmailTemplateLanguageSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One language of a template version: its content plus the identity a concurrent-edit check needs. Reading a language returns everything you need to edit it and save it back.\n",
+  required: ["language", "revision", "compatibility", "compatibility_severity"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description:
+        "The language this content belongs to, in its canonical form. Send a tag in any casing and this reports the form the template stores.\n",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "This language's revision counter. Send it back when you save this language so a concurrent edit is caught instead of silently overwritten. It counts only this language's own changes, so editing another language never invalidates it.\n",
+    },
+    content_hash: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "A hash over this language's content, prefixed with the algorithm that produced it (`sha256:`), so the algorithm can change without the field becoming ambiguous. It tells you whether a language differs without transferring the content, and is comparable only within one version of this API. Null for a language saved before fingerprints were recorded.\n",
+      example:
+        "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this language was last saved. Null if that is not recorded.",
+    },
+    content: {
+      $ref: "#/components/schemas/EmailTemplateLanguageContent",
+    },
+    compatibility_severity: {
+      readOnly: true,
+      $ref: "#/components/schemas/EmailCompatibilityReportSeverity",
+    },
+    compatibility: {
+      type: "array",
+      readOnly: true,
+      maxItems: 200,
+      items: {
+        $ref: "#/components/schemas/EmailCompatibilityFinding",
+      },
+      description:
+        "What the stored HTML uses that mail clients remove, ignore, or render inconsistently, in the order the patterns appear. Empty when nothing is worth reporting. Line and column count in the `content.html` this response carries. At most 200 findings come back, the first 200 in source order; `compatibility_severity` is derived from every finding the HTML produced, including any beyond those 200.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateLanguageUpsertSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Content to save for one language, replacing whatever that language held. Send every field you want the language to keep: a field you omit is cleared, which is what makes saving the same content twice land the same way every time.\n",
+  required: ["subject"],
+  properties: {
+    subject: {
+      type: "string",
+      minLength: 1,
+      maxLength: 998,
+      description: "The email subject line for this language.",
+      example: "Welcome to Acme, {{ bird.contact.first_name }}!",
+    },
+    preview_text: {
+      type: "string",
+      maxLength: 255,
+      description:
+        "The line an inbox shows after the subject in the message list. Leave it out and the inbox shows the opening words of the body instead.\n",
+      example: "{{ bird.contact.first_name }}, your order is on its way",
+    },
+    html: {
+      type: "string",
+      maxLength: 524288,
+      description: "The HTML body for this language.",
+      example: "<h1>Hi {{ bird.contact.first_name }}</h1>",
+    },
+    text: {
+      type: "string",
+      maxLength: 524288,
+      description:
+        "The plain-text body for this language. Omit it and a plain-text alternative is derived from the HTML when you submit.\n",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      description:
+        "The revision you last read for this language, to detect a concurrent edit. The save is rejected with a conflict if the language moved on since. Omit it to save unconditionally. Creating a language does not need one.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateRefSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  description:
+    "The template this call addressed, as its id, even when you addressed it by slug. Send it back as `template_ref` on a follow-up call.\n",
+  example: "emt_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EmailTemplateLanguageSavedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The identity, revision counters, and fingerprint of a saved language. The response does not include its content; read the language to retrieve it.\n",
+  required: [
+    "language",
+    "revision",
+    "draft_revision",
+    "template_ref",
+    "version_id",
+    "compatibility",
+    "compatibility_severity",
+  ],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description:
+        "The language that was saved, in its canonical form. Send a tag in any casing and this reports the form the template stores.\n",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "This language's new revision. Send it back on your next save of this language so a concurrent edit is caught instead of silently overwritten.\n",
+    },
+    draft_revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "The draft's new revision. Saving a language moves it, so any template update you make next must send this value instead of the revision you read before the save.\n",
+    },
+    content_hash: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "A hash over the language's content as saved, prefixed with the algorithm that produced it (`sha256:`), so the algorithm can change without the field becoming ambiguous. It tells you whether a language differs without transferring the content, and is comparable only within one version of this API.\n",
+      example:
+        "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description: "When this language was saved.",
+    },
+    template_ref: {
+      readOnly: true,
+      description: "The template this save addressed.",
+      $ref: "#/components/schemas/EmailTemplateRef",
+    },
+    version_id: {
+      readOnly: true,
+      description: "The draft this save wrote to.",
+      $ref: "#/components/schemas/EmailTemplateVersionID",
+    },
+    compatibility_severity: {
+      readOnly: true,
+      $ref: "#/components/schemas/EmailCompatibilityReportSeverity",
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next with this save. Present on reads that compute it: an empty list means\nthere is nothing to do, and the field is absent entirely on responses that do not\nreport next actions.\n\nA `problem` in `compatibility` routes back to this same write, with the identifiers\nto address it already on this response; a `warning` says what degrades and leaves\nthe draft as it is.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+    compatibility: {
+      type: "array",
+      readOnly: true,
+      maxItems: 200,
+      items: {
+        $ref: "#/components/schemas/EmailCompatibilityFinding",
+      },
+      description:
+        "What the HTML you just saved uses that mail clients remove, ignore, or render inconsistently, in the order the patterns appear. Empty when nothing is worth reporting. Advisory: the language was saved either way, and a finding never refuses a write. Line and column count in the HTML as saved, which the language read returns as `content.html`. A partial update reports on the language in full rather than on the fields it carried, so it reads the same as the read of the same language. At most 200 findings come back, the first 200 in source order; `compatibility_severity` is derived from every finding the HTML produced, including any beyond those 200.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateLanguageUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  description:
+    "A partial edit to one language: send only the fields you are changing, and the rest keep their current values. The language must already exist. Create it by saving its full content instead.\n",
+  properties: {
+    subject: {
+      type: "string",
+      minLength: 1,
+      maxLength: 998,
+      description: "A new email subject line for this language.",
+      example: "Welcome to Acme, {{ bird.contact.first_name }}!",
+    },
+    preview_text: {
+      type: ["string", "null"],
+      maxLength: 255,
+      description:
+        "A new line for the inbox to show after the subject in the message list. Send null to clear it, and the inbox shows the opening words of the body instead.\n",
+      example: "{{ bird.contact.first_name }}, your order is on its way",
+    },
+    html: {
+      type: "string",
+      maxLength: 524288,
+      description: "A new HTML body for this language.",
+      example: "<h1>Hi {{ bird.contact.first_name }}</h1>",
+    },
+    text: {
+      type: ["string", "null"],
+      maxLength: 524288,
+      description:
+        "A new plain-text body for this language. Send null to clear it, and a plain-text alternative is derived from the HTML when you submit.\n",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      description:
+        "The revision you last read for this language, to detect a concurrent edit. The edit is rejected with a conflict if the language moved on since. Omit it to apply the edit unconditionally.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateRollbackSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Parameters for rolling a template back to an earlier published version. Rolling back also replaces the draft with that version's content, so you have to pass `revision`, the revision number of the draft you last read. If the draft has changed since you read it, that revision number is now stale, and the rollback fails with a conflict instead of overwriting the newer draft. Read the draft again to get its current revision, and try the rollback again.\n",
+  required: ["revision"],
+  properties: {
+    revision: {
+      $ref: "#/components/schemas/EmailTemplateDraftRevision",
+    },
+  },
+} as const;
+
+export const EmailTemplateSubmitSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Options for a submit. Every field here is optional, so an empty request body submits the draft exactly as it stands.\n",
+  properties: {
+    validate_only: {
+      type: "boolean",
+      default: false,
+      description:
+        "Check the draft without actually submitting it. Every language gets checked and every problem gets reported back to you, but nothing is frozen and no new version gets created. Give a validation run its own `Idempotency-Key`, separate from the real submit that follows it. You can also send no key. The validation request and real submit have different bodies, so using the same key for both is rejected as key reuse.\n",
+    },
+    expected_revision: {
+      $ref: "#/components/schemas/EmailTemplateDraftRevision",
+    },
+    languages: {
+      type: "array",
+      minItems: 1,
+      maxItems: 25,
+      items: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      description:
+        "Languages to process when submitting an already-published version. Email templates accept submissions only for drafts, so setting this field for an email template is rejected.\n",
+    },
+  },
+  example: {
+    expected_revision: 3,
+  },
+} as const;
+
+export const EmailTemplateSubmitProblemSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One problem found while checking whether a version can be submitted.",
+  required: ["code", "message"],
+  properties: {
+    language: {
+      readOnly: true,
+      description:
+        "The language this problem is about. Null when the problem is about the whole version rather than one language, for example an empty draft, or a default language the draft does not have.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    field: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Which field within that language has the problem, such as `subject` or `html`. Null when the problem is not about one particular field.\n",
+      example: "subject",
+    },
+    code: {
+      type: "string",
+      minLength: 1,
+      pattern: "^E\\d{5}$",
+      readOnly: true,
+      description:
+        "The error code a real submit would fail with. Look it up in the error catalog to see what it means and what to do about it.\n",
+      example: "E04051",
+    },
+    message: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "What is wrong, worded so you can show it directly to whoever is authoring the template.\n",
+      example: "A subject is required to submit.",
+    },
+  },
+} as const;
+
+export const EmailTemplateSubmitResultSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The outcome of a submit. This has the same shape whether the submit was a validation run or a real one, so you can read `valid` and `version` the same way either time to see what happened.\n",
+  required: [
+    "valid",
+    "errors",
+    "template_ref",
+    "version_id",
+    "compatibility",
+    "compatibility_severity",
+  ],
+  properties: {
+    valid: {
+      type: "boolean",
+      readOnly: true,
+      description: "Whether the version passed every check.",
+    },
+    errors: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/EmailTemplateSubmitProblem",
+      },
+      description:
+        "Every problem found across the draft's languages. Empty when `valid` is `true`.\n",
+    },
+    version: {
+      readOnly: true,
+      description:
+        "The version this submit created, or null when it was only a validation run and nothing got frozen. As soon as this is not null, sends already use that version. No further action is required to make it live.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateVersion",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    template_ref: {
+      readOnly: true,
+      description: "The template this submit addressed.",
+      $ref: "#/components/schemas/EmailTemplateRef",
+    },
+    version_id: {
+      readOnly: true,
+      description:
+        "The draft this submit addressed: the one it froze, or on a validation run the one it checked and left as it was. The frozen version, when there is one, is `version`.\n",
+      $ref: "#/components/schemas/EmailTemplateVersionID",
+    },
+    compatibility_severity: {
+      readOnly: true,
+      $ref: "#/components/schemas/EmailCompatibilityReportSeverity",
+    },
+    compatibility: {
+      type: "array",
+      readOnly: true,
+      maxItems: 200,
+      items: {
+        $ref: "#/components/schemas/EmailCompatibilityFinding",
+      },
+      description:
+        "What the draft's HTML uses that mail clients remove, ignore, or render inconsistently, across every language, in alphabetical order of language tag and then the order the patterns appear. Empty when nothing is worth reporting. Advisory, and separate from `errors`: a finding never fails a submit, so the version froze either way. Each finding names the `language` it is in, and its line and column count in that language's HTML, which the language read returns as `content.html`. At most 200 findings come back, the first 200 in that order, so a draft that reaches the cap can omit a later language's findings entirely rather than trimming each language: read a language's own findings from its read or its write. `compatibility_severity` is derived from every finding the draft produced, including any beyond those 200.\n",
     },
   },
 } as const;
@@ -25353,6 +27727,349 @@ export const EmailEventListWritableSchema = {
   ],
 } as const;
 
+export const EmailBroadcastTemplateWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id"],
+  description:
+    "The template a broadcast sends, and the exact version of it the broadcast is fixed to. The template cannot be one that requires every send to name a language, because a broadcast never names one, so a template that insists on it has nothing to work with.\n",
+  properties: {
+    id: {
+      $ref: "#/components/schemas/EmailTemplateID",
+      description:
+        "Which template the broadcast sends. Which version of it the send is fixed to is `version_id`.\n",
+    },
+  },
+} as const;
+
+export const EmailBroadcastWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["category", "track_opens", "track_clicks"],
+  properties: {
+    from: {
+      $ref: "#/components/schemas/EmailAddress",
+      description:
+        "The address this broadcast sends from. `name` is filled in when the broadcast was given a display name to send under. Left out on a draft that has not picked a sender yet.",
+    },
+    audience_id: {
+      $ref: "#/components/schemas/AudienceID",
+      description:
+        "The audience this broadcast sends to. When the send starts we turn the audience into a list of recipients, and you can read that list a page at a time with [List recipients of a broadcast](/docs/api/reference/list-email-broadcast-recipients). Left out on a draft that has not picked an audience yet.",
+    },
+    template: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastTemplateWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The template this broadcast sends. A broadcast sends the template's published version, and the exact version is fixed when the broadcast is prepared for sending, so publishing a new version afterwards does not change what this broadcast sends. Null on a draft that has not chosen a template yet.",
+    },
+    category: {
+      type: "string",
+      minLength: 1,
+      enum: ["marketing", "transactional"],
+      description:
+        "What kind of email this is, which decides how suppressions apply to it. A `marketing` broadcast is held back from every suppressed address. A `transactional` one still goes to addresses suppressed for a complaint or an unsubscribe, because those suppressions are about marketing mail.",
+    },
+    ip_pool_id: {
+      type: "string",
+      pattern: "^ipp_([0-9a-hjkmnp-tv-z]{26}|shared)$",
+      description:
+        "The IP pool this broadcast sends from, or `ipp_shared` when it sends through the shared pool. Absent when it sends on your organization's default pool.",
+    },
+    reply_to: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailAddress",
+      },
+      maxItems: 25,
+      description:
+        "Where replies to this broadcast go, if you want them somewhere other than the `from` address. Absent when you have not set one.",
+    },
+    headers: {
+      type: "object",
+      additionalProperties: {
+        type: "string",
+      },
+      description:
+        "Any custom email headers set on the broadcast. Returned on a single broadcast read and on the broadcast that creating, updating, sending or canceling one returns, and absent from the list. The unsubscribe headers we add ourselves are not included.",
+    },
+    tags: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      description:
+        "Labels on this broadcast, each one a `name` and a `value`, that you can filter and search broadcasts by. Use tags for anything you want to find broadcasts by later, and `metadata` for data you only want handed back to you.",
+    },
+    metadata: {
+      type: "object",
+      description:
+        "Any JSON you want to keep on the broadcast. We store it and hand it back in webhook payloads, and that is all it does. If you want to search or filter by it, use `tags` instead.",
+      additionalProperties: true,
+    },
+    track_opens: {
+      type: "boolean",
+      example: true,
+      description: "Whether opens are tracked for this broadcast.",
+    },
+    track_clicks: {
+      type: "boolean",
+      example: true,
+      description: "Whether link clicks are tracked for this broadcast.",
+    },
+  },
+} as const;
+
+export const EmailBroadcastListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of broadcast objects.",
+          items: {
+            $ref: "#/components/schemas/EmailBroadcastWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EmailBroadcastCreateRequestWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A broadcast sends one email to a whole audience. Every field here is optional, so you can create an empty draft and fill it in later. To actually send, a broadcast needs three things: a `from` address on a verified domain, an `audience_id`, and a `template`.\n\nLeave `send` false, which is the default, and you get a draft. Update it as often as you like, then send it when you are ready. Set `send` to true and the broadcast goes out as soon as it is created, or at `scheduled_at` if you set one.\n",
+  properties: {
+    from: {
+      $ref: "#/components/schemas/EmailAddressInput",
+      description:
+        "The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.",
+    },
+    audience_id: {
+      $ref: "#/components/schemas/AudienceID",
+      description:
+        "The audience this broadcast sends to. We take the audience's contacts as they stand when the send starts and drop any suppressed addresses, and what is left is who gets the email.",
+    },
+    template: {
+      $ref: "#/components/schemas/EmailBroadcastTemplateWritable",
+      description:
+        "The template the broadcast sends. You can leave it out on a draft, but a broadcast cannot send without one. The template's published version is fixed when the broadcast is prepared for sending, and each recipient's contact properties are filled into the content as the email goes out.",
+    },
+    reply_to: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailAddressInput",
+      },
+      minItems: 1,
+      maxItems: 25,
+      description:
+        "Where replies to this broadcast should go. Give each address as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. You can list more than one.",
+    },
+    headers: {
+      type: "object",
+      maxProperties: 25,
+      additionalProperties: {
+        type: "string",
+        maxLength: 998,
+      },
+      description:
+        "Custom email headers to set on the broadcast, as name and value pairs. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.\n",
+    },
+    tags: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      maxItems: 20,
+      description:
+        "Labels on this broadcast, each one a `name` and a `value`, up to 20 of them. You can filter the broadcast list by a tag, break your stats down by one, and read them back off webhook payloads. Use tags for anything you want to find broadcasts by later, and `metadata` for data you only want handed back to you.",
+    },
+    metadata: {
+      type: "object",
+      description:
+        "Any JSON you want to keep on the broadcast. We store it, hand it back when you read the broadcast, and include it in webhook payloads, and you can break stats down by a path inside it such as `metadata.order_id`. It can be up to 2 KB once serialized.",
+      additionalProperties: true,
+    },
+    track_opens: {
+      type: "boolean",
+      default: true,
+      description: "Whether to track opens for this broadcast.",
+    },
+    track_clicks: {
+      type: "boolean",
+      default: true,
+      description: "Whether to track link clicks for this broadcast.",
+    },
+    ip_pool_id: {
+      type: "string",
+      pattern: "^ipp_([0-9a-hjkmnp-tv-z]{26}|shared)$",
+      description:
+        "The IP pool to send this broadcast from. Pass a pool ID, or `ipp_shared` to send through the shared pool on purpose. Leave it out and the broadcast uses your organization's default pool. A pool we do not recognize, or one with no IPs available to send from, is refused with a `422`.",
+    },
+    category: {
+      type: "string",
+      enum: ["marketing", "transactional"],
+      default: "marketing",
+      description:
+        "What kind of email this is. A broadcast sets this itself rather than taking it from its template, and it decides two things: which suppressions apply, and whether we add an unsubscribe header.\n\n`marketing`, the default, is held back from every suppressed address and has the one-click unsubscribe headers. `transactional` still goes to addresses suppressed for a complaint or an unsubscribe, and has no unsubscribe header. Only use `transactional` for genuine operational mail such as a terms-of-service update or a service outage notice. Marketing content sent this way still reaches people who have already unsubscribed from you.\n",
+    },
+    send: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether to send the broadcast as soon as it is created. Set it to true and the broadcast goes out immediately, or at `scheduled_at` if you set one. Leave it false, which is the default, and you get a draft you can update and send later.",
+    },
+    scheduled_at: {
+      type: "string",
+      format: "date-time",
+      description:
+        "When to send the broadcast. It has to be at least 30 seconds and at most 365 days from now. It requires `send` to be true, so a `scheduled_at` on its own is refused rather than saved on the draft.\n",
+    },
+  },
+  example: {
+    from: "newsletter@acme.com",
+    audience_id: "adn_01krdgeqcxet5s7t44vh8rt9mg",
+    template: {
+      id: "emt_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    category: "marketing",
+    tags: [
+      {
+        name: "campaign",
+        value: "spring_launch",
+      },
+    ],
+    metadata: {
+      campaign_id: "12345",
+    },
+  },
+} as const;
+
+export const EmailBroadcastUpdateRequestWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Changes a broadcast that is still a draft or is scheduled. Whatever you send here is applied, and anything you leave out keeps the value it already had. Once a broadcast has started sending it can no longer be edited.\n",
+  properties: {
+    from: {
+      $ref: "#/components/schemas/EmailAddressInput",
+      description:
+        "The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.",
+    },
+    audience_id: {
+      $ref: "#/components/schemas/AudienceID",
+      description:
+        "The audience this broadcast sends to. We take the audience's contacts as they stand when the send starts and drop any suppressed addresses, and what is left is who gets the email.",
+    },
+    template: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastTemplateWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The template the broadcast sends. Its published version is fixed when the broadcast is prepared for sending. Set this to null to take the template off a draft, or leave it out to keep the one already set.",
+    },
+    reply_to: {
+      type: ["array", "null"],
+      items: {
+        $ref: "#/components/schemas/EmailAddressInput",
+      },
+      minItems: 1,
+      maxItems: 25,
+      description:
+        "Where replies to this broadcast should go. Set this to null to remove the addresses already set.",
+    },
+    headers: {
+      type: "object",
+      maxProperties: 25,
+      additionalProperties: {
+        type: "string",
+        maxLength: 998,
+      },
+      description:
+        "Custom email headers to set on the broadcast, as name and value pairs. What you send replaces the headers the draft already had rather than adding to them. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.\n",
+    },
+    tags: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      maxItems: 20,
+      description:
+        "Labels on this broadcast, each one a `name` and a `value`, that you can filter and search broadcasts by. What you send replaces the tags the draft already had rather than adding to them.",
+    },
+    metadata: {
+      type: "object",
+      description:
+        "Any JSON you want to keep on the broadcast, up to 2 KB once serialized. What you send replaces the metadata the draft already had rather than merging into it.",
+      additionalProperties: true,
+    },
+    track_opens: {
+      type: "boolean",
+      description: "Whether to track opens for this broadcast.",
+    },
+    track_clicks: {
+      type: "boolean",
+      description: "Whether to track link clicks for this broadcast.",
+    },
+    ip_pool_id: {
+      type: ["string", "null"],
+      pattern: "^ipp_([0-9a-hjkmnp-tv-z]{26}|shared)$",
+      description:
+        "The IP pool to send this broadcast from. Pass a pool ID, or `ipp_shared` to send through the shared pool on purpose. Set it to null to fall back to your organization's default pool.",
+    },
+    category: {
+      type: "string",
+      enum: ["marketing", "transactional"],
+      description:
+        "What kind of email this is. It decides two things: which suppressions apply, and whether we add an unsubscribe header.\n\n`marketing` is held back from every suppressed address and has the one-click unsubscribe headers. `transactional` still goes to addresses suppressed for a complaint or an unsubscribe, and has no unsubscribe header. Only use `transactional` for genuine operational mail such as a terms-of-service update or a service outage notice. Marketing content sent this way reaches people who have already unsubscribed from you.\n",
+    },
+  },
+  example: {
+    category: "marketing",
+    template: {
+      id: "emt_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+  },
+} as const;
+
+export const EmailBroadcastCountsWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "How many people a broadcast would reach right now, narrowing from everyone in the audience down to the ones it could actually be sent to.\n\nThese are live numbers, worked out at the moment you ask. Audience membership and suppressions change, so they can drift between now and when the broadcast sends.\n\n**They are about the audience, not about delivery, and sending does not change them.** Once the broadcast has sent, its own `recipient_count` is the number that actually went out, and what each of those recipients did with the message is in [the broadcast's recipients](/docs/api/reference/list-email-broadcast-recipients) and [its events](/docs/api/reference/list-email-broadcast-events). `status` is here so you can tell which question these numbers are answering, and `broadcast_id` names what they are about.\n",
+} as const;
+
+export const EmailBroadcastClickedLinkListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "The broadcast's clicked URLs, most-clicked first, capped at 100 rows.",
+    },
+  },
+} as const;
+
 export const AudienceRefWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -27537,6 +30254,33 @@ export const EmailTemplateListWritableSchema = {
   ],
 } as const;
 
+export const EmailTemplateWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "category", "source", "description"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The template's display name, shown wherever the template is listed. You can change it any time. It defaults to the slug if you do not set one.",
+      example: "Welcome email",
+    },
+    description: {
+      type: ["string", "null"],
+      description:
+        "What the template is for, in your own words. Null if you have not set one.",
+    },
+    category: {
+      $ref: "#/components/schemas/EmailTemplateCategory",
+    },
+    source: {
+      $ref: "#/components/schemas/EmailTemplateSource",
+    },
+  },
+} as const;
+
 export const ActorWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -27564,6 +30308,98 @@ export const ActorWritableSchema = {
       example: "user",
     },
   },
+} as const;
+
+export const EmailTemplateVersionSummaryWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One version of a template, without its content. Version history lists every version a template has ever had, and each one has a full copy of the content in every language it was published with. The listing describes the versions; read a single version to get what it holds.\n",
+} as const;
+
+export const EmailTemplateVersionListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "One page of the template's versions, newest first. Each entry describes a version and which languages it holds. Read a single version if you want its actual content.\n",
+          items: {
+            $ref: "#/components/schemas/EmailTemplateVersionSummaryWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EmailTemplateBroadcastListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "Page of broadcasts blocking a delete of the template, newest first.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EmailTemplateVersionWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
+export const EmailTemplateLanguageListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "Every language the version holds, ordered by language tag, without their content. Read a single language to get its content.\n",
+    },
+  },
+} as const;
+
+export const EmailTemplateLanguageWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One language of a template version: its content plus the identity a concurrent-edit check needs. Reading a language returns everything you need to edit it and save it back.\n",
+  properties: {
+    content: {
+      $ref: "#/components/schemas/EmailTemplateLanguageContent",
+    },
+  },
+} as const;
+
+export const EmailTemplateLanguageSavedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The identity, revision counters, and fingerprint of a saved language. The response does not include its content; read the language to retrieve it.\n",
+} as const;
+
+export const EmailTemplateSubmitResultWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The outcome of a submit. This has the same shape whether the submit was a validation run or a real one, so you can read `valid` and `version` the same way either time to see what happened.\n",
 } as const;
 
 export const InboundAddressWritableSchema = {

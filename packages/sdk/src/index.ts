@@ -93,10 +93,6 @@ export type {
   SmsTemplateListQuery,
 } from "./resources/smsTemplates.gen.js";
 export type {
-  EmailTemplateSummary,
-  EmailTemplatesListQuery,
-} from "./resources/emailTemplates.gen.js";
-export type {
   SmsStatsSummary,
   SmsStatsResponse,
   SmsStatsByCountryResponse,
@@ -222,11 +218,31 @@ export type {
   PreferenceCreateParams,
   PreferenceWriteResult,
 } from "./resources/preferences.js";
+export type {
+  EmailBroadcast,
+  EmailBroadcastClickedLinkList,
+  EmailBroadcastCounts,
+  EmailBroadcastSendQuota,
+  EmailEvent,
+  EmailRecipient,
+  BroadcastsListQuery,
+  BroadcastsListEventsQuery,
+  BroadcastsListRecipientsQuery,
+} from "./resources/broadcasts.gen.js";
+export type {
+  BroadcastCreateParams,
+  BroadcastUpdateParams,
+  BroadcastSendParams,
+} from "./resources/broadcasts.js";
 export type { Workspace } from "./resources/workspace.gen.js";
 export type {
   PreferenceStatus,
   PreferenceCoverage,
   TemplateStatus,
+  EmailBroadcastClickedLink,
+  EmailBroadcastStatus,
+  EmailSendAllowanceWindow,
+  RecipientRole,
 } from "./generated/types.gen.js";
 export type {
   Contact,
@@ -306,11 +322,15 @@ export type {
 export { WebhookEventType } from "./event-types.gen.js";
 export type { WebhookEventTypeValue } from "./event-types.gen.js";
 export {
+  EmailClientFamily,
+  EmailClientPlatform,
+  EmailCompatibilityRuleID,
   EmailEventType,
   EmailLookupFlag,
   EmailLookupReason,
   EmailLookupResult,
   EmailTemplateSource,
+  EmailTemplateTheme,
   LookupFlag,
   LookupPropertyStatus,
   NumberCapability,
@@ -354,11 +374,15 @@ export {
   WhatsAppUsernameStatus,
 } from "./open-enums.gen.js";
 export type {
+  EmailClientFamilyValue,
+  EmailClientPlatformValue,
+  EmailCompatibilityRuleIDValue,
   EmailEventTypeValue,
   EmailLookupFlagValue,
   EmailLookupReasonValue,
   EmailLookupResultValue,
   EmailTemplateSourceValue,
+  EmailTemplateThemeValue,
   LookupFlagValue,
   LookupPropertyStatusValue,
   NumberCapabilityValue,
@@ -432,3 +456,32 @@ export type {
   EmailThreadsMessagesListQuery,
   EmailThreadsMessagesReplyParams,
 } from "./resources/emailThreadsMessages.gen.js";
+export type {
+  EmailTemplate,
+  EmailTemplateSummary,
+  EmailTemplatePreview,
+  EmailTemplatesListQuery,
+  EmailTemplatesUpdateParams,
+  EmailTemplatesDuplicateParams,
+  EmailTemplatesPreviewParams,
+} from "./resources/emailTemplates.gen.js";
+export type { EmailTemplatesCreateParams } from "./resources/emailTemplates.js";
+export type {
+  EmailTemplateBroadcastSummary,
+  EmailTemplatesBroadcastsListQuery,
+} from "./resources/emailTemplatesBroadcasts.gen.js";
+export type {
+  EmailTemplateVersion,
+  EmailTemplateVersionSummary,
+  EmailTemplateSubmitResult,
+  EmailTemplatesVersionsListQuery,
+  EmailTemplatesVersionsSubmitParams,
+  EmailTemplatesVersionsRollbackParams,
+} from "./resources/emailTemplatesVersions.gen.js";
+export type {
+  EmailTemplateLanguage,
+  EmailTemplateLanguageList,
+  EmailTemplateLanguageSaved,
+  EmailTemplatesVersionsLanguagesSetParams,
+  EmailTemplatesVersionsLanguagesUpdateParams,
+} from "./resources/emailTemplatesVersionsLanguages.gen.js";

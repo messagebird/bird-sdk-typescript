@@ -15,6 +15,9 @@ import type {
   AssignAudienceContactsData,
   AssignAudienceContactsErrors,
   AssignAudienceContactsResponses,
+  CancelEmailBroadcastData,
+  CancelEmailBroadcastErrors,
+  CancelEmailBroadcastResponses,
   CancelEmailMessageData,
   CancelEmailMessageErrors,
   CancelEmailMessageResponses,
@@ -33,6 +36,9 @@ import type {
   CreateDomainData,
   CreateDomainErrors,
   CreateDomainResponses,
+  CreateEmailBroadcastData,
+  CreateEmailBroadcastErrors,
+  CreateEmailBroadcastResponses,
   CreateEmailLookupData,
   CreateEmailLookupErrors,
   CreateEmailLookupResponses,
@@ -42,6 +48,9 @@ import type {
   CreateEmailMessageData,
   CreateEmailMessageErrors,
   CreateEmailMessageResponses,
+  CreateEmailTemplateData,
+  CreateEmailTemplateErrors,
+  CreateEmailTemplateResponses,
   CreateMailboxData,
   CreateMailboxErrors,
   CreateMailboxMessageData,
@@ -96,6 +105,18 @@ import type {
   DeleteDomainData,
   DeleteDomainErrors,
   DeleteDomainResponses,
+  DeleteEmailBroadcastData,
+  DeleteEmailBroadcastErrors,
+  DeleteEmailBroadcastResponses,
+  DeleteEmailTemplateData,
+  DeleteEmailTemplateErrors,
+  DeleteEmailTemplateLanguageData,
+  DeleteEmailTemplateLanguageErrors,
+  DeleteEmailTemplateLanguageResponses,
+  DeleteEmailTemplateResponses,
+  DeleteEmailTemplateVersionData,
+  DeleteEmailTemplateVersionErrors,
+  DeleteEmailTemplateVersionResponses,
   DeleteEmailThreadData,
   DeleteEmailThreadErrors,
   DeleteEmailThreadResponses,
@@ -123,6 +144,9 @@ import type {
   DisconnectRealtimeAppMemberData,
   DisconnectRealtimeAppMemberErrors,
   DisconnectRealtimeAppMemberResponses,
+  DuplicateEmailTemplateData,
+  DuplicateEmailTemplateErrors,
+  DuplicateEmailTemplateResponses,
   GetAudienceData,
   GetAudienceErrors,
   GetAudienceResponses,
@@ -141,6 +165,15 @@ import type {
   GetDomainData,
   GetDomainErrors,
   GetDomainResponses,
+  GetEmailBroadcastCountsData,
+  GetEmailBroadcastCountsErrors,
+  GetEmailBroadcastCountsResponses,
+  GetEmailBroadcastData,
+  GetEmailBroadcastErrors,
+  GetEmailBroadcastResponses,
+  GetEmailBroadcastSendQuotaData,
+  GetEmailBroadcastSendQuotaErrors,
+  GetEmailBroadcastSendQuotaResponses,
   GetEmailMessageData,
   GetEmailMessageErrors,
   GetEmailMessageResponses,
@@ -192,6 +225,18 @@ import type {
   GetEmailStatsSummaryData,
   GetEmailStatsSummaryErrors,
   GetEmailStatsSummaryResponses,
+  GetEmailTemplateData,
+  GetEmailTemplateErrors,
+  GetEmailTemplateLanguageData,
+  GetEmailTemplateLanguageErrors,
+  GetEmailTemplateLanguageResponses,
+  GetEmailTemplatePreviewData,
+  GetEmailTemplatePreviewErrors,
+  GetEmailTemplatePreviewResponses,
+  GetEmailTemplateResponses,
+  GetEmailTemplateVersionData,
+  GetEmailTemplateVersionErrors,
+  GetEmailTemplateVersionResponses,
   GetEmailThreadData,
   GetEmailThreadErrors,
   GetEmailThreadMessageBodyData,
@@ -368,12 +413,33 @@ import type {
   ListDomainsData,
   ListDomainsErrors,
   ListDomainsResponses,
+  ListEmailBroadcastClickedLinksData,
+  ListEmailBroadcastClickedLinksErrors,
+  ListEmailBroadcastClickedLinksResponses,
+  ListEmailBroadcastEventsData,
+  ListEmailBroadcastEventsErrors,
+  ListEmailBroadcastEventsResponses,
+  ListEmailBroadcastRecipientsData,
+  ListEmailBroadcastRecipientsErrors,
+  ListEmailBroadcastRecipientsResponses,
+  ListEmailBroadcastsData,
+  ListEmailBroadcastsErrors,
+  ListEmailBroadcastsResponses,
   ListEmailMessagesData,
   ListEmailMessagesErrors,
   ListEmailMessagesResponses,
+  ListEmailTemplateBroadcastsData,
+  ListEmailTemplateBroadcastsErrors,
+  ListEmailTemplateBroadcastsResponses,
   ListEmailTemplatesData,
   ListEmailTemplatesErrors,
   ListEmailTemplatesResponses,
+  ListEmailTemplateVersionLanguagesData,
+  ListEmailTemplateVersionLanguagesErrors,
+  ListEmailTemplateVersionLanguagesResponses,
+  ListEmailTemplateVersionsData,
+  ListEmailTemplateVersionsErrors,
+  ListEmailTemplateVersionsResponses,
   ListEmailThreadMessageAttachmentsData,
   ListEmailThreadMessageAttachmentsErrors,
   ListEmailThreadMessageAttachmentsResponses,
@@ -476,15 +542,24 @@ import type {
   ResumeMailboxData,
   ResumeMailboxErrors,
   ResumeMailboxResponses,
+  RollbackEmailTemplateData,
+  RollbackEmailTemplateErrors,
+  RollbackEmailTemplateResponses,
   RotateWebhookSecretData,
   RotateWebhookSecretErrors,
   RotateWebhookSecretResponses,
+  SendEmailBroadcastData,
+  SendEmailBroadcastErrors,
+  SendEmailBroadcastResponses,
   SendRealtimeAppMemberEventData,
   SendRealtimeAppMemberEventErrors,
   SendRealtimeAppMemberEventResponses,
   SendWhatsAppReadReceiptData,
   SendWhatsAppReadReceiptErrors,
   SendWhatsAppReadReceiptResponses,
+  SubmitEmailTemplateVersionData,
+  SubmitEmailTemplateVersionErrors,
+  SubmitEmailTemplateVersionResponses,
   TestWebhookData,
   TestWebhookErrors,
   TestWebhookResponses,
@@ -509,6 +584,15 @@ import type {
   UpdateDomainData,
   UpdateDomainErrors,
   UpdateDomainResponses,
+  UpdateEmailBroadcastData,
+  UpdateEmailBroadcastErrors,
+  UpdateEmailBroadcastResponses,
+  UpdateEmailTemplateData,
+  UpdateEmailTemplateErrors,
+  UpdateEmailTemplateLanguageData,
+  UpdateEmailTemplateLanguageErrors,
+  UpdateEmailTemplateLanguageResponses,
+  UpdateEmailTemplateResponses,
   UpdateEmailThreadData,
   UpdateEmailThreadErrors,
   UpdateEmailThreadResponses,
@@ -521,6 +605,9 @@ import type {
   UpdateWebhookData,
   UpdateWebhookErrors,
   UpdateWebhookResponses,
+  UpsertEmailTemplateLanguageData,
+  UpsertEmailTemplateLanguageErrors,
+  UpsertEmailTemplateLanguageResponses,
   UpsertWhatsAppMessageReactionData,
   UpsertWhatsAppMessageReactionErrors,
   UpsertWhatsAppMessageReactionResponses,
@@ -996,6 +1083,436 @@ export const cancelEmailMessage = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/email/messages/{message_id}/cancel",
+    ...options,
+  });
+
+/**
+ * List broadcasts
+ *
+ * Returns a paginated list of broadcasts in the workspace, newest first. `created_after` and `created_before` narrow the list to broadcasts created in a half-open window, which is how you page a single month or quarter rather than the whole history.
+ *
+ */
+export const listEmailBroadcasts = <ThrowOnError extends boolean = false>(
+  options?: Options<ListEmailBroadcastsData, ThrowOnError>,
+): RequestResult<
+  ListEmailBroadcastsResponses,
+  ListEmailBroadcastsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListEmailBroadcastsResponses,
+    ListEmailBroadcastsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts",
+    ...options,
+  });
+
+/**
+ * Create a broadcast
+ *
+ * Creates a broadcast for a stored audience. The default is an editable draft.
+ * Set `send` to `true` to send now or at `scheduled_at`; `scheduled_at` without
+ * `send` set to `true` returns `422`. Use
+ * [Create an email message](/docs/api/reference/create-email-message) for a small,
+ * explicit recipient list.
+ *
+ * Contacts in the audience at send time become recipients after suppressions. Read
+ * their states with
+ * [List recipients of a broadcast](/docs/api/reference/list-email-broadcast-recipients).
+ * With `send`, the request returns `422` if any of these are true:
+ *
+ * - The sender domain is not verified.
+ * - No audience is selected, or the selected audience no longer exists.
+ * - The audience has no contact with an email address, or every contact is suppressed for the broadcast's category.
+ * - No template is set, or the set template has no published version.
+ * - The organization has used its broadcast allowance for the current billing period, or (for an immediate send) is already at its concurrent-broadcast limit; schedule the send instead to wait for a free slot.
+ *
+ * If the audience is empty when a scheduled send starts, the broadcast becomes
+ * `failed` with a readable reason instead of silently dropping it.
+ *
+ */
+export const createEmailBroadcast = <ThrowOnError extends boolean = false>(
+  options: Options<CreateEmailBroadcastData, ThrowOnError>,
+): RequestResult<
+  CreateEmailBroadcastResponses,
+  CreateEmailBroadcastErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateEmailBroadcastResponses,
+    CreateEmailBroadcastErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a broadcast
+ *
+ * Deletes a draft broadcast. Only a draft can be deleted. To stop a scheduled or sending broadcast, use [Cancel a broadcast](/docs/api/reference/cancel-email-broadcast) instead.
+ *
+ */
+export const deleteEmailBroadcast = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteEmailBroadcastData, ThrowOnError>,
+): RequestResult<
+  DeleteEmailBroadcastResponses,
+  DeleteEmailBroadcastErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteEmailBroadcastResponses,
+    DeleteEmailBroadcastErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}",
+    ...options,
+  });
+
+/**
+ * Get a broadcast
+ *
+ * Returns one broadcast, with its audience reference and counters.
+ *
+ * The full recipient list, with each recipient's own delivery status, is paginated separately: see [List recipients of a broadcast](/docs/api/reference/list-email-broadcast-recipients).
+ *
+ */
+export const getEmailBroadcast = <ThrowOnError extends boolean = false>(
+  options: Options<GetEmailBroadcastData, ThrowOnError>,
+): RequestResult<
+  GetEmailBroadcastResponses,
+  GetEmailBroadcastErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailBroadcastResponses,
+    GetEmailBroadcastErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}",
+    ...options,
+  });
+
+/**
+ * Update a broadcast
+ *
+ * Updates a draft or scheduled broadcast. A field you supply in the request is changed. A field you leave out is left as it is.
+ *
+ * A scheduled broadcast stays editable right up until it is accepted for sending. After that, editing it returns a conflict error.
+ *
+ */
+export const updateEmailBroadcast = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateEmailBroadcastData, ThrowOnError>,
+): RequestResult<
+  UpdateEmailBroadcastResponses,
+  UpdateEmailBroadcastErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateEmailBroadcastResponses,
+    UpdateEmailBroadcastErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get a broadcast's audience counts
+ *
+ * Returns a live estimate of how many contacts the broadcast can reach, narrowing from everyone in its audience down to the ones the send would go to.
+ *
+ * - `total` is every contact in the audience.
+ * - `addressable` is how many of those have an email address.
+ * - `sendable` is how many addressable contacts are not suppressed for the broadcast's category.
+ *
+ * A transactional broadcast still reaches a contact who unsubscribed from or complained about marketing mail. A marketing broadcast does not.
+ *
+ * The estimate can change until the broadcast sends. The broadcast must have an audience selected; otherwise, the request returns `422`.
+ *
+ * These are audience numbers, and sending does not change them: after a send they still describe who the broadcast resolved to, not what happened to them. `status` says which of the two situations you are in. For delivery outcomes, read [the broadcast's recipients](/docs/api/reference/list-email-broadcast-recipients) for per-recipient status, [its events](/docs/api/reference/list-email-broadcast-events) for the raw feed, or [email statistics by broadcast](/docs/api/reference/get-email-stats-by-broadcast) for the aggregates.
+ *
+ */
+export const getEmailBroadcastCounts = <ThrowOnError extends boolean = false>(
+  options: Options<GetEmailBroadcastCountsData, ThrowOnError>,
+): RequestResult<
+  GetEmailBroadcastCountsResponses,
+  GetEmailBroadcastCountsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailBroadcastCountsResponses,
+    GetEmailBroadcastCountsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}/counts",
+    ...options,
+  });
+
+/**
+ * Get how much of a broadcast the send allowance covers
+ *
+ * Returns how much of the broadcast the organization's email send allowance covers, so a send that would run past it can be reconsidered rather than failing part-way. `recipients` is how many contacts the broadcast would send to right now, the same number the audience counts report as sendable. `allowed` is how many of those the allowance covers, and equals `recipients` when nothing limits the send. `limited_by` names the allowance that stops the rest, either the monthly one that runs with the billing period or the daily one, with `limit` and `remaining` describing it. Both numbers are live estimates: audience membership, suppressions and the sends already made in the current window all move until the broadcast sends. The broadcast must have an audience selected; a broadcast with no audience yet returns a 422.
+ *
+ */
+export const getEmailBroadcastSendQuota = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEmailBroadcastSendQuotaData, ThrowOnError>,
+): RequestResult<
+  GetEmailBroadcastSendQuotaResponses,
+  GetEmailBroadcastSendQuotaErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailBroadcastSendQuotaResponses,
+    GetEmailBroadcastSendQuotaErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}/send-quota",
+    ...options,
+  });
+
+/**
+ * List recipients of a broadcast
+ *
+ * Returns recipient-level delivery state for a broadcast, paginated. This is who a broadcast reached and how far each one got.
+ *
+ * The list is empty for a draft, scheduled, or accepted broadcast: recipients are resolved from the audience only once sending begins. Pass `to` to return just that address's row, which is how you answer "did this person get it?" on a send too large to page through.
+ *
+ */
+export const listEmailBroadcastRecipients = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListEmailBroadcastRecipientsData, ThrowOnError>,
+): RequestResult<
+  ListEmailBroadcastRecipientsResponses,
+  ListEmailBroadcastRecipientsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListEmailBroadcastRecipientsResponses,
+    ListEmailBroadcastRecipientsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}/recipients",
+    ...options,
+  });
+
+/**
+ * List events for a broadcast
+ *
+ * Returns the per-recipient delivery timeline for a broadcast, oldest first, as a cursor page. Each entry is one event, such as a send, an open, a click, or a bounce.
+ *
+ */
+export const listEmailBroadcastEvents = <ThrowOnError extends boolean = false>(
+  options: Options<ListEmailBroadcastEventsData, ThrowOnError>,
+): RequestResult<
+  ListEmailBroadcastEventsResponses,
+  ListEmailBroadcastEventsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListEmailBroadcastEventsResponses,
+    ListEmailBroadcastEventsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}/events",
+    ...options,
+  });
+
+/**
+ * List a broadcast's clicked links
+ *
+ * Returns the destination URLs a broadcast's recipients clicked, grouped by URL and sorted by click count. Each entry carries an exact click count and distinct-recipient count over every click event the broadcast has, plus the link's name: the name used by the most clicks that named it, or null if no click through that URL ever carried one. `data` is capped at the 100 most-clicked URLs; `total` carries the actual number of distinct URLs clicked, so a capped response is never mistaken for a complete one.
+ *
+ */
+export const listEmailBroadcastClickedLinks = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListEmailBroadcastClickedLinksData, ThrowOnError>,
+): RequestResult<
+  ListEmailBroadcastClickedLinksResponses,
+  ListEmailBroadcastClickedLinksErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListEmailBroadcastClickedLinksResponses,
+    ListEmailBroadcastClickedLinksErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}/clicked-links",
+    ...options,
+  });
+
+/**
+ * Send a broadcast
+ *
+ * Sends a draft or scheduled broadcast, either immediately or at `scheduled_at`.
+ * Calling this on a scheduled broadcast replaces its schedule or sends it now if
+ * `scheduled_at` is omitted. Calling it again on a broadcast that is already
+ * `accepted` retries dispatch rather than returning an error. A broadcast that
+ * has started sending, or that already reached a final state, returns a conflict.
+ *
+ * The audience's contacts at send time become the recipients after suppressions.
+ * The request returns `422` if any of these are true:
+ *
+ * - The sender domain is not verified.
+ * - No audience is selected, or the selected audience no longer exists.
+ * - The audience has no contact with an email address, or every contact is suppressed for the broadcast's category.
+ * - No template is set, or the set template has no published version.
+ * - The organization has used its broadcast allowance for the current billing period, or (for an immediate send) is already at its concurrent-broadcast limit; schedule the send instead to wait for a free slot.
+ *
+ * If the audience is empty when a scheduled send starts, the broadcast becomes
+ * `failed` with a readable reason instead of silently dropping it.
+ *
+ */
+export const sendEmailBroadcast = <ThrowOnError extends boolean = false>(
+  options: Options<SendEmailBroadcastData, ThrowOnError>,
+): RequestResult<
+  SendEmailBroadcastResponses,
+  SendEmailBroadcastErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    SendEmailBroadcastResponses,
+    SendEmailBroadcastErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}/send",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Cancel a broadcast
+ *
+ * Cancels a scheduled, accepted, or sending broadcast. Canceling it while it is sending stops every delivery that has not gone out yet, though messages already on their way to a recipient are not recalled.
+ *
+ * Calling this again on a broadcast that is already canceling or canceled is idempotent: it returns the broadcast's current state rather than an error. A draft cannot be canceled, because it was never sent; use [Delete a broadcast](/docs/api/reference/delete-email-broadcast) instead. A broadcast that already sent or failed has reached a terminal state and returns a conflict.
+ *
+ */
+export const cancelEmailBroadcast = <ThrowOnError extends boolean = false>(
+  options: Options<CancelEmailBroadcastData, ThrowOnError>,
+): RequestResult<
+  CancelEmailBroadcastResponses,
+  CancelEmailBroadcastErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CancelEmailBroadcastResponses,
+    CancelEmailBroadcastErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}/cancel",
     ...options,
   });
 
@@ -5233,6 +5750,621 @@ export const listEmailTemplates = <ThrowOnError extends boolean = false>(
     ],
     url: "/v1/email/templates",
     ...options,
+  });
+
+/**
+ * Create an email template
+ *
+ * Creates a template and its first editable draft.
+ *
+ * Send the template's `slug` (the name you send the template by), an optional display name that
+ * defaults to the slug, a category, the authoring format (`source`), and the draft's content in one
+ * or more languages. Leave the content out to start from an empty draft. A slug already used in the
+ * workspace returns a conflict.
+ *
+ */
+export const createEmailTemplate = <ThrowOnError extends boolean = false>(
+  options: Options<CreateEmailTemplateData, ThrowOnError>,
+): RequestResult<
+  CreateEmailTemplateResponses,
+  CreateEmailTemplateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateEmailTemplateResponses,
+    CreateEmailTemplateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete an email template
+ *
+ * Deletes the template and all its versions. The slug becomes available for reuse in the workspace, and the deletion cannot be undone.
+ *
+ * A template can't be deleted while a broadcast that has not started sending still uses it, because a `scheduled` or `accepted` broadcast has not pinned the content it will send yet. [List the broadcasts blocking a template delete](/docs/api/reference/list-email-template-broadcasts) to see which ones those are. A broadcast that has already started sending does not block the delete: it pinned its version when it started, so it keeps sending the content it froze.
+ *
+ */
+export const deleteEmailTemplate = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteEmailTemplateData, ThrowOnError>,
+): RequestResult<
+  DeleteEmailTemplateResponses,
+  DeleteEmailTemplateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteEmailTemplateResponses,
+    DeleteEmailTemplateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}",
+    ...options,
+  });
+
+/**
+ * Get an email template
+ *
+ * Returns a template's metadata, language states, sendable languages, draft revision, and draft and published version IDs. Read a version's language to retrieve content.
+ *
+ * Accepts a workspace template ID (`emt_…`) or a built-in `system` template's `bird_` slug. A `system` template has `null` for the workspace, draft, revision, and timestamp fields.
+ *
+ */
+export const getEmailTemplate = <ThrowOnError extends boolean = false>(
+  options: Options<GetEmailTemplateData, ThrowOnError>,
+): RequestResult<
+  GetEmailTemplateResponses,
+  GetEmailTemplateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailTemplateResponses,
+    GetEmailTemplateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}",
+    ...options,
+  });
+
+/**
+ * Update an email template
+ *
+ * Updates a template's metadata and draft settings, such as its name or default language. Only the fields you send are changed.
+ *
+ * Content is not edited here: save a language on the draft version instead.
+ *
+ * Send the draft `revision` you last read. If someone else changed the draft first, including by saving a language, the revision is stale and the request returns a conflict so you can reload and retry.
+ *
+ */
+export const updateEmailTemplate = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateEmailTemplateData, ThrowOnError>,
+): RequestResult<
+  UpdateEmailTemplateResponses,
+  UpdateEmailTemplateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateEmailTemplateResponses,
+    UpdateEmailTemplateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Duplicate an email template
+ *
+ * Creates a new template by copying an existing one: one of your workspace
+ * templates, or a built-in `system` template (by its `bird_` slug). The copy
+ * is a new template with its own id and a single editable draft seeded from
+ * the source's current content. It inherits the source's category, authoring
+ * format (`source`), and description. Copying a workspace template also
+ * carries over its default language and its missing-language policy, so the
+ * copy behaves like what it was copied from. The copy starts unpublished.
+ *
+ * By default the copy's slug derives from the source's slug, for example
+ * `welcome-email-copy`, with a numeric suffix added if that slug is already
+ * taken. Supply `slug` to choose your own. A slug already in use in the
+ * workspace returns a conflict.
+ *
+ */
+export const duplicateEmailTemplate = <ThrowOnError extends boolean = false>(
+  options: Options<DuplicateEmailTemplateData, ThrowOnError>,
+): RequestResult<
+  DuplicateEmailTemplateResponses,
+  DuplicateEmailTemplateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    DuplicateEmailTemplateResponses,
+    DuplicateEmailTemplateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/duplicate",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get an email template preview
+ *
+ * Renders a template with the sample values you supply and returns the resulting subject, HTML, and plain-text bodies: the personalized email as it will look once sent. By default it renders the current draft, so you can check your changes before you submit it. Pass `version` to preview a specific published version instead; built-in `system` templates have no versions, so `version` on a `bird_` template returns a validation error. Pass `contact` to see the email the way one of your contacts would receive it. Works for your workspace templates and built-in `system` templates. Sample `parameters` are capped at 16 KB once serialized, and personalization that is not valid or not supported returns a validation error naming what to fix.
+ * The response also reports what the HTML uses that mail clients remove, ignore, or render inconsistently. Each finding in `compatibility` names the pattern, the line and column it sits on, and what to use instead, and `compatibility_severity` reduces them to one word for the whole body. It is advisory: the preview renders either way.
+ *
+ */
+export const getEmailTemplatePreview = <ThrowOnError extends boolean = false>(
+  options: Options<GetEmailTemplatePreviewData, ThrowOnError>,
+): RequestResult<
+  GetEmailTemplatePreviewResponses,
+  GetEmailTemplatePreviewErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    GetEmailTemplatePreviewResponses,
+    GetEmailTemplatePreviewErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/preview",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List email template versions
+ *
+ * Returns the template's versions as a cursor page (the current draft plus all published versions), newest first. Each entry names its languages without returning their content. Templates retain every language of every submitted version, so listing their content would grow the response with the template's history. Read a single version for its content.
+ *
+ */
+export const listEmailTemplateVersions = <ThrowOnError extends boolean = false>(
+  options: Options<ListEmailTemplateVersionsData, ThrowOnError>,
+): RequestResult<
+  ListEmailTemplateVersionsResponses,
+  ListEmailTemplateVersionsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListEmailTemplateVersionsResponses,
+    ListEmailTemplateVersionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/versions",
+    ...options,
+  });
+
+/**
+ * List the broadcasts blocking a template delete
+ *
+ * Returns the broadcasts that block deleting this template, as a cursor page, newest first. Those are the ones that have not started sending, so they have not pinned the content they will send: `scheduled` and `accepted`. Clear every one of them and the delete goes through. Canceling clears either status; repointing at another template only works while the broadcast is `scheduled`, because an `accepted` broadcast is committed to send and an edit returns a conflict. A broadcast that is already sending is not listed and does not block the delete, because it froze its version when it started.
+ *
+ */
+export const listEmailTemplateBroadcasts = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListEmailTemplateBroadcastsData, ThrowOnError>,
+): RequestResult<
+  ListEmailTemplateBroadcastsResponses,
+  ListEmailTemplateBroadcastsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListEmailTemplateBroadcastsResponses,
+    ListEmailTemplateBroadcastsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/broadcasts",
+    ...options,
+  });
+
+/**
+ * Delete an email template draft
+ *
+ * Discards the draft's unsaved work: its content resets to what is currently published (or to a single empty language when nothing has been published yet), so the draft matches what sends actually deliver again. Compare each language's `content_hash` against the published version's to see what a discard would throw away.
+ *
+ * The draft itself remains, ready for new edits at a bumped `revision`, and what is published never changes. Only the draft can be discarded. Addressing a published version returns a `422` `validation_error`, because published versions are permanent history.
+ *
+ */
+export const deleteEmailTemplateVersion = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<DeleteEmailTemplateVersionData, ThrowOnError>,
+): RequestResult<
+  DeleteEmailTemplateVersionResponses,
+  DeleteEmailTemplateVersionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteEmailTemplateVersionResponses,
+    DeleteEmailTemplateVersionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/versions/{version_id}",
+    ...options,
+  });
+
+/**
+ * Get an email template version
+ *
+ * Returns a single version of an email template:
+ *
+ * - Its lifecycle metadata (`status`, `version_number`, `published_at`).
+ * - The content it froze in every language.
+ * - The `variables` that content expects at send time.
+ *
+ * Use [List email template versions](/docs/api/reference/list-email-template-versions) to enumerate the draft and published versions. [Roll back an email template](/docs/api/reference/rollback-email-template) makes an earlier published version live again. Returns a `404 Not Found` error if the template or version does not exist in the workspace.
+ *
+ */
+export const getEmailTemplateVersion = <ThrowOnError extends boolean = false>(
+  options: Options<GetEmailTemplateVersionData, ThrowOnError>,
+): RequestResult<
+  GetEmailTemplateVersionResponses,
+  GetEmailTemplateVersionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailTemplateVersionResponses,
+    GetEmailTemplateVersionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/versions/{version_id}",
+    ...options,
+  });
+
+/**
+ * List a version's languages
+ *
+ * Returns every language the version holds, ordered by language tag, without the content itself, so listing a template with twenty-five languages stays small.
+ *
+ * Each entry has the language's `revision` (send it back when you save that language) and its `content_hash`, so you can tell which languages changed since you last read them and fetch only those. Read a single language for its subject and bodies.
+ *
+ */
+export const listEmailTemplateVersionLanguages = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListEmailTemplateVersionLanguagesData, ThrowOnError>,
+): RequestResult<
+  ListEmailTemplateVersionLanguagesResponses,
+  ListEmailTemplateVersionLanguagesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListEmailTemplateVersionLanguagesResponses,
+    ListEmailTemplateVersionLanguagesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/versions/{version_id}/languages",
+    ...options,
+  });
+
+/**
+ * Delete one language from a draft
+ *
+ * Removes one language from the template's draft, along with its content. Every other language is untouched, and the change takes effect for sends when you next submit.
+ *
+ * The draft's current default language cannot be removed on its own. Point the default at a different language first, then remove the old one; doing it in the other order returns a `422` `validation_error`. Removing a language the draft does not have returns a `404` `not_found_error`, and only a draft can be changed, so addressing a published version also returns a `422` `validation_error`.
+ *
+ */
+export const deleteEmailTemplateLanguage = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<DeleteEmailTemplateLanguageData, ThrowOnError>,
+): RequestResult<
+  DeleteEmailTemplateLanguageResponses,
+  DeleteEmailTemplateLanguageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteEmailTemplateLanguageResponses,
+    DeleteEmailTemplateLanguageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/versions/{version_id}/languages/{language}",
+    ...options,
+  });
+
+/**
+ * Get one language of a version
+ *
+ * Returns one language's content from a version (its subject and bodies) plus the `revision` to send back when saving it.
+ *
+ * Works on any version, including a published version whose content is frozen. Returns a `404 Not Found` error if the version does not have the language.
+ *
+ */
+export const getEmailTemplateLanguage = <ThrowOnError extends boolean = false>(
+  options: Options<GetEmailTemplateLanguageData, ThrowOnError>,
+): RequestResult<
+  GetEmailTemplateLanguageResponses,
+  GetEmailTemplateLanguageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailTemplateLanguageResponses,
+    GetEmailTemplateLanguageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/versions/{version_id}/languages/{language}",
+    ...options,
+  });
+
+/**
+ * Update one language of a draft
+ *
+ * Changes part of one language's content on the template's draft: send only the fields you are changing and the rest keep their current values. Use this to fix a subject line without resending a megabyte of HTML.
+ *
+ * The language must already exist on the draft. A language it does not have returns a `404` `not_found_error`. Save the language's full content instead to create it.
+ *
+ * Send the `revision` you last read to have a concurrent edit rejected with a `409` `conflict_error`. Only a draft can be edited. Addressing a published version returns a `422` `validation_error`.
+ *
+ */
+export const updateEmailTemplateLanguage = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<UpdateEmailTemplateLanguageData, ThrowOnError>,
+): RequestResult<
+  UpdateEmailTemplateLanguageResponses,
+  UpdateEmailTemplateLanguageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateEmailTemplateLanguageResponses,
+    UpdateEmailTemplateLanguageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/versions/{version_id}/languages/{language}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Upsert one language of a draft
+ *
+ * Saves one language's content on the template's draft, creating that language if the draft does not have it yet and replacing it in full if it does. Send the same content twice and the draft ends up the same way, so a sync job or CI run needs one call rather than a create-or-edit decision.
+ *
+ * Saving one language leaves every other language untouched, so a template with many languages can be edited a language at a time. Send the `revision` you last read to have a concurrent edit rejected with a `409` `conflict_error` instead of silently overwritten.
+ *
+ * Only a draft can be saved: addressing a published version returns a `422` `validation_error`, because a published version never changes. A template holds at most 25 languages.
+ *
+ */
+export const upsertEmailTemplateLanguage = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<UpsertEmailTemplateLanguageData, ThrowOnError>,
+): RequestResult<
+  UpsertEmailTemplateLanguageResponses,
+  UpsertEmailTemplateLanguageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).put<
+    UpsertEmailTemplateLanguageResponses,
+    UpsertEmailTemplateLanguageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/versions/{version_id}/languages/{language}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Roll back an email template
+ *
+ * Makes an earlier published version the live version used by sends, and replaces the draft with that version's content so editing continues from it. The change is immediate. No new version is created, and the version history is unchanged. Include the draft `revision` you last read, so the request is rejected with a conflict if someone else changed the draft first. The draft's current content is replaced. Rolling back to the currently live version is allowed and resets the draft to it. Only published versions can be rolled back to.
+ *
+ */
+export const rollbackEmailTemplate = <ThrowOnError extends boolean = false>(
+  options: Options<RollbackEmailTemplateData, ThrowOnError>,
+): RequestResult<
+  RollbackEmailTemplateResponses,
+  RollbackEmailTemplateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RollbackEmailTemplateResponses,
+    RollbackEmailTemplateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/versions/{version_id}/rollback",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Submit an email template version
+ *
+ * Submits the template's draft as a new immutable, numbered version and
+ * makes it the live version used by sends. The draft remains editable.
+ *
+ * Every language the draft has must have a subject and a body, and the
+ * default language must be present. Submission is all or nothing: an
+ * incomplete language rejects the request and the response reports every
+ * language error. A submit freezes every language the draft carries, so it
+ * cannot name a subset. The draft does not have to hold every language you
+ * plan to support: add more in a later version.
+ *
+ * Set `validate_only: true` to run the checks without creating a version.
+ * Set `expected_revision` to reject a concurrent edit. An unchanged draft is
+ * rejected. Submission is synchronous, and a returned `version` is live.
+ *
+ */
+export const submitEmailTemplateVersion = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<SubmitEmailTemplateVersionData, ThrowOnError>,
+): RequestResult<
+  SubmitEmailTemplateVersionResponses,
+  SubmitEmailTemplateVersionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    SubmitEmailTemplateVersionResponses,
+    SubmitEmailTemplateVersionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/versions/{version_id}/submit",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**

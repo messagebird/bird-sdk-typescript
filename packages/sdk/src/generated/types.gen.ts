@@ -1612,9 +1612,486 @@ export type EmailMessageContent = {
   text?: string;
 };
 
+/**
+ * Where the broadcast itself has got to. This is separate from what happened to individual recipients, which the broadcast's own `sent_count`, `delivered_count`, `bounced_count` and `complained_count` tell you. Those four are fields on the broadcast, not on everything that carries this status, and reading the broadcast's recipients or its events gives the same outcomes one recipient at a time.
+ *
+ * - `draft`: Created, and not sent or scheduled yet.
+ * - `scheduled`: Due to send at `scheduled_at`. You can still edit it, and you can still change the time, right up until sending starts.
+ * - `accepted`: Taken for immediate sending. Nothing has gone out yet.
+ * - `sending`: On its way. Some recipients have been sent to and some have not.
+ * - `sent`: Every recipient has been sent to.
+ * - `canceling`: A cancellation is under way and the remaining sends are stopping.
+ * - `canceled`: The cancellation finished. Anything already on its way to a recipient when you canceled cannot be pulled back.
+ * - `failed`: The broadcast could not be sent. Reading the broadcast gives `failure_reason`, which says why. If it had already started sending, the recipients it reached keep their delivery status and carry on producing events.
+ *
+ * A draft is deleted rather than canceled, because it was never sent.
+ *
+ */
+export type EmailBroadcastStatus =
+  | "draft"
+  | "scheduled"
+  | "accepted"
+  | "sending"
+  | "sent"
+  | "canceling"
+  | "canceled"
+  | "failed";
+
 export type AudienceId = string;
 
+/**
+ * The template a broadcast sends, and the exact version of it the broadcast is fixed to. The template cannot be one that requires every send to name a language, because a broadcast never names one, so a template that insists on it has nothing to work with.
+ *
+ */
+export type EmailBroadcastTemplate = {
+  /**
+   * Which template the broadcast sends. Which version of it the send is fixed to is `version_id`.
+   *
+   */
+  id: EmailTemplateId;
+  /**
+   * The template version this broadcast is fixed to. It is chosen when the broadcast is prepared for sending, so publishing a new version while the broadcast is going out cannot change what the rest of the recipients get. Null until the broadcast is prepared.
+   *
+   */
+  readonly version_id?: EmailTemplateVersionId | null;
+};
+
+export type EmailBroadcast = {
+  /**
+   * Broadcast ID.
+   */
+  readonly id: string;
+  /**
+   * The address this broadcast sends from. `name` is filled in when the broadcast was given a display name to send under. Left out on a draft that has not picked a sender yet.
+   */
+  from?: EmailAddress;
+  /**
+   * The audience this broadcast sends to. When the send starts we turn the audience into a list of recipients, and you can read that list a page at a time with [List recipients of a broadcast](/docs/api/reference/list-email-broadcast-recipients). Left out on a draft that has not picked an audience yet.
+   */
+  audience_id?: AudienceId;
+  /**
+   * The template this broadcast sends. A broadcast sends the template's published version, and the exact version is fixed when the broadcast is prepared for sending, so publishing a new version afterwards does not change what this broadcast sends. Null on a draft that has not chosen a template yet.
+   */
+  template?: EmailBroadcastTemplate | null;
+  /**
+   * Size of the HTML body this broadcast sends, in bytes, or 0 when its content has no HTML part. Measured on the template version the broadcast sends, so this is the real body we send and differs per recipient only by that recipient's own merge values. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending or canceling one returns, none of which measure the content. Absent too when the broadcast has no template or its content can no longer be read.
+   *
+   */
+  readonly html_bytes?: number;
+  /**
+   * Size of the plain-text body this broadcast sends, in bytes, or 0 when its content has no plain-text part. Measured, and absent, the same way as `html_bytes`.
+   *
+   */
+  readonly text_bytes?: number;
+  /**
+   * What kind of email this is, which decides how suppressions apply to it. A `marketing` broadcast is held back from every suppressed address. A `transactional` one still goes to addresses suppressed for a complaint or an unsubscribe, because those suppressions are about marketing mail.
+   */
+  category: "marketing" | "transactional";
+  /**
+   * The IP pool this broadcast sends from, or `ipp_shared` when it sends through the shared pool. Absent when it sends on your organization's default pool.
+   */
+  ip_pool_id?: string;
+  /**
+   * Where replies to this broadcast go, if you want them somewhere other than the `from` address. Absent when you have not set one.
+   */
+  reply_to?: Array<EmailAddress>;
+  /**
+   * Any custom email headers set on the broadcast. Returned on a single broadcast read and on the broadcast that creating, updating, sending or canceling one returns, and absent from the list. The unsubscribe headers we add ourselves are not included.
+   */
+  headers?: {
+    [key: string]: string;
+  };
+  /**
+   * Where the broadcast itself has got to, separate from what happened to individual recipients: for that, read `sent_count`, `delivered_count`, `bounced_count` and `complained_count` below. When it is `failed`, `failure_reason` says why.
+   *
+   */
+  readonly status: EmailBroadcastStatus;
+  /**
+   * What to do next about this broadcast, given the state it is in. Each entry names one action and
+   * says why it is worth taking. Present on reads that compute it: an empty list means there is
+   * nothing to do, and the field is absent entirely on responses that do not report next actions.
+   *
+   */
+  readonly next?: Array<NextAction>;
+  /**
+   * Why the broadcast failed. Set when `status` is `failed`, and `null` the rest of the time.
+   *
+   * - `empty_audience`: There was nobody to send to. Either the audience has no members, or every address in it is suppressed.
+   * - `audience_unavailable`: The audience no longer exists, so there was nothing to resolve.
+   * - `content_invalid`: The broadcast could not be set up to send. `failure_detail` says exactly what was wrong. It is one of these:
+   * - The broadcast has no template, or its template has been deleted.
+   * - The template has no published version, or no sendable content.
+   * - The template uses a loop that a broadcast cannot fill.
+   * - The template requires every send to name a language.
+   * - The sending domain is no longer verified.
+   * - The IP pool has nothing to send from.
+   * - The message could not be handed off for delivery.
+   * - `insufficient_funds`: There was not enough in the workspace balance to pay for the send.
+   * - `quota_exceeded`: The send would have gone past your organization's daily or monthly email allowance, whichever runs out first. This can happen when the broadcast is being prepared, or partway through sending if the remaining recipients no longer fit. `failure_detail` gives you the count and the limit.
+   * - `internal_error`: Something went wrong on our side. Retry, and open a support ticket if it keeps happening.
+   *
+   */
+  readonly failure_reason?:
+    | "empty_audience"
+    | "audience_unavailable"
+    | "content_invalid"
+    | "insufficient_funds"
+    | "quota_exceeded"
+    | "internal_error"
+    | null;
+  /**
+   * A sentence explaining the failure in more detail than `failure_reason` does, and `null` when the broadcast has not failed. Show it to the person using your app. Do not write code that reads it, because the wording can change. Branch on `failure_reason` instead.
+   */
+  readonly failure_detail?: string | null;
+  /**
+   * Number of recipients after suppressed addresses are removed from the audience. This is 0 until sending starts and the audience becomes a recipient list.
+   */
+  readonly recipient_count: number;
+  /**
+   * How many recipients the broadcast has been sent to, counting every recipient whose status is `processed` or later. The number rises while the broadcast is `sending` and stops changing once the broadcast has finished. These counters are exact. The email stats endpoints report on the same sending but are approximate, so use these numbers when you need the precise count. Absent when the broadcast comes back from creating, updating, sending or canceling it, none of which read the counters. Absent from a list row for a broadcast that has no delivery events yet, such as a draft, where reading that one broadcast answers 0 instead. Absent too when the event store cannot be reached, which still returns 200. Read the broadcast again for the numbers.
+   */
+  readonly sent_count?: number;
+  /**
+   * How many recipients' messages were accepted by their mail server. Absent when `sent_count` is.
+   */
+  readonly delivered_count?: number;
+  /**
+   * How many recipients the message could not be delivered to at all. Absent when `sent_count` is.
+   */
+  readonly bounced_count?: number;
+  /**
+   * How many recipients marked the message as spam. Absent when `sent_count` is.
+   */
+  readonly complained_count?: number;
+  /**
+   * How many times the message was opened, added up across every recipient. One recipient opening it twice counts twice. Absent when `sent_count` is.
+   */
+  readonly open_count?: number;
+  /**
+   * How many times a link in the message was clicked, added up across every recipient. One recipient clicking twice counts twice. Absent when `sent_count` is.
+   */
+  readonly click_count?: number;
+  /**
+   * The IP addresses this broadcast's messages went out from, up to 100 of them. A broadcast is spread across every address in its pool, so more than one can appear. The receiving mail systems name the address when they deliver, bounce or defer a message, so this stays absent until the first of those comes back. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending or canceling one returns, none of which read them. For delivery and latency broken down per address, read the sending-IP stats.
+   *
+   */
+  readonly sending_ips?: Array<string>;
+  /**
+   * How many distinct recipients opened the message at least once, excluding opens auto-fetched by inbox privacy features (such as Apple Mail Privacy Protection and the Gmail image proxy). A recipient who opened several times, or whose inbox prefetched the message, counts once. Absent when `sent_count` is.
+   */
+  readonly unique_opens_non_prefetched?: number;
+  /**
+   * How many distinct recipients clicked a link in the message at least once. A recipient who clicked several times counts once. Absent when `sent_count` is.
+   */
+  readonly unique_clicks?: number;
+  /**
+   * How many recipients bounced after the message had already been accepted for delivery. A recipient who bounced this way more than once counts once. Absent when `sent_count` is.
+   */
+  readonly out_of_band_bounces?: number;
+  /**
+   * How many distinct recipients a delivery landed for. This is the denominator to measure `unique_opens_non_prefetched`, `unique_clicks` and `complained_count` against. It differs from `delivered_count`, which reports how many recipients are currently in the delivered state: a recipient who was delivered to and then complained moves to `complained_count` and leaves `delivered_count`, but stays here, because the message did reach them. Absent when `sent_count` is.
+   */
+  readonly delivered_recipients?: number;
+  /**
+   * Labels on this broadcast, each one a `name` and a `value`, that you can filter and search broadcasts by. Use tags for anything you want to find broadcasts by later, and `metadata` for data you only want handed back to you.
+   */
+  tags?: Array<Tag>;
+  /**
+   * Any JSON you want to keep on the broadcast. We store it and hand it back in webhook payloads, and that is all it does. If you want to search or filter by it, use `tags` instead.
+   */
+  metadata?: {
+    [key: string]: unknown;
+  };
+  /**
+   * Whether opens are tracked for this broadcast.
+   */
+  track_opens: boolean;
+  /**
+   * Whether link clicks are tracked for this broadcast.
+   */
+  track_clicks: boolean;
+  /**
+   * When the broadcast was created.
+   */
+  readonly created_at: string;
+  /**
+   * When the broadcast is due to send, and absent when it is not scheduled.
+   */
+  readonly scheduled_at?: string;
+  /**
+   * When the broadcast started sending. Absent until then. Compare with `sent_at`, which is when the broadcast finished sending.
+   */
+  readonly started_at?: string;
+  /**
+   * When the last recipient was sent to and the broadcast became `sent`. Null until then. Compare with `started_at`, which is when the broadcast started sending.
+   */
+  readonly sent_at: string | null;
+  /**
+   * When the broadcast was canceled, and absent if it never was. This is when cancellation was requested, so it is set as soon as the status is `canceling` and does not move while the remaining sends stop and the status becomes `canceled`.
+   */
+  readonly canceled_at?: string;
+};
+
+export type EmailBroadcastList = {
+  /**
+   * Page of broadcast objects.
+   */
+  data: Array<EmailBroadcast>;
+} & ListEnvelope;
+
+/**
+ * A broadcast sends one email to a whole audience. Every field here is optional, so you can create an empty draft and fill it in later. To actually send, a broadcast needs three things: a `from` address on a verified domain, an `audience_id`, and a `template`.
+ *
+ * Leave `send` false, which is the default, and you get a draft. Update it as often as you like, then send it when you are ready. Set `send` to true and the broadcast goes out as soon as it is created, or at `scheduled_at` if you set one.
+ *
+ */
+export type EmailBroadcastCreateRequest = {
+  /**
+   * The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.
+   */
+  from?: EmailAddressInput;
+  /**
+   * The audience this broadcast sends to. We take the audience's contacts as they stand when the send starts and drop any suppressed addresses, and what is left is who gets the email.
+   */
+  audience_id?: AudienceId;
+  /**
+   * The template the broadcast sends. You can leave it out on a draft, but a broadcast cannot send without one. The template's published version is fixed when the broadcast is prepared for sending, and each recipient's contact properties are filled into the content as the email goes out.
+   */
+  template?: EmailBroadcastTemplate;
+  /**
+   * Where replies to this broadcast should go. Give each address as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. You can list more than one.
+   */
+  reply_to?: Array<EmailAddressInput>;
+  /**
+   * Custom email headers to set on the broadcast, as name and value pairs. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.
+   *
+   */
+  headers?: {
+    [key: string]: string;
+  };
+  /**
+   * Labels on this broadcast, each one a `name` and a `value`, up to 20 of them. You can filter the broadcast list by a tag, break your stats down by one, and read them back off webhook payloads. Use tags for anything you want to find broadcasts by later, and `metadata` for data you only want handed back to you.
+   */
+  tags?: Array<Tag>;
+  /**
+   * Any JSON you want to keep on the broadcast. We store it, hand it back when you read the broadcast, and include it in webhook payloads, and you can break stats down by a path inside it such as `metadata.order_id`. It can be up to 2 KB once serialized.
+   */
+  metadata?: {
+    [key: string]: unknown;
+  };
+  /**
+   * Whether to track opens for this broadcast.
+   */
+  track_opens?: boolean;
+  /**
+   * Whether to track link clicks for this broadcast.
+   */
+  track_clicks?: boolean;
+  /**
+   * The IP pool to send this broadcast from. Pass a pool ID, or `ipp_shared` to send through the shared pool on purpose. Leave it out and the broadcast uses your organization's default pool. A pool we do not recognize, or one with no IPs available to send from, is refused with a `422`.
+   */
+  ip_pool_id?: string;
+  /**
+   * What kind of email this is. A broadcast sets this itself rather than taking it from its template, and it decides two things: which suppressions apply, and whether we add an unsubscribe header.
+   *
+   * `marketing`, the default, is held back from every suppressed address and has the one-click unsubscribe headers. `transactional` still goes to addresses suppressed for a complaint or an unsubscribe, and has no unsubscribe header. Only use `transactional` for genuine operational mail such as a terms-of-service update or a service outage notice. Marketing content sent this way still reaches people who have already unsubscribed from you.
+   *
+   */
+  category?: "marketing" | "transactional";
+  /**
+   * Whether to send the broadcast as soon as it is created. Set it to true and the broadcast goes out immediately, or at `scheduled_at` if you set one. Leave it false, which is the default, and you get a draft you can update and send later.
+   */
+  send?: boolean;
+  /**
+   * When to send the broadcast. It has to be at least 30 seconds and at most 365 days from now. It requires `send` to be true, so a `scheduled_at` on its own is refused rather than saved on the draft.
+   *
+   */
+  scheduled_at?: string;
+};
+
+/**
+ * Changes a broadcast that is still a draft or is scheduled. Whatever you send here is applied, and anything you leave out keeps the value it already had. Once a broadcast has started sending it can no longer be edited.
+ *
+ */
+export type EmailBroadcastUpdateRequest = {
+  /**
+   * The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.
+   */
+  from?: EmailAddressInput;
+  /**
+   * The audience this broadcast sends to. We take the audience's contacts as they stand when the send starts and drop any suppressed addresses, and what is left is who gets the email.
+   */
+  audience_id?: AudienceId;
+  /**
+   * The template the broadcast sends. Its published version is fixed when the broadcast is prepared for sending. Set this to null to take the template off a draft, or leave it out to keep the one already set.
+   */
+  template?: EmailBroadcastTemplate | null;
+  /**
+   * Where replies to this broadcast should go. Set this to null to remove the addresses already set.
+   */
+  reply_to?: Array<EmailAddressInput> | null;
+  /**
+   * Custom email headers to set on the broadcast, as name and value pairs. What you send replaces the headers the draft already had rather than adding to them. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.
+   *
+   */
+  headers?: {
+    [key: string]: string;
+  };
+  /**
+   * Labels on this broadcast, each one a `name` and a `value`, that you can filter and search broadcasts by. What you send replaces the tags the draft already had rather than adding to them.
+   */
+  tags?: Array<Tag>;
+  /**
+   * Any JSON you want to keep on the broadcast, up to 2 KB once serialized. What you send replaces the metadata the draft already had rather than merging into it.
+   */
+  metadata?: {
+    [key: string]: unknown;
+  };
+  /**
+   * Whether to track opens for this broadcast.
+   */
+  track_opens?: boolean;
+  /**
+   * Whether to track link clicks for this broadcast.
+   */
+  track_clicks?: boolean;
+  /**
+   * The IP pool to send this broadcast from. Pass a pool ID, or `ipp_shared` to send through the shared pool on purpose. Set it to null to fall back to your organization's default pool.
+   */
+  ip_pool_id?: string | null;
+  /**
+   * What kind of email this is. It decides two things: which suppressions apply, and whether we add an unsubscribe header.
+   *
+   * `marketing` is held back from every suppressed address and has the one-click unsubscribe headers. `transactional` still goes to addresses suppressed for a complaint or an unsubscribe, and has no unsubscribe header. Only use `transactional` for genuine operational mail such as a terms-of-service update or a service outage notice. Marketing content sent this way reaches people who have already unsubscribed from you.
+   *
+   */
+  category?: "marketing" | "transactional";
+};
+
 export type EmailBroadcastId = string;
+
+/**
+ * How many people a broadcast would reach right now, narrowing from everyone in the audience down to the ones it could actually be sent to.
+ *
+ * These are live numbers, worked out at the moment you ask. Audience membership and suppressions change, so they can drift between now and when the broadcast sends.
+ *
+ * **They are about the audience, not about delivery, and sending does not change them.** Once the broadcast has sent, its own `recipient_count` is the number that actually went out, and what each of those recipients did with the message is in [the broadcast's recipients](/docs/api/reference/list-email-broadcast-recipients) and [its events](/docs/api/reference/list-email-broadcast-events). `status` is here so you can tell which question these numbers are answering, and `broadcast_id` names what they are about.
+ *
+ */
+export type EmailBroadcastCounts = {
+  /**
+   * The broadcast these counts are for.
+   */
+  readonly broadcast_id: EmailBroadcastId;
+  /**
+   * Where the broadcast is in its lifecycle, so the counts read in context. Anything past `draft` or `scheduled` means these numbers describe an audience the broadcast has already been sent to, not one it is about to reach.
+   *
+   */
+  readonly status: EmailBroadcastStatus;
+  /**
+   * What to do next, given where the broadcast is. On a broadcast that has already sent this names
+   * the reads that carry delivery outcomes, which these counts never do. An empty list means there
+   * is nothing to do; the field is absent entirely on responses that do not report next actions.
+   *
+   */
+  readonly next?: Array<NextAction>;
+  /**
+   * How many contacts are in the audience.
+   */
+  readonly total: number;
+  /**
+   * How many of those contacts have an email address. A contact with no address is not counted. This is never higher than `total`.
+   */
+  readonly addressable: number;
+  /**
+   * How many of the addressable contacts are not suppressed for this broadcast's category, which is who the email would actually go to. This is never higher than `addressable`. Which suppressions apply depends on the category, so the same audience can give a higher number for a transactional broadcast than for a marketing one. A transactional broadcast still reaches people who unsubscribed from or complained about marketing mail, and a marketing broadcast does not.
+   *
+   */
+  readonly sendable: number;
+};
+
+/**
+ * Which of the organization's email send allowances stops a send from reaching its whole audience.
+ *
+ * - `none`: every recipient is covered.
+ * - `monthly`: the allowance that runs with the billing period.
+ * - `daily`: the allowance that resets at the end of each UTC day.
+ *
+ * When both apply, the tighter of the two is reported.
+ *
+ */
+export type EmailSendAllowanceWindow = "none" | "monthly" | "daily";
+
+/**
+ * How much of a broadcast the organization's email send allowance covers, read before the broadcast is sent. The allowance is shared with every other email the organization sends, so `allowed` moves as those sends land, and `recipients` moves as audience membership and suppressions change. Treat both as a live estimate rather than a promise: a broadcast whose recipients all fit today can still run into the allowance if other sends consume it first.
+ *
+ */
+export type EmailBroadcastSendQuota = {
+  /**
+   * Number of contacts the broadcast would send to right now, after contacts without an email address and contacts suppressed for the broadcast's category are dropped. The same number the broadcast's audience counts report as sendable.
+   *
+   */
+  readonly recipients: number;
+  /**
+   * Number of those recipients the organization's email send allowance covers. Equal to `recipients` when nothing limits the send, and lower when part of the audience runs past what is left of it. A part-covered send goes out in whole batches, so this is cut back to a batch boundary rather than to the exact number of emails left: it can sit below `remaining` rather than matching it, and should be read rather than worked out from `limit` and `remaining`. 0 means none of them would go out, either because the audience is larger than the whole allowance, which is refused rather than sent in part, or because too little of the allowance is left to carry any of it.
+   *
+   */
+  readonly allowed: number;
+  readonly limited_by: EmailSendAllowanceWindow;
+  /**
+   * Size of the allowance named by `limited_by`, in emails. Omitted when nothing limits the send.
+   *
+   */
+  readonly limit?: number;
+  /**
+   * How much of that allowance is left in the current window, in emails. Omitted when nothing limits the send.
+   *
+   */
+  readonly remaining?: number;
+};
+
+/**
+ * One destination URL a broadcast's recipients clicked, with its exact click and recipient totals. Grouped over every click event the broadcast has, not a sample.
+ *
+ */
+export type EmailBroadcastClickedLink = {
+  /**
+   * The clicked URL.
+   */
+  readonly url: string;
+  /**
+   * What the link said, resolved by the name used by the most clicks that carried one. Null when no click through this URL ever carried a name.
+   *
+   */
+  readonly name: string | null;
+  /**
+   * Total clicks through this URL, including clicks that carried no link name.
+   */
+  readonly click_count: number;
+  /**
+   * Number of distinct recipients who clicked this URL at least once.
+   */
+  readonly recipient_count: number;
+};
+
+export type EmailBroadcastClickedLinkList = {
+  /**
+   * The broadcast's clicked URLs, most-clicked first, capped at 100 rows.
+   */
+  data: Array<EmailBroadcastClickedLink>;
+  /**
+   * Total number of distinct URLs the broadcast's recipients clicked, regardless of the cap on `data`. When it exceeds the number of rows returned, the list was capped at the 100 most-clicked URLs.
+   *
+   */
+  readonly total: number;
+};
+
+export type EmailBroadcastSendNowRequest = {
+  /**
+   * When to send the broadcast. It has to be at least 30 seconds and at most 365 days from now. Leave it out to send straight away.
+   */
+  scheduled_at?: string;
+};
 
 /**
  * Which identifier a contact has on file, `email` for an email address or `phone_number` for a phone number.
@@ -9664,10 +10141,16 @@ export type EmailTemplateCategory = "transactional" | "marketing";
 export type EmailTemplateSource = "html" | (string & {});
 
 /**
- * The visual theme a built-in template is designed in. Each of the catalog's five themes ships its own set of eight emails, and the sets overlap only partly, so the theme is what you choose between once you know which email you want. Only built-in `system` templates have one.
+ * Filter by the visual theme a built-in template is designed in. Only built-in `system` templates have a theme, so naming one returns built-ins alone.
+ */
+export type EmailTemplateThemeFilter =
+  "arcane" | "barebone" | "matte" | "protocol" | "studio";
+
+/**
+ * The visual theme a built-in template is designed in. Each of the catalog's five themes ships its own set of eight emails, and the sets overlap only partly, so the theme is what you choose between once you know which email you want. Only our built-in `system` templates have one.
  */
 export type EmailTemplateTheme =
-  "arcane" | "barebone" | "matte" | "protocol" | "studio";
+  "arcane" | "barebone" | "matte" | "protocol" | "studio" | (string & {});
 
 /**
  * Where one of the template's languages stands: whether sends are using it, and whether its draft contains an unpublished edit.
@@ -9770,6 +10253,589 @@ export type EmailTemplateList = {
   data: Array<EmailTemplateSummary>;
 } & ListEnvelope;
 
+/**
+ * The authoring format to create the template in. `html` is finished markup you provide, optionally personalized with Liquid; a format the API cannot author yet is refused.
+ */
+export type EmailTemplateSourceWrite = "html";
+
+/**
+ * One language's content for an email template. Each language carries its own subject, preview text and bodies, so a translation can differ in wording and length from every other language without affecting them.
+ *
+ */
+export type EmailTemplateLanguageContent = {
+  /**
+   * The email subject line for this language.
+   */
+  subject?: string;
+  /**
+   * The line an inbox shows after the subject in the message list, for this language. Leave it out and the inbox shows the opening words of the body instead. A mail client only reads it from the message body, so publishing folds it into the top of the HTML, hidden from view once the message is open; write it here rather than hiding your own copy in the body.
+   *
+   */
+  preview_text?: string;
+  /**
+   * The HTML body for this language.
+   */
+  html?: string;
+  /**
+   * The plain-text body for this language. Omit it and a plain-text alternative is derived from the HTML when you submit.
+   *
+   */
+  text?: string;
+};
+
+/**
+ * Parameters for creating an email template and its initial draft.
+ */
+export type EmailTemplateCreate = {
+  /**
+   * The template's workspace-unique handle, and a stable alternative to the template ID when sending by template. It can contain lowercase letters, numbers, hyphens, and underscores. It is fixed at creation, so pick it deliberately. Two prefixes are rejected: `bird_`, reserved for our built-in templates, and `emt_`, the template ID format, which a slug could never be distinguished from.
+   *
+   */
+  slug: TemplateSlug;
+  /**
+   * The template's display name, shown wherever the template is listed. You can change it any time. It defaults to the slug if you do not set one.
+   *
+   */
+  name?: string;
+  /**
+   * What the template is for, in your own words.
+   */
+  description?: string;
+  category: EmailTemplateCategory;
+  /**
+   * The authoring format the template is written in, fixed at creation.
+   * `html` is finished markup you provide, optionally personalized with
+   * Liquid. Liquid supports variables, filters, and control flow such
+   * as `{% if %}` conditionals and `{% for %}` loops. A few constructs are
+   * rejected when you submit, and the error names exactly what to change:
+   *
+   * - Partial includes (`{% include %}`, `{% render %}`).
+   * - The `increment`, `decrement`, and `ifchanged` tags.
+   * - The `money`, `format_date`, `format_time`, `json`, `inspect`, and `type` filters.
+   * - Comparing against `empty`/`blank` (use `.size == 0` instead).
+   * - Blocks nested far deeper than real email markup needs.
+   *
+   * A broadcast's template additionally cannot use a `{% for %}` loop,
+   * because a broadcast supplies one value per contact property, so there
+   * is nothing to iterate. Send with the messages API instead if the
+   * template needs one.
+   *
+   */
+  source: EmailTemplateSourceWrite;
+  /**
+   * The initial draft's content, keyed by language tag in BCP-47 form such as
+   * `en` or `pt-BR`. A template holds up to 25 languages, and a send picks one
+   * of them.
+   *
+   * Omit this to create an empty draft and add content later.
+   *
+   */
+  languages?: {
+    [key in LanguageTag]?: EmailTemplateLanguageContent;
+  };
+  /**
+   * The language a send uses when it does not name one, and the last resort when a requested language is not available. It has to be one of the languages you supply. If you leave it out, we default to `en`, unless you supply exactly one language, in which case we use that one instead. So if you supply two or more languages and `en` is not among them, you have to set this yourself.
+   *
+   */
+  default_language?: LanguageTag;
+  /**
+   * What a send does when it asks for a language this template does not carry. Defaults to `fallback` on email.
+   *
+   */
+  on_missing_language?: TemplateOnMissingLanguage;
+  /**
+   * Whether a send has to name a language. Set it to true to reject a send that names none instead of serving the default language. Pair it with `on_missing_language: fail` when every send must pick a language deliberately: on its own, `fail` is bypassed by naming no language at all. A template with this set cannot be used for a broadcast, which has no way to name one. Defaults to false.
+   *
+   */
+  language_source_required?: boolean;
+};
+
+export type EmailTemplate = {
+  /**
+   * Template ID.
+   */
+  readonly id: EmailTemplateId;
+  /**
+   * The workspace that owns the template. Null for a built-in `system` template, which no workspace owns.
+   */
+  readonly workspace_id: WorkspaceId | null;
+  /**
+   * The name you send the template by. You can use either the slug or the id when you send. It never changes after the template is created. A built-in `system` template's slug always starts with `bird_`.
+   */
+  readonly slug: TemplateSlug;
+  /**
+   * The template's display name, shown wherever the template is listed. You can change it any time. It defaults to the slug if you do not set one.
+   */
+  name: string;
+  /**
+   * What the template is for, in your own words. Null if you have not set one.
+   */
+  description: string | null;
+  scope: TemplateScope;
+  status: TemplateStatus;
+  category: EmailTemplateCategory;
+  source: EmailTemplateSource;
+  /**
+   * The visual theme a built-in template is designed in, or null for a template your workspace authored (which has no theme).
+   */
+  readonly theme: EmailTemplateTheme | null;
+  /**
+   * The current editable draft version. Null for a built-in `system` template, which has no draft.
+   */
+  readonly draft_version_id: EmailTemplateVersionId | null;
+  /**
+   * The version a send resolves to, or null if the template has never been published.
+   *
+   */
+  readonly live_version_id: EmailTemplateVersionId | null;
+  /**
+   * Deprecated: use `live_version_id` instead, which carries the same value.
+   *
+   *
+   * @deprecated
+   */
+  readonly published_version_id: EmailTemplateVersionId | null;
+  /**
+   * The draft's revision counter. Send it back on the next update to detect concurrent edits. Null for a built-in `system` template, which is unversioned.
+   */
+  readonly revision: number | null;
+  /**
+   * Every language this template has, keyed by language tag in BCP-47 form
+   * such as `en` or `pt-BR`, each with its state. One read tells you which
+   * languages are live and which have unpublished edits, without fetching any
+   * content.
+   *
+   * Content is not here: read a version's languages for that, one language at
+   * a time.
+   *
+   */
+  readonly languages: {
+    [key in LanguageTag]?: EmailTemplateLanguageState;
+  };
+  /**
+   * The language the draft defaults to. This is the language `languages` is
+   * keyed against while you edit, and the language used by sends once you
+   * submit this draft.
+   *
+   * Until then sends keep using the live version's default, so this can
+   * differ from what is being sent right now. `available_languages` describes
+   * the live version for the same reason; read a version to see the default a
+   * send currently uses.
+   *
+   */
+  readonly default_language: LanguageTag;
+  /**
+   * The languages this template currently supports for sending, as BCP-47 tags. Empty until the template is published, because sends serve published content. The set may shrink for reasons other than editing, so read it rather than assuming it matches what was published. A built-in `system` template has no publish step and always reports its one language.
+   *
+   */
+  readonly available_languages: Array<LanguageTag>;
+  /**
+   * What a send does when it asks for a language this template does not carry. Defaults to `fallback` on email.
+   *
+   */
+  readonly on_missing_language: TemplateOnMissingLanguage;
+  /**
+   * Whether a send has to name a language. When true, a send that names none is rejected instead of being served the default language, and the template cannot be used for a broadcast, which has no way to name one.
+   *
+   */
+  readonly language_source_required: boolean;
+  /**
+   * When this template was last submitted. Null if it never has been. Submitting is the only thing that moves this timestamp: rolling back changes which version is live without counting as a submit, so this keeps reporting the last real submit. Read it alongside `languages`, which says where each language stands.
+   *
+   */
+  readonly last_submitted_at: string | null;
+  /**
+   * When the template was created. Null for a built-in `system` template.
+   */
+  readonly created_at: string | null;
+  /**
+   * When the template was last modified. Null for a built-in `system` template.
+   */
+  readonly updated_at: string | null;
+};
+
+/**
+ * The draft revision you last read (from the template's `revision` field). A stale value returns a conflict so you can reload and retry.
+ *
+ */
+export type EmailTemplateDraftRevision = number;
+
+/**
+ * Partial update of a template's metadata and draft settings. Only the fields you send are changed. The rest are left as-is. Include the draft `revision` you last read so concurrent edits are detected. Content is not here: save a language on the draft version to change what the template says.
+ *
+ */
+export type EmailTemplateUpdate = {
+  revision: EmailTemplateDraftRevision;
+  /**
+   * New display name, in free text. The slug stays fixed at creation, so renaming the template does not break whatever refers to it by slug or id.
+   *
+   */
+  name?: string;
+  /**
+   * What the template is for, in your own words. Send `null` to clear it.
+   */
+  description?: string | null;
+  /**
+   * New default language for the draft. Must be one of the languages the draft already has, so add the language first if it is not there yet.
+   *
+   */
+  default_language?: LanguageTag;
+  /**
+   * What a send does when it asks for a language this template does not carry.
+   *
+   */
+  on_missing_language?: TemplateOnMissingLanguage;
+  /**
+   * Whether a send has to name a language. Turning it on rejects a send that names none instead of serving the default language, and makes the template unusable for a broadcast, which has no way to name one.
+   *
+   */
+  language_source_required?: boolean;
+};
+
+/**
+ * Optional parameters when duplicating an email template. The body may be omitted entirely to accept the defaults.
+ *
+ */
+export type EmailTemplateDuplicate = {
+  /**
+   * The copy's workspace-unique handle, and the stable alternative to the template ID when sending by template. It can contain lowercase letters, numbers, hyphens, and underscores. Omit it to derive one from the source (for example, `welcome-email-copy`), with a numeric suffix if that slug is already taken. Two prefixes are rejected: `bird_`, reserved for our built-in templates, and `emt_`, the template ID format, which a slug could never be distinguished from. If you supply a slug that is already in use in the workspace, the request returns a conflict.
+   *
+   */
+  slug?: TemplateSlug;
+};
+
+/**
+ * Content to render instead of the template's stored draft. Give it the subject and bodies you have in hand and they are rendered exactly as the draft would be, so an editor can show what a change looks like before it is saved.
+ *
+ */
+export type EmailTemplatePreviewContent = {
+  /**
+   * The subject line to render.
+   */
+  subject?: string;
+  /**
+   * The preview text to render. It is folded into the top of the HTML the same way publishing folds it, so the rendered body carries the hidden preheader a recipient's inbox would read.
+   *
+   */
+  preview_text?: string;
+  /**
+   * The HTML body to render.
+   */
+  html?: string;
+  /**
+   * The plain-text body to render. Omit it and a plain-text alternative is derived from the HTML, the same way it is derived when you publish.
+   *
+   */
+  text?: string;
+};
+
+/**
+ * Sample values and options for rendering a template preview. Omit the body entirely to preview the current draft: `bird.contact.` tokens then fill from stand-in values, and a parameter you give no value for renders as empty.
+ *
+ */
+export type EmailTemplatePreviewRequest = {
+  /**
+   * Render this content rather than the template's stored draft. It is what an editor uses to show a change as it is made, since nothing has to be saved first.
+   *
+   * The content is treated exactly as a draft would be: personalization is filled in the same way, a plain-text body is derived from the HTML when you omit it, and content that could not be published is refused with the same error. `version` asks for a published version's own content, so the two cannot be combined.
+   *
+   */
+  content?: EmailTemplatePreviewContent;
+  /**
+   * Sample values for the variables the template uses, for this one preview only. A variable takes its value under its own name. A `bird.` value nests to match the token, so `{"bird": {"contact": {"first_name": "Ada"}}}` fills `{{ bird.contact.first_name }}`.
+   *
+   * A preview is more forgiving than a send: a parameter you leave out renders as empty here rather than being rejected. `parameters` is capped at 16 KB once serialized.
+   *
+   */
+  parameters?: {
+    [key: string]: unknown;
+  };
+  /**
+   * Render the template the way this contact would receive it. Every `{{ bird.contact.… }}` token takes its value from the contact's record, narrowed to the attributes the template reads and filled from each property's `fallback_value` where the contact holds no value: the same values a broadcast to this contact would send.
+   *
+   * Values are read as the contact stands right now, so a preview reflects an edit to their record as soon as you make it. A `bird.contact.…` value you also pass in `parameters` wins for that one attribute, so you can preview a contact with one field changed without editing them.
+   *
+   */
+  contact?: ContactId;
+  /**
+   * Which of the template's languages to render. Omit it to render the default language. When the template does not have the language you ask for, its own `on_missing_language` setting decides whether a close match is rendered instead or the request is rejected. It is the same choice the send makes.
+   *
+   */
+  language?: LanguageTag;
+  /**
+   * Preview a specific published version by its id, instead of the current draft.
+   *
+   */
+  version?: EmailTemplateVersionId;
+};
+
+/**
+ * The worst severity across every finding the response was computed from, which
+ * is the authoritative reading: a response that caps how many findings it lists
+ * still accounts here for the ones it left out. Each response's `compatibility`
+ * says which content it covered.
+ *
+ * - `problem`: at least one finding is a `problem`.
+ * - `warning`: every finding is a `warning`.
+ * - `none`: there are no findings.
+ *
+ */
+export type EmailCompatibilityReportSeverity = "problem" | "warning" | "none";
+
+/**
+ * Which rule produced a finding.
+ *
+ * - `html_script`: a `<script>` tag.
+ * - `html_event_handlers`: a JavaScript event-handler attribute such as `onclick`.
+ * - `html_embedded_content`: an `<iframe>`, `<embed>`, or `<object>`.
+ * - `html_linked_stylesheet`: a `<link rel="stylesheet">`.
+ * - `css_at_import`: an `@import` rule.
+ * - `html_form`: a `<form>`, `<input>`, `<select>`, or `<textarea>`.
+ * - `html_svg`: an inline `<svg>`.
+ * - `html_media`: a `<video>` or `<audio>` element.
+ * - `css_display_flex_grid`: `display: flex` or `display: grid`, and their `inline-` forms.
+ * - `css_position_fixed_sticky`: `position: fixed` or `position: sticky`.
+ * - `css_variables_no_fallback`: a `var()` with no fallback value.
+ * - `css_viewport_units`: a `vh` or `vw` length.
+ * - `html_button`: a `<button>` element.
+ * - `css_math_functions`: `clamp()`, `min()`, or `max()`.
+ * - `css_modern_color`: `oklch()`, `oklab()`, `lch()`, or `lab()`.
+ * - `html_web_page_markup`: markup a web framework left behind, such as a `data-reactroot` attribute or a `__next` element id.
+ *
+ */
+export type EmailCompatibilityRuleId =
+  | "html_script"
+  | "html_event_handlers"
+  | "html_embedded_content"
+  | "html_linked_stylesheet"
+  | "css_at_import"
+  | "html_form"
+  | "html_svg"
+  | "html_media"
+  | "css_display_flex_grid"
+  | "css_position_fixed_sticky"
+  | "css_variables_no_fallback"
+  | "css_viewport_units"
+  | "html_button"
+  | "css_math_functions"
+  | "css_modern_color"
+  | "html_web_page_markup"
+  | (string & {});
+
+/**
+ * What a finding costs you.
+ *
+ * - `problem`: the pattern does nothing at all. The client removes the markup, never loads the stylesheet carrying it, or will not operate the control. Where a finding names clients, that is what happens in those clients.
+ * - `warning`: it does something, but not what you wrote.
+ *
+ * Neither one refuses a save, a submit, or a send.
+ *
+ */
+export type EmailCompatibilitySeverity = "problem" | "warning";
+
+/**
+ * Which mail client a finding applies to. A finding's `message` names at most
+ * Apple Mail, Gmail, Outlook, and Yahoo; its `unsupported_clients` and
+ * `partial_clients` name every client affected.
+ *
+ * - `gmail`: Gmail
+ * - `outlook`: Outlook
+ * - `yahoo`: Yahoo
+ * - `apple_mail`: Apple Mail
+ * - `aol`: AOL
+ * - `thunderbird`: Mozilla Thunderbird
+ * - `samsung_email`: Samsung Email
+ * - `sfr`: SFR
+ * - `orange`: Orange
+ * - `protonmail`: ProtonMail
+ * - `hey`: HEY
+ * - `mail_ru`: Mail.ru
+ * - `fastmail`: Fastmail
+ * - `laposte`: LaPoste.net
+ * - `gmx`: GMX
+ * - `web_de`: WEB.DE
+ * - `ionos_1and1`: 1&1
+ * - `wp_pl`: WP.pl
+ *
+ */
+export type EmailClientFamily =
+  | "gmail"
+  | "outlook"
+  | "yahoo"
+  | "apple_mail"
+  | "aol"
+  | "thunderbird"
+  | "samsung_email"
+  | "sfr"
+  | "orange"
+  | "protonmail"
+  | "hey"
+  | "mail_ru"
+  | "fastmail"
+  | "laposte"
+  | "gmx"
+  | "web_de"
+  | "ionos_1and1"
+  | "wp_pl"
+  | (string & {});
+
+/**
+ * Which build of a client family a finding applies to. A family can support a
+ * feature in one build and not another, so Gmail on iOS is tracked separately
+ * from Gmail on the web.
+ *
+ * - `desktop_webmail`: Desktop Webmail
+ * - `mobile_webmail`: Mobile Webmail
+ * - `ios`: iOS
+ * - `android`: Android
+ * - `windows`: Windows
+ * - `macos`: macOS
+ * - `windows_mail`: Windows Mail
+ * - `outlook_com`: Outlook.com
+ *
+ */
+export type EmailClientPlatform =
+  | "desktop_webmail"
+  | "mobile_webmail"
+  | "ios"
+  | "android"
+  | "windows"
+  | "macos"
+  | "windows_mail"
+  | "outlook_com"
+  | (string & {});
+
+/**
+ * One mail client family a finding applies to, and which of that family's platforms.
+ *
+ */
+export type EmailClientSupport = {
+  readonly family: EmailClientFamily;
+  /**
+   * Which of the family's platforms this applies to, in alphabetical order.
+   *
+   */
+  readonly platforms: Array<EmailClientPlatform>;
+};
+
+/**
+ * One pattern in the HTML that mail clients remove, ignore, or render inconsistently.
+ *
+ */
+export type EmailCompatibilityFinding = {
+  /**
+   * The rule that produced this finding.
+   */
+  readonly rule_id: EmailCompatibilityRuleId;
+  readonly severity: EmailCompatibilitySeverity;
+  /**
+   * Which language's content this finding is in. Null when the call covered a single language.
+   *
+   */
+  readonly language: LanguageTag | null;
+  /**
+   * Which field of that language the finding is in. Always `html`; the subject and the plain-text body are not checked.
+   *
+   */
+  readonly field: string;
+  /**
+   * What is wrong and which clients it affects, worded to show to whoever is authoring the template. It covers the rule's whole category rather than the exact text that matched, so a rule covering `<video>` and `<audio>` names both whichever one is on the line. Show `fix` and then `partial` after it.
+   *
+   */
+  readonly message: string;
+  /**
+   * What to use instead. Null when there is no drop-in alternative and the fix is a restructure.
+   *
+   */
+  readonly fix: string | null;
+  /**
+   * Which clients support the feature only partly. Null when no client's support is partial.
+   *
+   */
+  readonly partial: string | null;
+  /**
+   * The 1-based line the pattern is on, in the HTML the containing response's `compatibility` says it covered.
+   *
+   */
+  readonly line: number;
+  /**
+   * The 1-based column the pattern starts at, on that line.
+   */
+  readonly column: number;
+  /**
+   * The source text that matched, starting at `line` and `column`: the smallest span that identifies what is wrong. Never the enclosing line. For a finding on a whole element, the span runs from the opening tag through the close tag, because the client drops the element's content along with its markup. Cut at 256 characters, so an element holding a long body is quoted from its start rather than in full.
+   *
+   */
+  readonly match: string;
+  /**
+   * Every client family that does not support the feature at all, in alphabetical order by each entry's `family`. Empty on a finding whose `message`, `fix`, and `partial` name no client. `message` names at most four families; this names all of them.
+   *
+   */
+  readonly unsupported_clients: Array<EmailClientSupport>;
+  /**
+   * Every client family that renders something other than what you wrote, in alphabetical order by each entry's `family`. Empty when no client's support is partial, which is also when `partial` is null. `partial` names at most four families; this names all of them.
+   *
+   */
+  readonly partial_clients: Array<EmailClientSupport>;
+};
+
+/**
+ * A rendered preview of an email template: its subject, HTML, and plain-text bodies with the supplied sample values filled in, ready to display.
+ *
+ */
+export type EmailTemplatePreview = {
+  /**
+   * The rendered subject line. Null when the template has no subject.
+   */
+  readonly subject: string | null;
+  /**
+   * The rendered HTML body. Null when the template has no HTML body.
+   */
+  readonly html: string | null;
+  /**
+   * The rendered plain-text body. Derived from the HTML when the template has no separate plain-text body, and null when it has neither.
+   *
+   */
+  readonly text: string | null;
+  /**
+   * The language this preview rendered. It differs from the language you asked for when the template does not have that one and a close match was served instead.
+   *
+   */
+  readonly language: LanguageTag;
+  /**
+   * The variables you can fill in with `parameters`. This list covers only the
+   * language named by `language`. A version read combines the variables from
+   * every language the version holds. Preview each language separately to see
+   * its own variables.
+   *
+   * Variables under the reserved `bird.` namespace are not listed here. We
+   * supply those values, but you can nest sample values under `bird` in
+   * `parameters` to preview them.
+   *
+   */
+  readonly variables: Array<TemplateVariable>;
+  readonly compatibility_severity: EmailCompatibilityReportSeverity;
+  /**
+   * What the previewed HTML uses that mail clients remove, ignore, or render inconsistently, in the order the patterns appear. Empty when nothing is worth reporting. Line and column count in the `content.html` you supplied, or in the template's own HTML when you supplied none, so they address the source rather than the rendered output. Previewing a published `version` is the exception: where the stored version keeps no authored copy of a language the publish step rewrote, the positions count in that rewritten body, which no response returns. A preview renders either way. At most 200 findings come back, the first 200 in source order; `compatibility_severity` is derived from every finding the HTML produced, including any beyond those 200.
+   *
+   */
+  readonly compatibility: Array<EmailCompatibilityFinding>;
+};
+
+/**
+ * Whether this version is still being edited or has been published. It records
+ * the version's publication history: a version that a later one replaced stays
+ * `published`. The template's `live_version_id` names the version a send
+ * resolves to now.
+ *
+ * `archived` is reserved and no version carries it yet. Version retirement will
+ * produce it, so it is declared here ahead of that feature: a client written
+ * against this list today keeps working when the first archived version arrives,
+ * rather than the value's arrival being a breaking change.
+ *
+ */
+export type EmailTemplateVersionStatus = "draft" | "published" | "archived";
+
 export type Actor = {
   /**
    * Actor identifier.
@@ -9784,6 +10850,438 @@ export type Actor = {
    *
    */
   readonly display_name?: string | null;
+};
+
+/**
+ * One version of a template, without its content. Version history lists every version a template has ever had, and each one has a full copy of the content in every language it was published with. The listing describes the versions; read a single version to get what it holds.
+ *
+ */
+export type EmailTemplateVersionSummary = {
+  /**
+   * Template version ID.
+   */
+  readonly id: EmailTemplateVersionId;
+  /**
+   * The template this version belongs to.
+   */
+  readonly template_id: EmailTemplateId;
+  /**
+   * Sequential published-version number (1, 2, 3…). Null while the version is a draft.
+   */
+  readonly version_number?: number | null;
+  status: EmailTemplateVersionStatus;
+  /**
+   * The version's revision counter.
+   */
+  readonly revision: number;
+  /**
+   * Every variable this version's content uses. You supply a value for each of them when you send.
+   *
+   * The list combines all the languages, because languages do not have to use the same variables: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. Send a value for every variable in the list rather than only the ones you expect the language you are sending to use. A language that does not use a variable ignores the value you sent for it, and a variable the sent language does use but you left out is rejected with a `422` naming it.
+   *
+   * Variables under the reserved `bird.` namespace are not listed here. We fill those in ourselves from the recipient's contact record.
+   *
+   */
+  readonly variables: Array<TemplateVariable>;
+  /**
+   * The language this version treats as its default: the one a send uses when it names none, and the last resort when a requested language is not available.
+   *
+   */
+  readonly default_language: LanguageTag;
+  /**
+   * The languages this version holds, as BCP-47 tags: the keys its `languages` map would return, without the content itself.
+   *
+   */
+  readonly available_languages: Array<LanguageTag>;
+  /**
+   * When this version was created.
+   */
+  readonly created_at: string;
+  /**
+   * When this version was published, or null if it has not been published.
+   */
+  readonly published_at?: string | null;
+  /**
+   * Who last saved this version: a member's own session, an OAuth token delegated from one, or a workspace API key. Publishing freezes a version, so on a published one this is whoever published it. Null means no actor is on record: a built-in template, which is code-defined rather than stored, or a version last saved by an API key before this field existed. Every other version has one, even when its display_name could not be resolved (a member whose account is gone, say).
+   *
+   */
+  readonly updated_by?: Actor | null;
+};
+
+export type EmailTemplateVersionList = {
+  /**
+   * One page of the template's versions, newest first. Each entry describes a version and which languages it holds. Read a single version if you want its actual content.
+   *
+   */
+  data: Array<EmailTemplateVersionSummary>;
+} & ListEnvelope;
+
+/**
+ * One broadcast that blocks deleting this template.
+ */
+export type EmailTemplateBroadcastSummary = {
+  /**
+   * Broadcast ID.
+   */
+  readonly id: EmailBroadcastId;
+  /**
+   * Where the broadcast has got to. Only `scheduled` and `accepted` appear here: those are the two that have not pinned their content yet, so they are the ones blocking the delete. This list carries the status alone; the per-recipient totals live on the broadcast itself.
+   *
+   */
+  readonly status: EmailBroadcastStatus;
+  /**
+   * When the broadcast is due to send, or null when it is not scheduled.
+   */
+  readonly scheduled_at?: string | null;
+  /**
+   * When the broadcast was created.
+   */
+  readonly created_at: string;
+};
+
+export type EmailTemplateBroadcastList = {
+  /**
+   * Page of broadcasts blocking a delete of the template, newest first.
+   */
+  data: Array<EmailTemplateBroadcastSummary>;
+} & ListEnvelope;
+
+export type EmailTemplateVersion = {
+  /**
+   * Template version ID.
+   */
+  readonly id: EmailTemplateVersionId;
+  /**
+   * The template this version belongs to.
+   */
+  readonly template_id: EmailTemplateId;
+  /**
+   * Sequential published-version number (1, 2, 3…). Null while the version is a draft.
+   */
+  readonly version_number?: number | null;
+  status: EmailTemplateVersionStatus;
+  /**
+   * The version's revision counter.
+   */
+  readonly revision: number;
+  /**
+   * Every variable this version's content uses. You supply a value for each of them when you send.
+   *
+   * The list combines all the languages, because languages do not have to use the same variables: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. Send a value for every variable in the list rather than only the ones you expect the language you are sending to use. A language that does not use a variable ignores the value you sent for it, and a variable the sent language does use but you left out is rejected with a `422` naming it.
+   *
+   * Variables under the reserved `bird.` namespace are not listed here. We fill those in ourselves from the recipient's contact record.
+   *
+   */
+  readonly variables: Array<TemplateVariable>;
+  /**
+   * The content this version holds, keyed by language tag in BCP-47 form such as `en` or `pt-BR`. Publishing freezes every language together, so a version shows exactly what it would send in each of them. On a published version this is the send content.
+   *
+   */
+  readonly languages: {
+    [key in LanguageTag]?: EmailTemplateLanguageContent;
+  };
+  /**
+   * The language this version treats as its default: the one a send uses when it names none, and the last resort when a requested language is not available.
+   *
+   */
+  readonly default_language: LanguageTag;
+  /**
+   * When this version was created.
+   */
+  readonly created_at: string;
+  /**
+   * When this version was published, or null if it has not been published.
+   */
+  readonly published_at?: string | null;
+  /**
+   * Who last saved this version: a member's own session, an OAuth token delegated from one, or a workspace API key. Publishing freezes a version, so on a published one this is whoever published it. Null means no actor is on record: a built-in template, which is code-defined rather than stored, or a version last saved by an API key before this field existed. Every other version has one, even when its display_name could not be resolved (a member whose account is gone, say).
+   *
+   */
+  readonly updated_by?: Actor | null;
+};
+
+/**
+ * One language of a template version, without its content: enough to list what a version holds and how big each language is. Read a single language to get its content and its compatibility report.
+ *
+ */
+export type EmailTemplateLanguageSummary = {
+  /**
+   * The language, in its canonical form.
+   */
+  readonly language: LanguageTag;
+  /**
+   * This language's revision counter, to send back when you save it. It counts only this language's own changes.
+   *
+   */
+  readonly revision: number;
+  /**
+   * A hash over this language's content, prefixed with the algorithm that produced it (`sha256:`), so the algorithm can change without the field becoming ambiguous. It tells you whether a language differs without transferring the content, and is comparable only within one version of this API. Null for a language saved before fingerprints were recorded.
+   *
+   */
+  readonly content_hash?: string | null;
+  /**
+   * When this language was last saved. Null if that is not recorded.
+   */
+  readonly updated_at?: string | null;
+  /**
+   * Whether this language has an HTML body.
+   */
+  readonly has_html?: boolean;
+  /**
+   * Whether this language has a plain-text body.
+   */
+  readonly has_text?: boolean;
+};
+
+export type EmailTemplateLanguageList = {
+  /**
+   * Every language the version holds, ordered by language tag, without their content. Read a single language to get its content.
+   *
+   */
+  data: Array<EmailTemplateLanguageSummary>;
+};
+
+/**
+ * One language of a template version: its content plus the identity a concurrent-edit check needs. Reading a language returns everything you need to edit it and save it back.
+ *
+ */
+export type EmailTemplateLanguage = {
+  /**
+   * The language this content belongs to, in its canonical form. Send a tag in any casing and this reports the form the template stores.
+   *
+   */
+  readonly language: LanguageTag;
+  /**
+   * This language's revision counter. Send it back when you save this language so a concurrent edit is caught instead of silently overwritten. It counts only this language's own changes, so editing another language never invalidates it.
+   *
+   */
+  readonly revision: number;
+  /**
+   * A hash over this language's content, prefixed with the algorithm that produced it (`sha256:`), so the algorithm can change without the field becoming ambiguous. It tells you whether a language differs without transferring the content, and is comparable only within one version of this API. Null for a language saved before fingerprints were recorded.
+   *
+   */
+  readonly content_hash?: string | null;
+  /**
+   * When this language was last saved. Null if that is not recorded.
+   */
+  readonly updated_at?: string | null;
+  content?: EmailTemplateLanguageContent;
+  readonly compatibility_severity: EmailCompatibilityReportSeverity;
+  /**
+   * What the stored HTML uses that mail clients remove, ignore, or render inconsistently, in the order the patterns appear. Empty when nothing is worth reporting. Line and column count in the `content.html` this response carries. At most 200 findings come back, the first 200 in source order; `compatibility_severity` is derived from every finding the HTML produced, including any beyond those 200.
+   *
+   */
+  readonly compatibility: Array<EmailCompatibilityFinding>;
+};
+
+/**
+ * Content to save for one language, replacing whatever that language held. Send every field you want the language to keep: a field you omit is cleared, which is what makes saving the same content twice land the same way every time.
+ *
+ */
+export type EmailTemplateLanguageUpsert = {
+  /**
+   * The email subject line for this language.
+   */
+  subject: string;
+  /**
+   * The line an inbox shows after the subject in the message list. Leave it out and the inbox shows the opening words of the body instead.
+   *
+   */
+  preview_text?: string;
+  /**
+   * The HTML body for this language.
+   */
+  html?: string;
+  /**
+   * The plain-text body for this language. Omit it and a plain-text alternative is derived from the HTML when you submit.
+   *
+   */
+  text?: string;
+  /**
+   * The revision you last read for this language, to detect a concurrent edit. The save is rejected with a conflict if the language moved on since. Omit it to save unconditionally. Creating a language does not need one.
+   *
+   */
+  revision?: number;
+};
+
+/**
+ * The template this call addressed, as its id, even when you addressed it by slug. Send it back as `template_ref` on a follow-up call.
+ *
+ */
+export type EmailTemplateRef = string;
+
+/**
+ * The identity, revision counters, and fingerprint of a saved language. The response does not include its content; read the language to retrieve it.
+ *
+ */
+export type EmailTemplateLanguageSaved = {
+  /**
+   * The language that was saved, in its canonical form. Send a tag in any casing and this reports the form the template stores.
+   *
+   */
+  readonly language: LanguageTag;
+  /**
+   * This language's new revision. Send it back on your next save of this language so a concurrent edit is caught instead of silently overwritten.
+   *
+   */
+  readonly revision: number;
+  /**
+   * The draft's new revision. Saving a language moves it, so any template update you make next must send this value instead of the revision you read before the save.
+   *
+   */
+  readonly draft_revision: number;
+  /**
+   * A hash over the language's content as saved, prefixed with the algorithm that produced it (`sha256:`), so the algorithm can change without the field becoming ambiguous. It tells you whether a language differs without transferring the content, and is comparable only within one version of this API.
+   *
+   */
+  readonly content_hash?: string | null;
+  /**
+   * When this language was saved.
+   */
+  readonly updated_at?: string | null;
+  /**
+   * The template this save addressed.
+   */
+  readonly template_ref: EmailTemplateRef;
+  /**
+   * The draft this save wrote to.
+   */
+  readonly version_id: EmailTemplateVersionId;
+  readonly compatibility_severity: EmailCompatibilityReportSeverity;
+  /**
+   * What to do next with this save. Present on reads that compute it: an empty list means
+   * there is nothing to do, and the field is absent entirely on responses that do not
+   * report next actions.
+   *
+   * A `problem` in `compatibility` routes back to this same write, with the identifiers
+   * to address it already on this response; a `warning` says what degrades and leaves
+   * the draft as it is.
+   *
+   */
+  readonly next?: Array<NextAction>;
+  /**
+   * What the HTML you just saved uses that mail clients remove, ignore, or render inconsistently, in the order the patterns appear. Empty when nothing is worth reporting. Advisory: the language was saved either way, and a finding never refuses a write. Line and column count in the HTML as saved, which the language read returns as `content.html`. A partial update reports on the language in full rather than on the fields it carried, so it reads the same as the read of the same language. At most 200 findings come back, the first 200 in source order; `compatibility_severity` is derived from every finding the HTML produced, including any beyond those 200.
+   *
+   */
+  readonly compatibility: Array<EmailCompatibilityFinding>;
+};
+
+/**
+ * A partial edit to one language: send only the fields you are changing, and the rest keep their current values. The language must already exist. Create it by saving its full content instead.
+ *
+ */
+export type EmailTemplateLanguageUpdate = {
+  /**
+   * A new email subject line for this language.
+   */
+  subject?: string;
+  /**
+   * A new line for the inbox to show after the subject in the message list. Send null to clear it, and the inbox shows the opening words of the body instead.
+   *
+   */
+  preview_text?: string | null;
+  /**
+   * A new HTML body for this language.
+   */
+  html?: string;
+  /**
+   * A new plain-text body for this language. Send null to clear it, and a plain-text alternative is derived from the HTML when you submit.
+   *
+   */
+  text?: string | null;
+  /**
+   * The revision you last read for this language, to detect a concurrent edit. The edit is rejected with a conflict if the language moved on since. Omit it to apply the edit unconditionally.
+   *
+   */
+  revision?: number;
+};
+
+/**
+ * Parameters for rolling a template back to an earlier published version. Rolling back also replaces the draft with that version's content, so you have to pass `revision`, the revision number of the draft you last read. If the draft has changed since you read it, that revision number is now stale, and the rollback fails with a conflict instead of overwriting the newer draft. Read the draft again to get its current revision, and try the rollback again.
+ *
+ */
+export type EmailTemplateRollback = {
+  revision: EmailTemplateDraftRevision;
+};
+
+/**
+ * Options for a submit. Every field here is optional, so an empty request body submits the draft exactly as it stands.
+ *
+ */
+export type EmailTemplateSubmit = {
+  /**
+   * Check the draft without actually submitting it. Every language gets checked and every problem gets reported back to you, but nothing is frozen and no new version gets created. Give a validation run its own `Idempotency-Key`, separate from the real submit that follows it. You can also send no key. The validation request and real submit have different bodies, so using the same key for both is rejected as key reuse.
+   *
+   */
+  validate_only?: boolean;
+  expected_revision?: EmailTemplateDraftRevision;
+  /**
+   * Languages to process when submitting an already-published version. Email templates accept submissions only for drafts, so setting this field for an email template is rejected.
+   *
+   */
+  languages?: Array<LanguageTag>;
+};
+
+/**
+ * One problem found while checking whether a version can be submitted.
+ */
+export type EmailTemplateSubmitProblem = {
+  /**
+   * The language this problem is about. Null when the problem is about the whole version rather than one language, for example an empty draft, or a default language the draft does not have.
+   *
+   */
+  readonly language?: LanguageTag | null;
+  /**
+   * Which field within that language has the problem, such as `subject` or `html`. Null when the problem is not about one particular field.
+   *
+   */
+  readonly field?: string | null;
+  /**
+   * The error code a real submit would fail with. Look it up in the error catalog to see what it means and what to do about it.
+   *
+   */
+  readonly code: string;
+  /**
+   * What is wrong, worded so you can show it directly to whoever is authoring the template.
+   *
+   */
+  readonly message: string;
+};
+
+/**
+ * The outcome of a submit. This has the same shape whether the submit was a validation run or a real one, so you can read `valid` and `version` the same way either time to see what happened.
+ *
+ */
+export type EmailTemplateSubmitResult = {
+  /**
+   * Whether the version passed every check.
+   */
+  readonly valid: boolean;
+  /**
+   * Every problem found across the draft's languages. Empty when `valid` is `true`.
+   *
+   */
+  readonly errors: Array<EmailTemplateSubmitProblem>;
+  /**
+   * The version this submit created, or null when it was only a validation run and nothing got frozen. As soon as this is not null, sends already use that version. No further action is required to make it live.
+   *
+   */
+  readonly version?: EmailTemplateVersion | null;
+  /**
+   * The template this submit addressed.
+   */
+  readonly template_ref: EmailTemplateRef;
+  /**
+   * The draft this submit addressed: the one it froze, or on a validation run the one it checked and left as it was. The frozen version, when there is one, is `version`.
+   *
+   */
+  readonly version_id: EmailTemplateVersionId;
+  readonly compatibility_severity: EmailCompatibilityReportSeverity;
+  /**
+   * What the draft's HTML uses that mail clients remove, ignore, or render inconsistently, across every language, in alphabetical order of language tag and then the order the patterns appear. Empty when nothing is worth reporting. Advisory, and separate from `errors`: a finding never fails a submit, so the version froze either way. Each finding names the `language` it is in, and its line and column count in that language's HTML, which the language read returns as `content.html`. At most 200 findings come back, the first 200 in that order, so a draft that reaches the cap can omit a later language's findings entirely rather than trimming each language: read a language's own findings from its read or its write. `compatibility_severity` is derived from every finding the draft produced, including any beyond those 200.
+   *
+   */
+  readonly compatibility: Array<EmailCompatibilityFinding>;
 };
 
 export type InboundAddressId = string;
@@ -14212,6 +15710,224 @@ export type EmailEventListWritable = {
 } & ListEnvelope;
 
 /**
+ * The template a broadcast sends, and the exact version of it the broadcast is fixed to. The template cannot be one that requires every send to name a language, because a broadcast never names one, so a template that insists on it has nothing to work with.
+ *
+ */
+export type EmailBroadcastTemplateWritable = {
+  /**
+   * Which template the broadcast sends. Which version of it the send is fixed to is `version_id`.
+   *
+   */
+  id: EmailTemplateId;
+};
+
+export type EmailBroadcastWritable = {
+  /**
+   * The address this broadcast sends from. `name` is filled in when the broadcast was given a display name to send under. Left out on a draft that has not picked a sender yet.
+   */
+  from?: EmailAddress;
+  /**
+   * The audience this broadcast sends to. When the send starts we turn the audience into a list of recipients, and you can read that list a page at a time with [List recipients of a broadcast](/docs/api/reference/list-email-broadcast-recipients). Left out on a draft that has not picked an audience yet.
+   */
+  audience_id?: AudienceId;
+  /**
+   * The template this broadcast sends. A broadcast sends the template's published version, and the exact version is fixed when the broadcast is prepared for sending, so publishing a new version afterwards does not change what this broadcast sends. Null on a draft that has not chosen a template yet.
+   */
+  template?: EmailBroadcastTemplateWritable | null;
+  /**
+   * What kind of email this is, which decides how suppressions apply to it. A `marketing` broadcast is held back from every suppressed address. A `transactional` one still goes to addresses suppressed for a complaint or an unsubscribe, because those suppressions are about marketing mail.
+   */
+  category: "marketing" | "transactional";
+  /**
+   * The IP pool this broadcast sends from, or `ipp_shared` when it sends through the shared pool. Absent when it sends on your organization's default pool.
+   */
+  ip_pool_id?: string;
+  /**
+   * Where replies to this broadcast go, if you want them somewhere other than the `from` address. Absent when you have not set one.
+   */
+  reply_to?: Array<EmailAddress>;
+  /**
+   * Any custom email headers set on the broadcast. Returned on a single broadcast read and on the broadcast that creating, updating, sending or canceling one returns, and absent from the list. The unsubscribe headers we add ourselves are not included.
+   */
+  headers?: {
+    [key: string]: string;
+  };
+  /**
+   * Labels on this broadcast, each one a `name` and a `value`, that you can filter and search broadcasts by. Use tags for anything you want to find broadcasts by later, and `metadata` for data you only want handed back to you.
+   */
+  tags?: Array<Tag>;
+  /**
+   * Any JSON you want to keep on the broadcast. We store it and hand it back in webhook payloads, and that is all it does. If you want to search or filter by it, use `tags` instead.
+   */
+  metadata?: {
+    [key: string]: unknown;
+  };
+  /**
+   * Whether opens are tracked for this broadcast.
+   */
+  track_opens: boolean;
+  /**
+   * Whether link clicks are tracked for this broadcast.
+   */
+  track_clicks: boolean;
+};
+
+export type EmailBroadcastListWritable = {
+  /**
+   * Page of broadcast objects.
+   */
+  data: Array<EmailBroadcastWritable>;
+} & ListEnvelope;
+
+/**
+ * A broadcast sends one email to a whole audience. Every field here is optional, so you can create an empty draft and fill it in later. To actually send, a broadcast needs three things: a `from` address on a verified domain, an `audience_id`, and a `template`.
+ *
+ * Leave `send` false, which is the default, and you get a draft. Update it as often as you like, then send it when you are ready. Set `send` to true and the broadcast goes out as soon as it is created, or at `scheduled_at` if you set one.
+ *
+ */
+export type EmailBroadcastCreateRequestWritable = {
+  /**
+   * The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.
+   */
+  from?: EmailAddressInput;
+  /**
+   * The audience this broadcast sends to. We take the audience's contacts as they stand when the send starts and drop any suppressed addresses, and what is left is who gets the email.
+   */
+  audience_id?: AudienceId;
+  /**
+   * The template the broadcast sends. You can leave it out on a draft, but a broadcast cannot send without one. The template's published version is fixed when the broadcast is prepared for sending, and each recipient's contact properties are filled into the content as the email goes out.
+   */
+  template?: EmailBroadcastTemplateWritable;
+  /**
+   * Where replies to this broadcast should go. Give each address as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. You can list more than one.
+   */
+  reply_to?: Array<EmailAddressInput>;
+  /**
+   * Custom email headers to set on the broadcast, as name and value pairs. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.
+   *
+   */
+  headers?: {
+    [key: string]: string;
+  };
+  /**
+   * Labels on this broadcast, each one a `name` and a `value`, up to 20 of them. You can filter the broadcast list by a tag, break your stats down by one, and read them back off webhook payloads. Use tags for anything you want to find broadcasts by later, and `metadata` for data you only want handed back to you.
+   */
+  tags?: Array<Tag>;
+  /**
+   * Any JSON you want to keep on the broadcast. We store it, hand it back when you read the broadcast, and include it in webhook payloads, and you can break stats down by a path inside it such as `metadata.order_id`. It can be up to 2 KB once serialized.
+   */
+  metadata?: {
+    [key: string]: unknown;
+  };
+  /**
+   * Whether to track opens for this broadcast.
+   */
+  track_opens?: boolean;
+  /**
+   * Whether to track link clicks for this broadcast.
+   */
+  track_clicks?: boolean;
+  /**
+   * The IP pool to send this broadcast from. Pass a pool ID, or `ipp_shared` to send through the shared pool on purpose. Leave it out and the broadcast uses your organization's default pool. A pool we do not recognize, or one with no IPs available to send from, is refused with a `422`.
+   */
+  ip_pool_id?: string;
+  /**
+   * What kind of email this is. A broadcast sets this itself rather than taking it from its template, and it decides two things: which suppressions apply, and whether we add an unsubscribe header.
+   *
+   * `marketing`, the default, is held back from every suppressed address and has the one-click unsubscribe headers. `transactional` still goes to addresses suppressed for a complaint or an unsubscribe, and has no unsubscribe header. Only use `transactional` for genuine operational mail such as a terms-of-service update or a service outage notice. Marketing content sent this way still reaches people who have already unsubscribed from you.
+   *
+   */
+  category?: "marketing" | "transactional";
+  /**
+   * Whether to send the broadcast as soon as it is created. Set it to true and the broadcast goes out immediately, or at `scheduled_at` if you set one. Leave it false, which is the default, and you get a draft you can update and send later.
+   */
+  send?: boolean;
+  /**
+   * When to send the broadcast. It has to be at least 30 seconds and at most 365 days from now. It requires `send` to be true, so a `scheduled_at` on its own is refused rather than saved on the draft.
+   *
+   */
+  scheduled_at?: string;
+};
+
+/**
+ * Changes a broadcast that is still a draft or is scheduled. Whatever you send here is applied, and anything you leave out keeps the value it already had. Once a broadcast has started sending it can no longer be edited.
+ *
+ */
+export type EmailBroadcastUpdateRequestWritable = {
+  /**
+   * The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.
+   */
+  from?: EmailAddressInput;
+  /**
+   * The audience this broadcast sends to. We take the audience's contacts as they stand when the send starts and drop any suppressed addresses, and what is left is who gets the email.
+   */
+  audience_id?: AudienceId;
+  /**
+   * The template the broadcast sends. Its published version is fixed when the broadcast is prepared for sending. Set this to null to take the template off a draft, or leave it out to keep the one already set.
+   */
+  template?: EmailBroadcastTemplateWritable | null;
+  /**
+   * Where replies to this broadcast should go. Set this to null to remove the addresses already set.
+   */
+  reply_to?: Array<EmailAddressInput> | null;
+  /**
+   * Custom email headers to set on the broadcast, as name and value pairs. What you send replaces the headers the draft already had rather than adding to them. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.
+   *
+   */
+  headers?: {
+    [key: string]: string;
+  };
+  /**
+   * Labels on this broadcast, each one a `name` and a `value`, that you can filter and search broadcasts by. What you send replaces the tags the draft already had rather than adding to them.
+   */
+  tags?: Array<Tag>;
+  /**
+   * Any JSON you want to keep on the broadcast, up to 2 KB once serialized. What you send replaces the metadata the draft already had rather than merging into it.
+   */
+  metadata?: {
+    [key: string]: unknown;
+  };
+  /**
+   * Whether to track opens for this broadcast.
+   */
+  track_opens?: boolean;
+  /**
+   * Whether to track link clicks for this broadcast.
+   */
+  track_clicks?: boolean;
+  /**
+   * The IP pool to send this broadcast from. Pass a pool ID, or `ipp_shared` to send through the shared pool on purpose. Set it to null to fall back to your organization's default pool.
+   */
+  ip_pool_id?: string | null;
+  /**
+   * What kind of email this is. It decides two things: which suppressions apply, and whether we add an unsubscribe header.
+   *
+   * `marketing` is held back from every suppressed address and has the one-click unsubscribe headers. `transactional` still goes to addresses suppressed for a complaint or an unsubscribe, and has no unsubscribe header. Only use `transactional` for genuine operational mail such as a terms-of-service update or a service outage notice. Marketing content sent this way reaches people who have already unsubscribed from you.
+   *
+   */
+  category?: "marketing" | "transactional";
+};
+
+/**
+ * How many people a broadcast would reach right now, narrowing from everyone in the audience down to the ones it could actually be sent to.
+ *
+ * These are live numbers, worked out at the moment you ask. Audience membership and suppressions change, so they can drift between now and when the broadcast sends.
+ *
+ * **They are about the audience, not about delivery, and sending does not change them.** Once the broadcast has sent, its own `recipient_count` is the number that actually went out, and what each of those recipients did with the message is in [the broadcast's recipients](/docs/api/reference/list-email-broadcast-recipients) and [its events](/docs/api/reference/list-email-broadcast-events). `status` is here so you can tell which question these numbers are answering, and `broadcast_id` names what they are about.
+ *
+ */
+export type EmailBroadcastCountsWritable = {
+  [key: string]: never;
+};
+
+export type EmailBroadcastClickedLinkListWritable = {
+  /**
+   * The broadcast's clicked URLs, most-clicked first, capped at 100 rows.
+   */
+  data: Array<unknown>;
+};
+
+/**
  * A compact reference to an audience, carrying its ID and display name.
  */
 export type AudienceRefWritable = {
@@ -15728,6 +17444,19 @@ export type EmailTemplateListWritable = {
   data: Array<EmailTemplateSummaryWritable>;
 } & ListEnvelope;
 
+export type EmailTemplateWritable = {
+  /**
+   * The template's display name, shown wherever the template is listed. You can change it any time. It defaults to the slug if you do not set one.
+   */
+  name: string;
+  /**
+   * What the template is for, in your own words. Null if you have not set one.
+   */
+  description: string | null;
+  category: EmailTemplateCategory;
+  source: EmailTemplateSource;
+};
+
 export type ActorWritable = {
   /**
    * Actor identifier.
@@ -15737,6 +17466,65 @@ export type ActorWritable = {
    * Who or what performed the action: `user` for a member's own session, `oauth_token` for a token issued to a caller on a member's behalf, `api_key` for a workspace API key, `system` for our own automation, `sso` for an organization's SSO connection, and `service_account` for a workspace's connected Integration acting with no member behind it. Open enum: new actor types may be added over time, so treat any unrecognized value as a future type rather than an error.
    */
   type: string;
+};
+
+/**
+ * One version of a template, without its content. Version history lists every version a template has ever had, and each one has a full copy of the content in every language it was published with. The listing describes the versions; read a single version to get what it holds.
+ *
+ */
+export type EmailTemplateVersionSummaryWritable = {
+  [key: string]: never;
+};
+
+export type EmailTemplateVersionListWritable = {
+  /**
+   * One page of the template's versions, newest first. Each entry describes a version and which languages it holds. Read a single version if you want its actual content.
+   *
+   */
+  data: Array<EmailTemplateVersionSummaryWritable>;
+} & ListEnvelope;
+
+export type EmailTemplateBroadcastListWritable = {
+  /**
+   * Page of broadcasts blocking a delete of the template, newest first.
+   */
+  data: Array<unknown>;
+} & ListEnvelope;
+
+export type EmailTemplateVersionWritable = {
+  [key: string]: never;
+};
+
+export type EmailTemplateLanguageListWritable = {
+  /**
+   * Every language the version holds, ordered by language tag, without their content. Read a single language to get its content.
+   *
+   */
+  data: Array<unknown>;
+};
+
+/**
+ * One language of a template version: its content plus the identity a concurrent-edit check needs. Reading a language returns everything you need to edit it and save it back.
+ *
+ */
+export type EmailTemplateLanguageWritable = {
+  content?: EmailTemplateLanguageContent;
+};
+
+/**
+ * The identity, revision counters, and fingerprint of a saved language. The response does not include its content; read the language to retrieve it.
+ *
+ */
+export type EmailTemplateLanguageSavedWritable = {
+  [key: string]: never;
+};
+
+/**
+ * The outcome of a submit. This has the same shape whether the submit was a validation run or a real one, so you can read `valid` and `version` the same way either time to see what happened.
+ *
+ */
+export type EmailTemplateSubmitResultWritable = {
+  [key: string]: never;
 };
 
 /**
@@ -16637,6 +18425,29 @@ export type CreatedBefore = string;
  *
  */
 export type TagFilter = Array<string>;
+
+/**
+ * Filter by lifecycle status. Repeat the parameter to match more than one status, for example `?status=accepted&status=sending`.
+ *
+ */
+export type EmailBroadcastStatusFilter = Array<EmailBroadcastStatus>;
+
+/**
+ * Filter by audience. Only broadcasts that use this audience are returned.
+ */
+export type EmailBroadcastAudienceFilter = AudienceId;
+
+/**
+ * Filter by tag. Pass `name` to match any broadcast that has that tag name, or pass `name:value` to match a specific tag pair, for example `campaign:spring_launch`.
+ *
+ */
+export type EmailBroadcastTagFilter = string;
+
+/**
+ * Case-insensitive substring match against the broadcast's tag names and values, or the referenced template's name.
+ *
+ */
+export type EmailBroadcastSearchFilter = string;
 
 /**
  * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
@@ -17693,6 +19504,893 @@ export type CancelEmailMessageResponses = {
 
 export type CancelEmailMessageResponse =
   CancelEmailMessageResponses[keyof CancelEmailMessageResponses];
+
+export type ListEmailBroadcastsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * Filter by lifecycle status. Repeat the parameter to match more than one status, for example `?status=accepted&status=sending`.
+     *
+     */
+    status?: Array<EmailBroadcastStatus>;
+    /**
+     * Filter by audience. Only broadcasts that use this audience are returned.
+     */
+    audience_id?: AudienceId;
+    /**
+     * Filter by tag. Pass `name` to match any broadcast that has that tag name, or pass `name:value` to match a specific tag pair, for example `campaign:spring_launch`.
+     *
+     */
+    tag?: string;
+    /**
+     * Case-insensitive substring match against the broadcast's tag names and values, or the referenced template's name.
+     *
+     */
+    q?: string;
+    /**
+     * Limits the response to resources created at or after this timestamp. Combine it with `created_before` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_after?: string;
+    /**
+     * Limits the response to resources created before this timestamp. Combine it with `created_after` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_before?: string;
+  };
+  url: "/v1/email/broadcasts";
+};
+
+export type ListEmailBroadcastsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEmailBroadcastsError =
+  ListEmailBroadcastsErrors[keyof ListEmailBroadcastsErrors];
+
+export type ListEmailBroadcastsResponses = {
+  /**
+   * Paginated list of broadcasts.
+   */
+  200: EmailBroadcastList;
+};
+
+export type ListEmailBroadcastsResponse =
+  ListEmailBroadcastsResponses[keyof ListEmailBroadcastsResponses];
+
+export type CreateEmailBroadcastData = {
+  body: EmailBroadcastCreateRequestWritable;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/email/broadcasts";
+};
+
+export type CreateEmailBroadcastErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateEmailBroadcastError =
+  CreateEmailBroadcastErrors[keyof CreateEmailBroadcastErrors];
+
+export type CreateEmailBroadcastResponses = {
+  /**
+   * Draft broadcast created.
+   */
+  201: EmailBroadcast;
+  /**
+   * Broadcast accepted for delivery.
+   */
+  202: EmailBroadcast;
+};
+
+export type CreateEmailBroadcastResponse =
+  CreateEmailBroadcastResponses[keyof CreateEmailBroadcastResponses];
+
+export type DeleteEmailBroadcastData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * Broadcast identifier. Starts with `eb_`.
+     */
+    broadcast_id: string;
+  };
+  query?: never;
+  url: "/v1/email/broadcasts/{broadcast_id}";
+};
+
+export type DeleteEmailBroadcastErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteEmailBroadcastError =
+  DeleteEmailBroadcastErrors[keyof DeleteEmailBroadcastErrors];
+
+export type DeleteEmailBroadcastResponses = {
+  /**
+   * Draft broadcast deleted.
+   */
+  204: void;
+};
+
+export type DeleteEmailBroadcastResponse =
+  DeleteEmailBroadcastResponses[keyof DeleteEmailBroadcastResponses];
+
+export type GetEmailBroadcastData = {
+  body?: never;
+  path: {
+    /**
+     * Broadcast identifier. Starts with `eb_`.
+     */
+    broadcast_id: string;
+  };
+  query?: never;
+  url: "/v1/email/broadcasts/{broadcast_id}";
+};
+
+export type GetEmailBroadcastErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEmailBroadcastError =
+  GetEmailBroadcastErrors[keyof GetEmailBroadcastErrors];
+
+export type GetEmailBroadcastResponses = {
+  /**
+   * The broadcast.
+   */
+  200: EmailBroadcast;
+};
+
+export type GetEmailBroadcastResponse =
+  GetEmailBroadcastResponses[keyof GetEmailBroadcastResponses];
+
+export type UpdateEmailBroadcastData = {
+  body: EmailBroadcastUpdateRequestWritable;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * Broadcast identifier. Starts with `eb_`.
+     */
+    broadcast_id: string;
+  };
+  query?: never;
+  url: "/v1/email/broadcasts/{broadcast_id}";
+};
+
+export type UpdateEmailBroadcastErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateEmailBroadcastError =
+  UpdateEmailBroadcastErrors[keyof UpdateEmailBroadcastErrors];
+
+export type UpdateEmailBroadcastResponses = {
+  /**
+   * The updated broadcast.
+   */
+  200: EmailBroadcast;
+};
+
+export type UpdateEmailBroadcastResponse =
+  UpdateEmailBroadcastResponses[keyof UpdateEmailBroadcastResponses];
+
+export type GetEmailBroadcastCountsData = {
+  body?: never;
+  path: {
+    /**
+     * Broadcast identifier. Starts with `eb_`.
+     */
+    broadcast_id: EmailBroadcastId;
+  };
+  query?: never;
+  url: "/v1/email/broadcasts/{broadcast_id}/counts";
+};
+
+export type GetEmailBroadcastCountsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEmailBroadcastCountsError =
+  GetEmailBroadcastCountsErrors[keyof GetEmailBroadcastCountsErrors];
+
+export type GetEmailBroadcastCountsResponses = {
+  /**
+   * The broadcast's audience counts.
+   */
+  200: EmailBroadcastCounts;
+};
+
+export type GetEmailBroadcastCountsResponse =
+  GetEmailBroadcastCountsResponses[keyof GetEmailBroadcastCountsResponses];
+
+export type GetEmailBroadcastSendQuotaData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the broadcast whose send allowance to check.
+     */
+    broadcast_id: EmailBroadcastId;
+  };
+  query?: never;
+  url: "/v1/email/broadcasts/{broadcast_id}/send-quota";
+};
+
+export type GetEmailBroadcastSendQuotaErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEmailBroadcastSendQuotaError =
+  GetEmailBroadcastSendQuotaErrors[keyof GetEmailBroadcastSendQuotaErrors];
+
+export type GetEmailBroadcastSendQuotaResponses = {
+  /**
+   * How much of the broadcast the send allowance covers.
+   */
+  200: EmailBroadcastSendQuota;
+};
+
+export type GetEmailBroadcastSendQuotaResponse =
+  GetEmailBroadcastSendQuotaResponses[keyof GetEmailBroadcastSendQuotaResponses];
+
+export type ListEmailBroadcastRecipientsData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the broadcast whose recipients to read.
+     */
+    broadcast_id: string;
+  };
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * Return only the recipient at this address. Exact match, normalised to lowercase before comparison, so it returns at most one row.
+     */
+    to?: string;
+  };
+  url: "/v1/email/broadcasts/{broadcast_id}/recipients";
+};
+
+export type ListEmailBroadcastRecipientsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEmailBroadcastRecipientsError =
+  ListEmailBroadcastRecipientsErrors[keyof ListEmailBroadcastRecipientsErrors];
+
+export type ListEmailBroadcastRecipientsResponses = {
+  /**
+   * Paginated list of recipients for this broadcast.
+   */
+  200: EmailRecipientList;
+};
+
+export type ListEmailBroadcastRecipientsResponse =
+  ListEmailBroadcastRecipientsResponses[keyof ListEmailBroadcastRecipientsResponses];
+
+export type ListEmailBroadcastEventsData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the broadcast whose event timeline to read.
+     */
+    broadcast_id: string;
+  };
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * Filter by event type, for example `email.bounced` or `email.opened`. A broadcast timeline is recipient-scoped, so `email.scheduled` and `email.canceled` never appear on it; a canceled broadcast reports that in its own `status`.
+     */
+    type?: EmailEventType;
+  };
+  url: "/v1/email/broadcasts/{broadcast_id}/events";
+};
+
+export type ListEmailBroadcastEventsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEmailBroadcastEventsError =
+  ListEmailBroadcastEventsErrors[keyof ListEmailBroadcastEventsErrors];
+
+export type ListEmailBroadcastEventsResponses = {
+  /**
+   * Paginated event timeline for this broadcast.
+   */
+  200: EmailEventList;
+};
+
+export type ListEmailBroadcastEventsResponse =
+  ListEmailBroadcastEventsResponses[keyof ListEmailBroadcastEventsResponses];
+
+export type ListEmailBroadcastClickedLinksData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the broadcast whose clicked links to read.
+     */
+    broadcast_id: EmailBroadcastId;
+  };
+  query?: never;
+  url: "/v1/email/broadcasts/{broadcast_id}/clicked-links";
+};
+
+export type ListEmailBroadcastClickedLinksErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEmailBroadcastClickedLinksError =
+  ListEmailBroadcastClickedLinksErrors[keyof ListEmailBroadcastClickedLinksErrors];
+
+export type ListEmailBroadcastClickedLinksResponses = {
+  /**
+   * The broadcast's clicked links, grouped by URL.
+   */
+  200: EmailBroadcastClickedLinkList;
+};
+
+export type ListEmailBroadcastClickedLinksResponse =
+  ListEmailBroadcastClickedLinksResponses[keyof ListEmailBroadcastClickedLinksResponses];
+
+export type SendEmailBroadcastData = {
+  body?: EmailBroadcastSendNowRequest;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * Broadcast identifier. Starts with `eb_`.
+     */
+    broadcast_id: string;
+  };
+  query?: never;
+  url: "/v1/email/broadcasts/{broadcast_id}/send";
+};
+
+export type SendEmailBroadcastErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type SendEmailBroadcastError =
+  SendEmailBroadcastErrors[keyof SendEmailBroadcastErrors];
+
+export type SendEmailBroadcastResponses = {
+  /**
+   * Broadcast accepted for delivery.
+   */
+  202: EmailBroadcast;
+};
+
+export type SendEmailBroadcastResponse =
+  SendEmailBroadcastResponses[keyof SendEmailBroadcastResponses];
+
+export type CancelEmailBroadcastData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * Broadcast identifier. Starts with `eb_`.
+     */
+    broadcast_id: string;
+  };
+  query?: never;
+  url: "/v1/email/broadcasts/{broadcast_id}/cancel";
+};
+
+export type CancelEmailBroadcastErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CancelEmailBroadcastError =
+  CancelEmailBroadcastErrors[keyof CancelEmailBroadcastErrors];
+
+export type CancelEmailBroadcastResponses = {
+  /**
+   * Cancellation accepted.
+   */
+  202: EmailBroadcast;
+};
+
+export type CancelEmailBroadcastResponse =
+  CancelEmailBroadcastResponses[keyof CancelEmailBroadcastResponses];
 
 export type ListContactsData = {
   body?: never;
@@ -26939,7 +29637,7 @@ export type ListEmailTemplatesData = {
     /**
      * Filter by the visual theme a built-in template is designed in. Only our built-in templates have a theme, so naming one returns built-ins alone.
      */
-    theme?: EmailTemplateTheme;
+    theme?: EmailTemplateThemeFilter;
     /**
      * A case-insensitive substring search across the template's slug, name, and description.
      */
@@ -26996,6 +29694,1366 @@ export type ListEmailTemplatesResponses = {
 
 export type ListEmailTemplatesResponse =
   ListEmailTemplatesResponses[keyof ListEmailTemplatesResponses];
+
+export type CreateEmailTemplateData = {
+  body: EmailTemplateCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/email/templates";
+};
+
+export type CreateEmailTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateEmailTemplateError =
+  CreateEmailTemplateErrors[keyof CreateEmailTemplateErrors];
+
+export type CreateEmailTemplateResponses = {
+  /**
+   * Email template created.
+   */
+  201: EmailTemplate;
+};
+
+export type CreateEmailTemplateResponse =
+  CreateEmailTemplateResponses[keyof CreateEmailTemplateResponses];
+
+export type DeleteEmailTemplateData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. On read, a built-in `system` template's `bird_` slug also resolves here. Write operations (update, delete) accept a workspace template only, because a `system` template is immutable.
+     *
+     */
+    template_ref: string;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}";
+};
+
+export type DeleteEmailTemplateErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteEmailTemplateError =
+  DeleteEmailTemplateErrors[keyof DeleteEmailTemplateErrors];
+
+export type DeleteEmailTemplateResponses = {
+  /**
+   * Email template deleted.
+   */
+  204: void;
+};
+
+export type DeleteEmailTemplateResponse =
+  DeleteEmailTemplateResponses[keyof DeleteEmailTemplateResponses];
+
+export type GetEmailTemplateData = {
+  body?: never;
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. On read, a built-in `system` template's `bird_` slug also resolves here. Write operations (update, delete) accept a workspace template only, because a `system` template is immutable.
+     *
+     */
+    template_ref: string;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}";
+};
+
+export type GetEmailTemplateErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEmailTemplateError =
+  GetEmailTemplateErrors[keyof GetEmailTemplateErrors];
+
+export type GetEmailTemplateResponses = {
+  /**
+   * The requested email template metadata.
+   */
+  200: EmailTemplate;
+};
+
+export type GetEmailTemplateResponse =
+  GetEmailTemplateResponses[keyof GetEmailTemplateResponses];
+
+export type UpdateEmailTemplateData = {
+  body: EmailTemplateUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. On read, a built-in `system` template's `bird_` slug also resolves here. Write operations (update, delete) accept a workspace template only, because a `system` template is immutable.
+     *
+     */
+    template_ref: string;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}";
+};
+
+export type UpdateEmailTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateEmailTemplateError =
+  UpdateEmailTemplateErrors[keyof UpdateEmailTemplateErrors];
+
+export type UpdateEmailTemplateResponses = {
+  /**
+   * The template with the updated metadata and draft settings.
+   */
+  200: EmailTemplate;
+};
+
+export type UpdateEmailTemplateResponse =
+  UpdateEmailTemplateResponses[keyof UpdateEmailTemplateResponses];
+
+export type DuplicateEmailTemplateData = {
+  body?: EmailTemplateDuplicate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * The source template to copy: a workspace template's id (`emt_…`) or slug, or a built-in `system` template's `bird_` slug. The copy is always a new workspace template.
+     *
+     */
+    template_ref: string;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}/duplicate";
+};
+
+export type DuplicateEmailTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DuplicateEmailTemplateError =
+  DuplicateEmailTemplateErrors[keyof DuplicateEmailTemplateErrors];
+
+export type DuplicateEmailTemplateResponses = {
+  /**
+   * The newly created template copy.
+   */
+  201: EmailTemplate;
+};
+
+export type DuplicateEmailTemplateResponse =
+  DuplicateEmailTemplateResponses[keyof DuplicateEmailTemplateResponses];
+
+export type GetEmailTemplatePreviewData = {
+  body?: EmailTemplatePreviewRequest;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * The template to preview: a workspace template's id (`emt_…`) or slug, or a built-in `system` template's `bird_` slug.
+     *
+     */
+    template_ref: string;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}/preview";
+};
+
+export type GetEmailTemplatePreviewErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailTemplatePreviewError =
+  GetEmailTemplatePreviewErrors[keyof GetEmailTemplatePreviewErrors];
+
+export type GetEmailTemplatePreviewResponses = {
+  /**
+   * The rendered preview.
+   */
+  200: EmailTemplatePreview;
+};
+
+export type GetEmailTemplatePreviewResponse =
+  GetEmailTemplatePreviewResponses[keyof GetEmailTemplatePreviewResponses];
+
+export type ListEmailTemplateVersionsData = {
+  body?: never;
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. A built-in `system` template's `bird_` slug also resolves here, to its one permanently published version.
+     *
+     */
+    template_ref: string;
+  };
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/email/templates/{template_ref}/versions";
+};
+
+export type ListEmailTemplateVersionsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEmailTemplateVersionsError =
+  ListEmailTemplateVersionsErrors[keyof ListEmailTemplateVersionsErrors];
+
+export type ListEmailTemplateVersionsResponses = {
+  /**
+   * The template's versions.
+   */
+  200: EmailTemplateVersionList;
+};
+
+export type ListEmailTemplateVersionsResponse =
+  ListEmailTemplateVersionsResponses[keyof ListEmailTemplateVersionsResponses];
+
+export type ListEmailTemplateBroadcastsData = {
+  body?: never;
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. A built-in `system` template's `bird_` slug also resolves here, but a system template can never be referenced by a broadcast, so this always returns an empty page for one.
+     *
+     */
+    template_ref: string;
+  };
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/email/templates/{template_ref}/broadcasts";
+};
+
+export type ListEmailTemplateBroadcastsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEmailTemplateBroadcastsError =
+  ListEmailTemplateBroadcastsErrors[keyof ListEmailTemplateBroadcastsErrors];
+
+export type ListEmailTemplateBroadcastsResponses = {
+  /**
+   * The broadcasts blocking a delete of the template.
+   */
+  200: EmailTemplateBroadcastList;
+};
+
+export type ListEmailTemplateBroadcastsResponse =
+  ListEmailTemplateBroadcastsResponses[keyof ListEmailTemplateBroadcastsResponses];
+
+export type DeleteEmailTemplateVersionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. On read, a built-in `system` template's `bird_` slug also resolves here, to its one permanently published version. Discarding a draft requires a workspace template, because a `system` template has no draft and returns `404` `not_found_error`.
+     *
+     */
+    template_ref: string;
+    version_id: EmailTemplateVersionId;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}/versions/{version_id}";
+};
+
+export type DeleteEmailTemplateVersionErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteEmailTemplateVersionError =
+  DeleteEmailTemplateVersionErrors[keyof DeleteEmailTemplateVersionErrors];
+
+export type DeleteEmailTemplateVersionResponses = {
+  /**
+   * The draft was reset.
+   */
+  204: void;
+};
+
+export type DeleteEmailTemplateVersionResponse =
+  DeleteEmailTemplateVersionResponses[keyof DeleteEmailTemplateVersionResponses];
+
+export type GetEmailTemplateVersionData = {
+  body?: never;
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. On read, a built-in `system` template's `bird_` slug also resolves here, to its one permanently published version. Discarding a draft requires a workspace template, because a `system` template has no draft and returns `404` `not_found_error`.
+     *
+     */
+    template_ref: string;
+    version_id: EmailTemplateVersionId;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}/versions/{version_id}";
+};
+
+export type GetEmailTemplateVersionErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEmailTemplateVersionError =
+  GetEmailTemplateVersionErrors[keyof GetEmailTemplateVersionErrors];
+
+export type GetEmailTemplateVersionResponses = {
+  /**
+   * Email template version object.
+   */
+  200: EmailTemplateVersion;
+};
+
+export type GetEmailTemplateVersionResponse =
+  GetEmailTemplateVersionResponses[keyof GetEmailTemplateVersionResponses];
+
+export type ListEmailTemplateVersionLanguagesData = {
+  body?: never;
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. A built-in `system` template's `bird_` slug also resolves here, to its one permanently published version.
+     *
+     */
+    template_ref: string;
+    version_id: EmailTemplateVersionId;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}/versions/{version_id}/languages";
+};
+
+export type ListEmailTemplateVersionLanguagesErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEmailTemplateVersionLanguagesError =
+  ListEmailTemplateVersionLanguagesErrors[keyof ListEmailTemplateVersionLanguagesErrors];
+
+export type ListEmailTemplateVersionLanguagesResponses = {
+  /**
+   * The version's languages.
+   */
+  200: EmailTemplateLanguageList;
+};
+
+export type ListEmailTemplateVersionLanguagesResponse =
+  ListEmailTemplateVersionLanguagesResponses[keyof ListEmailTemplateVersionLanguagesResponses];
+
+export type DeleteEmailTemplateLanguageData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. On read, a built-in `system` template's `bird_` slug also resolves here. Writing or removing a language requires a workspace template, because a `system` template has no draft to edit and returns `404` `not_found_error`.
+     *
+     */
+    template_ref: string;
+    version_id: EmailTemplateVersionId;
+    language: LanguageTag;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}/versions/{version_id}/languages/{language}";
+};
+
+export type DeleteEmailTemplateLanguageErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteEmailTemplateLanguageError =
+  DeleteEmailTemplateLanguageErrors[keyof DeleteEmailTemplateLanguageErrors];
+
+export type DeleteEmailTemplateLanguageResponses = {
+  /**
+   * The language was removed.
+   */
+  204: void;
+};
+
+export type DeleteEmailTemplateLanguageResponse =
+  DeleteEmailTemplateLanguageResponses[keyof DeleteEmailTemplateLanguageResponses];
+
+export type GetEmailTemplateLanguageData = {
+  body?: never;
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. On read, a built-in `system` template's `bird_` slug also resolves here. Writing or removing a language requires a workspace template, because a `system` template has no draft to edit and returns `404` `not_found_error`.
+     *
+     */
+    template_ref: string;
+    version_id: EmailTemplateVersionId;
+    language: LanguageTag;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}/versions/{version_id}/languages/{language}";
+};
+
+export type GetEmailTemplateLanguageErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEmailTemplateLanguageError =
+  GetEmailTemplateLanguageErrors[keyof GetEmailTemplateLanguageErrors];
+
+export type GetEmailTemplateLanguageResponses = {
+  /**
+   * The version's content for this language.
+   */
+  200: EmailTemplateLanguage;
+};
+
+export type GetEmailTemplateLanguageResponse =
+  GetEmailTemplateLanguageResponses[keyof GetEmailTemplateLanguageResponses];
+
+export type UpdateEmailTemplateLanguageData = {
+  body: EmailTemplateLanguageUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. On read, a built-in `system` template's `bird_` slug also resolves here. Writing or removing a language requires a workspace template, because a `system` template has no draft to edit and returns `404` `not_found_error`.
+     *
+     */
+    template_ref: string;
+    version_id: EmailTemplateVersionId;
+    language: LanguageTag;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}/versions/{version_id}/languages/{language}";
+};
+
+export type UpdateEmailTemplateLanguageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateEmailTemplateLanguageError =
+  UpdateEmailTemplateLanguageErrors[keyof UpdateEmailTemplateLanguageErrors];
+
+export type UpdateEmailTemplateLanguageResponses = {
+  /**
+   * The edited language's new revisions and fingerprint.
+   */
+  200: EmailTemplateLanguageSaved;
+};
+
+export type UpdateEmailTemplateLanguageResponse =
+  UpdateEmailTemplateLanguageResponses[keyof UpdateEmailTemplateLanguageResponses];
+
+export type UpsertEmailTemplateLanguageData = {
+  body: EmailTemplateLanguageUpsert;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. On read, a built-in `system` template's `bird_` slug also resolves here. Writing or removing a language requires a workspace template, because a `system` template has no draft to edit and returns `404` `not_found_error`.
+     *
+     */
+    template_ref: string;
+    version_id: EmailTemplateVersionId;
+    language: LanguageTag;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}/versions/{version_id}/languages/{language}";
+};
+
+export type UpsertEmailTemplateLanguageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpsertEmailTemplateLanguageError =
+  UpsertEmailTemplateLanguageErrors[keyof UpsertEmailTemplateLanguageErrors];
+
+export type UpsertEmailTemplateLanguageResponses = {
+  /**
+   * The saved language's new revisions and fingerprint.
+   */
+  200: EmailTemplateLanguageSaved;
+};
+
+export type UpsertEmailTemplateLanguageResponse =
+  UpsertEmailTemplateLanguageResponses[keyof UpsertEmailTemplateLanguageResponses];
+
+export type RollbackEmailTemplateData = {
+  body: EmailTemplateRollback;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. Rollback resets a draft, and a built-in `system` template has no draft, so its `bird_` slug returns `404` `not_found_error` here.
+     *
+     */
+    template_ref: string;
+    version_id: EmailTemplateVersionId;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}/versions/{version_id}/rollback";
+};
+
+export type RollbackEmailTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type RollbackEmailTemplateError =
+  RollbackEmailTemplateErrors[keyof RollbackEmailTemplateErrors];
+
+export type RollbackEmailTemplateResponses = {
+  /**
+   * The template, with its draft reset to the restored version's content.
+   */
+  200: EmailTemplate;
+};
+
+export type RollbackEmailTemplateResponse =
+  RollbackEmailTemplateResponses[keyof RollbackEmailTemplateResponses];
+
+export type SubmitEmailTemplateVersionData = {
+  body?: EmailTemplateSubmit;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * The template's id (`emt_…`) or slug. Submit freezes a draft, and a built-in `system` template has no draft, so its `bird_` slug returns `404` `not_found_error` here.
+     *
+     */
+    template_ref: string;
+    version_id: EmailTemplateVersionId;
+  };
+  query?: never;
+  url: "/v1/email/templates/{template_ref}/versions/{version_id}/submit";
+};
+
+export type SubmitEmailTemplateVersionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type SubmitEmailTemplateVersionError =
+  SubmitEmailTemplateVersionErrors[keyof SubmitEmailTemplateVersionErrors];
+
+export type SubmitEmailTemplateVersionResponses = {
+  /**
+   * The submit's outcome, including the frozen version unless this was a validation run.
+   */
+  200: EmailTemplateSubmitResult;
+};
+
+export type SubmitEmailTemplateVersionResponse =
+  SubmitEmailTemplateVersionResponses[keyof SubmitEmailTemplateVersionResponses];
 
 export type ListMailboxesData = {
   body?: never;

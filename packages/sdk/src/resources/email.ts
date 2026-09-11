@@ -23,9 +23,9 @@ import type {
   EmailSendBatch,
 } from "./emailDefaults.js";
 import { EmailStatsResource } from "./emailStats.gen.js";
-import { EmailTemplatesResource } from "./emailTemplates.gen.js";
 import { EmailMailboxesResource } from "./emailMailboxes.js";
 import { EmailThreadsResource } from "./emailThreads.js";
+import { EmailTemplatesResource } from "./emailTemplates.js";
 import type {
   APIPromise,
   PaginatedPromise,
@@ -62,7 +62,7 @@ export class EmailResource<
   /** Conversations across every mailbox — `bird.email.threads.list(...)`, `.get(...)`, … */
   readonly threads: EmailThreadsResource;
 
-  /** Email templates: `bird.email.templates.list(...)`. */
+  /** Reusable templates — `bird.email.templates.list(...)`, `.create(...)`, `.versions.submit(...)`, … */
   readonly templates: EmailTemplatesResource;
 
   constructor(

@@ -6,7 +6,11 @@ import type { BirdClient } from "./client.js";
 
 export type _Email = Pick<BirdClient["email"], "send" | "sendBatch" | "get" | "list" | "cancel">;
 export type _EmailStats = Pick<BirdClient["email"]["stats"], "summary" | "daily" | "hourly" | "byTag" | "byCategory" | "bySendingIp" | "bySendingDomain" | "byRecipientDomain" | "byMailboxProvider" | "byMailboxProviderRegion" | "byTemplate" | "byLocation" | "byClient" | "byBounceCode" | "byComplaintType" | "byBroadcast">;
-export type _EmailTemplates = Pick<BirdClient["email"]["templates"], "list">;
+export type _EmailTemplates = Pick<BirdClient["email"]["templates"], "create" | "list" | "get" | "update" | "delete" | "duplicate" | "preview">;
+export type _EmailTemplatesVersions = Pick<BirdClient["email"]["templates"]["versions"], "list" | "get" | "delete" | "submit" | "rollback">;
+export type _EmailTemplatesVersionsLanguages = Pick<BirdClient["email"]["templates"]["versions"]["languages"], "list" | "get" | "set" | "update" | "delete">;
+export type _EmailTemplatesBroadcasts = Pick<BirdClient["email"]["templates"]["broadcasts"], "list">;
+export type _Broadcasts = Pick<BirdClient["broadcasts"], "create" | "list" | "get" | "update" | "delete" | "send" | "cancel" | "listEvents" | "listRecipients" | "counts" | "listClickedLinks" | "sendQuota">;
 export type _Sms = Pick<BirdClient["sms"], "send" | "sendBatch" | "get" | "list" | "listEvents">;
 export type _SmsTemplates = Pick<BirdClient["smsTemplates"], "list" | "get">;
 export type _SmsStats = Pick<BirdClient["sms"]["stats"], "summary" | "daily" | "hourly" | "byCountry" | "byCarrier" | "byCategory" | "byOriginator" | "byStatus" | "byErrorCode" | "byTag">;
