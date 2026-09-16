@@ -23,7 +23,7 @@ export class NumbersAvailableResource extends Resource {
    */
   list(query: NumbersAvailableListQuery, options?: RequestOptions): PaginatedPromise<AvailableNumber> {
     return this.paginated<AvailableNumber>("GET", options, ({ signal, headers }, cursor) =>
-      listAvailableNumbers({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listAvailableNumbers({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

@@ -34,7 +34,7 @@ export class WhatsappResourceBase extends Resource {
    */
   list(query?: WhatsappListQuery, options?: RequestOptions): PaginatedPromise<WhatsAppMessage> {
     return this.paginated<WhatsAppMessage>("GET", options, ({ signal, headers }, cursor) =>
-      listWhatsAppMessages({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listWhatsAppMessages({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

@@ -20,7 +20,7 @@ export class EmailThreadsResourceBase extends Resource {
    */
   list(query?: EmailThreadsListQuery, options?: RequestOptions): PaginatedPromise<EmailThread> {
     return this.paginated<EmailThread>("GET", options, ({ signal, headers }, cursor) =>
-      listEmailThreads({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listEmailThreads({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

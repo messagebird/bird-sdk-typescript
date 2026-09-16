@@ -26,7 +26,7 @@ export class WebhooksResourceBase extends Resource {
    */
   list(query?: WebhooksListQuery, options?: RequestOptions): PaginatedPromise<WebhookEndpoint> {
     return this.paginated<WebhookEndpoint>("GET", options, ({ signal, headers }, cursor) =>
-      listWebhooks({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listWebhooks({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

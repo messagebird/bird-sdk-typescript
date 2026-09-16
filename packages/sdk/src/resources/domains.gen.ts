@@ -20,7 +20,7 @@ export class DomainsResource extends Resource {
    */
   list(query?: DomainListQuery, options?: RequestOptions): PaginatedPromise<Domain> {
     return this.paginated<Domain>("GET", options, ({ signal, headers }, cursor) =>
-      listDomains({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listDomains({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

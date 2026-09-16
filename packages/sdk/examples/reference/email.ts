@@ -28,6 +28,14 @@ export async function emailList() {
   const page = await bird.email.list({ limit: 50 }); // page.data, page.next_cursor
 }
 
+export async function emailHealth() {
+  const health = await bird.email.health({ from: "2026-05-01", to: "2026-05-31" });
+  console.log(health.status);
+  for (const signal of health.signals) {
+    console.log(signal.metric, signal.value, signal.status);
+  }
+}
+
 export async function emailStatsSummary() {
   const s = await bird.email.stats.summary({ from: "2026-05-01", to: "2026-05-31" });
   console.log(s.sends_accepted, s.delivery.delivered);
@@ -278,4 +286,184 @@ export async function emailTemplatesList() {
   for await (const tpl of bird.email.templates.list({ scope: "workspace" })) {
     console.log(tpl.slug, tpl.name);
   }
+}
+
+export async function insights_email_competitive_brands_search() {
+  // Requires Insights preview access for the organization.
+  const report = await bird.email.competitive.brands.search({ q: "Everlane" });
+  console.log(report.data);
+}
+
+export async function insights_email_competitive_watchlist_get() {
+  // Requires Insights preview access for the organization.
+  const report = await bird.email.competitive.watchlist.get({ range: 30 });
+  console.log(report.data);
+}
+
+export async function insights_email_competitive_watchlist_brands_create() {
+  // Requires Insights preview access for the organization.
+  const matches = await bird.email.competitive.brands.search({ q: "Everlane" });
+  const match = matches.data.find((brand) => brand.name === "Everlane");
+  if (!match) throw new Error("No exact Everlane match");
+  const entry = await bird.email.competitive.watchlist.brands.create({ brand_id: match.brand_id });
+  console.log(entry.id);
+}
+
+export async function insights_email_competitive_watchlist_brands_get() {
+  // Requires Insights preview access for the organization.
+  const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
+  const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
+  if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
+  const watchlistBrandId = entry.watchlist_brand_id;
+  const report = await bird.email.competitive.watchlist.brands.get(watchlistBrandId, { range: 30 });
+  console.log(report);
+}
+
+export async function insights_email_competitive_watchlist_brands_sendTime() {
+  // Requires Insights preview access for the organization.
+  const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
+  const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
+  if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
+  const watchlistBrandId = entry.watchlist_brand_id;
+  const report = await bird.email.competitive.watchlist.brands.sendTime(watchlistBrandId, { timezone: "UTC" });
+  console.log(report);
+}
+
+export async function insights_email_competitive_watchlist_brands_delete() {
+  // Requires Insights preview access for the organization.
+  const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
+  const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
+  if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
+  const watchlistBrandId = entry.watchlist_brand_id;
+  await bird.email.competitive.watchlist.brands.delete(watchlistBrandId);
+}
+
+export async function insights_email_competitive_watchlist_notable() {
+  // Requires Insights preview access for the organization.
+  const report = await bird.email.competitive.watchlist.notable({ range: 30 });
+  console.log(report);
+}
+
+export async function insights_email_competitive_volumeSeries() {
+  // Requires Insights preview access for the organization.
+  const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
+  const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
+  if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
+  const watchlistBrandId = entry.watchlist_brand_id;
+  const report = await bird.email.competitive.volumeSeries({ range: 30, brand_ids: [watchlistBrandId] });
+  console.log(report);
+}
+
+export async function insights_email_competitive_watchlist_brands_campaigns_list() {
+  // Requires Insights preview access for the organization.
+  const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
+  const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
+  if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
+  const watchlistBrandId = entry.watchlist_brand_id;
+  for await (const campaign of bird.email.competitive.watchlist.brands.campaigns.list(watchlistBrandId, { range: 30, limit: 25 })) {
+    console.log(campaign.id);
+  }
+}
+
+export async function insights_email_competitive_watchlist_brands_campaigns_get() {
+  // Requires Insights preview access for the organization.
+  const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
+  const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
+  if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
+  const watchlistBrandId = entry.watchlist_brand_id;
+  const page = await bird.email.competitive.watchlist.brands.campaigns.list(watchlistBrandId, { range: 30, limit: 1 });
+  const campaign = page.data[0];
+  if (!campaign) throw new Error("No captured campaigns");
+  const report = await bird.email.competitive.watchlist.brands.campaigns.get(watchlistBrandId, campaign.id);
+  console.log(report);
+}
+
+export async function insights_email_inboxInsights_domains_list() {
+  // Requires Insights preview access for the organization.
+  for await (const domain of bird.email.inboxInsights.domains.list({ limit: 25 })) {
+    console.log(domain.domain, domain.monitored);
+  }
+}
+
+export async function insights_email_inboxInsights_domains_update() {
+  // Requires Insights preview access for the organization.
+  let sendingDomain: string | undefined;
+  for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
+    if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
+  }
+  if (!sendingDomain) throw new Error("Verify mail.example.com in this workspace first");
+  const report = await bird.email.inboxInsights.domains.update(sendingDomain, { monitored: false });
+  console.log(report.monitored);
+}
+
+export async function insights_email_inboxInsights_domainMonitoring_upsert() {
+  // Requires Insights preview access for the organization.
+  const result = await bird.email.inboxInsights.domainMonitoring.upsert();
+  console.log(result.outcome, result.domain);
+}
+
+export async function insights_email_inboxInsights_placement() {
+  // Requires Insights preview access for the organization.
+  let sendingDomain: string | undefined;
+  for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
+    if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
+  }
+  if (!sendingDomain) throw new Error("Verify mail.example.com in this workspace first");
+  const report = await bird.email.inboxInsights.placement({ sending_domain: sendingDomain });
+  console.log(report);
+}
+
+export async function insights_email_inboxInsights_authentication() {
+  // Requires Insights preview access for the organization.
+  let sendingDomain: string | undefined;
+  for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
+    if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
+  }
+  if (!sendingDomain) throw new Error("Verify mail.example.com in this workspace first");
+  const report = await bird.email.inboxInsights.authentication({ sending_domain: sendingDomain });
+  console.log(report);
+}
+
+export async function insights_email_inboxInsights_complaints() {
+  // Requires Insights preview access for the organization.
+  let sendingDomain: string | undefined;
+  for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
+    if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
+  }
+  if (!sendingDomain) throw new Error("Verify mail.example.com in this workspace first");
+  const report = await bird.email.inboxInsights.complaints({ sending_domain: sendingDomain });
+  console.log(report);
+}
+
+export async function insights_email_inboxInsights_spamTraps() {
+  // Requires Insights preview access for the organization.
+  let sendingDomain: string | undefined;
+  for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
+    if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
+  }
+  if (!sendingDomain) throw new Error("Verify mail.example.com in this workspace first");
+  const report = await bird.email.inboxInsights.spamTraps({ sending_domain: sendingDomain });
+  console.log(report);
+}
+
+export async function insights_email_inboxInsights_blocklists() {
+  // Requires Insights preview access for the organization.
+  let sendingDomain: string | undefined;
+  for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
+    if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
+  }
+  if (!sendingDomain) throw new Error("Verify mail.example.com in this workspace first");
+  const report = await bird.email.inboxInsights.blocklists({ sending_domain: sendingDomain });
+  console.log(report);
+}
+
+export async function insights_email_inboxInsights_benchmarks_industry() {
+  // Requires Insights preview access for the organization.
+  let sendingDomain: string | undefined;
+  for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
+    if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
+  }
+  if (!sendingDomain) throw new Error("Verify mail.example.com in this workspace first");
+  const report = await bird.email.inboxInsights.benchmarks.industry({ sending_domain: sendingDomain });
+  console.log(report);
 }

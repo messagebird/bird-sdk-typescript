@@ -18,7 +18,7 @@ export class PreferencesResourceBase extends Resource {
    */
   list(query?: PreferencesListQuery, options?: RequestOptions): PaginatedPromise<Preference> {
     return this.paginated<Preference>("GET", options, ({ signal, headers }, cursor) =>
-      listPreferences({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listPreferences({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

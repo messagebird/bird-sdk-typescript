@@ -23,7 +23,7 @@ export class ContactsResourceBase extends Resource {
    */
   list(query?: ContactListQuery, options?: RequestOptions): PaginatedPromise<Contact> {
     return this.paginated<Contact>("GET", options, ({ signal, headers }, cursor) =>
-      listContacts({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listContacts({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

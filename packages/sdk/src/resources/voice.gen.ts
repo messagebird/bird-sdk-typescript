@@ -18,7 +18,7 @@ export class VoiceResource extends Resource {
    */
   list(query?: VoiceListQuery, options?: RequestOptions): PaginatedPromise<VoiceCall> {
     return this.paginated<VoiceCall>("GET", options, ({ signal, headers }, cursor) =>
-      listVoiceCalls({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listVoiceCalls({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

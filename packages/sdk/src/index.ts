@@ -89,9 +89,23 @@ export type {
 export type { SmsMessage, SmsListQuery } from "./resources/sms.gen.js";
 export type {
   SmsTemplate,
-  SmsTemplateList,
+  SmsTemplateSummary,
   SmsTemplateListQuery,
 } from "./resources/smsTemplates.gen.js";
+export type {
+  SmsTemplateList,
+  SmsTemplateVersionLanguage,
+  SmsTemplateLanguageSummary,
+} from "./generated/types.gen.js";
+export type {
+  SmsTemplateVersion,
+  SmsTemplateVersionSummary,
+  SmsTemplatesVersionsListQuery,
+} from "./resources/smsTemplatesVersions.gen.js";
+export type {
+  SmsTemplateLanguage,
+  SmsTemplateLanguageList,
+} from "./resources/smsTemplatesVersionsLanguages.gen.js";
 export type {
   SmsStatsSummary,
   SmsStatsResponse,
@@ -283,6 +297,12 @@ export type {
   DomainCapabilities,
 } from "./generated/types.gen.js";
 export type {
+  Suppression,
+  SuppressionsListQuery,
+  SuppressionsAddParams,
+} from "./resources/suppressions.gen.js";
+export type { SuppressionScope } from "./generated/types.gen.js";
+export type {
   BirdWebhookEvent,
   WebhookHeaders,
   WebhookOptions,
@@ -325,6 +345,12 @@ export {
   EmailClientFamily,
   EmailClientPlatform,
   EmailCompatibilityRuleID,
+  EmailInboxInsightsGmailTab,
+  EmailInboxInsightsDmarcReadinessReason,
+  EmailInboxInsightsDmarcVerdict,
+  EmailInboxInsightsTrapType,
+  EmailInboxInsightsTrapSource,
+  EmailCompetitiveCampaignSignal,
   EmailEventType,
   EmailLookupFlag,
   EmailLookupReason,
@@ -377,6 +403,12 @@ export type {
   EmailClientFamilyValue,
   EmailClientPlatformValue,
   EmailCompatibilityRuleIDValue,
+  EmailInboxInsightsGmailTabValue,
+  EmailInboxInsightsDmarcReadinessReasonValue,
+  EmailInboxInsightsDmarcVerdictValue,
+  EmailInboxInsightsTrapTypeValue,
+  EmailInboxInsightsTrapSourceValue,
+  EmailCompetitiveCampaignSignalValue,
   EmailEventTypeValue,
   EmailLookupFlagValue,
   EmailLookupReasonValue,
@@ -485,3 +517,62 @@ export type {
   EmailTemplatesVersionsLanguagesSetParams,
   EmailTemplatesVersionsLanguagesUpdateParams,
 } from "./resources/emailTemplatesVersionsLanguages.gen.js";
+
+export type {
+  EmailCompetitiveVolumeSeries,
+  EmailCompetitiveVolumeSeriesQuery,
+} from "./resources/emailCompetitive.gen.js";
+
+export type {
+  EmailCompetitiveBrandSearchResults,
+  EmailCompetitiveBrandsSearchQuery,
+} from "./resources/emailCompetitiveBrands.gen.js";
+
+export type {
+  EmailCompetitiveWatchlist,
+  EmailCompetitiveNotableFeed,
+  EmailCompetitiveWatchlistGetQuery,
+  EmailCompetitiveWatchlistNotableQuery,
+} from "./resources/emailCompetitiveWatchlist.gen.js";
+
+export type {
+  EmailCompetitiveWatchlistBrand,
+  EmailCompetitiveBrandProfile,
+  EmailCompetitiveSendTimeGrid,
+  EmailCompetitiveWatchlistBrandsCreateParams,
+  EmailCompetitiveWatchlistBrandsGetQuery,
+  EmailCompetitiveWatchlistBrandsSendTimeQuery,
+} from "./resources/emailCompetitiveWatchlistBrands.gen.js";
+
+export type {
+  EmailCompetitiveCampaign,
+  EmailCompetitiveWatchlistBrandsCampaignsListQuery,
+} from "./resources/emailCompetitiveWatchlistBrandsCampaigns.gen.js";
+
+export type {
+  EmailInboxInsightsPlacement,
+  EmailInboxInsightsAuthentication,
+  EmailInboxInsightsComplaints,
+  EmailInboxInsightsSpamTraps,
+  EmailInboxInsightsBlocklists,
+  EmailInboxInsightsPlacementQuery,
+  EmailInboxInsightsAuthenticationQuery,
+  EmailInboxInsightsComplaintsQuery,
+  EmailInboxInsightsSpamTrapsQuery,
+  EmailInboxInsightsBlocklistsQuery,
+} from "./resources/emailInboxInsights.gen.js";
+
+export type {
+  EmailInboxInsightsIndustryBenchmark,
+  EmailInboxInsightsBenchmarksIndustryQuery,
+} from "./resources/emailInboxInsightsBenchmarks.gen.js";
+
+export type {
+  EmailInboxInsightsDomainMonitoringResult,
+} from "./resources/emailInboxInsightsDomainMonitoring.gen.js";
+
+export type {
+  EmailInboxInsightsDomain,
+  EmailInboxInsightsDomainsListQuery,
+  EmailInboxInsightsDomainsUpdateParams,
+} from "./resources/emailInboxInsightsDomains.gen.js";

@@ -14,7 +14,7 @@ export class SmsSuppressionsResource extends Resource {
    */
   list(query?: SmsSuppressionsListQuery, options?: RequestOptions): PaginatedPromise<SmsSuppression> {
     return this.paginated<SmsSuppression>("GET", options, ({ signal, headers }, cursor) =>
-      listSmsSuppressions({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listSmsSuppressions({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

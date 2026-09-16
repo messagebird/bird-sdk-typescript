@@ -176,8 +176,6 @@ export type WebhookEvent =
       type: "whatsapp_suppression.created";
     } & EventWhatsAppSuppressionCreated);
 
-export type WorkspaceId = string;
-
 export type ErrorDetail = {
   /**
    * Dotted field path, such as `to[0].email`, `subject`, or `.`. When the request was rejected for a query parameter the endpoint does not declare, this carries that parameter's name instead of a field path.
@@ -300,7 +298,24 @@ export type Error = {
 
 export type UserId = string;
 
+/**
+ * Deployment region identifier.
+ */
+export type Region = "us1" | "eu1";
+
 export type OrganizationId = string;
+
+export type WorkspaceId = string;
+
+/**
+ * IANA timezone identifier, such as `America/New_York`, `Europe/Amsterdam`, or `UTC`.
+ */
+export type Timezone = string;
+
+/**
+ * Sort direction, ascending or descending.
+ */
+export type SortOrder = "asc" | "desc";
 
 export type ListEnvelope = {
   /**
@@ -323,11 +338,6 @@ export type ListEnvelopeWithTotal = ListEnvelope & {
    */
   total?: number | null;
 };
-
-/**
- * Deployment region identifier.
- */
-export type Region = "us1" | "eu1";
 
 export type DocsSearchResult = {
   /**
@@ -2626,6 +2636,16 @@ export type SmsMessageStatus =
   | "expired"
   | "received";
 
+export type SmsTemplateId = string;
+
+export type SmsTemplateVersionId = string;
+
+/**
+ * A fingerprint of SMS template text, prefixed with its algorithm. Compare it within this API version to identify the exact source without transferring it.
+ *
+ */
+export type SmsTemplateContentHash = string;
+
 /**
  * Segment breakdown for the message body. Segment count drives billing.
  */
@@ -2778,9 +2798,32 @@ export type SmsMessage = {
    */
   text?: string;
   /**
-   * Content classification supplied on the send. Null for inbound messages.
+   * Content classification supplied for free text or derived from the template. Null for inbound messages.
    */
   category?: SmsMessageCategory | null;
+  /**
+   * The template language requested by the send, in canonical form. Null when the send named no language or used no template.
+   *
+   */
+  readonly requested_language: LanguageTag | null;
+  /**
+   * The template language whose text was rendered, in canonical form. Null when the send used no template. This can differ from `requested_language` when the template's fallback policy selects another language.
+   *
+   */
+  readonly resolved_language: LanguageTag | null;
+  /**
+   * The template rendered for this message, or null for a free-text message.
+   */
+  readonly template_id: SmsTemplateId | null;
+  /**
+   * The workspace published version or synthetic built-in version rendered at acceptance, or null for a free-text message. For a built-in template, `template_content_hash` identifies the exact catalogue source.
+   *
+   */
+  readonly template_version_id: SmsTemplateVersionId | null;
+  /**
+   * The rendered language's source fingerprint, or null for a free-text message.
+   */
+  readonly template_content_hash: SmsTemplateContentHash | null;
   /**
    * Segment breakdown for the body.
    */
@@ -2865,20 +2908,18 @@ export type SmsSendOptions = {
   max_price_per_segment?: number;
 };
 
-export type SmsTemplateId = string;
-
 export type SmsTemplateSend = unknown & {
   /**
-   * The template to send, by its id.
+   * The workspace or built-in template to send, by ID.
    */
   id?: SmsTemplateId;
   /**
-   * The template to send, by its slug handle (for example `bird_otp_verification`). Browse the available templates and their variables with the templates endpoint.
+   * The workspace or built-in template to send, by its immutable slug. Read the template's live version to see its variables.
    *
    */
   slug?: TemplateSlug;
   /**
-   * Deprecated: use `slug` instead. Resolved as a slug first, and only if that finds nothing, matched against the template's display name.
+   * Deprecated. Use `slug` instead. This resolves legacy built-in catalogue names and never matches a workspace template's display name.
    *
    *
    * @deprecated
@@ -2890,7 +2931,7 @@ export type SmsTemplateSend = unknown & {
    */
   language?: LanguageTag;
   /**
-   * Values for the template's variables, keyed by variable name. The accepted keys and their formats are fixed per template (the template's `variables` on the templates endpoint). A missing required variable, an undeclared key, a value that does not match its variable's format, or a serialized payload over 16 KB each return a `422`.
+   * Values for the template's variables, keyed by variable name. Read the live version to see the accepted keys and formats. A missing key, an undeclared key, an invalid value, or a serialized object over 16 KiB returns `422`.
    *
    */
   parameters?: {
@@ -2905,7 +2946,7 @@ export type SmsMessageSendRequest = unknown & {
    */
   to: string;
   /**
-   * Sender to send from. It must be a sender the workspace holds: a number it owns in E.164, such as `+15557654321`, a short code it holds, such as `24680`, or an alphanumeric sender ID it has claimed, such as `MyBrand`. A sender the workspace does not hold returns a `422` `SMSSenderNotConfigured`, and an alphanumeric sender must also be permitted, and where required registered, for the destination country. Required on a free-text send: omitting it returns a `422` `SMSNoEligibleSender`. Not accepted alongside `template`, which selects its sender automatically.
+   * Sender to send from. It must be a sender the workspace holds: a number it owns in E.164, such as `+15557654321`, a short code it holds, such as `24680`, or an alphanumeric sender ID it has claimed, such as `MyBrand`. A sender the workspace does not hold returns a `422` `SMSSenderNotConfigured`, and an alphanumeric sender must also be permitted, and where required registered, for the destination country. Required on a free-text send and when sending a workspace template. Omitting it in either case returns `422`. A built-in template selects its sender automatically and rejects `from`.
    *
    */
   from?: string;
@@ -2954,7 +2995,7 @@ export type SmsMessageSendRequest = unknown & {
    */
   scheduled_at?: string;
   /**
-   * Send using a stored template instead of free text. Mutually exclusive with `text`; the message category is derived from the template, so `from`, `category`, and `media_urls` are not accepted alongside it.
+   * Send using a stored template instead of free text. The category is derived from the template, so `category` and `media_urls` are rejected. A workspace template requires `from`; a built-in template selects its sender and rejects `from`.
    *
    */
   template?: SmsTemplateSend;
@@ -3060,6 +3101,13 @@ export type SmsEventList = {
 export type TemplateScope = "system" | "workspace";
 
 /**
+ * Why messages use this template. Use `authentication` for one-time codes, `marketing` for promotions, and `transactional` for service messages.
+ *
+ */
+export type SmsTemplateCategory =
+  "transactional" | "marketing" | "authentication";
+
+/**
  * Where the template stands as a whole. The same five states on every channel.
  *
  * - `draft`: nothing has ever gone live.
@@ -3083,35 +3131,9 @@ export type TemplateStatus =
   "draft" | "pending" | "active" | "rejected" | "inactive";
 
 /**
- * A single variable slot a template fills in from the values supplied when sending. The same shape on email, SMS and WhatsApp, so reading what a template needs works the same way whichever channel you are sending on.
- *
+ * Field to sort SMS templates and their versions by.
  */
-export type TemplateVariable = {
-  /**
-   * The key this slot is filled by. On email and SMS it is the key you set in the send's `parameters` object. On WhatsApp it is the `name` you repeat on the matching parameter inside `components`, or, for a template whose placeholders are positional, the position itself as `1`, `2` and so on.
-   *
-   */
-  readonly key: string;
-  /**
-   * The value type this slot accepts. SMS templates use the typed slots (`code`, `amount` and the rest), each of which rejects a value that does not match its `constraint`. Email and WhatsApp templates use `text`, which accepts any value. Open enum: treat an unrecognized value as a future type rather than an error.
-   *
-   */
-  readonly type: string;
-  /**
-   * Whether the send must supply this variable. Omitting a required value returns `422` on email, SMS, and WhatsApp sends.
-   *
-   */
-  readonly required: boolean;
-  /**
-   * A plain-language description of what values this variable accepts.
-   */
-  readonly constraint: string;
-  /**
-   * Whether this slot's value is kept out of durable storage. A sensitive slot's rendered value never appears in message content read back through the API: a stand-in placeholder is stored instead.
-   *
-   */
-  readonly sensitive?: boolean;
-};
+export type SmsTemplateSortField = "created_at";
 
 /**
  * Status of one template language on channels without third-party review.
@@ -3127,12 +3149,98 @@ export type TemplateLanguageStatus =
   "draft" | "live" | "superseded" | (string & {});
 
 /**
- * One language's state on a template: whether it is live for sends. Content is not here; the template carries the body of its default language, and a send resolves the rest.
- *
+ * Whether a language is live and whether its draft has unpublished changes.
  */
 export type SmsTemplateLanguageState = {
-  status: TemplateLanguageStatus;
+  readonly status: TemplateLanguageStatus;
+  /**
+   * Whether the draft has an unpublished change for this language. When true beside `live`, sends keep using the older published text until submit.
+   *
+   */
+  readonly draft?: boolean;
 };
+
+/**
+ * An SMS template without content or draft concurrency settings.
+ */
+export type SmsTemplateSummary = {
+  /**
+   * Template ID.
+   */
+  readonly id: SmsTemplateId;
+  /**
+   * The workspace that owns the template. Null for a built-in `system` template.
+   */
+  readonly workspace_id: WorkspaceId | null;
+  /**
+   * The immutable handle used to address and send the template.
+   */
+  readonly slug: TemplateSlug;
+  /**
+   * The template's display name.
+   */
+  name: string;
+  /**
+   * What the template is for. Null if it has no description.
+   */
+  description: string | null;
+  scope: TemplateScope;
+  status: TemplateStatus;
+  category: SmsTemplateCategory;
+  /**
+   * The permanent editable draft version. Null for a built-in template.
+   */
+  readonly draft_version_id: SmsTemplateVersionId | null;
+  /**
+   * The version sends resolve to, or null before first publication.
+   */
+  readonly live_version_id: SmsTemplateVersionId | null;
+  /**
+   * Deprecated. Use `live_version_id`, which carries the same value.
+   *
+   * @deprecated
+   */
+  readonly published_version_id: SmsTemplateVersionId | null;
+  /**
+   * Each language and its live or draft state, keyed by canonical BCP-47 tag.
+   */
+  readonly languages: {
+    [key: string]: SmsTemplateLanguageState;
+  };
+  /**
+   * The draft's default language.
+   */
+  readonly default_language: LanguageTag;
+  /**
+   * Languages the live version can currently send. Empty before first publication.
+   */
+  readonly available_languages: Array<LanguageTag>;
+  /**
+   * When the template was last published. Null before first publication and for built-in templates.
+   */
+  readonly last_submitted_at: string | null;
+  /**
+   * When the template was created. Null for built-in templates.
+   */
+  readonly created_at: string | null;
+  /**
+   * When the template was last modified. Null for built-in templates.
+   */
+  readonly updated_at: string | null;
+};
+
+export type SmsTemplateList = {
+  /**
+   * One page of SMS templates.
+   */
+  data: Array<SmsTemplateSummary>;
+} & ListEnvelope;
+
+/**
+ * SMS template text, limited to 16 KiB of UTF-8 source. Blank text can be saved in a draft but cannot be published. Workspace templates support scalar variables, conditional text, and bounded filters. Loops, assignments, captures, partials, collections, and string-expanding filters are rejected.
+ *
+ */
+export type SmsTemplateText = string;
 
 /**
  * What a send or a preview does when it asks for a language the template
@@ -3157,122 +3265,294 @@ export type SmsTemplateLanguageState = {
  */
 export type TemplateOnMissingLanguage = "fallback" | "fail";
 
-export type SmsTemplateVersionId = string;
-
 /**
- * A message template: one identity holding a copy of the message per language, resolved to one at send. It declares the variable slots a send fills in, so the parts that change travel with the request and the wording does not.
+ * One SMS template identity and its authoring state. Content and variables live on versions, so this resource stays shallow.
  *
  */
 export type SmsTemplate = {
   /**
-   * The template's generated identifier. Accepted anywhere a template is referenced: the `{template_ref}` path segment, and `template.id` on a send. The `slug` works in the same places and is more readable.
+   * Template ID.
    */
   readonly id: SmsTemplateId;
   /**
-   * The template's permanent handle. Pass it (or the id) as the template reference when sending. Handles beginning with `bird_` are reserved for our built-in templates.
+   * The workspace that owns the template. Null for a built-in `system` template.
+   */
+  readonly workspace_id: WorkspaceId | null;
+  /**
+   * The immutable handle used to address and send the template. A built-in template's slug starts with `bird_`.
    *
    */
   readonly slug: TemplateSlug;
   /**
-   * The template's display name, shown wherever the template is listed. Nothing resolves through it, so it is safe to show wherever a human reads the template.
-   *
+   * The template's display name. It defaults to the slug and can be changed on workspace templates.
    */
-  readonly name: string;
+  name: string;
   /**
-   * What the template is for. Null when unset.
+   * What the template is for. Null if it has no description.
    */
-  readonly description: string | null;
-  /**
-   * Whether the template is one of our built-in templates (`system`) or one your workspace created (`workspace`). Every SMS template is `system`.
-   *
-   */
-  readonly scope: TemplateScope;
+  description: string | null;
+  scope: TemplateScope;
   status: TemplateStatus;
+  category: SmsTemplateCategory;
   /**
-   * Content classification applied to messages sent from this template.
+   * The permanent editable draft version. Null for a built-in template.
    */
-  readonly category: SmsMessageCategory;
+  readonly draft_version_id: SmsTemplateVersionId | null;
   /**
-   * The template body in its default language, shown for preview. Variable placeholders appear inline (for example `{{ code }}`). Name a `language` on the send to have another one served.
+   * The version sends resolve to, or null before a workspace template is first published. A built-in template points to a synthetic published version that projects its current catalogue content.
    *
    */
-  readonly body: string;
+  readonly live_version_id: SmsTemplateVersionId | null;
   /**
-   * The typed slots this template fills in from the values you supply in `parameters` when sending. Every language of a template declares the same slots, so this list holds for whichever one a send resolves to.
+   * Deprecated. Use `live_version_id`, which carries the same value.
    *
+   * @deprecated
    */
-  readonly variables: Array<TemplateVariable>;
+  readonly published_version_id: SmsTemplateVersionId | null;
   /**
-   * The language a send uses when it names none, and the last resort when `on_missing_language` is `fallback` and the language asked for is not available.
-   *
+   * The draft revision to use for concurrent-edit checks. Null for a built-in template.
    */
-  readonly default_language: LanguageTag;
+  readonly revision: number | null;
   /**
-   * The languages a send can resolve right now, as BCP-47 tags. The set may shrink for reasons other than editing, so read it rather than assuming it matches what you last saw.
-   *
-   */
-  readonly available_languages: Array<LanguageTag>;
-  /**
-   * Where each of the template's languages stands, keyed by BCP-47 language tag. Content is not here: `body` previews the default language, and a send resolves the one it needs.
+   * Each language the template has, keyed by canonical BCP-47 tag, with its live state and whether the draft contains unpublished changes. Content is available from version reads.
    *
    */
   readonly languages: {
     [key: string]: SmsTemplateLanguageState;
   };
   /**
-   * What a send does when it asks for a language this template does not carry. Defaults to `fallback` on SMS.
+   * The draft's default language. Sends continue using the live version's default until the draft is published.
    *
+   */
+  readonly default_language: LanguageTag;
+  /**
+   * Languages the live version can currently send. Empty before first publication.
+   *
+   */
+  readonly available_languages: Array<LanguageTag>;
+  /**
+   * How a send handles a requested language that the live version does not have.
    */
   readonly on_missing_language: TemplateOnMissingLanguage;
   /**
-   * Whether a send has to name a language. When true, a send that names none is rejected instead of being served the default language.
-   *
+   * Whether each send must name a language instead of using the live version's default.
    */
   readonly language_source_required: boolean;
   /**
-   * The current editable draft version, or null for a built-in `system` template, which has no draft.
-   *
-   */
-  readonly draft_version_id: SmsTemplateVersionId | null;
-  /**
-   * The version a send resolves to, or null for a built-in `system` template, which Bird ships ready to send rather than versioning.
-   *
-   */
-  readonly live_version_id: SmsTemplateVersionId | null;
-  /**
-   * Deprecated: use `live_version_id` instead, which carries the same value.
-   *
-   *
-   * @deprecated
-   */
-  readonly published_version_id: SmsTemplateVersionId | null;
-  /**
-   * The draft's revision counter. Null for a built-in `system` template, which is unversioned.
-   *
-   */
-  readonly revision: number | null;
-  /**
-   * When this template was last submitted. Null for a built-in `system` template, which is already available to send.
-   *
+   * When the template was last published. Null before first publication and for built-in templates.
    */
   readonly last_submitted_at: string | null;
   /**
-   * When the template was created. Null for a built-in `system` template, which Bird ships rather than stores.
-   *
+   * When the template was created. Null for built-in templates.
    */
   readonly created_at: string | null;
   /**
-   * When the template was last modified. Null for a built-in `system` template, which Bird ships rather than stores.
-   *
+   * When the template was last modified. Null for built-in templates.
    */
   readonly updated_at: string | null;
 };
 
-export type SmsTemplateList = {
+/**
+ * A single variable slot a template fills in from the values supplied when sending. The same shape on email, SMS and WhatsApp, so reading what a template needs works the same way whichever channel you are sending on.
+ *
+ */
+export type TemplateVariable = {
   /**
-   * The templates available to your workspace. The catalog is returned in full and is not paginated.
+   * The key this slot is filled by. On email and SMS it is the key you set in the send's `parameters` object. On WhatsApp it is the `name` you repeat on the matching parameter inside `components`, or, for a template whose placeholders are positional, the position itself as `1`, `2` and so on.
+   *
    */
-  data: Array<SmsTemplate>;
+  readonly key: string;
+  /**
+   * The value type this slot accepts. Built-in SMS templates use typed slots (`code`, `amount` and the rest), each of which rejects a value that does not match its `constraint`. Email, WhatsApp and workspace SMS templates use `text`. Workspace SMS parameters must be scalar values. Open enum: treat an unrecognized value as a future type rather than an error.
+   *
+   */
+  readonly type: string;
+  /**
+   * Whether the send must supply this variable. Omitting a required value returns `422` on email, SMS, and WhatsApp sends.
+   *
+   */
+  readonly required: boolean;
+  /**
+   * A plain-language description of what values this variable accepts.
+   */
+  readonly constraint: string;
+  /**
+   * Whether this slot's value is redacted from stored message content. A placeholder replaces the sensitive value in message history; transport queues can still carry the text needed for delivery.
+   *
+   */
+  readonly sensitive?: boolean;
+};
+
+/**
+ * Whether the version is the editable draft or published. Published workspace versions are immutable and remain `published` after a later version goes live. A built-in template's synthetic published version projects the current catalogue entry.
+ *
+ */
+export type SmsTemplateVersionStatus = "draft" | "published";
+
+/**
+ * One SMS template version without its text.
+ */
+export type SmsTemplateVersionSummary = {
+  /**
+   * Template version ID.
+   */
+  readonly id: SmsTemplateVersionId;
+  /**
+   * The template this version belongs to.
+   */
+  readonly template_id: SmsTemplateId;
+  /**
+   * Sequential publication number. Null for the draft; a built-in template reports 1.
+   */
+  readonly version_number: number | null;
+  readonly status: SmsTemplateVersionStatus;
+  /**
+   * The version's revision counter.
+   */
+  readonly revision: number;
+  /**
+   * Variables inferred from the version's text and shared by each language.
+   */
+  readonly variables: Array<TemplateVariable>;
+  /**
+   * The language this version treats as its default.
+   */
+  readonly default_language: LanguageTag;
+  /**
+   * Languages this version contains, without their text.
+   */
+  readonly available_languages: Array<LanguageTag>;
+  /**
+   * When the version was created. Null for a built-in template's synthetic version.
+   */
+  readonly created_at: string | null;
+  /**
+   * When the version was published. Null for the draft and for a built-in template's synthetic version.
+   */
+  readonly published_at: string | null;
+};
+
+export type SmsTemplateVersionList = {
+  /**
+   * One page of the template's versions, newest first.
+   */
+  data: Array<SmsTemplateVersionSummary>;
+} & ListEnvelope;
+
+/**
+ * One language's content and revision metadata within a version.
+ */
+export type SmsTemplateVersionLanguage = {
+  /**
+   * Stored template text, including its `{{ variable }}` placeholders.
+   */
+  readonly text: SmsTemplateText;
+  /**
+   * This language's revision counter.
+   */
+  readonly revision: number;
+  readonly content_hash: SmsTemplateContentHash;
+  /**
+   * When this language was last saved. Null for a built-in template.
+   */
+  readonly updated_at: string | null;
+};
+
+/**
+ * One SMS template version with its content. A workspace template keeps one editable draft and immutable published versions. A built-in template exposes its current catalogue content as one synthetic published version.
+ *
+ */
+export type SmsTemplateVersion = {
+  /**
+   * Template version ID.
+   */
+  readonly id: SmsTemplateVersionId;
+  /**
+   * The template this version belongs to.
+   */
+  readonly template_id: SmsTemplateId;
+  /**
+   * Sequential publication number. Null for the draft; a built-in template reports 1.
+   */
+  readonly version_number: number | null;
+  readonly status: SmsTemplateVersionStatus;
+  /**
+   * The version revision. A draft revision advances with each metadata or content change. Published workspace versions are frozen; a built-in template's synthetic version reports 0.
+   *
+   */
+  readonly revision: number;
+  /**
+   * Variables inferred from the version's text. Every language in a publishable SMS version uses the same set. Built-in templates may apply additional typed constraints described by each variable.
+   *
+   */
+  readonly variables: Array<TemplateVariable>;
+  /**
+   * Full content for each language, keyed by canonical BCP-47 tag.
+   */
+  readonly languages: {
+    [key: string]: SmsTemplateVersionLanguage;
+  };
+  /**
+   * The language this version treats as its default.
+   */
+  readonly default_language: LanguageTag;
+  /**
+   * When the version was created. Null for a built-in template's synthetic version.
+   */
+  readonly created_at: string | null;
+  /**
+   * When the version was published. Null for the draft and for a built-in template's synthetic version.
+   */
+  readonly published_at: string | null;
+};
+
+/**
+ * One language of an SMS template version without its text.
+ */
+export type SmsTemplateLanguageSummary = {
+  /**
+   * The language in canonical BCP-47 form.
+   */
+  readonly language: LanguageTag;
+  /**
+   * This language's revision counter.
+   */
+  readonly revision: number;
+  readonly content_hash: SmsTemplateContentHash;
+  /**
+   * When this language was last saved. Null for a built-in template.
+   */
+  readonly updated_at: string | null;
+};
+
+export type SmsTemplateLanguageList = {
+  /**
+   * The version's languages ordered by canonical tag, without text.
+   */
+  data: Array<SmsTemplateLanguageSummary>;
+};
+
+/**
+ * One language's full SMS template text and revision metadata.
+ */
+export type SmsTemplateLanguage = {
+  /**
+   * The language in canonical BCP-47 form.
+   */
+  readonly language: LanguageTag;
+  /**
+   * Stored template text, including its `{{ variable }}` placeholders.
+   */
+  readonly text: SmsTemplateText;
+  /**
+   * This language's revision counter, used for concurrent-edit checks on draft writes.
+   */
+  readonly revision: number;
+  readonly content_hash: SmsTemplateContentHash;
+  /**
+   * When this language was last saved. Null for a built-in template.
+   */
+  readonly updated_at: string | null;
 };
 
 export type SmsSuppressionReasonFilter =
@@ -8406,6 +8686,1073 @@ export type WhatsAppBusinessAccountList = {
 export type WhatsAppSuppressionId = string;
 
 /**
+ * The bucket size a series is grouped by. Day suits the product's charts; wider grains suit long ranges.
+ *
+ */
+export type EmailInboxInsightsGroupBy = "day" | "week" | "month";
+
+/**
+ * Set to `previous_period` to include the immediately preceding window of equal length in the same response, so deltas need no second request.
+ *
+ */
+export type EmailInboxInsightsCompare = "previous_period";
+
+/**
+ * Where the audience mix behind the placement weighting came from: `account` when it was configured for this account, `global` when a general default was used instead.
+ *
+ */
+export type EmailInboxInsightsWeightingSource = "account" | "global";
+
+/**
+ * How the placement figures in this response were weighted, so a number is
+ * self-describing wherever it is quoted or screenshotted.
+ *
+ * Placement rates are a weighted average of per-provider rates against an
+ * audience mix (the share of recipients expected at each mailbox provider)
+ * rather than a share of delivered volume.
+ *
+ */
+export type EmailInboxInsightsWeighting = {
+  /**
+   * The measurement's own identifier for the audience mix, carried through so a client can tell two weightings apart without comparing `basis` strings. No operation accepts it.
+   *
+   */
+  readonly weight_set_id: string;
+  /**
+   * Which audience mix the weighting used. Null when the measurement weighted these figures by a method this API does not model: the enum is closed so that a client can branch on it exhaustively, which means an unfamiliar method has to answer "not one of these" rather than be passed through. `basis` usually still describes the method in words when that happens.
+   *
+   */
+  readonly source: EmailInboxInsightsWeightingSource | null;
+  /**
+   * The weighting method behind the rates, as the measurement names it. A slug rather than a sentence, so render it as a label and do not expect it to read as English. Null when the measurement did not state one, which pairs with `source`: both describe the method, so neither can claim to know it when the measurement was silent.
+   *
+   */
+  readonly basis: string | null;
+};
+
+/**
+ * How the figures in this response were measured, so a number is self-describing in a screenshot or a bug report.
+ *
+ */
+export type EmailInboxInsightsMeasurement = {
+  /**
+   * Identifiers of the measurement systems that contributed to these figures. The set grows as measurement coverage does, so treat the values as labels rather than a closed list.
+   *
+   */
+  readonly sources: Array<string>;
+  /**
+   * How the figures were weighted. Present on figures weighted against an audience mix, which is placement's method; measurements that weight nothing carry no weighting block.
+   *
+   */
+  readonly weighting?: EmailInboxInsightsWeighting;
+};
+
+/**
+ * How current the figures are. Freshness differs per resource (authentication data can lag a day or more while blocklist lookups are near real time), so any "as of" label binds from this field, never from a fixed string.
+ *
+ */
+export type EmailInboxInsightsFreshness = {
+  /**
+   * The most recent UTC day the figures include, or null for a live lookup that has no measurement window.
+   *
+   */
+  readonly as_of: string | null;
+  /**
+   * How far behind real time this resource usually runs. A lowercase
+   * identifier rather than a display label, so pick your own wording for it,
+   * and treat the set as open: the measurement names a hint per resource and
+   * can add one without notice.
+   *
+   * Null when the measurement reports no hint, which several resources do:
+   * show the figures without an age rather than inventing one.
+   *
+   */
+  readonly lag_hint: string | null;
+};
+
+/**
+ * The meta every Inbox Insights resource carries, whatever it measures, so one client adapter serves them all.
+ *
+ */
+export type EmailInboxInsightsEnvelopeBase = {
+  /**
+   * Which resource this response is, echoed for self-description.
+   */
+  readonly resource: string;
+  /**
+   * The sending domain the figures describe.
+   */
+  readonly domain: string;
+  /**
+   * How the figures were measured. Present only where a figure was weighted or drawn from a named set of sources, which today means placement and the industry benchmark. Absent on the reputation resources and on a live lookup, neither of which weights anything.
+   *
+   */
+  readonly measurement?: EmailInboxInsightsMeasurement;
+  /**
+   * When the measurement service computed these figures.
+   */
+  readonly generated_at: string;
+  readonly freshness: EmailInboxInsightsFreshness;
+  /**
+   * Present when the response was served from a short-lived copy rather than fetched for this request: when that copy was fetched.
+   *
+   */
+  readonly cached_at?: string;
+};
+
+/**
+ * The period every figure in the response covers: whole UTC calendar days,
+ * inclusive on both ends. The same window convention the email statistics
+ * endpoints use, so figures from the two sources describe the same days and
+ * can be combined without adjustment.
+ *
+ */
+export type EmailInboxInsightsWindow = {
+  /**
+   * First UTC day of the period, inclusive.
+   */
+  readonly start: string;
+  /**
+   * Last UTC day of the period, inclusive.
+   */
+  readonly end: string;
+  /**
+   * The bucket size any series in this response is grouped by. Absent on resources with no series.
+   */
+  readonly group_by?: EmailInboxInsightsGroupBy;
+};
+
+/**
+ * The prior equal-length period the delta figures compare against. Present only when the request asked for a comparison.
+ *
+ */
+export type EmailInboxInsightsComparedTo = {
+  /**
+   * First UTC day of the prior period, inclusive.
+   */
+  readonly start: string;
+  /**
+   * Last UTC day of the prior period, inclusive.
+   */
+  readonly end: string;
+};
+
+/**
+ * The meta a windowed Inbox Insights resource carries: the common fields plus the period the figures cover and how they were measured.
+ *
+ */
+export type EmailInboxInsightsEnvelope = EmailInboxInsightsEnvelopeBase & {
+  window: EmailInboxInsightsWindow;
+  compared_to?: EmailInboxInsightsComparedTo;
+};
+
+/**
+ * Raw measured placements behind a set of rates, before any weighting. A measured placement is one message whose mailbox destination the measurement observed.
+ *
+ */
+export type EmailInboxInsightsPlacementCounts = {
+  /**
+   * Measured placements observed in the inbox.
+   */
+  readonly inbox: number;
+  /**
+   * Measured placements observed in spam.
+   */
+  readonly spam: number;
+  /**
+   * Measured sends that arrived in neither folder.
+   */
+  readonly missing: number;
+  /**
+   * Total measured placements the rates were computed over.
+   */
+  readonly measured: number;
+};
+
+/**
+ * How the domain-wide rates moved against the prior period, in percentage points. Present only when the request asked for a comparison and the prior period had data; absence means no comparable prior data, never zero change.
+ *
+ */
+export type EmailInboxInsightsPlacementDeltaPts = {
+  /**
+   * Inbox-rate movement in percentage points; negative means it fell.
+   */
+  readonly inbox: number;
+  /**
+   * Spam-rate movement in percentage points.
+   */
+  readonly spam: number;
+};
+
+/**
+ * Whether a section of the response carries figures, and when it does not, why.
+ *
+ * `ok` means the section is populated. `no_data` means the measurement ran and
+ * observed nothing to report for this domain in the period. `not_configured`
+ * means the section needs a setup step that has not been completed yet, such as
+ * connecting Google Postmaster Tools; treat it as an invitation to finish
+ * setup rather than a fault. `unavailable` means the figures could not be retrieved this time and
+ * the same request may well succeed on a retry; the rest of the response is
+ * unaffected. `not_applicable` means the section is meaningless for this domain
+ * in this period, so there is nothing to show or fix.
+ *
+ * A successful response never implies every section is populated; read each
+ * section's status rather than assuming figures are present.
+ *
+ */
+export type EmailInboxInsightsSectionStatus =
+  "ok" | "no_data" | "not_configured" | "unavailable" | "not_applicable";
+
+/**
+ * The domain-wide placement figures for the period.
+ *
+ * These rates are weighted against the audience mix in `measurement.weighting`,
+ * so they can legitimately differ from any single provider row, which has no
+ * mix to weight. Rates are percentages of measured placements, never of
+ * delivered volume.
+ *
+ */
+export type EmailInboxInsightsPlacementSummary = {
+  /**
+   * Estimated share of measured placements that landed in the inbox, as a percentage.
+   */
+  readonly inbox_rate_percent: number | null;
+  /**
+   * Estimated share of measured placements that landed in spam, as a percentage.
+   */
+  readonly spam_rate_percent: number | null;
+  /**
+   * Estimated share of measured sends that arrived in neither folder, as a percentage.
+   */
+  readonly missing_rate_percent: number | null;
+  /**
+   * The measured placements the rates above were computed over, or null when the summary has none: a period with no measured mail reports null here rather than four zeros, because a zero count is a real measurement and would read as "we looked and found nothing" for a domain nothing looked at. Read `status` alongside it.
+   *
+   */
+  readonly raw_counts: EmailInboxInsightsPlacementCounts | null;
+  /**
+   * Estimated share of inbox-placed mail that was read, as a percentage, measured by the panel's dwell time. This is not an open rate; the two count different things and are not interchangeable.
+   *
+   */
+  readonly read_rate_percent: number | null;
+  readonly delta_pts?: EmailInboxInsightsPlacementDeltaPts;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * A mailbox provider, as the measurement identifies it. A lowercase identifier rather than
+ * a display name, so pick your own label for it, and treat the set as open: this is a long
+ * tail rather than a handful of household names, and some entries are domains
+ * (`fastmail.com`, `seznam.cz`) rather than brands.
+ *
+ * The measurement places mail into its own seed lists, so its buckets are not the ones the
+ * [mailbox-provider stats breakdown](/docs/api/reference/get-email-stats-by-mailbox-provider)
+ * reports: Microsoft's properties appear here as `hotmail` rather than `microsoft`, and
+ * `apple` appears here where the Competitive Insights panel has no measurement for it at
+ * all. None of the three is a joinable dimension against the others.
+ *
+ */
+export type EmailInboxInsightsMailboxProvider = string;
+
+/**
+ * One mailbox provider's placement for the period. Unlike the domain-wide summary, a single provider's rates are unweighted: there is no audience mix to weight within one provider.
+ *
+ */
+export type EmailInboxInsightsPlacementProvider = {
+  /**
+   * The provider whose placement this row describes.
+   */
+  readonly mailbox_provider: EmailInboxInsightsMailboxProvider;
+  /**
+   * Share of this provider's measured placements that landed in the inbox, as a percentage.
+   */
+  readonly inbox_rate_percent: number | null;
+  /**
+   * Share of this provider's measured placements that landed in spam, as a percentage.
+   */
+  readonly spam_rate_percent: number | null;
+  readonly raw_counts: EmailInboxInsightsPlacementCounts;
+  /**
+   * Inbox-rate movement against the prior period, in percentage points. Present only when the request asked for a comparison and the prior period had data for this provider; absence is not zero change.
+   *
+   */
+  readonly delta_pts?: number;
+  /**
+   * Share of this provider's inbox-placed mail that was read, as a percentage.
+   */
+  readonly read_rate_percent: number | null;
+};
+
+/**
+ * The per-provider placement table.
+ */
+export type EmailInboxInsightsPlacementProviders = {
+  /**
+   * One row per mailbox provider the measurement observed for this domain in the period.
+   */
+  readonly items: Array<EmailInboxInsightsPlacementProvider>;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * One bucket of the placement series.
+ */
+export type EmailInboxInsightsPlacementSeriesPoint = {
+  /**
+   * First UTC day of the bucket.
+   */
+  readonly date: string;
+  /**
+   * The provider this point describes, or null on the domain-wide line. Per-provider points appear only when the request named providers.
+   *
+   */
+  readonly mailbox_provider: EmailInboxInsightsMailboxProvider | null;
+  /**
+   * Inbox share of the bucket's measured placements, as a percentage.
+   */
+  readonly inbox_rate_percent: number | null;
+  /**
+   * Spam share of the bucket's measured placements, as a percentage.
+   */
+  readonly spam_rate_percent: number | null;
+  /**
+   * Measured placements observed in the inbox in this bucket.
+   */
+  readonly inbox_raw_count: number;
+  /**
+   * Measured placements observed in spam in this bucket.
+   */
+  readonly spam_raw_count: number;
+};
+
+/**
+ * The placement time series, at the grain named in `window.group_by`.
+ *
+ * The series is sparse: buckets with no measured placement are omitted rather
+ * than returned as zeros, because an invented zero would be indistinguishable
+ * from a measured one. Index by date, never by position.
+ *
+ */
+export type EmailInboxInsightsPlacementSeries = {
+  /**
+   * One point per bucket with measured placements. With providers named in the request, one point per bucket per provider.
+   *
+   */
+  readonly items: Array<EmailInboxInsightsPlacementSeriesPoint>;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * A Gmail tab, as the measurement identifies it. A lowercase identifier rather than a
+ * display name, so pick your own label for it, and treat the set as open: these are
+ * Gmail's own tabs, and the measurement reports whichever one it saw.
+ *
+ * `none` is a value rather than an absence: Gmail delivered the mail under no tab at all,
+ * which is an ordinary outcome and not a gap in the measurement.
+ *
+ */
+export type EmailInboxInsightsGmailTab =
+  | "primary"
+  | "promotions"
+  | "updates"
+  | "forums"
+  | "social"
+  | "none"
+  | (string & {});
+
+/**
+ * How the domain's Gmail-placed mail split across one Gmail tab.
+ */
+export type EmailInboxInsightsGmailTabCategory = {
+  /**
+   * The tab this row describes.
+   */
+  readonly category: EmailInboxInsightsGmailTab;
+  /**
+   * Share of the domain's Gmail-placed mail that landed under this tab, as a percentage.
+   */
+  readonly overall_percent: number | null;
+  /**
+   * Share of this tab's mail that placed in the inbox, as a percentage.
+   */
+  readonly inbox_percent: number | null;
+  /**
+   * Share of this tab's mail that placed in spam, as a percentage.
+   */
+  readonly spam_percent: number | null;
+};
+
+/**
+ * Where the domain's Gmail-placed mail landed across Gmail's tabs. The status is `not_applicable` when the domain had no Gmail placement in the period; hide the section rather than showing an empty split.
+ *
+ */
+export type EmailInboxInsightsGmailTabs = {
+  /**
+   * One entry per Gmail tab that received mail.
+   */
+  readonly categories: Array<EmailInboxInsightsGmailTabCategory>;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * One sending IP's placement and authentication pass rates for the period.
+ */
+export type EmailInboxInsightsPlacementIpDetail = {
+  /**
+   * The sending IP address.
+   */
+  readonly ip: string;
+  /**
+   * Share of this IP's measured placements that landed in the inbox, as a percentage.
+   */
+  readonly inbox_rate_percent: number | null;
+  readonly raw_counts: EmailInboxInsightsPlacementCounts;
+  /**
+   * Share of this IP's measured mail that passed SPF, as a percentage.
+   */
+  readonly spf_pass_rate_percent: number | null;
+  /**
+   * Share of this IP's measured mail that passed DKIM, as a percentage.
+   */
+  readonly dkim_pass_rate_percent: number | null;
+};
+
+/**
+ * Per-IP placement detail for the domain's sending infrastructure. Returned only when the request asked for IP detail.
+ *
+ */
+export type EmailInboxInsightsPlacementIpDetails = {
+  /**
+   * One row per sending IP the measurement observed for this domain in the period.
+   */
+  readonly items: Array<EmailInboxInsightsPlacementIpDetail>;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * Where a sending domain's measured mail landed over the period: the
+ * domain-wide summary, the per-provider table, the time series, the Gmail tab
+ * split, and optionally per-IP detail.
+ *
+ * Placement figures are estimates from a measurement panel of real mailboxes,
+ * and every rate is a percentage of measured placements, never of delivered
+ * volume. Each section carries its own status; a successful response never
+ * implies every section is populated.
+ *
+ */
+export type EmailInboxInsightsPlacement = EmailInboxInsightsEnvelope & {
+  summary: EmailInboxInsightsPlacementSummary;
+  providers: EmailInboxInsightsPlacementProviders;
+  series: EmailInboxInsightsPlacementSeries;
+  gmail_tabs: EmailInboxInsightsGmailTabs;
+  ip_details?: EmailInboxInsightsPlacementIpDetails;
+};
+
+/**
+ * One authentication check's pass rate over the period.
+ */
+export type EmailInboxInsightsAuthPassRate = {
+  /**
+   * Share of the domain's measured mail that passed this check, as a percentage.
+   */
+  readonly pass_rate_percent: number | null;
+  /**
+   * How the pass rate moved against the prior period, in percentage points. Present only when the request asked for a comparison and the prior period had data; absence is not zero change.
+   *
+   */
+  readonly delta_pts?: number;
+  /**
+   * Where this figure comes from. `dmarc_rua` is authoritative aggregate
+   * reporting and covers every sender of the domain, forwarders included;
+   * `google_postmaster` is a fallback covering only mail Google received. It
+   * can differ from the source of the DMARC figures, so surface it per check
+   * rather than once per response.
+   *
+   * Null on a check that reports no figure at all, which is what a
+   * `not_configured` status means: there is no measurement, so there is no
+   * source to name.
+   *
+   */
+  readonly source: string | null;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * The DMARC policy published in the domain's DNS record: what receivers are asked to do with mail that fails DMARC.
+ *
+ */
+export type EmailInboxInsightsDmarcPolicy = "none" | "quarantine" | "reject";
+
+/**
+ * Why the domain is not yet ready to move its DMARC policy to `reject`. `source_below_threshold` means at least one legitimate sender is not authenticating well enough yet; `data_too_stale` means the reporting is too old to judge; `no_rua_data` means no aggregate reports have arrived at all; `no_policy` means the domain publishes no DMARC record to tighten. The reporting decides this set and can add to it, so show an unrecognised value rather than treating it as no reason at all.
+ *
+ */
+export type EmailInboxInsightsDmarcReadinessReason =
+  | "source_below_threshold"
+  | "data_too_stale"
+  | "no_rua_data"
+  | "no_policy"
+  | (string & {});
+
+/**
+ * The domain's DMARC standing over the period.
+ */
+export type EmailInboxInsightsDmarc = {
+  /**
+   * Share of the domain's measured mail that passed DMARC alignment, as a percentage.
+   */
+  readonly aligned_rate_percent: number | null;
+  /**
+   * The policy published in the domain's DNS record, or null when the domain publishes no DMARC record at all. Null is not `none`: `none` is a policy, asking receivers to take no action while the domain monitors its reporting, and a domain that has one is already set up. A null asks for a record to be published, which is a different first step.
+   *
+   */
+  readonly policy: EmailInboxInsightsDmarcPolicy | null;
+  /**
+   * Whether the domain's authentication is consistent enough to move the policy to `reject` without losing legitimate mail. Deliberately conservative: false whenever the data is insufficient to be sure. Null when the measurement reached no verdict, which is what a `status` other than `ok` means here: false would read as a considered "not yet" rather than as no assessment having been made.
+   *
+   */
+  readonly ready_for_reject: boolean | null;
+  /**
+   * Why `ready_for_reject` is false, so the answer is actionable rather than a bare refusal. Empty when nothing is holding the domain back, and null when readiness was not assessed, which pairs with `ready_for_reject`: an empty list alongside a null verdict would say the opposite of what was measured. Render these rather than a plain "not ready": the fix differs per reason, and a domain held back only by stale reporting needs no configuration change at all.
+   *
+   */
+  readonly readiness_reasons: Array<EmailInboxInsightsDmarcReadinessReason> | null;
+  /**
+   * How the aligned rate moved against the prior period, in percentage points. Present only when the request asked for a comparison and the prior period had data; absence is not zero change.
+   *
+   */
+  readonly delta_pts?: number;
+  /**
+   * Where the DMARC figures come from. `dmarc_rua` is authoritative
+   * aggregate reporting and covers every sender of the domain, forwarders
+   * included; `google_postmaster` is a fallback covering only mail Google
+   * received. The two are not equivalent, so surface which one is shown.
+   *
+   * Null when the section reports no figures, which is what a
+   * `not_configured` status means for a domain with no aggregate reporting
+   * and no Postmaster connection.
+   *
+   */
+  readonly source: string | null;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * How a sending source's mail authenticates against the domain's DMARC policy. `aligned` passes with both SPF and DKIM aligned; `dkim_only` and `spf_only` pass on one mechanism; `fails_policy` passes neither. The reporting decides this set and can add to it, so treat an unrecognised value as a label to show rather than a case to exhaust. A source whose verdict is new still belongs in the table.
+ *
+ */
+export type EmailInboxInsightsDmarcVerdict =
+  "aligned" | "dkim_only" | "spf_only" | "fails_policy" | (string & {});
+
+/**
+ * One system observed sending as this domain, with how its mail authenticates.
+ */
+export type EmailInboxInsightsAuthSource = {
+  /**
+   * The sending source as the reporting identifies it. Not a fixed list: unidentified senders, mostly forwarders, appear as a real category.
+   *
+   */
+  readonly name: string;
+  /**
+   * A coarse classification of the source. The set can grow; treat values as labels. Null when the measurement did not classify this sender.
+   *
+   */
+  readonly category: string | null;
+  /**
+   * Messages the reporting attributes to this source over the period.
+   */
+  readonly volume: number;
+  /**
+   * Share of this source's mail that passed SPF with alignment, as a percentage.
+   */
+  readonly spf_aligned_rate_percent: number | null;
+  /**
+   * Share of this source's mail that passed DKIM with alignment, as a percentage.
+   */
+  readonly dkim_aligned_rate_percent: number | null;
+  /**
+   * Share of this source's mail that passed DMARC, as a percentage.
+   */
+  readonly dmarc_pass_rate_percent: number | null;
+  readonly verdict: EmailInboxInsightsDmarcVerdict;
+  /**
+   * Whether this source counts toward the reject recommendation. A source that does not is excluded from that judgement, which is what lets this table explain a conservative recommendation instead of contradicting it.
+   *
+   */
+  readonly qualifies_for_readiness: boolean;
+};
+
+/**
+ * Every system observed sending as this domain, with how each authenticates. This is the table that shows who else sends under the domain's name.
+ *
+ */
+export type EmailInboxInsightsAuthSources = {
+  /**
+   * One row per observed sending source.
+   */
+  readonly items: Array<EmailInboxInsightsAuthSource>;
+  /**
+   * The most recent UTC day the source reporting includes. Aggregate DMARC reports arrive on reporters' own schedules, routinely a day or more behind, so the newest days look sparse; label from this date rather than treating the dip as a regression.
+   *
+   */
+  readonly latest_data_date: string | null;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * Whether the domain's mail authenticates, and who sends as the domain: SPF
+ * and DKIM pass rates, the DMARC standing with its published policy, and the
+ * per-source table that shows every system observed sending under the
+ * domain's name.
+ *
+ * Without a completed Google Postmaster connection and without aggregate
+ * DMARC reporting, sections report `not_configured`: an invitation to finish
+ * setup rather than a fault. Each section carries its own status.
+ *
+ */
+export type EmailInboxInsightsAuthentication = EmailInboxInsightsEnvelope & {
+  /**
+   * The domain's SPF pass rate.
+   */
+  spf: EmailInboxInsightsAuthPassRate;
+  /**
+   * The domain's DKIM pass rate.
+   */
+  dkim: EmailInboxInsightsAuthPassRate;
+  dmarc: EmailInboxInsightsDmarc;
+  sources: EmailInboxInsightsAuthSources;
+};
+
+/**
+ * The worst day for complaints in the period.
+ */
+export type EmailInboxInsightsComplaintPeak = {
+  /**
+   * The UTC day the highest rate fell on.
+   */
+  readonly date: string;
+  /**
+   * The rate on that day, as a percentage.
+   */
+  readonly value_percent: number;
+};
+
+/**
+ * The rate at which the domain's mail is reported as spam, as Google Postmaster measures it.
+ */
+export type EmailInboxInsightsComplaintRate = {
+  /**
+   * Share of the domain's Gmail-received mail that recipients reported as spam, as a percentage, from Google Postmaster.
+   *
+   */
+  readonly gmail_postmaster_spam_rate_percent: number | null;
+  /**
+   * How the rate moved against the prior period, in percentage points. Present only when the request asked for a comparison and the prior period had data; absence is not zero change.
+   *
+   */
+  readonly delta_pts?: number;
+  /**
+   * The worst day in the period, so a spike can be named without scanning the series. Absent when there is no rate to peak.
+   *
+   */
+  readonly peak?: EmailInboxInsightsComplaintPeak;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * One bucket of the complaint-rate series.
+ */
+export type EmailInboxInsightsComplaintSeriesPoint = {
+  /**
+   * First UTC day of the bucket.
+   */
+  readonly date: string;
+  /**
+   * The bucket's Google Postmaster spam rate, as a percentage.
+   */
+  readonly gmail_postmaster_spam_rate_percent: number | null;
+};
+
+/**
+ * The complaint-rate series, at the grain named in `window.group_by`. Index by date, never by position.
+ *
+ */
+export type EmailInboxInsightsComplaintSeries = {
+  /**
+   * One point per bucket.
+   */
+  readonly items: Array<EmailInboxInsightsComplaintSeriesPoint>;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * How often the domain's mail is reported as spam, as Google Postmaster
+ * measures it. This is Google's number for Gmail-received mail only; the
+ * feedback-loop complaint rate for all providers is a Bird-measured figure
+ * served by the email statistics endpoints, and the two are different
+ * measurements of different mail.
+ *
+ * For a domain without a completed Google Postmaster connection every section
+ * reports `not_configured`: an invitation to finish setup rather than a fault.
+ *
+ */
+export type EmailInboxInsightsComplaints = EmailInboxInsightsEnvelope & {
+  rate: EmailInboxInsightsComplaintRate;
+  series: EmailInboxInsightsComplaintSeries;
+};
+
+/**
+ * What kind of spam trap was hit. `pristine` addresses were never used by a real person and never subscribed to anything, so a hit means the address was harvested or guessed rather than collected. `recycled` addresses belonged to a real person once and were retired, so hits point at stale list data. `typo` addresses catch misspellings of real domains, `parked` addresses sit on domains that are registered but not used for real mail, and `mixed` covers hits the trap network reports without a single kind. The trap network decides this set and can add to it, so treat an unrecognised value as a label to show rather than a case to exhaust. A hit whose kind is new is still a hit worth acting on.
+ *
+ */
+export type EmailInboxInsightsTrapType =
+  "pristine" | "recycled" | "typo" | "parked" | "mixed" | (string & {});
+
+/**
+ * Trap hits of one kind.
+ */
+export type EmailInboxInsightsSpamTrapTypeCount = {
+  readonly type: EmailInboxInsightsTrapType;
+  /**
+   * Hits of this kind over the period. A zero is a measured zero, not missing data: no pristine hits is a genuinely good result rather than an empty state.
+   *
+   */
+  readonly hits: number;
+};
+
+/**
+ * The trap network that observed a hit. The set grows as coverage does, so treat the values as labels rather than a closed list.
+ *
+ */
+export type EmailInboxInsightsTrapSource =
+  "cloudmark" | "abusix" | (string & {});
+
+/**
+ * Trap hits attributed to one trap network.
+ */
+export type EmailInboxInsightsSpamTrapSourceCount = {
+  readonly source: EmailInboxInsightsTrapSource;
+  /**
+   * Hits this network observed over the period.
+   */
+  readonly hits: number;
+};
+
+/**
+ * One trap address this domain's mail reached, with enough detail to trace where the address came from. A row can represent several hits on the same trap, so read `hit_count` rather than counting rows.
+ *
+ */
+export type EmailInboxInsightsSpamTrapHit = {
+  /**
+   * When the trap network first observed mail from this domain at this trap.
+   */
+  readonly first_seen: string;
+  /**
+   * The most recent sighting, or null when the trap was seen only once. On a row with several hits this is the far end of the period they span.
+   *
+   */
+  readonly last_seen: string | null;
+  /**
+   * The sending IP the message came from.
+   */
+  readonly ip_address: string;
+  readonly source: EmailInboxInsightsTrapSource;
+  readonly type: EmailInboxInsightsTrapType;
+  /**
+   * How many times this trap was hit over the period, so rows do not sum to `total` on their own: one repeatedly hit trap is one row. Absent when the trap network does not break the count out, which is not the same as one hit. A row exists because the trap was reached at least once either way.
+   *
+   */
+  readonly hit_count?: number;
+  /**
+   * How long the trap address has been a trap, in days, or null when the network does not say. A high age on a recycled trap suggests the address has been dead in the list for a long time.
+   *
+   */
+  readonly trap_age_days: number | null;
+};
+
+/**
+ * The individual trap hits behind the totals. A sample rather than a guaranteed complete list, and its rows do not count hits: one row is one trap address, carrying a `hit_count` for how many times that address was reached. Neither the number of rows nor the sum of `hit_count` reconstructs `total`, because that field is absent wherever the trap network does not break the figure out. Read `truncated_types` for what the measurement capped rather than inferring completeness by comparing counts.
+ *
+ */
+export type EmailInboxInsightsSpamTrapHits = {
+  /**
+   * One entry per trap reached, newest first.
+   */
+  readonly items: Array<EmailInboxInsightsSpamTrapHit>;
+  /**
+   * Trap kinds whose hits the measurement capped, so the rows shown for them are incomplete by design rather than by chance. Typo-trap hits, for instance, only ever cover the last seven days. An empty array means nothing was capped.
+   *
+   */
+  readonly truncated_types: Array<EmailInboxInsightsTrapType>;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * Whether the domain's mail is reaching spam traps: addresses that exist only
+ * to catch senders mailing lists they should not be mailing.
+ *
+ * Zero hits is a measured zero and a good result, so the totals read as real
+ * figures rather than as an empty state. The kind of trap matters more than
+ * the count: pristine hits point at harvested or guessed addresses, while
+ * recycled hits point at stale list data.
+ *
+ */
+export type EmailInboxInsightsSpamTraps = EmailInboxInsightsEnvelope & {
+  /**
+   * Trap hits observed over the period, across every trap network. The authoritative count: `hit_rows` holds a sample of the rows behind it.
+   *
+   */
+  readonly total: number;
+  /**
+   * How the hit count moved against the prior period, as a change in the number of hits rather than in percentage points. Negative is an improvement. Present only when the request asked for a comparison and the prior period had data; absence is not zero change.
+   *
+   */
+  readonly delta?: number;
+  /**
+   * Hits split by kind, one entry per kind the trap network reported. Read counts from here rather than assuming a fixed set of kinds: the set can grow, and an entry that is absent was not reported rather than being a measured zero. These sum to `total`.
+   *
+   */
+  readonly by_type: Array<EmailInboxInsightsSpamTrapTypeCount>;
+  /**
+   * Hits split by the trap network that observed them.
+   */
+  readonly by_source: Array<EmailInboxInsightsSpamTrapSourceCount>;
+  readonly hit_rows: EmailInboxInsightsSpamTrapHits;
+};
+
+/**
+ * One listing of a target on one blocklist.
+ */
+export type EmailInboxInsightsBlocklistListing = {
+  /**
+   * Whether this listing is in force now. A false entry is history: it shows the target was listed and has since cleared, which is why the target's `is_listed` can be false while listings are present.
+   *
+   */
+  readonly is_active: boolean;
+  /**
+   * The provider's own short code for the listing reason, or null when it gives none. Stable where the prose in `reason` is not, so branch on this and display that.
+   *
+   */
+  readonly reason_code: string | null;
+  /**
+   * The blocklist that carries the listing. Providers publishing several lists are reported per list rather than under one combined name, because what a listing means and how it is cleared differ per list.
+   *
+   */
+  readonly provider: string;
+  /**
+   * The reason the provider gives for the listing, or null when it publishes none.
+   */
+  readonly reason: string | null;
+  /**
+   * When this listing was first observed.
+   */
+  readonly first_detected: string;
+  /**
+   * When this listing was most recently observed, or null while the listing is still in force. A provider records a last sighting only once one exists, so a null here reads as "still listed" rather than "never seen".
+   *
+   */
+  readonly last_detected: string | null;
+};
+
+/**
+ * One checked target, whether it is listed now, and the listings seen against it.
+ *
+ * Read `status` before `is_listed`. Each target is looked up independently and
+ * any one of them can fail while the rest succeed, so a target whose status is
+ * not `ok` was not checked and `is_listed: false` on it means nothing. Rendering
+ * that as "clear" is the one outcome this resource must never produce.
+ *
+ */
+export type EmailInboxInsightsBlocklistTarget = {
+  /**
+   * The sending IP or domain that was checked.
+   */
+  readonly target: string;
+  /**
+   * Whether this target is an IP address or a hostname. Null when the measurement did not report a kind for it, which is possible on a target whose check did not complete.
+   *
+   */
+  readonly target_type: string | null;
+  /**
+   * Whether the target is on at least one blocklist right now. Meaningful only when `status` is `ok`: on any other status this target was not checked, so the value carries no finding either way.
+   *
+   */
+  readonly is_listed: boolean;
+  /**
+   * Whether this target was actually checked. `unavailable` means the lookup failed or timed out for this target while others may have succeeded, so the honest rendering is "could not check" rather than a result.
+   *
+   */
+  readonly status: EmailInboxInsightsSectionStatus;
+  /**
+   * When this target was looked up, or null when it was not. Per target rather than per response, because each is a separate live lookup.
+   *
+   */
+  readonly checked_at: string | null;
+  /**
+   * Listings seen against this target, including ones that have since cleared, so a recent history is visible even when nothing is active. Read each listing's `is_active` rather than assuming every entry is current.
+   *
+   */
+  readonly listings: Array<EmailInboxInsightsBlocklistListing>;
+};
+
+/**
+ * Whether the domain's sending infrastructure is on any blocklist, checked
+ * when the request is made.
+ *
+ * This is a live lookup rather than a measurement over a period, so it carries
+ * no window: `freshness.as_of` is null and only the lag hint applies.
+ *
+ * "Nothing found" and "could not look" must never render alike, and failure here
+ * happens at two grains. If nothing at all could be checked the request fails
+ * rather than returning an empty result. If some targets were checked and others
+ * were not, this is a normal response and each target's own `status` says which
+ * is which: read that before `is_listed`, because a target that was not checked
+ * reports `is_listed: false` and that value carries no finding. `active_count`
+ * is absent whenever no target could be checked, so an absent count is never a
+ * zero.
+ *
+ */
+export type EmailInboxInsightsBlocklists = EmailInboxInsightsEnvelopeBase & {
+  /**
+   * How many of the checked targets currently carry an active listing. A count of targets, not of listings: a target on three blocklists counts once. Null when no target could be checked at all, which is not the same as zero. Zero means every target was checked and none of them is listed.
+   *
+   */
+  readonly active_count: number | null;
+  /**
+   * One entry per sending IP or domain checked for this sending domain.
+   */
+  readonly targets: Array<EmailInboxInsightsBlocklistTarget>;
+};
+
+/**
+ * The industry a sending domain was classified into.
+ */
+export type EmailInboxInsightsIndustry = {
+  /**
+   * The measurement's own identifier for this industry, carried through so a client can tell two cohorts apart without comparing labels. No operation accepts it.
+   *
+   */
+  readonly id: string;
+  /**
+   * Display name of the industry. The classification is broad, so bind this label rather than assuming a finer category exists.
+   *
+   */
+  readonly name: string;
+};
+
+/**
+ * How senders in a domain's industry place, as a median across the industry's
+ * measured senders.
+ *
+ * The benchmark describes the industry, not the domain, so it carries no
+ * comparison of its own: compute that against the domain's own placement rate.
+ * Its weighting is a general default rather than any one account's audience
+ * mix, which is a deliberate asymmetry with the placement figure it is
+ * compared against.
+ *
+ * The status is `no_data` when too few measured senders share the industry for
+ * a median to be meaningful, when the domain's industry is not classified, or
+ * before the industry figures have been computed. Handle that state from the
+ * start: it is the normal state for a young industry cohort rather than an
+ * edge case.
+ *
+ */
+export type EmailInboxInsightsIndustryBenchmark =
+  EmailInboxInsightsEnvelopeBase & {
+    /**
+     * The cohort the median describes, or null when the domain is not classified into an industry. This description already names that as a `no_data` cause and a normal state for a young cohort, so it needs a representation: without one the only way to report an unclassified domain is a cohort with a blank name.
+     *
+     */
+    readonly industry: EmailInboxInsightsIndustry | null;
+    /**
+     * The industry's median inbox rate, as a percentage.
+     */
+    readonly median_inbox_rate_percent: number | null;
+    /**
+     * How many days the cohort figure covers. Reported rather than assumed because the period is the one the nightly computation produced, not one the caller chose, so a label built from a requested window would be wrong. Absent when the computation does not report it, in which case a label must not name a period at all.
+     *
+     */
+    readonly window_days?: number;
+    /**
+     * How many measured senders the median was computed across.
+     */
+    readonly cohort_size: number | null;
+    readonly status: EmailInboxInsightsSectionStatus;
+  };
+
+/**
+ * Field used to sort owned domains.
+ */
+export type EmailInboxInsightsDomainSort = "domain";
+
+/**
+ * One of the workspace's verified sending domains, and whether Inbox Insights is switched on for it.
+ *
+ */
+export type EmailInboxInsightsDomain = {
+  /**
+   * The sending domain, lowercased, as it appears in your sending domains.
+   */
+  readonly domain: string;
+  /**
+   * Whether Inbox Insights reports on this domain. Switching it off stops the reporting and keeps the measurement history, so switching it back on restores the full history rather than starting again.
+   *
+   */
+  readonly monitored: boolean;
+};
+
+/**
+ * A page of sending domains this workspace can report on, and which of them Inbox Insights is switched on for.
+ *
+ */
+export type EmailInboxInsightsDomains = {
+  /**
+   * One entry per verified domain in this page, whether or not it is switched on. A domain that has not been verified does not appear, because verification is what proves the domain is yours to report on.
+   *
+   */
+  readonly data: Array<EmailInboxInsightsDomain>;
+} & ListEnvelope;
+
+/**
+ * The Inbox Insights setting to change for a sending domain.
+ */
+export type EmailInboxInsightsDomainUpdate = {
+  /**
+   * Whether the workspace wants this domain monitored. Enabling enrolls it with eDataSource; disabling removes only the workspace preference and preserves vendor enrollment and measurement history. Verified ownership governs report access.
+   *
+   */
+  monitored: boolean;
+};
+
+/**
+ * What switching on the main sending domain did.
+ *
+ * - `enabled`: Inbox Insights is now switched on for the domain named alongside this.
+ * - `already_on`: at least one domain was already switched on, so nothing changed.
+ * - `choice_required`: the main sending domain could not be identified, most often
+ * because the workspace has several verified domains and no sending to rank them
+ * by. Ask the customer to choose.
+ * - `no_verified_domains`: the workspace has no verified sending domain, so there is
+ * nothing to report on until one is verified.
+ *
+ */
+export type EmailInboxInsightsDomainMonitoringOutcome =
+  "enabled" | "already_on" | "choice_required" | "no_verified_domains";
+
+/**
+ * What switching on the workspace's main sending domain did. There are four outcomes, because each one leaves the customer somewhere different: one domain is now reporting, one already was, we could not tell which domain is the main one, or there is no verified domain to report on at all.
+ *
+ */
+export type EmailInboxInsightsDomainMonitoringResult = {
+  readonly outcome: EmailInboxInsightsDomainMonitoringOutcome;
+  /**
+   * The sending domain this call switched on, lowercased. The server sends a domain with the `enabled` outcome and null with the other three, `already_on` included: that outcome says only that the workspace had already made its choice, not which domain it chose. Read the domain list for that. Check `outcome` first rather than treating a domain as present.
+   *
+   */
+  readonly domain: string | null;
+};
+
+/**
  * The window and bucket grain the response covers, echoed from the request, plus the freshness boundary the data is current to.
  *
  */
@@ -9603,6 +10950,71 @@ export type EmailStatsByBroadcastResponse = {
 };
 
 /**
+ * The boundaries this signal's status was judged against. Use them to classify your own slices, such as per-domain or per-tag rates, against the same bands. The `direction` field identifies the risky side of the boundaries: `above` means the status degrades as the value rises past a boundary, as with bounce and complaint rates, and `below` means it degrades as the value falls, as with delivery rate. The boundaries are exclusive, so a value exactly on one keeps the better status. Omitted for a metric with no risk boundaries, such as open rate.
+ *
+ */
+export type EmailHealthSignalThresholds = {
+  /**
+   * Which side of the boundaries is at risk. `above` for higher-is-worse rates (bounce, complaint), `below` for lower-is-worse rates (delivery).
+   */
+  readonly direction: "above" | "below";
+  /**
+   * Crossing this boundary in the risk direction moves the signal to `watching`, as a fraction.
+   */
+  readonly watching: number;
+  /**
+   * Crossing this boundary in the risk direction moves the signal to `throttled`, as a fraction.
+   */
+  readonly throttled: number;
+};
+
+/**
+ * The current value and verdict for a single sending-health metric over the window.
+ */
+export type EmailHealthSignal = {
+  /**
+   * Which rate this signal reports.
+   */
+  readonly metric:
+    "delivery_rate" | "open_rate" | "bounce_rate" | "complaint_rate";
+  /**
+   * The current rate over the window, as a fraction. Null when its denominator is zero.
+   */
+  readonly value: number | null;
+  /**
+   * The reference deliverability limit for this rate, as a fraction (for example `0.005` for a 0.5% bounce-rate limit). Null for metrics that have no limit, such as delivery rate and open rate. The verdict is classified using `thresholds`, which can differ from this reference limit.
+   */
+  readonly limit: number | null;
+  /**
+   * This metric's individual verdict, ordered best to worst: `strong`, `healthy`, `watching`, `throttled`. `strong` applies only to `open_rate`, for an open rate well above typical. For the other rates, `healthy`, `watching`, and `throttled` indicate how close the rate is to a level that risks deliverability. The verdict follows the `thresholds` boundaries rather than the displayed reference `limit`. A signal whose `value` is null, because its denominator was zero in the window, is reported as `healthy`.
+   *
+   */
+  readonly status: "strong" | "healthy" | "watching" | "throttled";
+  readonly thresholds?: EmailHealthSignalThresholds;
+};
+
+/**
+ * The workspace's current sending-health verdict over the requested window, plus reference deliverability limits and classification boundaries. Use it to render a health badge, the bounce-rate and complaint-rate limit labels, and the risk lines on deliverability charts without hard-coding any thresholds of your own.
+ *
+ */
+export type EmailHealth = {
+  /**
+   * The date range the verdict was computed over, echoed back from the request.
+   */
+  period: EmailStatsPeriod;
+  /**
+   * Overall sending-health verdict for the window, taken as the worst status among the bounce-rate, complaint-rate, and delivery-rate signals. The open-rate signal, which can be `strong`, is not part of this roll-up. The overall verdict is one of `healthy`, `watching`, or `throttled`. It is `healthy` when the other three signals are each healthy or better. It is `watching` when at least one is watching, and `throttled` when at least one is throttled. This verdict describes deliverability risk. It never pauses your sending on its own.
+   *
+   */
+  readonly status: "healthy" | "watching" | "throttled";
+  /**
+   * The per-rate signals include `delivery_rate`, `open_rate`, `bounce_rate`, and `complaint_rate`. Read a signal by matching on its `metric`. Each entry carries its current value, a reference deliverability limit (null where no limit applies), and its own verdict. Delivery rate, bounce rate, and complaint rate also carry the thresholds their verdict was classified against; open rate does not, because a high open rate is never a risk.
+   *
+   */
+  readonly signals: Array<EmailHealthSignal>;
+};
+
+/**
  * Per-domain behavior toggles. Changes apply immediately to new sends.
  *
  */
@@ -10041,14 +11453,23 @@ export type ShareDomainDnsRequest = {
   emails: Array<string>;
 };
 
+export type SuppressionReasonFilter =
+  "hard_bounce" | "complaint" | "unsubscribe" | "manual";
+
+export type SuppressionScopeTypeFilter =
+  "workspace" | "category" | "audience" | "topic" | "contact" | "domain";
+
 export type SuppressionId = string;
 
+/**
+ * How widely the email suppression applies. Responses use `workspace`. The values `category`, `audience`, `topic`, `contact`, and `domain` are reserved and have no records. The record's `applies_to` field determines which message categories are blocked.
+ *
+ */
+export type SuppressionScopeType =
+  "workspace" | "category" | "audience" | "topic" | "contact" | "domain";
+
 export type SuppressionScope = {
-  /**
-   * How widely the email suppression applies. Responses currently use `workspace`, which blocks the address for every email sent by the workspace. WhatsApp suppressions use a separate list.
-   *
-   */
-  type: "workspace" | "category" | "audience" | "topic" | "contact" | "domain";
+  type: SuppressionScopeType;
   /**
    * Public ID or alias of the scoped resource. For workspace scope, this is the workspace ID.
    *
@@ -10069,6 +11490,7 @@ export type Suppression = {
    * - `hard_bounce`: A delivery permanently failed.
    * - `complaint`: The recipient reported a message as spam.
    * - `manual`: Added through the API or dashboard.
+   * - `unsubscribe`: The recipient opted out. Deprecated, and no new record carries it: an opt-out is a messaging preference rather than a suppression. Legacy records remain visible until they are moved to messaging preferences.
    *
    * An address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.
    *
@@ -10081,6 +11503,8 @@ export type Suppression = {
    * - `complaint_event`: Created from a spam complaint.
    * - `api_key`: Added through the API with an API key.
    * - `user`: Added by a user in the dashboard.
+   * - `unsubscribe_event`: The mailbox provider reported an opt-out. Deprecated with `reason: unsubscribe`.
+   * - `unsubscribe_link`: The recipient used a Bird unsubscribe link. Deprecated with `reason: unsubscribe`.
    *
    * This list grows over time. Treat unknown values as informational rather than rejecting the record.
    *
@@ -10128,6 +11552,809 @@ export type SuppressionCreate = {
    *
    */
   email: string;
+};
+
+/**
+ * The period every figure in the response covers, echoed back from the request.
+ *
+ * Figures are fetched when the request is made, so they are current as of `to`.
+ * The period always ends at the moment of the request rather than at a cached
+ * boundary, which is why two requests a minute apart can differ slightly.
+ *
+ */
+export type EmailCompetitivePeriod = {
+  /**
+   * Length of the period in days.
+   */
+  readonly days: number;
+  /**
+   * Start of the period, inclusive.
+   */
+  readonly from: string;
+  /**
+   * End of the period, exclusive. Daily figures therefore run through the previous whole UTC day and never include the one in progress.
+   *
+   */
+  readonly to: string;
+};
+
+/**
+ * Where your sending sits against the brands you watch, over the same period as the
+ * rows.
+ *
+ * Every figure here is derived from those rows rather than measured separately, so
+ * the two always agree. As on a row, each is present and `null` when the rows cannot
+ * support it: the peer medians need at least one watched brand the panel reported
+ * on, and the share figures need sending of your own to compare.
+ *
+ */
+export type EmailCompetitiveWatchlistSummary = {
+  /**
+   * Your share of everything the watched set sent over the period, your own sending included in the total. Your half of the ratio is an exact count of your own sending while the rest is the panel's estimate, so the two sides are measured differently.
+   *
+   */
+  readonly share_of_volume_percent: number | null;
+  /**
+   * How that share moved against the period immediately before, in percentage points. A share that went from 11.7 to 10.5 reports -1.2.
+   *
+   */
+  readonly share_of_volume_change_points: number | null;
+  /**
+   * Estimated volume the watched brands sent between them, excluding your own sending. A panel estimate, so read it as an order of magnitude rather than a count.
+   *
+   */
+  readonly competitor_sends: number | null;
+  /**
+   * Change in that volume against the period immediately before.
+   */
+  readonly competitor_sends_change_percent: number | null;
+  /**
+   * Median campaigns per week across the brands you watch, per sending domain. Your own row is excluded, since it is the figure being held against this one.
+   *
+   */
+  readonly peer_cadence_median_per_week: number | null;
+  /**
+   * Median inbox placement across the brands you watch. Your own row is excluded, as with the cadence median.
+   *
+   */
+  readonly peer_inbox_placement_median_rate: number | null;
+};
+
+export type CompetitiveWatchlistBrandId = string;
+
+/**
+ * Whether panel figures are available for a row, and when they are not, why.
+ *
+ * `ok` means the panel reported figures for the requested period. `not_in_panel`
+ * means the panel does not track the sending domain at all, which is common for
+ * smaller and newer senders. `no_data` means the panel tracks the domain but
+ * observed no mail from it in the period. `unavailable` means the figures could
+ * not be retrieved this time and the same request may well succeed on a retry.
+ *
+ */
+export type EmailCompetitivePanelStatus =
+  "ok" | "not_in_panel" | "no_data" | "unavailable";
+
+/**
+ * The most recent campaign observed for a brand in the period.
+ */
+export type EmailCompetitiveCampaignSummary = {
+  /**
+   * The identifier for this campaign. Use it to fetch this one campaign on its own.
+   *
+   * It is a string, and it needs to stay one. The values are long enough that
+   * JavaScript, and any other language that stores every number as a floating point
+   * value, will round them, and a rounded identifier matches no campaign at all.
+   * Compare it and pass it back as text.
+   *
+   */
+  readonly id: string;
+  /**
+   * The subject line the panel saw on this campaign.
+   */
+  readonly subject: string;
+  /**
+   * When the panel first saw this campaign arrive.
+   */
+  readonly sent_at: string;
+  /**
+   * Where the panel's capture of the rendered email can be fetched, null when it captured none. Panels image only some of what they observe, so an absent creative is an ordinary outcome rather than a failed one. The image is served from the panel's own host rather than from ours, so a page embedding it has to allow that host.
+   *
+   */
+  readonly image_url: string | null;
+};
+
+/**
+ * Where a figure came from. `measured` means it is counted from your own
+ * sending. `panel` means it is an estimate from an email panel, which observes a
+ * sample of real inboxes and scales what it sees up to a whole audience. `none`
+ * means there is no figure for this field on this row, so there is nothing to
+ * attribute a source to.
+ *
+ * Only your own row carries `measured` figures, and only where the metric is counted
+ * rather than estimated. Everything about a competitor is a panel estimate.
+ *
+ */
+export type EmailCompetitiveFieldSource = "measured" | "panel" | "none";
+
+/**
+ * Where each figure on the row came from, so a comparison can be labelled
+ * honestly. Every field on a competitor's row is a panel estimate. On your own
+ * row the source varies by field: what is counted directly is reported as measured,
+ * falls back to the panel for what is not, and reports `none` for a field this row
+ * never carries at all.
+ *
+ * Read rate is a panel estimate even on your own row. Comparing a measured rate
+ * against a panel estimate of the same rate is not a like for like
+ * comparison, because the two count an open differently, so both sides of the
+ * comparison come from the panel.
+ *
+ */
+export type EmailCompetitiveWatchlistRowProvenance = {
+  /**
+   * Source of `sends` and of `sends_change_percent`, which is derived from it.
+   */
+  sends: EmailCompetitiveFieldSource;
+  /**
+   * Source of `cadence_per_week`.
+   */
+  cadence_per_week: EmailCompetitiveFieldSource;
+  /**
+   * Source of `inbox_placement_rate`.
+   */
+  inbox_placement_rate: EmailCompetitiveFieldSource;
+  /**
+   * Source of `read_rate`.
+   */
+  read_rate: EmailCompetitiveFieldSource;
+  /**
+   * Source of `audience_overlap_rate`.
+   */
+  audience_overlap_rate: EmailCompetitiveFieldSource;
+  /**
+   * Source of `last_campaign`.
+   */
+  last_campaign: EmailCompetitiveFieldSource;
+};
+
+/**
+ * One brand on the watchlist, with its figures for the requested period. Your own
+ * workspace appears as a row too, so the table can be read as a single ranking.
+ *
+ * Every metric is present on every row and is `null` when it is unavailable for
+ * that brand, so a `0` is always a real measurement rather than a gap. Check
+ * `panel_status` for why a metric is null.
+ *
+ * `esp` and `list_size` are the exception. They are populated only when you read a
+ * single brand, and are always `null` on the watchlist whatever `panel_status`
+ * reports.
+ *
+ */
+export type EmailCompetitiveWatchlistRow = {
+  /**
+   * The watchlist entry, for removing the brand. Absent on your own row, which is not a watchlist entry.
+   */
+  readonly watchlist_brand_id?: CompetitiveWatchlistBrandId;
+  /**
+   * True on the row describing your own workspace's sending.
+   */
+  readonly is_workspace: boolean;
+  /**
+   * The brand's name as it was when the brand was added to the watchlist.
+   */
+  readonly name: string;
+  /**
+   * The brand's industry as it was when the brand was added, or null when the brand is not classified.
+   */
+  readonly industry: string | null;
+  /**
+   * The domains the brand's figures describe. Always one domain today: a brand is tracked by the single one the panel sees the most of its mail from, so a brand that splits its mail across several domains reports less than its full volume.
+   *
+   */
+  readonly sending_domains: Array<string>;
+  /**
+   * A sending platform observed on the domain, or null when the panel has none on record. A brand sending through more than one platform reports one of them rather than the list. This is frequently unavailable and updates monthly at best, so treat its absence as normal rather than as pending. Populated only when you read a single brand; on the watchlist it is always null.
+   *
+   */
+  readonly esp: string | null;
+  /**
+   * Estimated number of addresses the brand mails, or null when the panel has no estimate. Populated only when you read a single brand; on the watchlist it is always null.
+   *
+   */
+  readonly list_size: number | null;
+  /**
+   * Whether panel figures were available for this row, and when they were not, why.
+   */
+  readonly panel_status: EmailCompetitivePanelStatus;
+  /**
+   * Messages sent in the period.
+   */
+  readonly sends: number | null;
+  /**
+   * Change in send volume against the period immediately before this one, as a percentage. Null when the earlier period has nothing to compare against.
+   *
+   */
+  readonly sends_change_percent: number | null;
+  /**
+   * Average campaigns sent per week over the period.
+   */
+  readonly cadence_per_week: number | null;
+  /**
+   * Share of the brand's observed mail that reached an inbox rather than a spam folder.
+   *
+   */
+  readonly inbox_placement_rate: number | null;
+  /**
+   * Share of delivered mail that was read.
+   */
+  readonly read_rate: number | null;
+  /**
+   * Share of your own audience the panel also sees receiving this brand's mail. Null on your own row, and null for a competitor the panel measured no overlap with, which is an answer rather than a gap.
+   *
+   */
+  readonly audience_overlap_rate: number | null;
+  /**
+   * The most recent campaign observed in the period, or null when none was. Always null on your own row.
+   *
+   */
+  readonly last_campaign: EmailCompetitiveCampaignSummary | null;
+  /**
+   * Where each figure on this row came from.
+   */
+  readonly provenance: EmailCompetitiveWatchlistRowProvenance;
+};
+
+/**
+ * The workspace's competitor watchlist with its figures for the requested period.
+ *
+ * The list is capped by the organization's competitor limit and is returned whole,
+ * so it is not paginated. Your own row is included and is always first.
+ *
+ */
+export type EmailCompetitiveWatchlist = {
+  /**
+   * The period every figure covers.
+   */
+  period: EmailCompetitivePeriod;
+  /**
+   * Where your sending sits against the brands you watch.
+   */
+  summary: EmailCompetitiveWatchlistSummary;
+  /**
+   * Your own row first, then each watched brand in the order it was added. Your row is present once your workspace has sent email, since before that there is no sending of yours to compare against. Empty for a workspace that has neither sent nor added a brand.
+   *
+   */
+  readonly data: Array<EmailCompetitiveWatchlistRow>;
+};
+
+/**
+ * Why this campaign was surfaced. The set is open and grows as new signals are added.
+ *
+ * Every signal describes the campaign against its own brand's history, never against the
+ * other brands you watch, so several brands can carry the same signal in one period and
+ * none of them is the top of anything.
+ *
+ * `biggest_send` is a send far above that brand's own median: unusual for the brand, not
+ * merely large. `read_rate_standout` is a campaign read unusually well for its brand.
+ * `landing_in_spam` is one heavily filed as spam at a single mailbox provider, named in
+ * `mailbox_provider`, which is worth seeing even when the brand's overall placement looks healthy.
+ *
+ */
+export type EmailCompetitiveCampaignSignal =
+  "biggest_send" | "read_rate_standout" | "landing_in_spam" | (string & {});
+
+/**
+ * What the panel itself asserts about a campaign, in its own words. Present only on the campaigns the panel chose to make a claim about, which is a minority of them: a campaign can be surfaced as notable without the panel putting a headline on it, and that is an ordinary outcome rather than missing data.
+ *
+ */
+export type EmailCompetitiveNotableClaim = {
+  /**
+   * The panel's own phrasing, which may name the window the claim was measured over ("Biggest send in 7 days") or not ("Best-read campaign"). Show it as written rather than rebuilding it from the signal, and do not parse a window out of it.
+   *
+   */
+  readonly text: string;
+};
+
+/**
+ * The figures behind a campaign's signal, for ordering or filtering the list yourself. Which field carries a value depends on the signal, and each is null both on the signals it does not describe and on a campaign of its own signal the panel published no figure for.
+ *
+ */
+export type EmailCompetitiveNotableEvidence = {
+  /**
+   * How many times the brand's own median volume this send was. A value of 29 means the send was twenty-nine times the brand's typical volume for the period. Null on every signal other than `biggest_send`, and on a `biggest_send` campaign the panel published no ratio for.
+   *
+   */
+  readonly ratio_to_median: number | null;
+  /**
+   * How many panel observations `campaign.read_rate` was measured over. A rate over thirty observations and one over a hundred and forty are not equally worth showing, and this is what separates them. Null on every signal other than `read_rate_standout`, and on a `read_rate_standout` campaign the panel published no denominator for.
+   *
+   */
+  readonly read_rate_observations: number | null;
+  /**
+   * Share of this campaign filed as spam at the one provider named in `mailbox_provider`, as a value between 0 and 1. A different measurement from the campaign's overall `spam_rate`, and the one this signal is about. Null on every signal other than `landing_in_spam`, and on a `landing_in_spam` campaign whose provider counts the panel did not publish, so a spam entry can arrive without the rate behind it.
+   *
+   */
+  readonly mailbox_provider_spam_rate: number | null;
+  /**
+   * How many observations at that provider `mailbox_provider_spam_rate` was measured over. Null on the same terms.
+   *
+   */
+  readonly mailbox_provider_observations: number | null;
+};
+
+/**
+ * A mailbox provider, as the email panel identifies it. A lowercase identifier rather than a
+ * display name, so pick your own label for it, and treat the set as open: the panel reports
+ * whichever providers it observed, and `gmail`, `hotmail`, `yahoo`, `aol` and `comcast` are the
+ * ones it returns most. Apple never appears, because the panel does not measure it, so a surface
+ * offering an Apple row has no measurement behind it.
+ *
+ * The panel's buckets are not the same as the ones the [mailbox-provider stats
+ * breakdown](/docs/api/reference/get-email-stats-by-mailbox-provider) reports: Microsoft's
+ * properties appear here as `hotmail` rather than `microsoft`, and Apple is absent, so the two
+ * are not a joinable dimension.
+ *
+ */
+export type EmailCompetitivePanelMailboxProvider = string;
+
+/**
+ * One campaign an email panel observed a brand sending.
+ */
+export type EmailCompetitiveCampaign = EmailCompetitiveCampaignSummary & {
+  /**
+   * Estimated recipients this campaign reached, null when the panel observed the campaign but published no estimate for it.
+   *
+   */
+  readonly reach: number | null;
+  /**
+   * Estimated share of recipients who read this campaign, null when the panel published no rate for it. Panel read rates count dwell time, so they do not move with the automatic opens that inflate a sender's own open rate.
+   *
+   */
+  readonly read_rate: number | null;
+  /**
+   * Whether the panel captured the rendered email for this campaign.
+   */
+  readonly has_creative: boolean;
+  /**
+   * The discount the subject line leads with, null when it names none. Read from the subject text, so it finds a stated offer and not one revealed inside the email.
+   *
+   */
+  readonly discount_percent: number | null;
+  /**
+   * Share of this campaign that reached an inbox, null when the panel observed it without recording where it landed. It describes this send rather than the brand's domain, so a single bad campaign is visible against a brand whose overall placement still looks healthy.
+   *
+   */
+  readonly inbox_rate: number | null;
+  /**
+   * Share of this campaign that was filed as spam, null on the same terms.
+   */
+  readonly spam_rate: number | null;
+};
+
+/**
+ * A campaign the panel surfaced, and the reason it did.
+ */
+export type EmailCompetitiveNotableCampaign = {
+  /**
+   * The watchlist entry that sent it.
+   */
+  readonly watchlist_brand_id: CompetitiveWatchlistBrandId;
+  /**
+   * The brand's name.
+   */
+  readonly brand_name: string;
+  readonly signal: EmailCompetitiveCampaignSignal;
+  /**
+   * The panel's own headline for this campaign, or null where it surfaced the campaign without making one. Null is the common case and is not a fault.
+   *
+   */
+  readonly claim: EmailCompetitiveNotableClaim | null;
+  /**
+   * The figures behind the signal, for ordering or filtering the list.
+   */
+  readonly evidence: EmailCompetitiveNotableEvidence;
+  /**
+   * The provider a `landing_in_spam` campaign was heavily filed as spam at: spam placement is measured per provider, and this campaign's problem is at one of them. Null on every other signal.
+   *
+   */
+  readonly mailbox_provider: EmailCompetitivePanelMailboxProvider | null;
+  /**
+   * The campaign itself. Two of its fields behave differently here than on the brand's
+   * campaign feed, because the panel sends less about a campaign it surfaced this way.
+   *
+   * `has_creative` reports whether a capture came back with this entry rather than whether
+   * the panel ever captured the email, and captures are frequently absent here by design, so
+   * expect `false` on campaigns the panel did image. `reach` is null on every entry, because
+   * the panel does not estimate an audience for the campaigns it surfaces.
+   *
+   */
+  campaign: EmailCompetitiveCampaign;
+};
+
+/**
+ * Campaigns worth a second look across the brands a workspace watches.
+ */
+export type EmailCompetitiveNotableFeed = {
+  /**
+   * The period the campaigns were observed in, as the panel resolved it.
+   *
+   * Two things differ from the other competitive reads. It ends at the last instant of
+   * the previous whole day rather than at the moment of the request, so a campaign sent
+   * this morning is never among these. And the panel holds its selection for a period
+   * once it has made it, so two requests a minute apart return the same campaigns rather
+   * than differing slightly.
+   *
+   */
+  period: EmailCompetitivePeriod;
+  /**
+   * Whether the panel could be read for this feed, and when it could not, why.
+   */
+  panel_status: EmailCompetitivePanelStatus;
+  /**
+   * Up to 100 campaigns selected across watched brands. Selection takes turns across
+   * brands in watchlist order until the response is full, prioritizing spam placement,
+   * biggest sends, then read-rate standouts within each brand. Within one signal, rows
+   * compare the matching spam rate, volume ratio, or read rate descending; missing values
+   * sort last and ties retain tracked-domain and source order. Selected rows are returned
+   * in watchlist order, then biggest-send, read-rate, and spam signal order, followed by
+   * tracked-domain and source order.
+   *
+   * One campaign may appear once per signal because each row carries different evidence.
+   * Empty when nothing qualified; check `panel_status` to distinguish that from an
+   * unavailable panel.
+   *
+   */
+  readonly data: Array<EmailCompetitiveNotableCampaign>;
+  /**
+   * Whether Bird omitted eligible panel findings to keep this response to 100 rows. False does not promise that the panel observed every qualifying campaign in the period.
+   *
+   */
+  readonly truncated: boolean;
+};
+
+/**
+ * Identifier of the brand in the panel's catalog, used to add it to the watchlist. It is a string for the same reason a campaign id is: the values are wide enough that a client storing every number as a floating point value would round them, and a rounded identifier matches no brand at all.
+ *
+ */
+export type EmailCompetitiveBrandId = string;
+
+/**
+ * The brand to add to the watchlist. Obtained from a brand search, which only returns brands that can be watched.
+ *
+ */
+export type EmailCompetitiveWatchlistBrandCreate = {
+  brand_id: EmailCompetitiveBrandId;
+};
+
+/**
+ * A brand on the workspace's watchlist. This is the watchlist entry itself, with no figures on it; read the watchlist to get those.
+ *
+ */
+export type EmailCompetitiveWatchlistBrand = Timestamps & {
+  /**
+   * The watchlist entry.
+   */
+  readonly id: CompetitiveWatchlistBrandId;
+  readonly brand_id: EmailCompetitiveBrandId;
+  /**
+   * The brand's name when it was added. It is kept as it was so the row still reads correctly if the brand is later renamed or stops being tracked.
+   *
+   */
+  readonly name: string;
+  /**
+   * The brand's industry when it was added, or null when the brand is not classified.
+   */
+  readonly industry: string | null;
+  /**
+   * The domains this brand's figures describe. Always one domain today, chosen as the one the panel sees the most of its mail from.
+   *
+   */
+  readonly sending_domains: Array<string>;
+};
+
+/**
+ * How one mailbox provider treated a brand's mail, beside your own.
+ */
+export type EmailCompetitiveProviderPlacement = {
+  /**
+   * The provider whose treatment of the brand's mail this row describes.
+   */
+  readonly mailbox_provider: EmailCompetitivePanelMailboxProvider;
+  /**
+   * Share of the brand's mail this provider put in the inbox. Recomputed from what the panel observed across every domain the brand sends from, so a small subdomain cannot move it as much as the brand's main one.
+   *
+   */
+  readonly inbox_rate: number;
+  /**
+   * Share of the brand's mail this provider put in spam.
+   */
+  readonly spam_rate: number;
+  /**
+   * Your own inbox rate at this provider, null when you have not sent or the panel has no breakdown for your sending domain. It is the panel's view of your sending rather than from our own measurement of it, because a measured rate and a rate the panel estimated are not comparable, and this figure exists to be compared with the brand's.
+   *
+   */
+  readonly workspace_inbox_rate: number | null;
+};
+
+/**
+ * One watched brand's figures for the period, with its placement broken out by mailbox provider.
+ */
+export type EmailCompetitiveBrandProfile = {
+  /**
+   * The period every figure covers.
+   */
+  period: EmailCompetitivePeriod;
+  /**
+   * The figures the watchlist reports for this brand, derived the same way. Estimated
+   * volume can differ very slightly between the two views, because each request asks the
+   * panel about a different set of domains and the panel scales its estimate per request.
+   *
+   * `esp` and `list_size` are populated here; the watchlist reports both as null.
+   *
+   */
+  brand: EmailCompetitiveWatchlistRow;
+  /**
+   * Placement per mailbox provider, in the order the panel returned them. Empty when the panel published no breakdown for the brand's domains.
+   *
+   */
+  readonly providers: Array<EmailCompetitiveProviderPlacement>;
+};
+
+/**
+ * Field used to sort campaigns.
+ */
+export type EmailCompetitiveCampaignSort = "sent_at";
+
+/**
+ * A page of campaigns returned for a watched brand over the period.
+ */
+export type EmailCompetitiveCampaignFeed = {
+  /**
+   * The rolling period used for this request.
+   */
+  period: EmailCompetitivePeriod;
+  /**
+   * For this campaign feed, no_data means the requested page is empty; it does not mean the whole period has no campaigns.
+   */
+  panel_status: EmailCompetitivePanelStatus;
+  /**
+   * Number of eligible campaigns in the first 300 newest panel rows for each tracked domain. This sampled value is independent of the returned page.
+   *
+   */
+  readonly captured: number;
+  /**
+   * Fraction of captured campaigns whose subject leads with a discount. Null when captured is zero. This sampled value is independent of the returned page.
+   *
+   */
+  readonly promo_rate: number | null;
+  /**
+   * Whether the sampled statistics or returned page omit part of the requested collection. Use next_cursor to determine whether another page is available.
+   *
+   */
+  readonly truncated: boolean;
+  /**
+   * Campaigns in this page, in the requested order.
+   */
+  readonly data: Array<EmailCompetitiveCampaign>;
+} & ListEnvelope;
+
+/**
+ * A day of the week. Named rather than numbered because the two common numberings disagree about which day the week starts on.
+ *
+ */
+export type EmailCompetitiveWeekday =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+
+/**
+ * One weekday and hour of a brand's sending week.
+ */
+export type EmailCompetitiveSendTimeCell = {
+  /**
+   * The day of the week this hour falls on.
+   */
+  readonly weekday: EmailCompetitiveWeekday;
+  /**
+   * The hour this cell covers, in the timezone the response reports. `13` covers 13:00 to 14:00.
+   *
+   */
+  readonly hour: number;
+  /**
+   * Share of everything the brand sent over the period that fell in this hour. It is `0` for an hour the brand demonstrably did not send in, which on a disciplined sender is the most useful thing this grid says.
+   *
+   */
+  readonly share_percent: number;
+  /**
+   * How strongly the brand sends in this hour, against its own busiest hour at `1`.
+   * It is this cell's sending per `sample_days` divided by the busiest cell's, so it
+   * is derivable from the two numbers beside it and reconciles with them rather than
+   * competing: it is published because that correction is easy to get wrong, not
+   * because it knows anything they do not.
+   *
+   * Shade a cell by this rather than by `share_percent`: the period holds one more
+   * of some weekdays than others, so a share compares an hour that came round
+   * thirteen times against one that came round twelve.
+   *
+   */
+  readonly intensity: number;
+  /**
+   * How many days of the period fell on this weekday, whether or not the brand sent on them. It is what separates an hour the brand is quiet in from one there was little chance to observe.
+   *
+   */
+  readonly sample_days: number;
+};
+
+/**
+ * The hour of the day a brand sends most of its mail in.
+ */
+export type EmailCompetitiveSendTimePeak = {
+  /**
+   * The first hour of the window, in the timezone the response reports.
+   */
+  readonly start_hour: number;
+  /**
+   * The hour the window ends at, exclusive: a window of `13` to `14` covers 13:00 to
+   * 14:00. The window is always one hour wide on this endpoint, so this is always the
+   * hour after `start_hour`. The pair is kept rather than collapsed because the panel
+   * computes the window at whatever width it was asked for, and only this endpoint
+   * pins that to an hour.
+   *
+   * It can therefore be lower than `start_hour` in exactly one case: a peak at 23:00,
+   * whose window runs past midnight and ends at `0`.
+   *
+   */
+  readonly end_hour: number;
+  /**
+   * Share of everything the brand sent over the period that fell in this window.
+   *
+   * This is the panel's own figure, while a cell's `share_percent` is recomputed from
+   * the cells in the response. Adding up this hour's seven cells should therefore land
+   * on this number but is not guaranteed to; where they disagree, this one is the
+   * panel's answer about its own peak and the cells are the arithmetic behind the grid.
+   *
+   */
+  readonly share_percent: number;
+};
+
+/**
+ * When a watched brand sends, by weekday and hour of the day.
+ */
+export type EmailCompetitiveSendTimeGrid = {
+  /**
+   * The period the grid covers. It is always the last 90 days, whatever range the
+   * rest of the brand's figures are shown over: an hour of the week comes round
+   * about thirteen times in 90 days and once in a week, and a pattern drawn from
+   * one observation per cell is noise.
+   *
+   * Two things differ from the other competitive reads. It ends at the start of a
+   * day rather than at the moment of the request, and the panel answers repeat
+   * requests from a cache it holds for a day, so two requests a minute apart return
+   * identical figures and this grid can be up to a day behind the figures shown
+   * beside it.
+   *
+   */
+  period: EmailCompetitivePeriod;
+  /**
+   * The timezone the hours are reported in. Label the grid from this rather than from what was requested: a response the panel could not answer reports UTC whatever was asked for.
+   *
+   */
+  readonly timezone: Timezone;
+  /**
+   * Why the grid is empty, when it is.
+   */
+  panel_status: EmailCompetitivePanelStatus;
+  /**
+   * Every weekday and hour of the week, Monday first and hour ascending: 168 in all, whether or not the brand sent in them, so the grid needs no filling in. Empty when there was nothing to read, which `panel_status` explains.
+   *
+   */
+  readonly cells: Array<EmailCompetitiveSendTimeCell>;
+  /**
+   * The hour of the day the brand sends most of its mail in, totalled across the whole week, or null when nothing was observed. It carries no weekday: for most brands the hour of the day is where the pattern is and the day of the week barely moves, so naming a busiest weekday would give a figure more meaning than it has. It is also not always the darkest cell, on the same reasoning: one busy Wednesday can outweigh the hour the brand mails in every single day.
+   *
+   */
+  readonly peak_send_window: EmailCompetitiveSendTimePeak | null;
+};
+
+/**
+ * A brand matching a search, ready to be added to the watchlist.
+ */
+export type EmailCompetitiveBrandMatch = {
+  readonly brand_id: EmailCompetitiveBrandId;
+  /**
+   * The brand's name.
+   */
+  readonly name: string;
+  /**
+   * The domains this brand's figures would describe. Always one domain today, chosen as the one the panel sees the most of its mail from.
+   *
+   */
+  readonly sending_domains: Array<string>;
+};
+
+/**
+ * Brands matching the search. Ranked by how well they match, best first, and capped at 8 results because this backs a type-ahead. The panel's own answer is often shorter than the cap, in which case the cap was never the reason the list is short.
+ *
+ */
+export type EmailCompetitiveBrandSearchResults = {
+  /**
+   * Matching brands. Empty when nothing matched, which for an unusual brand name means the panel does not track it rather than that the search failed.
+   *
+   */
+  readonly data: Array<EmailCompetitiveBrandMatch>;
+};
+
+/**
+ * One day of one line on the volume chart.
+ */
+export type EmailCompetitiveVolumePoint = {
+  /**
+   * The UTC day this point covers.
+   */
+  readonly date: string;
+  /**
+   * Volume for the day. An estimate for a competitor and an exact count for your own line; `source` on the series records which. A day nothing was observed is `0` rather than a missing point, so every line shares one axis.
+   *
+   */
+  readonly sends: number;
+};
+
+/**
+ * One line on the volume chart: a watched brand's sending over time, or your own.
+ *
+ */
+export type EmailCompetitiveBrandSeries = {
+  /**
+   * The watchlist entry this line describes. Absent on your own line, which is not a watchlist entry.
+   */
+  readonly watchlist_brand_id?: CompetitiveWatchlistBrandId;
+  /**
+   * True on the line describing your own workspace's sending.
+   */
+  readonly is_workspace: boolean;
+  /**
+   * Label for the line: the brand's name, or your sending domain on your own line.
+   */
+  readonly name: string;
+  /**
+   * The sending domains the line's figures describe. Always one domain today.
+   */
+  readonly sending_domains: Array<string>;
+  /**
+   * Why a line has no volume in it. Always `ok` on your own line, which is counted rather than read from the panel.
+   *
+   */
+  panel_status: EmailCompetitivePanelStatus;
+  /**
+   * Where the line came from. Your own is an exact count of what was accepted for delivery; a competitor's is the panel's estimate of everything they sent. The two share an axis while resting on different measurements, so a chart that compares them should say so.
+   *
+   */
+  source: EmailCompetitiveFieldSource;
+  /**
+   * One point per day of the period, oldest first, ending with the last whole UTC day rather than the one in progress. A domain the panel tracks but observed nothing for plots as zeros, which is a measured silence rather than a missing measurement. Points are empty only when there was nothing to plot at all, reported by `panel_status` as `not_in_panel` or `unavailable`.
+   *
+   */
+  readonly points: Array<EmailCompetitiveVolumePoint>;
+};
+
+/**
+ * Volume over time for the requested watched brands, plus your own sending, on one shared daily axis.
+ *
+ */
+export type EmailCompetitiveVolumeSeries = {
+  /**
+   * The period every line covers.
+   */
+  period: EmailCompetitivePeriod;
+  /**
+   * Your own line first, then the requested brands in the order they were asked for. Your line is present once your workspace has sent email. Every line carries the same days in the same order, so they can be plotted against one axis without aligning them first.
+   *
+   */
+  readonly data: Array<EmailCompetitiveBrandSeries>;
 };
 
 /**
@@ -11409,28 +13636,30 @@ export type InboundEmailMessage = {
    */
   thread_id: string | null;
   /**
-   * Whether the sender of the received message was authenticated:
+   * DMARC result for the domain in the received message's `From` header.
    *
-   * - `pass`: The sender's identity was verified.
-   * - `fail`: The sender's identity was checked and did not verify.
-   * - `unknown`: No verdict is available, so the sender should not be treated as verified.
+   * - `pass`: SPF or DKIM passed and aligned with that domain.
+   * - `fail`: DMARC was evaluated and did not pass.
+   * - `unknown`: no trustworthy verdict is available.
+   *
+   * This follows `dmarc_pass` and does not verify a particular person. The receiving provider currently supplies no DMARC result, so received messages report `unknown`.
    *
    */
   authentication: "pass" | "fail" | "unknown" | null;
   /**
-   * Whether SPF passed for the sender, parsed from the message's authentication results. `null` when the authentication results did not include an SPF verdict.
+   * Whether the receiving provider reports that SPF authorized the envelope sender for the sending server. A soft failure is `false`. Missing, neutral and inconclusive results are `null`.
    */
   spf_pass: boolean | null;
   /**
-   * Whether DKIM passed for the sender, parsed from the message's authentication results. `null` when the authentication results did not include a DKIM verdict.
+   * Whether the receiving provider verified a DKIM signature. A passing signature makes this `true` even when another signature fails. Missing signatures and inconclusive verification results are `null`.
    */
   dkim_pass: boolean | null;
   /**
-   * Whether DMARC passed for the sender, parsed from the message's authentication results. `null` when the authentication results did not include a DMARC verdict.
+   * Whether SPF or DKIM passed and aligned with the domain in the message's `From` header. The receiving provider currently supplies no DMARC result, so this is `null`.
    */
   dmarc_pass: boolean | null;
   /**
-   * Spam score on the received message, or `null` when no score is available.
+   * Content spam score when available. The receiving provider currently supplies no score, so this is `null`.
    */
   spam_score: number | null;
   /**
@@ -11966,7 +14195,7 @@ export type EmailThread = {
    *
    * - `inbox`: The conversation is in the inbox.
    * - `archive`: The conversation was filed away and is done for now.
-   * - `spam`: The conversation's opening message failed sender authentication.
+   * - `spam`: The conversation's opening message is filed in Spam.
    * - `blocked`: The conversation's opening message was rejected by the mailbox's receive policy or rules.
    *
    * Move a conversation by updating its labels. Add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox`, or remove `spam`, `blocked`, or `archive`, to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list, and a conversation has at most 20 labels in total.
@@ -12128,7 +14357,7 @@ export type EmailThreadMessage = {
    *
    * - `inbox`: Accepted mail.
    * - `archive`: The message's conversation was filed away.
-   * - `spam`: The message failed sender authentication.
+   * - `spam`: The message is filed in Spam.
    * - `blocked`: The message was rejected by the mailbox's receive policy or rules.
    *
    * A received message also has `unread` until it is read. `trash` marks a message in the trash, in either direction. Custom labels share the same list, and a message has at most 20 labels in total.
@@ -12153,12 +14382,13 @@ export type EmailThreadMessage = {
    */
   readonly recipients: Array<EmailThreadMessageRecipient> | null;
   /**
-   * Whether the sender of a received message was authenticated.
+   * DMARC result for the domain in the received message's `From` header.
    *
-   * - `pass`: the sender's identity was verified.
-   * - `fail`: it was checked and did not verify.
-   * - `unknown`: no verdict could be determined, so do not treat the
-   * sender as verified.
+   * - `pass`: SPF or DKIM passed and aligned with that domain.
+   * - `fail`: DMARC was evaluated and did not pass.
+   * - `unknown`: no trustworthy verdict is available.
+   *
+   * This follows `dmarc_pass` and does not verify a particular person. The receiving provider currently supplies no DMARC result, so received messages report `unknown`.
    *
    * Null for sent messages. This field is readable for the mailbox's full
    * retention tier, so the verdict is still available after the 30-day
@@ -12167,18 +14397,15 @@ export type EmailThreadMessage = {
    */
   readonly authentication: "pass" | "fail" | "unknown" | null;
   /**
-   * Whether SPF passed for the sender of a received message. Null for sent messages and when no verdict is available. This field is kept for the mailbox's retention tier.
-   *
+   * Whether the receiving provider reports that SPF authorized the envelope sender for the sending server. A soft failure is `false`. Missing, neutral and inconclusive results are `null`. Sent messages have `null` results. Kept for the mailbox retention tier.
    */
   readonly spf_pass: boolean | null;
   /**
-   * Whether DKIM passed for the sender of a received message. Null for sent messages and when no verdict is available. This field is kept for the mailbox's retention tier.
-   *
+   * Whether the receiving provider verified a DKIM signature. A passing signature makes this `true` even when another signature fails. Missing signatures and inconclusive verification results are `null`. Sent messages have `null` results. Kept for the mailbox retention tier.
    */
   readonly dkim_pass: boolean | null;
   /**
-   * Whether DMARC passed for the sender of a received message. Null for sent messages and when no verdict is available. This field is kept for the mailbox's retention tier.
-   *
+   * Whether SPF or DKIM passed and aligned with the domain in the message's `From` header. The receiving provider currently supplies no DMARC result, so this is `null`. Sent messages have `null` results. Kept for the mailbox retention tier.
    */
   readonly dmarc_pass: boolean | null;
   /**
@@ -13088,7 +15315,7 @@ export type EventEmailReceivedData = {
    */
   message_id: string | null;
   /**
-   * Envelope-from address.
+   * Address from the message's From header, with the relay's parsed sender and then the SMTP envelope sender as fallbacks when that header cannot be read.
    */
   from: string;
   /**
@@ -13104,29 +15331,30 @@ export type EventEmailReceivedData = {
    */
   in_reply_to?: string | null;
   /**
-   * Whether the sender of the received message was authenticated.
+   * DMARC result for the domain in the received message's `From` header.
    *
-   * - `pass`: the sender's identity was verified.
-   * - `fail`: it was checked and did not verify.
-   * - `unknown`: no verdict is available, so do not treat the sender
-   * as verified.
+   * - `pass`: SPF or DKIM passed and aligned with that domain.
+   * - `fail`: DMARC was evaluated and did not pass.
+   * - `unknown`: no trustworthy verdict is available.
+   *
+   * This follows `dmarc_pass` and does not verify a particular person. The receiving provider currently supplies no DMARC result, so received messages report `unknown`.
    *
    */
   authentication?: "pass" | "fail" | "unknown" | null;
   /**
-   * Whether SPF passed for the sender, or null when the result did not carry an SPF verdict.
+   * Whether the receiving provider reports that SPF authorized the envelope sender for the sending server. A soft failure is `false`. Missing, neutral and inconclusive results are `null`.
    */
   spf_pass?: boolean | null;
   /**
-   * Whether DKIM passed for the sender, or null when the result did not carry a DKIM verdict.
+   * Whether the receiving provider verified a DKIM signature. A passing signature makes this `true` even when another signature fails. Missing signatures and inconclusive verification results are `null`.
    */
   dkim_pass?: boolean | null;
   /**
-   * Whether DMARC passed for the sender, or null when the result did not carry a DMARC verdict.
+   * Whether SPF or DKIM passed and aligned with the domain in the message's `From` header. The receiving provider currently supplies no DMARC result, so this is `null`.
    */
   dmarc_pass?: boolean | null;
   /**
-   * Spam score carried on the received message, or null when it carries no score.
+   * Content spam score when available. The receiving provider currently supplies no score, so this is `null`.
    */
   spam_score?: number | null;
 };
@@ -13352,25 +15580,26 @@ export type EventEmailMailboxMessageReceivedData = {
    */
   attachment_count: number;
   /**
-   * Whether the sender of the received message was authenticated.
+   * DMARC result for the domain in the received message's `From` header.
    *
-   * - `pass`: the sender's identity was verified.
-   * - `fail`: it was checked and did not verify.
-   * - `unknown`: no verdict is available, so do not treat the sender
-   * as verified.
+   * - `pass`: SPF or DKIM passed and aligned with that domain.
+   * - `fail`: DMARC was evaluated and did not pass.
+   * - `unknown`: no trustworthy verdict is available.
+   *
+   * This follows `dmarc_pass` and does not verify a particular person. The receiving provider currently supplies no DMARC result, so received messages report `unknown`.
    *
    */
   authentication?: "pass" | "fail" | "unknown" | null;
   /**
-   * Whether SPF passed for the sender, or null when no verdict was computable.
+   * Whether the receiving provider reports that SPF authorized the envelope sender for the sending server. A soft failure is `false`. Missing, neutral and inconclusive results are `null`.
    */
   spf_pass?: boolean | null;
   /**
-   * Whether DKIM passed for the sender, or null when no verdict was computable.
+   * Whether the receiving provider verified a DKIM signature. A passing signature makes this `true` even when another signature fails. Missing signatures and inconclusive verification results are `null`.
    */
   dkim_pass?: boolean | null;
   /**
-   * Whether DMARC passed for the sender, or null when no verdict was computable.
+   * Whether SPF or DKIM passed and aligned with the domain in the message's `From` header. The receiving provider currently supplies no DMARC result, so this is `null`.
    */
   dmarc_pass?: boolean | null;
 };
@@ -13659,6 +15888,29 @@ export type EventSmsBase = {
   metadata: {
     [key: string]: unknown;
   } | null;
+  /**
+   * The template language requested by the send, in canonical form. Null when the send named no language or used no template.
+   *
+   */
+  requested_language: LanguageTag | null;
+  /**
+   * The template language rendered at acceptance, in canonical form. Null when the send used no template.
+   *
+   */
+  resolved_language: LanguageTag | null;
+  /**
+   * The template rendered at acceptance, or null for a free-text message.
+   */
+  template_id: SmsTemplateId | null;
+  /**
+   * The workspace published version or synthetic built-in version rendered at acceptance, or null for a free-text message. For a built-in template, `template_content_hash` identifies the exact catalogue source.
+   *
+   */
+  template_version_id: SmsTemplateVersionId | null;
+  /**
+   * The rendered language's source fingerprint, or null for a free-text message.
+   */
+  template_content_hash: SmsTemplateContentHash | null;
   /**
    * Message cost as of this event, split into the platform charge and any
    * third-party fees passed through. Null on an event that priced nothing.
@@ -14954,13 +17206,12 @@ export type SipTrunkId = string;
  * - `reject`: refuses the call. This is where every number starts.
  * - `trunk`: delivers the call to one of your SIP trunks.
  * - `forward`: places a call to one of your verified caller IDs and connects the two.
- * - `voicemail`: answers, plays your greeting, and records what the caller says.
  *
  * It selects the answer's own shape, so a new way to answer a call arrives as a
  * new value alongside a new set of fields.
  *
  */
-export type VoiceCallRouteType = "reject" | "trunk" | "forward" | "voicemail";
+export type VoiceCallRouteType = "reject" | "trunk" | "forward";
 
 /**
  * Which of a forwarded call's two numbers it shows as the caller.
@@ -16069,7 +18320,7 @@ export type SmsMessageWritable = {
    */
   text?: string;
   /**
-   * Content classification supplied on the send. Null for inbound messages.
+   * Content classification supplied for free text or derived from the template. Null for inbound messages.
    */
   category?: SmsMessageCategory | null;
   /**
@@ -16121,26 +18372,55 @@ export type SmsEventListWritable = {
 };
 
 /**
- * One language's state on a template: whether it is live for sends. Content is not here; the template carries the body of its default language, and a send resolves the rest.
- *
+ * An SMS template without content or draft concurrency settings.
  */
-export type SmsTemplateLanguageStateWritable = {
-  [key: string]: never;
-};
-
-/**
- * A message template: one identity holding a copy of the message per language, resolved to one at send. It declares the variable slots a send fills in, so the parts that change travel with the request and the wording does not.
- *
- */
-export type SmsTemplateWritable = {
-  [key: string]: never;
+export type SmsTemplateSummaryWritable = {
+  /**
+   * The template's display name.
+   */
+  name: string;
+  /**
+   * What the template is for. Null if it has no description.
+   */
+  description: string | null;
+  category: SmsTemplateCategory;
 };
 
 export type SmsTemplateListWritable = {
   /**
-   * The templates available to your workspace. The catalog is returned in full and is not paginated.
+   * One page of SMS templates.
    */
-  data: Array<SmsTemplateWritable>;
+  data: Array<SmsTemplateSummaryWritable>;
+} & ListEnvelope;
+
+/**
+ * One SMS template identity and its authoring state. Content and variables live on versions, so this resource stays shallow.
+ *
+ */
+export type SmsTemplateWritable = {
+  /**
+   * The template's display name. It defaults to the slug and can be changed on workspace templates.
+   */
+  name: string;
+  /**
+   * What the template is for. Null if it has no description.
+   */
+  description: string | null;
+  category: SmsTemplateCategory;
+};
+
+export type SmsTemplateVersionListWritable = {
+  /**
+   * One page of the template's versions, newest first.
+   */
+  data: Array<unknown>;
+} & ListEnvelope;
+
+export type SmsTemplateLanguageListWritable = {
+  /**
+   * The version's languages ordered by canonical tag, without text.
+   */
+  data: Array<unknown>;
 };
 
 /**
@@ -17005,6 +19285,75 @@ export type WhatsAppBusinessAccountListWritable = {
 } & ListEnvelope;
 
 /**
+ * The meta a windowed Inbox Insights resource carries: the common fields plus the period the figures cover and how they were measured.
+ *
+ */
+export type EmailInboxInsightsEnvelopeWritable = {
+  [key: string]: unknown;
+};
+
+/**
+ * Where a sending domain's measured mail landed over the period: the
+ * domain-wide summary, the per-provider table, the time series, the Gmail tab
+ * split, and optionally per-IP detail.
+ *
+ * Placement figures are estimates from a measurement panel of real mailboxes,
+ * and every rate is a percentage of measured placements, never of delivered
+ * volume. Each section carries its own status; a successful response never
+ * implies every section is populated.
+ *
+ */
+export type EmailInboxInsightsPlacementWritable =
+  EmailInboxInsightsEnvelopeWritable;
+
+/**
+ * Whether the domain's mail authenticates, and who sends as the domain: SPF
+ * and DKIM pass rates, the DMARC standing with its published policy, and the
+ * per-source table that shows every system observed sending under the
+ * domain's name.
+ *
+ * Without a completed Google Postmaster connection and without aggregate
+ * DMARC reporting, sections report `not_configured`: an invitation to finish
+ * setup rather than a fault. Each section carries its own status.
+ *
+ */
+export type EmailInboxInsightsAuthenticationWritable =
+  EmailInboxInsightsEnvelopeWritable;
+
+/**
+ * How often the domain's mail is reported as spam, as Google Postmaster
+ * measures it. This is Google's number for Gmail-received mail only; the
+ * feedback-loop complaint rate for all providers is a Bird-measured figure
+ * served by the email statistics endpoints, and the two are different
+ * measurements of different mail.
+ *
+ * For a domain without a completed Google Postmaster connection every section
+ * reports `not_configured`: an invitation to finish setup rather than a fault.
+ *
+ */
+export type EmailInboxInsightsComplaintsWritable =
+  EmailInboxInsightsEnvelopeWritable;
+
+/**
+ * Whether the domain's mail is reaching spam traps: addresses that exist only
+ * to catch senders mailing lists they should not be mailing.
+ *
+ * Zero hits is a measured zero and a good result, so the totals read as real
+ * figures rather than as an empty state. The kind of trap matters more than
+ * the count: pristine hits point at harvested or guessed addresses, while
+ * recycled hits point at stale list data.
+ *
+ */
+export type EmailInboxInsightsSpamTrapsWritable =
+  EmailInboxInsightsEnvelopeWritable;
+
+/**
+ * A page of sending domains this workspace can report on, and which of them Inbox Insights is switched on for.
+ *
+ */
+export type EmailInboxInsightsDomainsWritable = ListEnvelope;
+
+/**
  * Latency percentiles (p50, p95, p99) in milliseconds for the bucket. On the summary endpoint these are computed across the whole period rather than per bucket. Three families are reported:
  *
  * - `processing`: Time from accepting the send to handing the message off for delivery. Measured per processed recipient; null when no recipient in the bucket has reached the processed stage.
@@ -17239,6 +19588,14 @@ export type EmailStatsByBroadcastResponseWritable = {
   [key: string]: never;
 };
 
+/**
+ * The workspace's current sending-health verdict over the requested window, plus reference deliverability limits and classification boundaries. Use it to render a health badge, the bounce-rate and complaint-rate limit labels, and the risk lines on deliverability charts without hard-coding any thresholds of your own.
+ *
+ */
+export type EmailHealthWritable = {
+  [key: string]: never;
+};
+
 export type DomainCapabilityWritable = {
   [key: string]: never;
 };
@@ -17367,6 +19724,7 @@ export type SuppressionWritable = {
    * - `hard_bounce`: A delivery permanently failed.
    * - `complaint`: The recipient reported a message as spam.
    * - `manual`: Added through the API or dashboard.
+   * - `unsubscribe`: The recipient opted out. Deprecated, and no new record carries it: an opt-out is a messaging preference rather than a suppression. Legacy records remain visible until they are moved to messaging preferences.
    *
    * An address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.
    *
@@ -17379,6 +19737,8 @@ export type SuppressionWritable = {
    * - `complaint_event`: Created from a spam complaint.
    * - `api_key`: Added through the API with an API key.
    * - `user`: Added by a user in the dashboard.
+   * - `unsubscribe_event`: The mailbox provider reported an opt-out. Deprecated with `reason: unsubscribe`.
+   * - `unsubscribe_link`: The recipient used a Bird unsubscribe link. Deprecated with `reason: unsubscribe`.
    *
    * This list grows over time. Treat unknown values as informational rather than rejecting the record.
    *
@@ -17415,6 +19775,111 @@ export type SuppressionListWritable = {
    */
   data: Array<SuppressionWritable>;
 } & ListEnvelope;
+
+/**
+ * One brand on the watchlist, with its figures for the requested period. Your own
+ * workspace appears as a row too, so the table can be read as a single ranking.
+ *
+ * Every metric is present on every row and is `null` when it is unavailable for
+ * that brand, so a `0` is always a real measurement rather than a gap. Check
+ * `panel_status` for why a metric is null.
+ *
+ * `esp` and `list_size` are the exception. They are populated only when you read a
+ * single brand, and are always `null` on the watchlist whatever `panel_status`
+ * reports.
+ *
+ */
+export type EmailCompetitiveWatchlistRowWritable = {
+  [key: string]: never;
+};
+
+/**
+ * The workspace's competitor watchlist with its figures for the requested period.
+ *
+ * The list is capped by the organization's competitor limit and is returned whole,
+ * so it is not paginated. Your own row is included and is always first.
+ *
+ */
+export type EmailCompetitiveWatchlistWritable = {
+  [key: string]: never;
+};
+
+/**
+ * A campaign the panel surfaced, and the reason it did.
+ */
+export type EmailCompetitiveNotableCampaignWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Campaigns worth a second look across the brands a workspace watches.
+ */
+export type EmailCompetitiveNotableFeedWritable = {
+  /**
+   * Whether the panel could be read for this feed, and when it could not, why.
+   */
+  panel_status: EmailCompetitivePanelStatus;
+};
+
+/**
+ * One watched brand's figures for the period, with its placement broken out by mailbox provider.
+ */
+export type EmailCompetitiveBrandProfileWritable = {
+  /**
+   * The figures the watchlist reports for this brand, derived the same way. Estimated
+   * volume can differ very slightly between the two views, because each request asks the
+   * panel about a different set of domains and the panel scales its estimate per request.
+   *
+   * `esp` and `list_size` are populated here; the watchlist reports both as null.
+   *
+   */
+  brand: EmailCompetitiveWatchlistRowWritable;
+};
+
+/**
+ * A page of campaigns returned for a watched brand over the period.
+ */
+export type EmailCompetitiveCampaignFeedWritable = {
+  /**
+   * For this campaign feed, no_data means the requested page is empty; it does not mean the whole period has no campaigns.
+   */
+  panel_status: EmailCompetitivePanelStatus;
+} & ListEnvelope;
+
+/**
+ * When a watched brand sends, by weekday and hour of the day.
+ */
+export type EmailCompetitiveSendTimeGridWritable = {
+  /**
+   * Why the grid is empty, when it is.
+   */
+  panel_status: EmailCompetitivePanelStatus;
+};
+
+/**
+ * One line on the volume chart: a watched brand's sending over time, or your own.
+ *
+ */
+export type EmailCompetitiveBrandSeriesWritable = {
+  /**
+   * Why a line has no volume in it. Always `ok` on your own line, which is counted rather than read from the panel.
+   *
+   */
+  panel_status: EmailCompetitivePanelStatus;
+  /**
+   * Where the line came from. Your own is an exact count of what was accepted for delivery; a competitor's is the panel's estimate of everything they sent. The two share an axis while resting on different measurements, so a chart that compares them should say so.
+   *
+   */
+  source: EmailCompetitiveFieldSource;
+};
+
+/**
+ * Volume over time for the requested watched brands, plus your own sending, on one shared daily axis.
+ *
+ */
+export type EmailCompetitiveVolumeSeriesWritable = {
+  [key: string]: never;
+};
 
 /**
  * Where one of the template's languages stands: whether sends are using it, and whether its draft contains an unpublished edit.
@@ -17602,28 +20067,30 @@ export type InboundEmailMessageWritable = {
    */
   thread_id: string | null;
   /**
-   * Whether the sender of the received message was authenticated:
+   * DMARC result for the domain in the received message's `From` header.
    *
-   * - `pass`: The sender's identity was verified.
-   * - `fail`: The sender's identity was checked and did not verify.
-   * - `unknown`: No verdict is available, so the sender should not be treated as verified.
+   * - `pass`: SPF or DKIM passed and aligned with that domain.
+   * - `fail`: DMARC was evaluated and did not pass.
+   * - `unknown`: no trustworthy verdict is available.
+   *
+   * This follows `dmarc_pass` and does not verify a particular person. The receiving provider currently supplies no DMARC result, so received messages report `unknown`.
    *
    */
   authentication: "pass" | "fail" | "unknown" | null;
   /**
-   * Whether SPF passed for the sender, parsed from the message's authentication results. `null` when the authentication results did not include an SPF verdict.
+   * Whether the receiving provider reports that SPF authorized the envelope sender for the sending server. A soft failure is `false`. Missing, neutral and inconclusive results are `null`.
    */
   spf_pass: boolean | null;
   /**
-   * Whether DKIM passed for the sender, parsed from the message's authentication results. `null` when the authentication results did not include a DKIM verdict.
+   * Whether the receiving provider verified a DKIM signature. A passing signature makes this `true` even when another signature fails. Missing signatures and inconclusive verification results are `null`.
    */
   dkim_pass: boolean | null;
   /**
-   * Whether DMARC passed for the sender, parsed from the message's authentication results. `null` when the authentication results did not include a DMARC verdict.
+   * Whether SPF or DKIM passed and aligned with the domain in the message's `From` header. The receiving provider currently supplies no DMARC result, so this is `null`.
    */
   dmarc_pass: boolean | null;
   /**
-   * Spam score on the received message, or `null` when no score is available.
+   * Content spam score when available. The receiving provider currently supplies no score, so this is `null`.
    */
   spam_score: number | null;
   /**
@@ -17771,7 +20238,7 @@ export type EmailThreadWritable = {
    *
    * - `inbox`: The conversation is in the inbox.
    * - `archive`: The conversation was filed away and is done for now.
-   * - `spam`: The conversation's opening message failed sender authentication.
+   * - `spam`: The conversation's opening message is filed in Spam.
    * - `blocked`: The conversation's opening message was rejected by the mailbox's receive policy or rules.
    *
    * Move a conversation by updating its labels. Add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox`, or remove `spam`, `blocked`, or `archive`, to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list, and a conversation has at most 20 labels in total.
@@ -17794,7 +20261,7 @@ export type EmailThreadMessageWritable = {
    *
    * - `inbox`: Accepted mail.
    * - `archive`: The message's conversation was filed away.
-   * - `spam`: The message failed sender authentication.
+   * - `spam`: The message is filed in Spam.
    * - `blocked`: The message was rejected by the mailbox's receive policy or rules.
    *
    * A received message also has `unread` until it is read. `trash` marks a message in the trash, in either direction. Custom labels share the same list, and a message has at most 20 labels in total.
@@ -17924,6 +20391,29 @@ export type EventSmsBaseWritable = {
   metadata: {
     [key: string]: unknown;
   } | null;
+  /**
+   * The template language requested by the send, in canonical form. Null when the send named no language or used no template.
+   *
+   */
+  requested_language: LanguageTag | null;
+  /**
+   * The template language rendered at acceptance, in canonical form. Null when the send used no template.
+   *
+   */
+  resolved_language: LanguageTag | null;
+  /**
+   * The template rendered at acceptance, or null for a free-text message.
+   */
+  template_id: SmsTemplateId | null;
+  /**
+   * The workspace published version or synthetic built-in version rendered at acceptance, or null for a free-text message. For a built-in template, `template_content_hash` identifies the exact catalogue source.
+   *
+   */
+  template_version_id: SmsTemplateVersionId | null;
+  /**
+   * The rendered language's source fingerprint, or null for a free-text message.
+   */
+  template_content_hash: null;
 };
 
 /**
@@ -18355,32 +20845,6 @@ export type VoiceCallListWritable = {
 } & ListEnvelope;
 
 /**
- * Maximum number of items to return per page.
- */
-export type PaginationLimit = number;
-
-/**
- * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
- */
-export type StartingAfter = string;
-
-/**
- * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
- */
-export type EndingBefore = string;
-
-/**
- * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
- */
-export type IncludeTotal = boolean;
-
-/**
- * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
- *
- */
-export type OrderDesc = "asc" | "desc";
-
-/**
  * Client-supplied key. On operations supporting request deduplication, a retained
  * response is replayed for duplicate requests with the same key within the
  * idempotency window (3 hours by default). This protection requires a workspace,
@@ -18404,6 +20868,38 @@ export type OrderDesc = "asc" | "desc";
  *
  */
 export type IdempotencyKey = string;
+
+/**
+ * Sort direction. Defaults to `asc`, which sorts alphabetically or from oldest to newest, depending on the selected sort field.
+ *
+ */
+export type OrderAsc = SortOrder;
+
+/**
+ * Maximum number of items to return per page.
+ */
+export type PaginationLimit = number;
+
+/**
+ * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+ */
+export type StartingAfter = string;
+
+/**
+ * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+ */
+export type EndingBefore = string;
+
+/**
+ * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+ */
+export type IncludeTotal = boolean;
+
+/**
+ * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+ *
+ */
+export type OrderDesc = SortOrder;
 
 /**
  * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
@@ -18466,6 +20962,18 @@ export type WhatsAppStatsTemplateFilter = string;
  *
  */
 export type EmailStatsTemplateFilter = string;
+
+/**
+ * How many days back the response covers, counting from now. One of three fixed trend windows rather than an open date range, matching how a competitive-intelligence chart is read. Defaults to 30.
+ *
+ */
+export type EmailCompetitiveRange = 7 | 30 | 90;
+
+/**
+ * IANA timezone identifier to report send times in; defaults to UTC. The grid is folded into this zone before it is summed, so a send lands on the weekday and hour it happened at locally rather than the one it happened at in UTC. A zone this API does not know returns 422 rather than falling back to UTC, so an axis is never labelled with a zone the figures were not folded into.
+ *
+ */
+export type EmailCompetitiveTimezone = Timezone;
 
 export type GetCurrentWorkspaceData = {
   body?: never;
@@ -22761,19 +25269,46 @@ export type ListSmsTemplatesData = {
   path?: never;
   query?: {
     /**
-     * Keep only templates of this scope. Every SMS template is `system`, so `workspace` matches none. Omit for all.
-     *
+     * Filter by who owns the template. Use `system` for built-in templates and `workspace` for templates your workspace created.
      */
     scope?: TemplateScope;
     /**
-     * Keep only templates whose `category` matches. Omit for all categories.
+     * Return templates in this category.
      */
-    category?: SmsMessageCategory;
+    category?: SmsTemplateCategory;
     /**
-     * Keep only templates available in this language, as a BCP-47 tag. Matches the template's `available_languages` entries exactly, with no fallback.
-     *
+     * Return templates with this lifecycle status.
+     */
+    status?: TemplateStatus;
+    /**
+     * Return templates whose published content contains this language, after the tag is canonicalized. Draft-only languages do not match.
      */
     language?: LanguageTag;
+    /**
+     * A case-insensitive substring search across slug, name, and description.
+     */
+    q?: string;
+    /**
+     * Field to sort by.
+     */
+    sort?: SmsTemplateSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
   };
   url: "/v1/sms/templates";
 };
@@ -22807,7 +25342,7 @@ export type ListSmsTemplatesError =
 
 export type ListSmsTemplatesResponses = {
   /**
-   * List of templates available to your workspace.
+   * Paginated list of SMS templates.
    */
   200: SmsTemplateList;
 };
@@ -22819,7 +25354,7 @@ export type GetSmsTemplateData = {
   body?: never;
   path: {
     /**
-     * The template's `slug` (for example `bird_otp_verification`) or its `smt_`-prefixed ID. A reference starting with `smt_` resolves by ID; anything else resolves by slug.
+     * The template's ID (`smt_…`) or slug. Built-in templates use a `bird_` slug. Write operations accept workspace templates because built-in templates are read-only.
      *
      */
     template_ref: string;
@@ -22861,13 +25396,263 @@ export type GetSmsTemplateError =
 
 export type GetSmsTemplateResponses = {
   /**
-   * The requested template.
+   * The requested SMS template.
    */
   200: SmsTemplate;
 };
 
 export type GetSmsTemplateResponse =
   GetSmsTemplateResponses[keyof GetSmsTemplateResponses];
+
+export type ListSmsTemplateVersionsData = {
+  body?: never;
+  path: {
+    /**
+     * The template's ID (`smt_…`) or slug.
+     */
+    template_ref: string;
+  };
+  query?: {
+    /**
+     * Field to sort by.
+     */
+    sort?: SmsTemplateSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/sms/templates/{template_ref}/versions";
+};
+
+export type ListSmsTemplateVersionsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListSmsTemplateVersionsError =
+  ListSmsTemplateVersionsErrors[keyof ListSmsTemplateVersionsErrors];
+
+export type ListSmsTemplateVersionsResponses = {
+  /**
+   * Paginated list of template versions.
+   */
+  200: SmsTemplateVersionList;
+};
+
+export type ListSmsTemplateVersionsResponse =
+  ListSmsTemplateVersionsResponses[keyof ListSmsTemplateVersionsResponses];
+
+export type GetSmsTemplateVersionData = {
+  body?: never;
+  path: {
+    /**
+     * The template's ID (`smt_…`) or slug.
+     */
+    template_ref: string;
+    /**
+     * The version to read or reset.
+     */
+    version_id: SmsTemplateVersionId;
+  };
+  query?: never;
+  url: "/v1/sms/templates/{template_ref}/versions/{version_id}";
+};
+
+export type GetSmsTemplateVersionErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetSmsTemplateVersionError =
+  GetSmsTemplateVersionErrors[keyof GetSmsTemplateVersionErrors];
+
+export type GetSmsTemplateVersionResponses = {
+  /**
+   * The requested SMS template version.
+   */
+  200: SmsTemplateVersion;
+};
+
+export type GetSmsTemplateVersionResponse =
+  GetSmsTemplateVersionResponses[keyof GetSmsTemplateVersionResponses];
+
+export type ListSmsTemplateVersionLanguagesData = {
+  body?: never;
+  path: {
+    /**
+     * The template's ID (`smt_…`) or slug.
+     */
+    template_ref: string;
+    /**
+     * The version whose languages to list.
+     */
+    version_id: SmsTemplateVersionId;
+  };
+  query?: never;
+  url: "/v1/sms/templates/{template_ref}/versions/{version_id}/languages";
+};
+
+export type ListSmsTemplateVersionLanguagesErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListSmsTemplateVersionLanguagesError =
+  ListSmsTemplateVersionLanguagesErrors[keyof ListSmsTemplateVersionLanguagesErrors];
+
+export type ListSmsTemplateVersionLanguagesResponses = {
+  /**
+   * The version's language summaries.
+   */
+  200: SmsTemplateLanguageList;
+};
+
+export type ListSmsTemplateVersionLanguagesResponse =
+  ListSmsTemplateVersionLanguagesResponses[keyof ListSmsTemplateVersionLanguagesResponses];
+
+export type GetSmsTemplateVersionLanguageData = {
+  body?: never;
+  path: {
+    /**
+     * The template's ID (`smt_…`) or slug.
+     */
+    template_ref: string;
+    /**
+     * The version that holds the language.
+     */
+    version_id: SmsTemplateVersionId;
+    /**
+     * The language as a BCP-47 tag. Case and separator differences are accepted and canonicalized.
+     */
+    language: LanguageTag;
+  };
+  query?: never;
+  url: "/v1/sms/templates/{template_ref}/versions/{version_id}/languages/{language}";
+};
+
+export type GetSmsTemplateVersionLanguageErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetSmsTemplateVersionLanguageError =
+  GetSmsTemplateVersionLanguageErrors[keyof GetSmsTemplateVersionLanguageErrors];
+
+export type GetSmsTemplateVersionLanguageResponses = {
+  /**
+   * The requested language and its text.
+   */
+  200: SmsTemplateLanguage;
+};
+
+export type GetSmsTemplateVersionLanguageResponse =
+  GetSmsTemplateVersionLanguageResponses[keyof GetSmsTemplateVersionLanguageResponses];
 
 export type ListSmsSuppressionsData = {
   body?: never;
@@ -27356,7 +30141,7 @@ export type ListWhatsAppNumbersData = {
      * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
      *
      */
-    order?: "asc" | "desc";
+    order?: SortOrder;
     /**
      * Maximum number of items to return per page.
      */
@@ -27480,7 +30265,7 @@ export type ListWhatsAppNumberEventsData = {
      * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
      *
      */
-    order?: "asc" | "desc";
+    order?: SortOrder;
     /**
      * Maximum number of items to return per page.
      */
@@ -27612,7 +30397,7 @@ export type ListWhatsAppBusinessAccountsData = {
      * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
      *
      */
-    order?: "asc" | "desc";
+    order?: SortOrder;
     /**
      * Maximum number of items to return per page.
      */
@@ -27719,6 +30504,781 @@ export type GetWhatsAppBusinessAccountResponses = {
 
 export type GetWhatsAppBusinessAccountResponse =
   GetWhatsAppBusinessAccountResponses[keyof GetWhatsAppBusinessAccountResponses];
+
+export type GetEmailInboxInsightsPlacementData = {
+  body?: never;
+  path?: never;
+  query: {
+    /**
+     * The sending domain to report on: one of the workspace's verified sending domains, exactly as it appears there. A domain that is not verified in this workspace answers not-found.
+     *
+     */
+    sending_domain: string;
+    /**
+     * First UTC day of the period, inclusive, in YYYY-MM-DD: the same window
+     * convention as the email statistics endpoints, so figures from the two
+     * sources cover the same days. Defaults to 30 days before `to`.
+     *
+     * It may be at most 30 days before `to`, which is also the default, so a
+     * request naming neither date is already at the limit. Asking for more
+     * answers `422`: the page pairs these figures with Bird's own per-provider
+     * sending statistics, and those are kept for 30 days, so a longer period
+     * could only describe two different spans side by side.
+     *
+     */
+    from?: string;
+    /**
+     * Last UTC day of the period, inclusive, in YYYY-MM-DD. Defaults to today.
+     */
+    to?: string;
+    /**
+     * Bucket size for the series. Defaults to day.
+     */
+    group_by?: EmailInboxInsightsGroupBy;
+    /**
+     * Include the prior equal-length period, populating `compared_to` and every delta field.
+     *
+     */
+    compare?: EmailInboxInsightsCompare;
+    /**
+     * Providers to break the series down by, named as the provider table names them. Each named provider adds one series line; without this, the series carries the domain-wide line only. The provider table is never filtered by this parameter.
+     *
+     */
+    series_providers?: Array<string>;
+    /**
+     * Include per-IP placement detail for the domain's sending infrastructure. Off by default; only the sending-infrastructure view needs it.
+     *
+     */
+    include_ip_details?: boolean;
+  };
+  url: "/v1/email/inbox-insights/placement";
+};
+
+export type GetEmailInboxInsightsPlacementErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailInboxInsightsPlacementError =
+  GetEmailInboxInsightsPlacementErrors[keyof GetEmailInboxInsightsPlacementErrors];
+
+export type GetEmailInboxInsightsPlacementResponses = {
+  /**
+   * Placement for the requested domain and period.
+   */
+  200: EmailInboxInsightsPlacement;
+};
+
+export type GetEmailInboxInsightsPlacementResponse =
+  GetEmailInboxInsightsPlacementResponses[keyof GetEmailInboxInsightsPlacementResponses];
+
+export type GetEmailInboxInsightsAuthenticationData = {
+  body?: never;
+  path?: never;
+  query: {
+    /**
+     * The sending domain to report on: one of the workspace's verified sending domains, exactly as it appears there. A domain that is not verified in this workspace answers not-found.
+     *
+     */
+    sending_domain: string;
+    /**
+     * First UTC day of the period, inclusive, in YYYY-MM-DD: the same window
+     * convention as the email statistics endpoints. Defaults to 30 days
+     * before `to`.
+     *
+     * It may be at most 30 days before `to`, which is also the default, so a
+     * request naming neither date is already at the limit. Asking for more
+     * answers `422`: the page pairs these figures with Bird's own per-provider
+     * sending statistics, and those are kept for 30 days, so a longer period
+     * could only describe two different spans side by side.
+     *
+     */
+    from?: string;
+    /**
+     * Last UTC day of the period, inclusive, in YYYY-MM-DD. Defaults to today.
+     */
+    to?: string;
+    /**
+     * Include the prior equal-length period, populating `compared_to`.
+     */
+    compare?: EmailInboxInsightsCompare;
+  };
+  url: "/v1/email/inbox-insights/authentication";
+};
+
+export type GetEmailInboxInsightsAuthenticationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailInboxInsightsAuthenticationError =
+  GetEmailInboxInsightsAuthenticationErrors[keyof GetEmailInboxInsightsAuthenticationErrors];
+
+export type GetEmailInboxInsightsAuthenticationResponses = {
+  /**
+   * Authentication standing for the requested domain and period.
+   */
+  200: EmailInboxInsightsAuthentication;
+};
+
+export type GetEmailInboxInsightsAuthenticationResponse =
+  GetEmailInboxInsightsAuthenticationResponses[keyof GetEmailInboxInsightsAuthenticationResponses];
+
+export type GetEmailInboxInsightsComplaintsData = {
+  body?: never;
+  path?: never;
+  query: {
+    /**
+     * The sending domain to report on: one of the workspace's verified sending domains, exactly as it appears there. A domain that is not verified in this workspace answers not-found.
+     *
+     */
+    sending_domain: string;
+    /**
+     * First UTC day of the period, inclusive, in YYYY-MM-DD: the same window
+     * convention as the email statistics endpoints. Defaults to 30 days
+     * before `to`.
+     *
+     * It may be at most 30 days before `to`, which is also the default, so a
+     * request naming neither date is already at the limit. Asking for more
+     * answers `422`: the page pairs these figures with Bird's own per-provider
+     * sending statistics, and those are kept for 30 days, so a longer period
+     * could only describe two different spans side by side.
+     *
+     */
+    from?: string;
+    /**
+     * Last UTC day of the period, inclusive, in YYYY-MM-DD. Defaults to today.
+     */
+    to?: string;
+    /**
+     * Bucket size for the series. Defaults to day.
+     */
+    group_by?: EmailInboxInsightsGroupBy;
+    /**
+     * Include the prior equal-length period, populating `compared_to` and the rate's delta.
+     *
+     */
+    compare?: EmailInboxInsightsCompare;
+  };
+  url: "/v1/email/inbox-insights/complaints";
+};
+
+export type GetEmailInboxInsightsComplaintsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailInboxInsightsComplaintsError =
+  GetEmailInboxInsightsComplaintsErrors[keyof GetEmailInboxInsightsComplaintsErrors];
+
+export type GetEmailInboxInsightsComplaintsResponses = {
+  /**
+   * The Google-reported spam rate for the requested domain and period.
+   */
+  200: EmailInboxInsightsComplaints;
+};
+
+export type GetEmailInboxInsightsComplaintsResponse =
+  GetEmailInboxInsightsComplaintsResponses[keyof GetEmailInboxInsightsComplaintsResponses];
+
+export type GetEmailInboxInsightsSpamTrapsData = {
+  body?: never;
+  path?: never;
+  query: {
+    /**
+     * The sending domain to report on: one of the workspace's verified sending domains, exactly as it appears there. A domain that is not verified in this workspace answers not-found.
+     *
+     */
+    sending_domain: string;
+    /**
+     * First UTC day of the period, inclusive, in YYYY-MM-DD: the same window
+     * convention as the email statistics endpoints. Defaults to 30 days
+     * before `to`.
+     *
+     * It may be at most 30 days before `to`, which is also the default, so a
+     * request naming neither date is already at the limit. Asking for more
+     * answers `422`: the page pairs these figures with Bird's own per-provider
+     * sending statistics, and those are kept for 30 days, so a longer period
+     * could only describe two different spans side by side.
+     *
+     */
+    from?: string;
+    /**
+     * Last UTC day of the period, inclusive, in YYYY-MM-DD. Defaults to today.
+     */
+    to?: string;
+    /**
+     * Include the prior equal-length period, populating `compared_to` and `delta`.
+     *
+     */
+    compare?: EmailInboxInsightsCompare;
+  };
+  url: "/v1/email/inbox-insights/spam-traps";
+};
+
+export type GetEmailInboxInsightsSpamTrapsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailInboxInsightsSpamTrapsError =
+  GetEmailInboxInsightsSpamTrapsErrors[keyof GetEmailInboxInsightsSpamTrapsErrors];
+
+export type GetEmailInboxInsightsSpamTrapsResponses = {
+  /**
+   * Spam-trap hits for the requested domain and period.
+   */
+  200: EmailInboxInsightsSpamTraps;
+};
+
+export type GetEmailInboxInsightsSpamTrapsResponse =
+  GetEmailInboxInsightsSpamTrapsResponses[keyof GetEmailInboxInsightsSpamTrapsResponses];
+
+export type GetEmailInboxInsightsBlocklistsData = {
+  body?: never;
+  path?: never;
+  query: {
+    /**
+     * The sending domain to check: one of the workspace's verified sending domains, exactly as it appears there. Every sending IP behind it is checked. A domain that is not verified in this workspace answers not-found.
+     *
+     */
+    sending_domain: string;
+  };
+  url: "/v1/email/inbox-insights/blocklists";
+};
+
+export type GetEmailInboxInsightsBlocklistsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailInboxInsightsBlocklistsError =
+  GetEmailInboxInsightsBlocklistsErrors[keyof GetEmailInboxInsightsBlocklistsErrors];
+
+export type GetEmailInboxInsightsBlocklistsResponses = {
+  /**
+   * Blocklist standing for the requested domain's sending infrastructure.
+   */
+  200: EmailInboxInsightsBlocklists;
+};
+
+export type GetEmailInboxInsightsBlocklistsResponse =
+  GetEmailInboxInsightsBlocklistsResponses[keyof GetEmailInboxInsightsBlocklistsResponses];
+
+export type GetEmailInboxInsightsIndustryBenchmarkData = {
+  body?: never;
+  path?: never;
+  query: {
+    /**
+     * The sending domain whose industry to benchmark: one of the workspace's verified sending domains, exactly as it appears there. A domain that is not verified in this workspace answers not-found.
+     *
+     */
+    sending_domain: string;
+  };
+  url: "/v1/email/inbox-insights/benchmarks/industry";
+};
+
+export type GetEmailInboxInsightsIndustryBenchmarkErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailInboxInsightsIndustryBenchmarkError =
+  GetEmailInboxInsightsIndustryBenchmarkErrors[keyof GetEmailInboxInsightsIndustryBenchmarkErrors];
+
+export type GetEmailInboxInsightsIndustryBenchmarkResponses = {
+  /**
+   * The industry benchmark for the requested domain's industry.
+   */
+  200: EmailInboxInsightsIndustryBenchmark;
+};
+
+export type GetEmailInboxInsightsIndustryBenchmarkResponse =
+  GetEmailInboxInsightsIndustryBenchmarkResponses[keyof GetEmailInboxInsightsIndustryBenchmarkResponses];
+
+export type GetEmailInboxInsightsDomainsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Exact sending domain to return. Matching is case-insensitive.
+     */
+    sending_domain?: string;
+    /**
+     * Substring match against the sending domain (case-insensitive).
+     */
+    search?: string;
+    /**
+     * Field to sort by. Defaults to `domain`.
+     */
+    sort?: EmailInboxInsightsDomainSort;
+    /**
+     * Sort direction. Defaults to `asc`, which sorts alphabetically or from oldest to newest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/email/inbox-insights/domains";
+};
+
+export type GetEmailInboxInsightsDomainsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailInboxInsightsDomainsError =
+  GetEmailInboxInsightsDomainsErrors[keyof GetEmailInboxInsightsDomainsErrors];
+
+export type GetEmailInboxInsightsDomainsResponses = {
+  /**
+   * A page of the workspace's sending domains and their Inbox Insights status.
+   */
+  200: EmailInboxInsightsDomains;
+};
+
+export type GetEmailInboxInsightsDomainsResponse =
+  GetEmailInboxInsightsDomainsResponses[keyof GetEmailInboxInsightsDomainsResponses];
+
+export type UpdateEmailInboxInsightsDomainData = {
+  body: EmailInboxInsightsDomainUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * The sending domain to change, exactly as it appears in your sending domains. A domain that is not verified in this workspace answers not-found.
+     *
+     */
+    sending_domain: string;
+  };
+  query?: never;
+  url: "/v1/email/inbox-insights/domains/{sending_domain}";
+};
+
+export type UpdateEmailInboxInsightsDomainErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateEmailInboxInsightsDomainError =
+  UpdateEmailInboxInsightsDomainErrors[keyof UpdateEmailInboxInsightsDomainErrors];
+
+export type UpdateEmailInboxInsightsDomainResponses = {
+  /**
+   * The domain's Inbox Insights setting after the change.
+   */
+  200: EmailInboxInsightsDomain;
+};
+
+export type UpdateEmailInboxInsightsDomainResponse =
+  UpdateEmailInboxInsightsDomainResponses[keyof UpdateEmailInboxInsightsDomainResponses];
+
+export type UpsertEmailInboxInsightsDomainMonitoringData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/email/inbox-insights/domain-monitoring";
+};
+
+export type UpsertEmailInboxInsightsDomainMonitoringErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpsertEmailInboxInsightsDomainMonitoringError =
+  UpsertEmailInboxInsightsDomainMonitoringErrors[keyof UpsertEmailInboxInsightsDomainMonitoringErrors];
+
+export type UpsertEmailInboxInsightsDomainMonitoringResponses = {
+  /**
+   * What the call did: a domain switched on, nothing to change, or nothing this endpoint is willing to decide.
+   *
+   */
+  200: EmailInboxInsightsDomainMonitoringResult;
+};
+
+export type UpsertEmailInboxInsightsDomainMonitoringResponse =
+  UpsertEmailInboxInsightsDomainMonitoringResponses[keyof UpsertEmailInboxInsightsDomainMonitoringResponses];
 
 export type GetEmailStatsDailyData = {
   body?: never;
@@ -29151,6 +32711,68 @@ export type GetEmailStatsByBroadcastResponses = {
 export type GetEmailStatsByBroadcastResponse =
   GetEmailStatsByBroadcastResponses[keyof GetEmailStatsByBroadcastResponses];
 
+export type GetEmailHealthData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Start date (inclusive) in `YYYY-MM-DD`, UTC. Defaults to 7 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * End date (inclusive) in `YYYY-MM-DD`, UTC. Defaults to today (UTC) when omitted. Window may not exceed 365 days. Day boundaries are always UTC; unlike the statistics reads, this one takes no `timezone`.
+     */
+    to?: string;
+  };
+  url: "/v1/email/health";
+};
+
+export type GetEmailHealthErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailHealthError =
+  GetEmailHealthErrors[keyof GetEmailHealthErrors];
+
+export type GetEmailHealthResponses = {
+  /**
+   * Current sending-health verdict, reference limits, and risk classification boundaries.
+   */
+  200: EmailHealth;
+};
+
+export type GetEmailHealthResponse =
+  GetEmailHealthResponses[keyof GetEmailHealthResponses];
+
 export type ListDomainsData = {
   body?: never;
   path?: never;
@@ -29167,7 +32789,7 @@ export type ListDomainsData = {
      * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
      *
      */
-    order?: "asc" | "desc";
+    order?: SortOrder;
     /**
      * Maximum number of items to return per page.
      */
@@ -29617,6 +33239,1031 @@ export type VerifyDomainResponses = {
 
 export type VerifyDomainResponse =
   VerifyDomainResponses[keyof VerifyDomainResponses];
+
+export type ListSuppressionsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Case-insensitive prefix filter on the address. Returns every suppression whose address starts with this value. A full address finds that address's records, while a fragment such as `alice` finds every address beginning with it. The same address can match several records, one per suppression reason.
+     *
+     */
+    email?: string;
+    /**
+     * Return only suppressions with this reason:
+     *
+     * - `hard_bounce`: Delivery permanently failed.
+     * - `complaint`: The recipient reported a message as spam.
+     * - `unsubscribe`: The recipient opted out. Deprecated: unsubscribes are now
+     * recorded as messaging preferences rather than suppressions, so no new
+     * records carry this reason. The filter returns legacy records until they
+     * are moved to messaging preferences.
+     * - `manual`: Added through the API or dashboard.
+     *
+     */
+    reason?: SuppressionReasonFilter;
+    /**
+     * Return only suppressions with this scope.
+     *
+     * Every suppression is workspace-wide, so `workspace` returns all of
+     * them without narrowing the results. The other five values,
+     * `category`, `audience`, `topic`, `contact` and `domain`, always come
+     * back with an empty page.
+     *
+     */
+    scope_type?: SuppressionScopeTypeFilter;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/email/suppressions";
+};
+
+export type ListSuppressionsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListSuppressionsError =
+  ListSuppressionsErrors[keyof ListSuppressionsErrors];
+
+export type ListSuppressionsResponses = {
+  /**
+   * Paginated list of suppressions.
+   */
+  200: SuppressionList;
+};
+
+export type ListSuppressionsResponse =
+  ListSuppressionsResponses[keyof ListSuppressionsResponses];
+
+export type CreateSuppressionData = {
+  body: SuppressionCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/email/suppressions";
+};
+
+export type CreateSuppressionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateSuppressionError =
+  CreateSuppressionErrors[keyof CreateSuppressionErrors];
+
+export type CreateSuppressionResponses = {
+  /**
+   * A manual suppression for this address already existed. The existing record is returned.
+   */
+  200: Suppression;
+  /**
+   * Suppression created.
+   */
+  201: Suppression;
+};
+
+export type CreateSuppressionResponse =
+  CreateSuppressionResponses[keyof CreateSuppressionResponses];
+
+export type DeleteSuppressionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the suppression record, as returned when the suppression was created or listed.
+     *
+     */
+    suppression_id: SuppressionId;
+  };
+  query?: never;
+  url: "/v1/email/suppressions/{suppression_id}";
+};
+
+export type DeleteSuppressionErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteSuppressionError =
+  DeleteSuppressionErrors[keyof DeleteSuppressionErrors];
+
+export type DeleteSuppressionResponses = {
+  /**
+   * Suppression deleted.
+   */
+  204: void;
+};
+
+export type DeleteSuppressionResponse =
+  DeleteSuppressionResponses[keyof DeleteSuppressionResponses];
+
+export type GetSuppressionData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the suppression record, as returned when the suppression was created or listed.
+     *
+     */
+    suppression_id: SuppressionId;
+  };
+  query?: never;
+  url: "/v1/email/suppressions/{suppression_id}";
+};
+
+export type GetSuppressionErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetSuppressionError =
+  GetSuppressionErrors[keyof GetSuppressionErrors];
+
+export type GetSuppressionResponses = {
+  /**
+   * Suppression object.
+   */
+  200: Suppression;
+};
+
+export type GetSuppressionResponse =
+  GetSuppressionResponses[keyof GetSuppressionResponses];
+
+export type GetEmailCompetitiveWatchlistData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * How many days back the response covers, counting from now. One of three fixed trend windows rather than an open date range, matching how a competitive-intelligence chart is read. Defaults to 30.
+     *
+     */
+    range?: 7 | 30 | 90;
+  };
+  url: "/v1/email/competitive/watchlist";
+};
+
+export type GetEmailCompetitiveWatchlistErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailCompetitiveWatchlistError =
+  GetEmailCompetitiveWatchlistErrors[keyof GetEmailCompetitiveWatchlistErrors];
+
+export type GetEmailCompetitiveWatchlistResponses = {
+  /**
+   * The watchlist with its figures for the requested period.
+   */
+  200: EmailCompetitiveWatchlist;
+};
+
+export type GetEmailCompetitiveWatchlistResponse =
+  GetEmailCompetitiveWatchlistResponses[keyof GetEmailCompetitiveWatchlistResponses];
+
+export type GetEmailCompetitiveNotableCampaignsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * How many days back the response covers, counting from now. One of three fixed trend windows rather than an open date range, matching how a competitive-intelligence chart is read. Defaults to 30.
+     *
+     */
+    range?: 7 | 30 | 90;
+  };
+  url: "/v1/email/competitive/watchlist/notable";
+};
+
+export type GetEmailCompetitiveNotableCampaignsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailCompetitiveNotableCampaignsError =
+  GetEmailCompetitiveNotableCampaignsErrors[keyof GetEmailCompetitiveNotableCampaignsErrors];
+
+export type GetEmailCompetitiveNotableCampaignsResponses = {
+  /**
+   * The notable campaigns for the period.
+   */
+  200: EmailCompetitiveNotableFeed;
+};
+
+export type GetEmailCompetitiveNotableCampaignsResponse =
+  GetEmailCompetitiveNotableCampaignsResponses[keyof GetEmailCompetitiveNotableCampaignsResponses];
+
+export type CreateEmailCompetitiveWatchlistBrandData = {
+  body: EmailCompetitiveWatchlistBrandCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/email/competitive/watchlist/brands";
+};
+
+export type CreateEmailCompetitiveWatchlistBrandErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateEmailCompetitiveWatchlistBrandError =
+  CreateEmailCompetitiveWatchlistBrandErrors[keyof CreateEmailCompetitiveWatchlistBrandErrors];
+
+export type CreateEmailCompetitiveWatchlistBrandResponses = {
+  /**
+   * The brand was added to the watchlist.
+   */
+  201: EmailCompetitiveWatchlistBrand;
+};
+
+export type CreateEmailCompetitiveWatchlistBrandResponse =
+  CreateEmailCompetitiveWatchlistBrandResponses[keyof CreateEmailCompetitiveWatchlistBrandResponses];
+
+export type DeleteEmailCompetitiveWatchlistBrandData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * The watchlist entry to act on.
+     */
+    watchlist_brand_id: CompetitiveWatchlistBrandId;
+  };
+  query?: never;
+  url: "/v1/email/competitive/watchlist/brands/{watchlist_brand_id}";
+};
+
+export type DeleteEmailCompetitiveWatchlistBrandErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteEmailCompetitiveWatchlistBrandError =
+  DeleteEmailCompetitiveWatchlistBrandErrors[keyof DeleteEmailCompetitiveWatchlistBrandErrors];
+
+export type DeleteEmailCompetitiveWatchlistBrandResponses = {
+  /**
+   * The brand was removed from the watchlist.
+   */
+  204: void;
+};
+
+export type DeleteEmailCompetitiveWatchlistBrandResponse =
+  DeleteEmailCompetitiveWatchlistBrandResponses[keyof DeleteEmailCompetitiveWatchlistBrandResponses];
+
+export type GetEmailCompetitiveBrandData = {
+  body?: never;
+  path: {
+    /**
+     * The watchlist entry to act on.
+     */
+    watchlist_brand_id: CompetitiveWatchlistBrandId;
+  };
+  query?: {
+    /**
+     * How many days back the response covers, counting from now. One of three fixed trend windows rather than an open date range, matching how a competitive-intelligence chart is read. Defaults to 30.
+     *
+     */
+    range?: 7 | 30 | 90;
+  };
+  url: "/v1/email/competitive/watchlist/brands/{watchlist_brand_id}";
+};
+
+export type GetEmailCompetitiveBrandErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailCompetitiveBrandError =
+  GetEmailCompetitiveBrandErrors[keyof GetEmailCompetitiveBrandErrors];
+
+export type GetEmailCompetitiveBrandResponses = {
+  /**
+   * The brand's figures for the period.
+   */
+  200: EmailCompetitiveBrandProfile;
+};
+
+export type GetEmailCompetitiveBrandResponse =
+  GetEmailCompetitiveBrandResponses[keyof GetEmailCompetitiveBrandResponses];
+
+export type GetEmailCompetitiveBrandCampaignsData = {
+  body?: never;
+  path: {
+    /**
+     * The watchlist entry whose campaigns to return.
+     */
+    watchlist_brand_id: CompetitiveWatchlistBrandId;
+  };
+  query?: {
+    /**
+     * How many days back the response covers, counting from now. One of three fixed trend windows rather than an open date range, matching how a competitive-intelligence chart is read. Defaults to 30.
+     *
+     */
+    range?: 7 | 30 | 90;
+    /**
+     * Field to sort campaigns by.
+     */
+    sort?: EmailCompetitiveCampaignSort;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/email/competitive/watchlist/brands/{watchlist_brand_id}/campaigns";
+};
+
+export type GetEmailCompetitiveBrandCampaignsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailCompetitiveBrandCampaignsError =
+  GetEmailCompetitiveBrandCampaignsErrors[keyof GetEmailCompetitiveBrandCampaignsErrors];
+
+export type GetEmailCompetitiveBrandCampaignsResponses = {
+  /**
+   * The brand's campaigns for the period.
+   */
+  200: EmailCompetitiveCampaignFeed;
+};
+
+export type GetEmailCompetitiveBrandCampaignsResponse =
+  GetEmailCompetitiveBrandCampaignsResponses[keyof GetEmailCompetitiveBrandCampaignsResponses];
+
+export type GetEmailCompetitiveBrandCampaignData = {
+  body?: never;
+  path: {
+    /**
+     * The watched brand that sent the campaign.
+     */
+    watchlist_brand_id: CompetitiveWatchlistBrandId;
+    /**
+     * The campaign to return, taken from the brand's campaign list.
+     */
+    campaign_id: string;
+  };
+  query?: never;
+  url: "/v1/email/competitive/watchlist/brands/{watchlist_brand_id}/campaigns/{campaign_id}";
+};
+
+export type GetEmailCompetitiveBrandCampaignErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailCompetitiveBrandCampaignError =
+  GetEmailCompetitiveBrandCampaignErrors[keyof GetEmailCompetitiveBrandCampaignErrors];
+
+export type GetEmailCompetitiveBrandCampaignResponses = {
+  /**
+   * The campaign.
+   */
+  200: EmailCompetitiveCampaign;
+};
+
+export type GetEmailCompetitiveBrandCampaignResponse =
+  GetEmailCompetitiveBrandCampaignResponses[keyof GetEmailCompetitiveBrandCampaignResponses];
+
+export type GetEmailCompetitiveBrandSendTimeData = {
+  body?: never;
+  path: {
+    /**
+     * The watchlist entry whose sending pattern to return.
+     */
+    watchlist_brand_id: CompetitiveWatchlistBrandId;
+  };
+  query?: {
+    /**
+     * IANA timezone identifier to report send times in; defaults to UTC. The grid is folded into this zone before it is summed, so a send lands on the weekday and hour it happened at locally rather than the one it happened at in UTC. A zone this API does not know returns 422 rather than falling back to UTC, so an axis is never labelled with a zone the figures were not folded into.
+     *
+     */
+    timezone?: Timezone;
+  };
+  url: "/v1/email/competitive/watchlist/brands/{watchlist_brand_id}/send-time";
+};
+
+export type GetEmailCompetitiveBrandSendTimeErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailCompetitiveBrandSendTimeError =
+  GetEmailCompetitiveBrandSendTimeErrors[keyof GetEmailCompetitiveBrandSendTimeErrors];
+
+export type GetEmailCompetitiveBrandSendTimeResponses = {
+  /**
+   * The brand's sending pattern for the period.
+   */
+  200: EmailCompetitiveSendTimeGrid;
+};
+
+export type GetEmailCompetitiveBrandSendTimeResponse =
+  GetEmailCompetitiveBrandSendTimeResponses[keyof GetEmailCompetitiveBrandSendTimeResponses];
+
+export type SearchEmailCompetitiveBrandsData = {
+  body?: never;
+  path?: never;
+  query: {
+    /**
+     * A brand name, or a sending domain to look up the brand behind it.
+     */
+    q: string;
+  };
+  url: "/v1/email/competitive/brands/search";
+};
+
+export type SearchEmailCompetitiveBrandsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type SearchEmailCompetitiveBrandsError =
+  SearchEmailCompetitiveBrandsErrors[keyof SearchEmailCompetitiveBrandsErrors];
+
+export type SearchEmailCompetitiveBrandsResponses = {
+  /**
+   * Brands matching the search.
+   */
+  200: EmailCompetitiveBrandSearchResults;
+};
+
+export type SearchEmailCompetitiveBrandsResponse =
+  SearchEmailCompetitiveBrandsResponses[keyof SearchEmailCompetitiveBrandsResponses];
+
+export type GetEmailCompetitiveVolumeSeriesData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * How many days back the response covers, counting from now. One of three fixed trend windows rather than an open date range, matching how a competitive-intelligence chart is read. Defaults to 30.
+     *
+     */
+    range?: 7 | 30 | 90;
+    /**
+     * Which watched brands to plot, in the order you want the lines. Omit to get only your own line. An id your workspace does not watch is rejected rather than skipped, so a chart cannot quietly lose a line.
+     *
+     */
+    brand_ids?: Array<CompetitiveWatchlistBrandId>;
+  };
+  url: "/v1/email/competitive/volume-series";
+};
+
+export type GetEmailCompetitiveVolumeSeriesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailCompetitiveVolumeSeriesError =
+  GetEmailCompetitiveVolumeSeriesErrors[keyof GetEmailCompetitiveVolumeSeriesErrors];
+
+export type GetEmailCompetitiveVolumeSeriesResponses = {
+  /**
+   * The requested lines for the period.
+   */
+  200: EmailCompetitiveVolumeSeries;
+};
+
+export type GetEmailCompetitiveVolumeSeriesResponse =
+  GetEmailCompetitiveVolumeSeriesResponses[keyof GetEmailCompetitiveVolumeSeriesResponses];
 
 export type ListEmailTemplatesData = {
   body?: never;
@@ -32824,7 +37471,7 @@ export type ListWebhooksData = {
      * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
      *
      */
-    order?: "asc" | "desc";
+    order?: SortOrder;
     /**
      * Maximum number of items to return per page.
      */

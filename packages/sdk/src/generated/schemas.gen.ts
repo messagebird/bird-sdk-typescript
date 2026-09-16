@@ -244,13 +244,6 @@ export const WebhookEventSchema = {
   },
 } as const;
 
-export const WorkspaceIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^ws_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "ws_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
 export const ErrorDetailSchema = {
   type: "object",
   additionalProperties: false,
@@ -425,11 +418,40 @@ export const UserIDSchema = {
   example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const RegionSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["us1", "eu1"],
+  description: "Deployment region identifier.",
+  example: "us1",
+} as const;
+
 export const OrganizationIDSchema = {
   type: "string",
   minLength: 1,
   pattern: "^org_[0-9a-hjkmnp-tv-z]{26}$",
   example: "org_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WorkspaceIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^ws_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const TimezoneSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "IANA timezone identifier, such as `America/New_York`, `Europe/Amsterdam`, or `UTC`.",
+  example: "America/New_York",
+} as const;
+
+export const SortOrderSchema = {
+  type: "string",
+  enum: ["asc", "desc"],
+  description: "Sort direction, ascending or descending.",
 } as const;
 
 export const _ListEnvelopeSchema = {
@@ -477,14 +499,6 @@ export const _ListEnvelopeWithTotalSchema = {
       },
     },
   ],
-} as const;
-
-export const RegionSchema = {
-  type: "string",
-  minLength: 1,
-  enum: ["us1", "eu1"],
-  description: "Deployment region identifier.",
-  example: "us1",
 } as const;
 
 export const DocsSearchResultSchema = {
@@ -4598,6 +4612,30 @@ export const SMSMessageStatusSchema = {
     "Delivery status:\n\n- `accepted`: Accepted and awaiting carrier handoff.\n- `sent`: Handed to the carrier and awaiting a delivery receipt.\n- `delivered`: Confirmed as delivered.\n- `undelivered`: The carrier reported delivery as failed for a reason that may clear later, such as a handset out of coverage or a carrier at capacity. Final all the same: the message is not retried, so reaching the recipient means sending again.\n- `failed`: The carrier reported delivery as failed for a reason that will not clear, such as an unassigned number, a recipient who has opted out, or content the carrier refused.\n- `rejected`: Refused before carrier handoff.\n- `expired`: Reached its validity limit without a final receipt.\n- `received`: Received as an inbound message.\n\n`scheduled` and `canceled` are declared ahead of the send-later scheduling\nfeature that produces them, so their arrival is not a breaking change. No\nmessage carries either status today.\n",
 } as const;
 
+export const SMSTemplateIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^smt_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "smt_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const SMSTemplateVersionIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^smv_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "smv_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const SMSTemplateContentHashSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  description:
+    "A fingerprint of SMS template text, prefixed with its algorithm. Compare it within this API version to identify the exact source without transferring it.\n",
+  example:
+    "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+} as const;
+
 export const SMSSegmentsSchema = {
   type: "object",
   additionalProperties: false,
@@ -4763,6 +4801,11 @@ export const SMSMessageSchema = {
     "to",
     "from",
     "segments",
+    "requested_language",
+    "resolved_language",
+    "template_id",
+    "template_version_id",
+    "template_content_hash",
     "created_at",
   ],
   properties: {
@@ -4819,7 +4862,72 @@ export const SMSMessageSchema = {
         },
       ],
       description:
-        "Content classification supplied on the send. Null for inbound messages.",
+        "Content classification supplied for free text or derived from the template. Null for inbound messages.",
+    },
+    requested_language: {
+      readOnly: true,
+      description:
+        "The template language requested by the send, in canonical form. Null when the send named no language or used no template.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    resolved_language: {
+      readOnly: true,
+      description:
+        "The template language whose text was rendered, in canonical form. Null when the send used no template. This can differ from `requested_language` when the template's fallback policy selects another language.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    template_id: {
+      readOnly: true,
+      description:
+        "The template rendered for this message, or null for a free-text message.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    template_version_id: {
+      readOnly: true,
+      description:
+        "The workspace published version or synthetic built-in version rendered at acceptance, or null for a free-text message. For a built-in template, `template_content_hash` identifies the exact catalogue source.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    template_content_hash: {
+      readOnly: true,
+      description:
+        "The rendered language's source fingerprint, or null for a free-text message.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateContentHash",
+        },
+        {
+          type: "null",
+        },
+      ],
     },
     segments: {
       $ref: "#/components/schemas/SMSSegments",
@@ -4952,18 +5060,11 @@ export const SMSSendOptionsSchema = {
   },
 } as const;
 
-export const SMSTemplateIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^smt_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "smt_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
 export const SMSTemplateSendSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A send-by-template reference. Identify the template by its `id` or its `slug` (supply exactly one), optionally name a language, and pass its variable values in `parameters`.\n",
+    "A send-by-template reference. Identify the template by `id` or `slug`, or use the deprecated `name` for a legacy built-in template. Supply exactly one reference, optionally select a language, and pass variable values in `parameters`.\n",
   oneOf: [
     {
       required: ["id"],
@@ -4977,7 +5078,7 @@ export const SMSTemplateSendSchema = {
   ],
   properties: {
     id: {
-      description: "The template to send, by its id.",
+      description: "The workspace or built-in template to send, by ID.",
       $ref: "#/components/schemas/SMSTemplateID",
     },
     slug: {
@@ -4987,7 +5088,7 @@ export const SMSTemplateSendSchema = {
         },
       ],
       description:
-        "The template to send, by its slug handle (for example `bird_otp_verification`). Browse the available templates and their variables with the templates endpoint.\n",
+        "The workspace or built-in template to send, by its immutable slug. Read the template's live version to see its variables.\n",
       example: "bird_otp_verification_ttl",
     },
     name: {
@@ -4995,7 +5096,7 @@ export const SMSTemplateSendSchema = {
       minLength: 1,
       deprecated: true,
       description:
-        "Deprecated: use `slug` instead. Resolved as a slug first, and only if that finds nothing, matched against the template's display name.\n",
+        "Deprecated. Use `slug` instead. This resolves legacy built-in catalogue names and never matches a workspace template's display name.\n",
     },
     language: {
       allOf: [
@@ -5011,7 +5112,7 @@ export const SMSTemplateSendSchema = {
       type: "object",
       additionalProperties: true,
       description:
-        "Values for the template's variables, keyed by variable name. The accepted keys and their formats are fixed per template (the template's `variables` on the templates endpoint). A missing required variable, an undeclared key, a value that does not match its variable's format, or a serialized payload over 16 KB each return a `422`.\n",
+        "Values for the template's variables, keyed by variable name. Read the live version to see the accepted keys and formats. A missing key, an undeclared key, an invalid value, or a serialized object over 16 KiB returns `422`.\n",
       example: {
         code: "493021",
         ttl: "10",
@@ -5034,6 +5135,31 @@ export const SMSMessageSendRequestSchema = {
       required: ["template"],
     },
   ],
+  not: {
+    anyOf: [
+      {
+        required: ["text", "template"],
+        properties: {
+          text: {},
+          template: {},
+        },
+      },
+      {
+        required: ["template", "category"],
+        properties: {
+          template: {},
+          category: {},
+        },
+      },
+      {
+        required: ["template", "media_urls"],
+        properties: {
+          template: {},
+          media_urls: {},
+        },
+      },
+    ],
+  },
   dependentRequired: {
     text: ["category"],
   },
@@ -5049,7 +5175,7 @@ export const SMSMessageSendRequestSchema = {
       type: "string",
       minLength: 1,
       description:
-        "Sender to send from. It must be a sender the workspace holds: a number it owns in E.164, such as `+15557654321`, a short code it holds, such as `24680`, or an alphanumeric sender ID it has claimed, such as `MyBrand`. A sender the workspace does not hold returns a `422` `SMSSenderNotConfigured`, and an alphanumeric sender must also be permitted, and where required registered, for the destination country. Required on a free-text send: omitting it returns a `422` `SMSNoEligibleSender`. Not accepted alongside `template`, which selects its sender automatically.\n",
+        "Sender to send from. It must be a sender the workspace holds: a number it owns in E.164, such as `+15557654321`, a short code it holds, such as `24680`, or an alphanumeric sender ID it has claimed, such as `MyBrand`. A sender the workspace does not hold returns a `422` `SMSSenderNotConfigured`, and an alphanumeric sender must also be permitted, and where required registered, for the destination country. Required on a free-text send and when sending a workspace template. Omitting it in either case returns `422`. A built-in template selects its sender automatically and rejects `from`.\n",
       example: "+15557654321",
     },
     text: {
@@ -5125,7 +5251,7 @@ export const SMSMessageSendRequestSchema = {
         },
       ],
       description:
-        "Send using a stored template instead of free text. Mutually exclusive with `text`; the message category is derived from the template, so `from`, `category`, and `media_urls` are not accepted alongside it.\n",
+        "Send using a stored template instead of free text. The category is derived from the template, so `category` and `media_urls` are rejected. A workspace template requires `from`; a built-in template selects its sender and rejects `from`.\n",
     },
     broadcast_id: {
       type: "string",
@@ -5318,6 +5444,14 @@ export const TemplateScopeSchema = {
     "Whether the template is one of our built-in templates (`system`) or one your workspace created (`workspace`).\n",
 } as const;
 
+export const SMSTemplateCategorySchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["transactional", "marketing", "authentication"],
+  description:
+    "Why messages use this template. Use `authentication` for one-time codes, `marketing` for promotions, and `transactional` for service messages.\n",
+} as const;
+
 export const TemplateStatusSchema = {
   type: "string",
   minLength: 1,
@@ -5326,6 +5460,451 @@ export const TemplateStatusSchema = {
   description:
     "Where the template stands as a whole. The same five states on every channel.\n\n- `draft`: nothing has ever gone live.\n- `pending`: nothing is live and at least one language is in review.\n- `active`: at least one language is live, so something can be sent.\n- `rejected`: it was reviewed and every language was refused.\n- `inactive`: nothing is live and nothing is in review, so content was withdrawn or was blocked before anything went live.\n\nA template with one language live is `active` even while another is still\ndrafted or refused. Read `languages` for the state of each language and its\nreason.\n\nWhich values a channel reports follows its review model. A channel whose\ncontent a third party reviews uses all five. On email and SMS, where content\ngoes live on publish, a template is `draft`, `active` or `inactive`, and\n`pending` and `rejected` are reserved for the review stage coming to both, so\na template reaching either is not a breaking change.\n",
   example: "active",
+} as const;
+
+export const SMSTemplateSortFieldSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Field to sort SMS templates and their versions by.",
+} as const;
+
+export const TemplateLanguageStatusSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  "x-extensible-enum": ["draft", "live", "superseded"],
+  description:
+    "Status of one template language on channels without third-party review.\n\n- `draft`: it has never been published.\n- `live`: it is available to sends.\n- `superseded`: a later version replaced it.\n\nTreat an unknown value as not sendable.\n",
+  example: "live",
+} as const;
+
+export const SMSTemplateLanguageStateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Whether a language is live and whether its draft has unpublished changes.",
+  required: ["status"],
+  properties: {
+    status: {
+      readOnly: true,
+      $ref: "#/components/schemas/TemplateLanguageStatus",
+    },
+    draft: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether the draft has an unpublished change for this language. When true beside `live`, sends keep using the older published text until submit.\n",
+    },
+  },
+} as const;
+
+export const SMSTemplateSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "An SMS template without content or draft concurrency settings.",
+  required: [
+    "id",
+    "workspace_id",
+    "slug",
+    "name",
+    "description",
+    "scope",
+    "status",
+    "category",
+    "default_language",
+    "available_languages",
+    "languages",
+    "draft_version_id",
+    "live_version_id",
+    "published_version_id",
+    "last_submitted_at",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      description: "Template ID.",
+      $ref: "#/components/schemas/SMSTemplateID",
+    },
+    workspace_id: {
+      readOnly: true,
+      description:
+        "The workspace that owns the template. Null for a built-in `system` template.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WorkspaceID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The immutable handle used to address and send the template.",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description: "The template's display name.",
+    },
+    description: {
+      type: ["string", "null"],
+      description: "What the template is for. Null if it has no description.",
+    },
+    scope: {
+      $ref: "#/components/schemas/TemplateScope",
+    },
+    status: {
+      $ref: "#/components/schemas/TemplateStatus",
+    },
+    category: {
+      $ref: "#/components/schemas/SMSTemplateCategory",
+    },
+    draft_version_id: {
+      readOnly: true,
+      description:
+        "The permanent editable draft version. Null for a built-in template.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    live_version_id: {
+      readOnly: true,
+      description:
+        "The version sends resolve to, or null before first publication.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    published_version_id: {
+      readOnly: true,
+      deprecated: true,
+      description:
+        "Deprecated. Use `live_version_id`, which carries the same value.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    languages: {
+      type: "object",
+      readOnly: true,
+      propertyNames: {
+        type: "string",
+        minLength: 2,
+        maxLength: 35,
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/SMSTemplateLanguageState",
+      },
+      description:
+        "Each language and its live or draft state, keyed by canonical BCP-47 tag.",
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description: "The draft's default language.",
+    },
+    available_languages: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      description:
+        "Languages the live version can currently send. Empty before first publication.",
+    },
+    last_submitted_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was last published. Null before first publication and for built-in templates.",
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was created. Null for built-in templates.",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was last modified. Null for built-in templates.",
+    },
+  },
+} as const;
+
+export const SMSTemplateListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "One page of SMS templates.",
+          items: {
+            $ref: "#/components/schemas/SMSTemplateSummary",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const SMSTemplateTextSchema = {
+  type: ["string"],
+  minLength: 0,
+  description:
+    "SMS template text, limited to 16 KiB of UTF-8 source. Blank text can be saved in a draft but cannot be published. Workspace templates support scalar variables, conditional text, and bounded filters. Loops, assignments, captures, partials, collections, and string-expanding filters are rejected.\n",
+} as const;
+
+export const TemplateOnMissingLanguageSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["fallback", "fail"],
+  "x-enum-varnames": [
+    "TemplateOnMissingLanguageFallback",
+    "TemplateOnMissingLanguageFail",
+  ],
+  description:
+    "What a send or a preview does when it asks for a language the template\ncannot serve.\n\n`fallback` serves the closest match instead. It tries a broader form of the\nsame language first, so a request for `pt-BR` can be served by a stocked\n`pt`, and then the template's default language. A send never fails because a\nlanguage is missing.\n\n`fail` rejects the send rather than serving a different language, for content\nwhere sending the wrong language is worse than not sending at all. It matches\nthe requested tag or a broader form of it and refuses a sibling variant, so\n`pt-BR` is never served by `pt-PT`. A send that names no language still uses\nthe default language.\n\nThe default is per channel and stated on each channel's own field, because\nwhat a wrong-language send costs differs. Where every language is separately\nreviewed and separately priced, falling back silently would send content the\nrecipient did not expect at a rate the sender did not choose.\n",
+  example: "fallback",
+} as const;
+
+export const SMSTemplateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One SMS template identity and its authoring state. Content and variables live on versions, so this resource stays shallow.\n",
+  required: [
+    "id",
+    "workspace_id",
+    "slug",
+    "name",
+    "description",
+    "scope",
+    "status",
+    "category",
+    "default_language",
+    "available_languages",
+    "languages",
+    "on_missing_language",
+    "language_source_required",
+    "draft_version_id",
+    "live_version_id",
+    "published_version_id",
+    "revision",
+    "last_submitted_at",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      description: "Template ID.",
+      $ref: "#/components/schemas/SMSTemplateID",
+    },
+    workspace_id: {
+      readOnly: true,
+      description:
+        "The workspace that owns the template. Null for a built-in `system` template.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WorkspaceID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The immutable handle used to address and send the template. A built-in template's slug starts with `bird_`.\n",
+      example: "order-shipped",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The template's display name. It defaults to the slug and can be changed on workspace templates.",
+      example: "Order shipped",
+    },
+    description: {
+      type: ["string", "null"],
+      description: "What the template is for. Null if it has no description.",
+    },
+    scope: {
+      $ref: "#/components/schemas/TemplateScope",
+    },
+    status: {
+      $ref: "#/components/schemas/TemplateStatus",
+    },
+    category: {
+      $ref: "#/components/schemas/SMSTemplateCategory",
+    },
+    draft_version_id: {
+      readOnly: true,
+      description:
+        "The permanent editable draft version. Null for a built-in template.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    live_version_id: {
+      readOnly: true,
+      description:
+        "The version sends resolve to, or null before a workspace template is first published. A built-in template points to a synthetic published version that projects its current catalogue content.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    published_version_id: {
+      readOnly: true,
+      deprecated: true,
+      description:
+        "Deprecated. Use `live_version_id`, which carries the same value.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    revision: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description:
+        "The draft revision to use for concurrent-edit checks. Null for a built-in template.",
+    },
+    languages: {
+      type: "object",
+      readOnly: true,
+      propertyNames: {
+        type: "string",
+        minLength: 2,
+        maxLength: 35,
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/SMSTemplateLanguageState",
+      },
+      description:
+        "Each language the template has, keyed by canonical BCP-47 tag, with its live state and whether the draft contains unpublished changes. Content is available from version reads.\n",
+      example: {
+        en: {
+          status: "live",
+        },
+        nl: {
+          status: "live",
+          draft: true,
+        },
+      },
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description:
+        "The draft's default language. Sends continue using the live version's default until the draft is published.\n",
+    },
+    available_languages: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      description:
+        "Languages the live version can currently send. Empty before first publication.\n",
+      example: ["en"],
+    },
+    on_missing_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateOnMissingLanguage",
+        },
+      ],
+      readOnly: true,
+      description:
+        "How a send handles a requested language that the live version does not have.",
+    },
+    language_source_required: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether each send must name a language instead of using the live version's default.",
+    },
+    last_submitted_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was last published. Null before first publication and for built-in templates.",
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was created. Null for built-in templates.",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was last modified. Null for built-in templates.",
+    },
+  },
 } as const;
 
 export const TemplateVariableSchema = {
@@ -5358,7 +5937,7 @@ export const TemplateVariableSchema = {
         "text",
       ],
       description:
-        "The value type this slot accepts. SMS templates use the typed slots (`code`, `amount` and the rest), each of which rejects a value that does not match its `constraint`. Email and WhatsApp templates use `text`, which accepts any value. Open enum: treat an unrecognized value as a future type rather than an error.\n",
+        "The value type this slot accepts. Built-in SMS templates use typed slots (`code`, `amount` and the rest), each of which rejects a value that does not match its `constraint`. Email, WhatsApp and workspace SMS templates use `text`. Workspace SMS parameters must be scalar values. Open enum: treat an unrecognized value as a future type rather than an error.\n",
     },
     required: {
       type: "boolean",
@@ -5378,147 +5957,64 @@ export const TemplateVariableSchema = {
       readOnly: true,
       default: false,
       description:
-        "Whether this slot's value is kept out of durable storage. A sensitive slot's rendered value never appears in message content read back through the API: a stand-in placeholder is stored instead.\n",
+        "Whether this slot's value is redacted from stored message content. A placeholder replaces the sensitive value in message history; transport queues can still carry the text needed for delivery.\n",
     },
   },
 } as const;
 
-export const TemplateLanguageStatusSchema = {
+export const SMSTemplateVersionStatusSchema = {
   type: "string",
   minLength: 1,
   readOnly: true,
-  "x-extensible-enum": ["draft", "live", "superseded"],
+  enum: ["draft", "published"],
   description:
-    "Status of one template language on channels without third-party review.\n\n- `draft`: it has never been published.\n- `live`: it is available to sends.\n- `superseded`: a later version replaced it.\n\nTreat an unknown value as not sendable.\n",
-  example: "live",
+    "Whether the version is the editable draft or published. Published workspace versions are immutable and remain `published` after a later version goes live. A built-in template's synthetic published version projects the current catalogue entry.\n",
+  example: "published",
 } as const;
 
-export const SMSTemplateLanguageStateSchema = {
+export const SMSTemplateVersionSummarySchema = {
   type: "object",
   additionalProperties: false,
-  description:
-    "One language's state on a template: whether it is live for sends. Content is not here; the template carries the body of its default language, and a send resolves the rest.\n",
-  required: ["status"],
-  properties: {
-    status: {
-      $ref: "#/components/schemas/TemplateLanguageStatus",
-    },
-  },
-} as const;
-
-export const TemplateOnMissingLanguageSchema = {
-  type: "string",
-  minLength: 1,
-  enum: ["fallback", "fail"],
-  "x-enum-varnames": [
-    "TemplateOnMissingLanguageFallback",
-    "TemplateOnMissingLanguageFail",
-  ],
-  description:
-    "What a send or a preview does when it asks for a language the template\ncannot serve.\n\n`fallback` serves the closest match instead. It tries a broader form of the\nsame language first, so a request for `pt-BR` can be served by a stocked\n`pt`, and then the template's default language. A send never fails because a\nlanguage is missing.\n\n`fail` rejects the send rather than serving a different language, for content\nwhere sending the wrong language is worse than not sending at all. It matches\nthe requested tag or a broader form of it and refuses a sibling variant, so\n`pt-BR` is never served by `pt-PT`. A send that names no language still uses\nthe default language.\n\nThe default is per channel and stated on each channel's own field, because\nwhat a wrong-language send costs differs. Where every language is separately\nreviewed and separately priced, falling back silently would send content the\nrecipient did not expect at a rate the sender did not choose.\n",
-  example: "fallback",
-} as const;
-
-export const SMSTemplateVersionIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^smv_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "smv_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const SMSTemplateSchema = {
-  type: "object",
-  additionalProperties: false,
-  description:
-    "A message template: one identity holding a copy of the message per language, resolved to one at send. It declares the variable slots a send fills in, so the parts that change travel with the request and the wording does not.\n",
+  description: "One SMS template version without its text.",
   required: [
     "id",
-    "slug",
-    "name",
-    "description",
-    "scope",
+    "template_id",
+    "version_number",
     "status",
-    "category",
-    "body",
+    "revision",
     "variables",
     "default_language",
     "available_languages",
-    "languages",
-    "on_missing_language",
-    "language_source_required",
-    "draft_version_id",
-    "live_version_id",
-    "published_version_id",
-    "revision",
-    "last_submitted_at",
     "created_at",
-    "updated_at",
+    "published_at",
   ],
   properties: {
     id: {
       readOnly: true,
-      description:
-        "The template's generated identifier. Accepted anywhere a template is referenced: the `{template_ref}` path segment, and `template.id` on a send. The `slug` works in the same places and is more readable.",
+      description: "Template version ID.",
+      $ref: "#/components/schemas/SMSTemplateVersionID",
+    },
+    template_id: {
+      readOnly: true,
+      description: "The template this version belongs to.",
       $ref: "#/components/schemas/SMSTemplateID",
     },
-    slug: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/TemplateSlug",
-        },
-      ],
+    version_number: {
+      type: ["integer", "null"],
+      minimum: 1,
       readOnly: true,
       description:
-        "The template's permanent handle. Pass it (or the id) as the template reference when sending. Handles beginning with `bird_` are reserved for our built-in templates.\n",
-      example: "bird_otp_verification",
-    },
-    name: {
-      type: "string",
-      minLength: 1,
-      maxLength: 255,
-      readOnly: true,
-      description:
-        "The template's display name, shown wherever the template is listed. Nothing resolves through it, so it is safe to show wherever a human reads the template.\n",
-      example: "bird_otp_verification",
-    },
-    description: {
-      type: ["string", "null"],
-      readOnly: true,
-      description: "What the template is for. Null when unset.",
-      example: "One-time passcode verification",
-    },
-    scope: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      allOf: [
-        {
-          $ref: "#/components/schemas/TemplateScope",
-        },
-      ],
-      description:
-        "Whether the template is one of our built-in templates (`system`) or one your workspace created (`workspace`). Every SMS template is `system`.\n",
+        "Sequential publication number. Null for the draft; a built-in template reports 1.",
     },
     status: {
-      $ref: "#/components/schemas/TemplateStatus",
-    },
-    category: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/SMSMessageCategory",
-        },
-      ],
       readOnly: true,
-      description:
-        "Content classification applied to messages sent from this template.",
+      $ref: "#/components/schemas/SMSTemplateVersionStatus",
     },
-    body: {
-      type: "string",
-      minLength: 1,
+    revision: {
+      type: "integer",
+      minimum: 0,
       readOnly: true,
-      description:
-        "The template body in its default language, shown for preview. Variable placeholders appear inline (for example `{{ code }}`). Name a `language` on the send to have another one served.\n",
-      example: "Your verification code is {{ code }}.",
+      description: "The version's revision counter.",
     },
     variables: {
       type: "array",
@@ -5527,17 +6023,12 @@ export const SMSTemplateSchema = {
         $ref: "#/components/schemas/TemplateVariable",
       },
       description:
-        "The typed slots this template fills in from the values you supply in `parameters` when sending. Every language of a template declares the same slots, so this list holds for whichever one a send resolves to.\n",
+        "Variables inferred from the version's text and shared by each language.",
     },
     default_language: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/LanguageTag",
-        },
-      ],
+      $ref: "#/components/schemas/LanguageTag",
       readOnly: true,
-      description:
-        "The language a send uses when it names none, and the last resort when `on_missing_language` is `fallback` and the language asked for is not available.\n",
+      description: "The language this version treats as its default.",
     },
     available_languages: {
       type: "array",
@@ -5545,9 +6036,158 @@ export const SMSTemplateSchema = {
       items: {
         $ref: "#/components/schemas/LanguageTag",
       },
+      description: "Languages this version contains, without their text.",
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
       description:
-        "The languages a send can resolve right now, as BCP-47 tags. The set may shrink for reasons other than editing, so read it rather than assuming it matches what you last saw.\n",
-      example: ["en"],
+        "When the version was created. Null for a built-in template's synthetic version.",
+    },
+    published_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the version was published. Null for the draft and for a built-in template's synthetic version.",
+    },
+  },
+  example: {
+    id: "smv_01krdgeqcxet5s7t44vh8rt9mg",
+    template_id: "smt_01krdgeqcxet5s7t44vh8rt9mg",
+    version_number: 1,
+    status: "published",
+    revision: 1,
+    variables: [
+      {
+        key: "order_number",
+        type: "text",
+        required: true,
+        constraint: "A string, number, or boolean.",
+      },
+    ],
+    default_language: "en",
+    created_at: "2026-09-10T09:00:00Z",
+    published_at: "2026-09-10T09:00:00Z",
+    available_languages: ["en"],
+  },
+} as const;
+
+export const SMSTemplateVersionListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "One page of the template's versions, newest first.",
+          items: {
+            $ref: "#/components/schemas/SMSTemplateVersionSummary",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const SMSTemplateVersionLanguageSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One language's content and revision metadata within a version.",
+  required: ["text", "revision", "content_hash", "updated_at"],
+  properties: {
+    text: {
+      $ref: "#/components/schemas/SMSTemplateText",
+      readOnly: true,
+      description:
+        "Stored template text, including its `{{ variable }}` placeholders.",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "This language's revision counter.",
+    },
+    content_hash: {
+      readOnly: true,
+      $ref: "#/components/schemas/SMSTemplateContentHash",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this language was last saved. Null for a built-in template.",
+    },
+  },
+  example: {
+    text: "Your order {{ order_number }} is on its way.",
+    revision: 1,
+    content_hash:
+      "sha256:3d948846f5f773fb7bed8ab81b57f3d0ff2cbff24cb549718f4d389f1ab0300a",
+    updated_at: "2026-09-10T09:00:00Z",
+  },
+} as const;
+
+export const SMSTemplateVersionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One SMS template version with its content. A workspace template keeps one editable draft and immutable published versions. A built-in template exposes its current catalogue content as one synthetic published version.\n",
+  required: [
+    "id",
+    "template_id",
+    "version_number",
+    "status",
+    "revision",
+    "variables",
+    "languages",
+    "default_language",
+    "created_at",
+    "published_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      description: "Template version ID.",
+      $ref: "#/components/schemas/SMSTemplateVersionID",
+    },
+    template_id: {
+      readOnly: true,
+      description: "The template this version belongs to.",
+      $ref: "#/components/schemas/SMSTemplateID",
+    },
+    version_number: {
+      type: ["integer", "null"],
+      minimum: 1,
+      readOnly: true,
+      description:
+        "Sequential publication number. Null for the draft; a built-in template reports 1.",
+    },
+    status: {
+      readOnly: true,
+      $ref: "#/components/schemas/SMSTemplateVersionStatus",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "The version revision. A draft revision advances with each metadata or content change. Published workspace versions are frozen; a built-in template's synthetic version reports 0.\n",
+    },
+    variables: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/TemplateVariable",
+      },
+      description:
+        "Variables inferred from the version's text. Every language in a publishable SMS version uses the same set. Built-in templates may apply additional typed constraints described by each variable.\n",
     },
     languages: {
       type: "object",
@@ -5558,107 +6198,99 @@ export const SMSTemplateSchema = {
         maxLength: 35,
       },
       additionalProperties: {
-        $ref: "#/components/schemas/SMSTemplateLanguageState",
+        $ref: "#/components/schemas/SMSTemplateVersionLanguage",
       },
       description:
-        "Where each of the template's languages stands, keyed by BCP-47 language tag. Content is not here: `body` previews the default language, and a send resolves the one it needs.\n",
-      example: {
-        en: {
-          status: "live",
-        },
-        nl: {
-          status: "live",
-        },
-      },
+        "Full content for each language, keyed by canonical BCP-47 tag.",
     },
-    on_missing_language: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/TemplateOnMissingLanguage",
-        },
-      ],
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
       readOnly: true,
-      description:
-        "What a send does when it asks for a language this template does not carry. Defaults to `fallback` on SMS.\n",
-    },
-    language_source_required: {
-      type: "boolean",
-      readOnly: true,
-      description:
-        "Whether a send has to name a language. When true, a send that names none is rejected instead of being served the default language.\n",
-    },
-    draft_version_id: {
-      readOnly: true,
-      description:
-        "The current editable draft version, or null for a built-in `system` template, which has no draft.\n",
-      oneOf: [
-        {
-          $ref: "#/components/schemas/SMSTemplateVersionID",
-        },
-        {
-          type: "null",
-        },
-      ],
-    },
-    live_version_id: {
-      readOnly: true,
-      description:
-        "The version a send resolves to, or null for a built-in `system` template, which Bird ships ready to send rather than versioning.\n",
-      oneOf: [
-        {
-          $ref: "#/components/schemas/SMSTemplateVersionID",
-        },
-        {
-          type: "null",
-        },
-      ],
-    },
-    published_version_id: {
-      readOnly: true,
-      deprecated: true,
-      description:
-        "Deprecated: use `live_version_id` instead, which carries the same value.\n",
-      oneOf: [
-        {
-          $ref: "#/components/schemas/SMSTemplateVersionID",
-        },
-        {
-          type: "null",
-        },
-      ],
-    },
-    revision: {
-      type: ["integer", "null"],
-      minimum: 0,
-      readOnly: true,
-      description:
-        "The draft's revision counter. Null for a built-in `system` template, which is unversioned.\n",
-    },
-    last_submitted_at: {
-      type: ["string", "null"],
-      format: "date-time",
-      readOnly: true,
-      description:
-        "When this template was last submitted. Null for a built-in `system` template, which is already available to send.\n",
+      description: "The language this version treats as its default.",
     },
     created_at: {
       type: ["string", "null"],
       format: "date-time",
       readOnly: true,
       description:
-        "When the template was created. Null for a built-in `system` template, which Bird ships rather than stores.\n",
+        "When the version was created. Null for a built-in template's synthetic version.",
+    },
+    published_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the version was published. Null for the draft and for a built-in template's synthetic version.",
+    },
+  },
+  example: {
+    id: "smv_01krdgeqcxet5s7t44vh8rt9mg",
+    template_id: "smt_01krdgeqcxet5s7t44vh8rt9mg",
+    version_number: 1,
+    status: "published",
+    revision: 1,
+    variables: [
+      {
+        key: "order_number",
+        type: "text",
+        required: true,
+        constraint: "A string, number, or boolean.",
+      },
+    ],
+    languages: {
+      en: {
+        text: "Your order {{ order_number }} is on its way.",
+        revision: 1,
+        content_hash:
+          "sha256:3d948846f5f773fb7bed8ab81b57f3d0ff2cbff24cb549718f4d389f1ab0300a",
+        updated_at: "2026-09-10T09:00:00Z",
+      },
+    },
+    default_language: "en",
+    created_at: "2026-09-10T09:00:00Z",
+    published_at: "2026-09-10T09:00:00Z",
+  },
+} as const;
+
+export const SMSTemplateLanguageSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One language of an SMS template version without its text.",
+  required: ["language", "revision", "content_hash", "updated_at"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description: "The language in canonical BCP-47 form.",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "This language's revision counter.",
+    },
+    content_hash: {
+      readOnly: true,
+      $ref: "#/components/schemas/SMSTemplateContentHash",
     },
     updated_at: {
       type: ["string", "null"],
       format: "date-time",
       readOnly: true,
       description:
-        "When the template was last modified. Null for a built-in `system` template, which Bird ships rather than stores.\n",
+        "When this language was last saved. Null for a built-in template.",
     },
+  },
+  example: {
+    language: "en",
+    revision: 1,
+    content_hash:
+      "sha256:3d948846f5f773fb7bed8ab81b57f3d0ff2cbff24cb549718f4d389f1ab0300a",
+    updated_at: "2026-09-10T09:00:00Z",
   },
 } as const;
 
-export const SMSTemplateListSchema = {
+export const SMSTemplateLanguageListSchema = {
   type: "object",
   additionalProperties: false,
   required: ["data"],
@@ -5666,11 +6298,57 @@ export const SMSTemplateListSchema = {
     data: {
       type: "array",
       description:
-        "The templates available to your workspace. The catalog is returned in full and is not paginated.",
+        "The version's languages ordered by canonical tag, without text.",
       items: {
-        $ref: "#/components/schemas/SMSTemplate",
+        $ref: "#/components/schemas/SMSTemplateLanguageSummary",
       },
     },
+  },
+} as const;
+
+export const SMSTemplateLanguageSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One language's full SMS template text and revision metadata.",
+  required: ["language", "text", "revision", "content_hash", "updated_at"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description: "The language in canonical BCP-47 form.",
+    },
+    text: {
+      $ref: "#/components/schemas/SMSTemplateText",
+      readOnly: true,
+      description:
+        "Stored template text, including its `{{ variable }}` placeholders.",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "This language's revision counter, used for concurrent-edit checks on draft writes.",
+    },
+    content_hash: {
+      readOnly: true,
+      $ref: "#/components/schemas/SMSTemplateContentHash",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this language was last saved. Null for a built-in template.",
+    },
+  },
+  example: {
+    language: "en",
+    text: "Your order {{ order_number }} is on its way.",
+    revision: 1,
+    content_hash:
+      "sha256:3d948846f5f773fb7bed8ab81b57f3d0ff2cbff24cb549718f4d389f1ab0300a",
+    updated_at: "2026-09-10T09:00:00Z",
   },
 } as const;
 
@@ -8403,6 +9081,7 @@ export const VerificationSchema = {
         },
         expires_at: {
           type: "string",
+          minLength: 1,
           format: "date-time",
           readOnly: true,
           description:
@@ -15012,6 +15691,1710 @@ export const WhatsAppSuppressionIDSchema = {
   example: "was_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const EmailInboxInsightsGroupBySchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "The bucket size a series is grouped by. Day suits the product's charts; wider grains suit long ranges.\n",
+  enum: ["day", "week", "month"],
+  example: "day",
+} as const;
+
+export const EmailInboxInsightsCompareSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Set to `previous_period` to include the immediately preceding window of equal length in the same response, so deltas need no second request.\n",
+  enum: ["previous_period"],
+  example: "previous_period",
+} as const;
+
+export const EmailInboxInsightsWeightingSourceSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Where the audience mix behind the placement weighting came from: `account` when it was configured for this account, `global` when a general default was used instead.\n",
+  enum: ["account", "global"],
+  example: "account",
+} as const;
+
+export const EmailInboxInsightsWeightingSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "How the placement figures in this response were weighted, so a number is\nself-describing wherever it is quoted or screenshotted.\n\nPlacement rates are a weighted average of per-provider rates against an\naudience mix (the share of recipients expected at each mailbox provider)\nrather than a share of delivered volume.\n",
+  required: ["weight_set_id", "source", "basis"],
+  properties: {
+    weight_set_id: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The measurement's own identifier for the audience mix, carried through so a client can tell two weightings apart without comparing `basis` strings. No operation accepts it.\n",
+      example: "12",
+    },
+    source: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailInboxInsightsWeightingSource",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        'Which audience mix the weighting used. Null when the measurement weighted these figures by a method this API does not model: the enum is closed so that a client can branch on it exhaustively, which means an unfamiliar method has to answer "not one of these" rather than be passed through. `basis` usually still describes the method in words when that happens.\n',
+    },
+    basis: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The weighting method behind the rates, as the measurement names it. A slug rather than a sentence, so render it as a label and do not expect it to read as English. Null when the measurement did not state one, which pairs with `source`: both describe the method, so neither can claim to know it when the measurement was silent.\n",
+      example: "weighted-mean-of-per-isp-rates",
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsMeasurementSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "How the figures in this response were measured, so a number is self-describing in a screenshot or a bug report.\n",
+  required: ["sources"],
+  properties: {
+    sources: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Identifiers of the measurement systems that contributed to these figures. The set grows as measurement coverage does, so treat the values as labels rather than a closed list.\n",
+      items: {
+        type: "string",
+        minLength: 1,
+        "x-extensible-enum": [
+          "panel",
+          "intelliseed_public",
+          "intelliseed_private",
+          "eds",
+        ],
+      },
+      example: ["panel", "intelliseed_public"],
+    },
+    weighting: {
+      $ref: "#/components/schemas/EmailInboxInsightsWeighting",
+      readOnly: true,
+      description:
+        "How the figures were weighted. Present on figures weighted against an audience mix, which is placement's method; measurements that weight nothing carry no weighting block.\n",
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsFreshnessSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    'How current the figures are. Freshness differs per resource (authentication data can lag a day or more while blocklist lookups are near real time), so any "as of" label binds from this field, never from a fixed string.\n',
+  required: ["as_of", "lag_hint"],
+  properties: {
+    as_of: {
+      type: ["string", "null"],
+      format: "date",
+      readOnly: true,
+      description:
+        "The most recent UTC day the figures include, or null for a live lookup that has no measurement window.\n",
+      example: "2026-08-17",
+    },
+    lag_hint: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "How far behind real time this resource usually runs. A lowercase\nidentifier rather than a display label, so pick your own wording for it,\nand treat the set as open: the measurement names a hint per resource and\ncan add one without notice.\n\nNull when the measurement reports no hint, which several resources do:\nshow the figures without an age rather than inventing one.\n",
+      "x-extensible-enum": ["daily", "nightly", "near_real_time"],
+      example: "daily",
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsEnvelopeBaseSchema = {
+  type: "object",
+  description:
+    "The meta every Inbox Insights resource carries, whatever it measures, so one client adapter serves them all.\n",
+  required: ["resource", "domain", "generated_at", "freshness"],
+  properties: {
+    resource: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Which resource this response is, echoed for self-description.",
+      example: "placement",
+    },
+    domain: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The sending domain the figures describe.",
+      example: "mail.acme.com",
+    },
+    measurement: {
+      $ref: "#/components/schemas/EmailInboxInsightsMeasurement",
+      readOnly: true,
+      description:
+        "How the figures were measured. Present only where a figure was weighted or drawn from a named set of sources, which today means placement and the industry benchmark. Absent on the reputation resources and on a live lookup, neither of which weights anything.\n",
+    },
+    generated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the measurement service computed these figures.",
+      example: "2026-08-18T09:34:00Z",
+    },
+    freshness: {
+      $ref: "#/components/schemas/EmailInboxInsightsFreshness",
+      readOnly: true,
+    },
+    cached_at: {
+      type: "string",
+      format: "date-time",
+      readOnly: true,
+      description:
+        "Present when the response was served from a short-lived copy rather than fetched for this request: when that copy was fetched.\n",
+      example: "2026-08-18T09:40:02Z",
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsWindowSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The period every figure in the response covers: whole UTC calendar days,\ninclusive on both ends. The same window convention the email statistics\nendpoints use, so figures from the two sources describe the same days and\ncan be combined without adjustment.\n",
+  required: ["start", "end"],
+  properties: {
+    start: {
+      type: "string",
+      format: "date",
+      minLength: 1,
+      readOnly: true,
+      description: "First UTC day of the period, inclusive.",
+      example: "2026-08-12",
+    },
+    end: {
+      type: "string",
+      format: "date",
+      minLength: 1,
+      readOnly: true,
+      description: "Last UTC day of the period, inclusive.",
+      example: "2026-08-18",
+    },
+    group_by: {
+      $ref: "#/components/schemas/EmailInboxInsightsGroupBy",
+      readOnly: true,
+      description:
+        "The bucket size any series in this response is grouped by. Absent on resources with no series.",
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsComparedToSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The prior equal-length period the delta figures compare against. Present only when the request asked for a comparison.\n",
+  required: ["start", "end"],
+  properties: {
+    start: {
+      type: "string",
+      format: "date",
+      minLength: 1,
+      readOnly: true,
+      description: "First UTC day of the prior period, inclusive.",
+      example: "2026-06-19",
+    },
+    end: {
+      type: "string",
+      format: "date",
+      minLength: 1,
+      readOnly: true,
+      description: "Last UTC day of the prior period, inclusive.",
+      example: "2026-07-18",
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsEnvelopeSchema = {
+  type: "object",
+  description:
+    "The meta a windowed Inbox Insights resource carries: the common fields plus the period the figures cover and how they were measured.\n",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsEnvelopeBase",
+    },
+    {
+      type: "object",
+      required: ["window"],
+      properties: {
+        window: {
+          $ref: "#/components/schemas/EmailInboxInsightsWindow",
+        },
+        compared_to: {
+          $ref: "#/components/schemas/EmailInboxInsightsComparedTo",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsPlacementCountsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Raw measured placements behind a set of rates, before any weighting. A measured placement is one message whose mailbox destination the measurement observed.\n",
+  required: ["inbox", "spam", "missing", "measured"],
+  properties: {
+    inbox: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Measured placements observed in the inbox.",
+      example: 418211,
+    },
+    spam: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Measured placements observed in spam.",
+      example: 60233,
+    },
+    missing: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Measured sends that arrived in neither folder.",
+      example: 0,
+    },
+    measured: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Total measured placements the rates were computed over.",
+      example: 478444,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsPlacementDeltaPtsSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "How the domain-wide rates moved against the prior period, in percentage points. Present only when the request asked for a comparison and the prior period had data; absence means no comparable prior data, never zero change.\n",
+  required: ["inbox", "spam"],
+  properties: {
+    inbox: {
+      type: "number",
+      readOnly: true,
+      description:
+        "Inbox-rate movement in percentage points; negative means it fell.",
+      example: -3.1,
+    },
+    spam: {
+      type: "number",
+      readOnly: true,
+      description: "Spam-rate movement in percentage points.",
+      example: 3.1,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSectionStatusSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Whether a section of the response carries figures, and when it does not, why.\n\n`ok` means the section is populated. `no_data` means the measurement ran and\nobserved nothing to report for this domain in the period. `not_configured`\nmeans the section needs a setup step that has not been completed yet, such as\nconnecting Google Postmaster Tools; treat it as an invitation to finish\nsetup rather than a fault. `unavailable` means the figures could not be retrieved this time and\nthe same request may well succeed on a retry; the rest of the response is\nunaffected. `not_applicable` means the section is meaningless for this domain\nin this period, so there is nothing to show or fix.\n\nA successful response never implies every section is populated; read each\nsection's status rather than assuming figures are present.\n",
+  enum: ["ok", "no_data", "not_configured", "unavailable", "not_applicable"],
+  example: "ok",
+} as const;
+
+export const EmailInboxInsightsPlacementSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The domain-wide placement figures for the period.\n\nThese rates are weighted against the audience mix in `measurement.weighting`,\nso they can legitimately differ from any single provider row, which has no\nmix to weight. Rates are percentages of measured placements, never of\ndelivered volume.\n",
+  required: [
+    "inbox_rate_percent",
+    "spam_rate_percent",
+    "missing_rate_percent",
+    "raw_counts",
+    "read_rate_percent",
+    "status",
+  ],
+  properties: {
+    inbox_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Estimated share of measured placements that landed in the inbox, as a percentage.",
+      example: 87.4,
+    },
+    spam_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Estimated share of measured placements that landed in spam, as a percentage.",
+      example: 12.6,
+    },
+    missing_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Estimated share of measured sends that arrived in neither folder, as a percentage.",
+      example: 0,
+    },
+    raw_counts: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailInboxInsightsPlacementCounts",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        'The measured placements the rates above were computed over, or null when the summary has none: a period with no measured mail reports null here rather than four zeros, because a zero count is a real measurement and would read as "we looked and found nothing" for a domain nothing looked at. Read `status` alongside it.\n',
+    },
+    read_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Estimated share of inbox-placed mail that was read, as a percentage, measured by the panel's dwell time. This is not an open rate; the two count different things and are not interchangeable.\n",
+      example: 21.4,
+    },
+    delta_pts: {
+      $ref: "#/components/schemas/EmailInboxInsightsPlacementDeltaPts",
+      readOnly: true,
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsMailboxProviderSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  description:
+    "A mailbox provider, as the measurement identifies it. A lowercase identifier rather than\na display name, so pick your own label for it, and treat the set as open: this is a long\ntail rather than a handful of household names, and some entries are domains\n(`fastmail.com`, `seznam.cz`) rather than brands.\n\nThe measurement places mail into its own seed lists, so its buckets are not the ones the\n[mailbox-provider stats breakdown](/docs/api/reference/get-email-stats-by-mailbox-provider)\nreports: Microsoft's properties appear here as `hotmail` rather than `microsoft`, and\n`apple` appears here where the Competitive Insights panel has no measurement for it at\nall. None of the three is a joinable dimension against the others.\n",
+  example: "gmail",
+} as const;
+
+export const EmailInboxInsightsPlacementProviderSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One mailbox provider's placement for the period. Unlike the domain-wide summary, a single provider's rates are unweighted: there is no audience mix to weight within one provider.\n",
+  required: [
+    "mailbox_provider",
+    "inbox_rate_percent",
+    "spam_rate_percent",
+    "raw_counts",
+    "read_rate_percent",
+  ],
+  properties: {
+    mailbox_provider: {
+      $ref: "#/components/schemas/EmailInboxInsightsMailboxProvider",
+      readOnly: true,
+      description: "The provider whose placement this row describes.",
+    },
+    inbox_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this provider's measured placements that landed in the inbox, as a percentage.",
+      example: 89.2,
+    },
+    spam_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this provider's measured placements that landed in spam, as a percentage.",
+      example: 10.8,
+    },
+    raw_counts: {
+      $ref: "#/components/schemas/EmailInboxInsightsPlacementCounts",
+      readOnly: true,
+    },
+    delta_pts: {
+      type: "number",
+      readOnly: true,
+      description:
+        "Inbox-rate movement against the prior period, in percentage points. Present only when the request asked for a comparison and the prior period had data for this provider; absence is not zero change.\n",
+      example: 0.4,
+    },
+    read_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this provider's inbox-placed mail that was read, as a percentage.",
+      example: 24.3,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsPlacementProvidersSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "The per-provider placement table.",
+  required: ["items", "status"],
+  properties: {
+    items: {
+      type: "array",
+      readOnly: true,
+      description:
+        "One row per mailbox provider the measurement observed for this domain in the period.",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsPlacementProvider",
+      },
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsPlacementSeriesPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One bucket of the placement series.",
+  required: [
+    "date",
+    "mailbox_provider",
+    "inbox_rate_percent",
+    "spam_rate_percent",
+    "inbox_raw_count",
+    "spam_raw_count",
+  ],
+  properties: {
+    date: {
+      type: "string",
+      format: "date",
+      minLength: 1,
+      readOnly: true,
+      description: "First UTC day of the bucket.",
+      example: "2026-07-19",
+    },
+    mailbox_provider: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailInboxInsightsMailboxProvider",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The provider this point describes, or null on the domain-wide line. Per-provider points appear only when the request named providers.\n",
+      example: null,
+    },
+    inbox_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Inbox share of the bucket's measured placements, as a percentage.",
+      example: 90.6,
+    },
+    spam_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Spam share of the bucket's measured placements, as a percentage.",
+      example: 9.4,
+    },
+    inbox_raw_count: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Measured placements observed in the inbox in this bucket.",
+      example: 14201,
+    },
+    spam_raw_count: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Measured placements observed in spam in this bucket.",
+      example: 1473,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsPlacementSeriesSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The placement time series, at the grain named in `window.group_by`.\n\nThe series is sparse: buckets with no measured placement are omitted rather\nthan returned as zeros, because an invented zero would be indistinguishable\nfrom a measured one. Index by date, never by position.\n",
+  required: ["items", "status"],
+  properties: {
+    items: {
+      type: "array",
+      readOnly: true,
+      description:
+        "One point per bucket with measured placements. With providers named in the request, one point per bucket per provider.\n",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsPlacementSeriesPoint",
+      },
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsGmailTabSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  description:
+    "A Gmail tab, as the measurement identifies it. A lowercase identifier rather than a\ndisplay name, so pick your own label for it, and treat the set as open: these are\nGmail's own tabs, and the measurement reports whichever one it saw.\n\n`none` is a value rather than an absence: Gmail delivered the mail under no tab at all,\nwhich is an ordinary outcome and not a gap in the measurement.\n",
+  "x-extensible-enum": [
+    "primary",
+    "promotions",
+    "updates",
+    "forums",
+    "social",
+    "none",
+  ],
+  example: "promotions",
+} as const;
+
+export const EmailInboxInsightsGmailTabCategorySchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "How the domain's Gmail-placed mail split across one Gmail tab.",
+  required: ["category", "overall_percent", "inbox_percent", "spam_percent"],
+  properties: {
+    category: {
+      $ref: "#/components/schemas/EmailInboxInsightsGmailTab",
+      readOnly: true,
+      description: "The tab this row describes.",
+    },
+    overall_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of the domain's Gmail-placed mail that landed under this tab, as a percentage.",
+      example: 34,
+    },
+    inbox_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this tab's mail that placed in the inbox, as a percentage.",
+      example: 94,
+    },
+    spam_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this tab's mail that placed in spam, as a percentage.",
+      example: 6,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsGmailTabsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Where the domain's Gmail-placed mail landed across Gmail's tabs. The status is `not_applicable` when the domain had no Gmail placement in the period; hide the section rather than showing an empty split.\n",
+  required: ["categories", "status"],
+  properties: {
+    categories: {
+      type: "array",
+      readOnly: true,
+      description: "One entry per Gmail tab that received mail.",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsGmailTabCategory",
+      },
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsPlacementIpDetailSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One sending IP's placement and authentication pass rates for the period.",
+  required: [
+    "ip",
+    "inbox_rate_percent",
+    "raw_counts",
+    "spf_pass_rate_percent",
+    "dkim_pass_rate_percent",
+  ],
+  properties: {
+    ip: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The sending IP address.",
+      example: "147.253.40.16",
+    },
+    inbox_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this IP's measured placements that landed in the inbox, as a percentage.",
+      example: 89.9,
+    },
+    raw_counts: {
+      $ref: "#/components/schemas/EmailInboxInsightsPlacementCounts",
+      readOnly: true,
+    },
+    spf_pass_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this IP's measured mail that passed SPF, as a percentage.",
+      example: 99.8,
+    },
+    dkim_pass_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this IP's measured mail that passed DKIM, as a percentage.",
+      example: 99.9,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsPlacementIpDetailsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-IP placement detail for the domain's sending infrastructure. Returned only when the request asked for IP detail.\n",
+  required: ["items", "status"],
+  properties: {
+    items: {
+      type: "array",
+      readOnly: true,
+      description:
+        "One row per sending IP the measurement observed for this domain in the period.",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsPlacementIpDetail",
+      },
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsPlacementSchema = {
+  description:
+    "Where a sending domain's measured mail landed over the period: the\ndomain-wide summary, the per-provider table, the time series, the Gmail tab\nsplit, and optionally per-IP detail.\n\nPlacement figures are estimates from a measurement panel of real mailboxes,\nand every rate is a percentage of measured placements, never of delivered\nvolume. Each section carries its own status; a successful response never\nimplies every section is populated.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsEnvelope",
+    },
+    {
+      type: "object",
+      required: ["summary", "providers", "series", "gmail_tabs", "measurement"],
+      properties: {
+        summary: {
+          $ref: "#/components/schemas/EmailInboxInsightsPlacementSummary",
+        },
+        providers: {
+          $ref: "#/components/schemas/EmailInboxInsightsPlacementProviders",
+        },
+        series: {
+          $ref: "#/components/schemas/EmailInboxInsightsPlacementSeries",
+        },
+        gmail_tabs: {
+          $ref: "#/components/schemas/EmailInboxInsightsGmailTabs",
+        },
+        ip_details: {
+          $ref: "#/components/schemas/EmailInboxInsightsPlacementIpDetails",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsAuthPassRateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One authentication check's pass rate over the period.",
+  required: ["pass_rate_percent", "source", "status"],
+  properties: {
+    pass_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of the domain's measured mail that passed this check, as a percentage.",
+      example: 99.8,
+    },
+    delta_pts: {
+      type: "number",
+      readOnly: true,
+      description:
+        "How the pass rate moved against the prior period, in percentage points. Present only when the request asked for a comparison and the prior period had data; absence is not zero change.\n",
+      example: 0.1,
+    },
+    source: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Where this figure comes from. `dmarc_rua` is authoritative aggregate\nreporting and covers every sender of the domain, forwarders included;\n`google_postmaster` is a fallback covering only mail Google received. It\ncan differ from the source of the DMARC figures, so surface it per check\nrather than once per response.\n\nNull on a check that reports no figure at all, which is what a\n`not_configured` status means: there is no measurement, so there is no\nsource to name.\n",
+      "x-extensible-enum": ["dmarc_rua", "google_postmaster"],
+      example: "dmarc_rua",
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsDmarcPolicySchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "The DMARC policy published in the domain's DNS record: what receivers are asked to do with mail that fails DMARC.\n",
+  enum: ["none", "quarantine", "reject"],
+  example: "quarantine",
+} as const;
+
+export const EmailInboxInsightsDmarcReadinessReasonSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Why the domain is not yet ready to move its DMARC policy to `reject`. `source_below_threshold` means at least one legitimate sender is not authenticating well enough yet; `data_too_stale` means the reporting is too old to judge; `no_rua_data` means no aggregate reports have arrived at all; `no_policy` means the domain publishes no DMARC record to tighten. The reporting decides this set and can add to it, so show an unrecognised value rather than treating it as no reason at all.\n",
+  "x-extensible-enum": [
+    "source_below_threshold",
+    "data_too_stale",
+    "no_rua_data",
+    "no_policy",
+  ],
+  example: "source_below_threshold",
+} as const;
+
+export const EmailInboxInsightsDmarcSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "The domain's DMARC standing over the period.",
+  required: [
+    "aligned_rate_percent",
+    "policy",
+    "ready_for_reject",
+    "readiness_reasons",
+    "source",
+    "status",
+  ],
+  properties: {
+    aligned_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of the domain's measured mail that passed DMARC alignment, as a percentage.",
+      example: 98.6,
+    },
+    policy: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailInboxInsightsDmarcPolicy",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The policy published in the domain's DNS record, or null when the domain publishes no DMARC record at all. Null is not `none`: `none` is a policy, asking receivers to take no action while the domain monitors its reporting, and a domain that has one is already set up. A null asks for a record to be published, which is a different first step.\n",
+    },
+    ready_for_reject: {
+      type: ["boolean", "null"],
+      readOnly: true,
+      description:
+        'Whether the domain\'s authentication is consistent enough to move the policy to `reject` without losing legitimate mail. Deliberately conservative: false whenever the data is insufficient to be sure. Null when the measurement reached no verdict, which is what a `status` other than `ok` means here: false would read as a considered "not yet" rather than as no assessment having been made.\n',
+      example: false,
+    },
+    readiness_reasons: {
+      type: ["array", "null"],
+      readOnly: true,
+      description:
+        'Why `ready_for_reject` is false, so the answer is actionable rather than a bare refusal. Empty when nothing is holding the domain back, and null when readiness was not assessed, which pairs with `ready_for_reject`: an empty list alongside a null verdict would say the opposite of what was measured. Render these rather than a plain "not ready": the fix differs per reason, and a domain held back only by stale reporting needs no configuration change at all.\n',
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsDmarcReadinessReason",
+      },
+    },
+    delta_pts: {
+      type: "number",
+      readOnly: true,
+      description:
+        "How the aligned rate moved against the prior period, in percentage points. Present only when the request asked for a comparison and the prior period had data; absence is not zero change.\n",
+      example: -0.2,
+    },
+    source: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Where the DMARC figures come from. `dmarc_rua` is authoritative\naggregate reporting and covers every sender of the domain, forwarders\nincluded; `google_postmaster` is a fallback covering only mail Google\nreceived. The two are not equivalent, so surface which one is shown.\n\nNull when the section reports no figures, which is what a\n`not_configured` status means for a domain with no aggregate reporting\nand no Postmaster connection.\n",
+      "x-extensible-enum": ["dmarc_rua", "google_postmaster"],
+      example: "dmarc_rua",
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsDmarcVerdictSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "How a sending source's mail authenticates against the domain's DMARC policy. `aligned` passes with both SPF and DKIM aligned; `dkim_only` and `spf_only` pass on one mechanism; `fails_policy` passes neither. The reporting decides this set and can add to it, so treat an unrecognised value as a label to show rather than a case to exhaust. A source whose verdict is new still belongs in the table.\n",
+  "x-extensible-enum": ["aligned", "dkim_only", "spf_only", "fails_policy"],
+  example: "aligned",
+} as const;
+
+export const EmailInboxInsightsAuthSourceSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One system observed sending as this domain, with how its mail authenticates.",
+  required: [
+    "name",
+    "category",
+    "volume",
+    "spf_aligned_rate_percent",
+    "dkim_aligned_rate_percent",
+    "dmarc_pass_rate_percent",
+    "verdict",
+    "qualifies_for_readiness",
+  ],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The sending source as the reporting identifies it. Not a fixed list: unidentified senders, mostly forwarders, appear as a real category.\n",
+      example: "Bird (mail.acme.com)",
+    },
+    category: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "A coarse classification of the source. The set can grow; treat values as labels. Null when the measurement did not classify this sender.\n",
+      "x-extensible-enum": ["esp", "unknown"],
+      example: "esp",
+    },
+    volume: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Messages the reporting attributes to this source over the period.",
+      example: 4820000,
+    },
+    spf_aligned_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this source's mail that passed SPF with alignment, as a percentage.",
+      example: 99.8,
+    },
+    dkim_aligned_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this source's mail that passed DKIM with alignment, as a percentage.",
+      example: 99.9,
+    },
+    dmarc_pass_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this source's mail that passed DMARC, as a percentage.",
+      example: 99.9,
+    },
+    verdict: {
+      $ref: "#/components/schemas/EmailInboxInsightsDmarcVerdict",
+      readOnly: true,
+    },
+    qualifies_for_readiness: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this source counts toward the reject recommendation. A source that does not is excluded from that judgement, which is what lets this table explain a conservative recommendation instead of contradicting it.\n",
+      example: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsAuthSourcesSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Every system observed sending as this domain, with how each authenticates. This is the table that shows who else sends under the domain's name.\n",
+  required: ["items", "latest_data_date", "status"],
+  properties: {
+    items: {
+      type: "array",
+      readOnly: true,
+      description: "One row per observed sending source.",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsAuthSource",
+      },
+    },
+    latest_data_date: {
+      type: ["string", "null"],
+      format: "date",
+      readOnly: true,
+      description:
+        "The most recent UTC day the source reporting includes. Aggregate DMARC reports arrive on reporters' own schedules, routinely a day or more behind, so the newest days look sparse; label from this date rather than treating the dip as a regression.\n",
+      example: "2026-08-15",
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsAuthenticationSchema = {
+  description:
+    "Whether the domain's mail authenticates, and who sends as the domain: SPF\nand DKIM pass rates, the DMARC standing with its published policy, and the\nper-source table that shows every system observed sending under the\ndomain's name.\n\nWithout a completed Google Postmaster connection and without aggregate\nDMARC reporting, sections report `not_configured`: an invitation to finish\nsetup rather than a fault. Each section carries its own status.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsEnvelope",
+    },
+    {
+      type: "object",
+      required: ["spf", "dkim", "dmarc", "sources"],
+      properties: {
+        spf: {
+          $ref: "#/components/schemas/EmailInboxInsightsAuthPassRate",
+          description: "The domain's SPF pass rate.",
+        },
+        dkim: {
+          $ref: "#/components/schemas/EmailInboxInsightsAuthPassRate",
+          description: "The domain's DKIM pass rate.",
+        },
+        dmarc: {
+          $ref: "#/components/schemas/EmailInboxInsightsDmarc",
+        },
+        sources: {
+          $ref: "#/components/schemas/EmailInboxInsightsAuthSources",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsComplaintPeakSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "The worst day for complaints in the period.",
+  required: ["date", "value_percent"],
+  properties: {
+    date: {
+      type: "string",
+      format: "date",
+      minLength: 1,
+      readOnly: true,
+      description: "The UTC day the highest rate fell on.",
+      example: "2026-08-02",
+    },
+    value_percent: {
+      type: "number",
+      readOnly: true,
+      description: "The rate on that day, as a percentage.",
+      example: 0.34,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsComplaintRateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The rate at which the domain's mail is reported as spam, as Google Postmaster measures it.",
+  required: ["gmail_postmaster_spam_rate_percent", "status"],
+  properties: {
+    gmail_postmaster_spam_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of the domain's Gmail-received mail that recipients reported as spam, as a percentage, from Google Postmaster.\n",
+      example: 0.11,
+    },
+    delta_pts: {
+      type: "number",
+      readOnly: true,
+      description:
+        "How the rate moved against the prior period, in percentage points. Present only when the request asked for a comparison and the prior period had data; absence is not zero change.\n",
+      example: 0.03,
+    },
+    peak: {
+      $ref: "#/components/schemas/EmailInboxInsightsComplaintPeak",
+      readOnly: true,
+      description:
+        "The worst day in the period, so a spike can be named without scanning the series. Absent when there is no rate to peak.\n",
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsComplaintSeriesPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One bucket of the complaint-rate series.",
+  required: ["date", "gmail_postmaster_spam_rate_percent"],
+  properties: {
+    date: {
+      type: "string",
+      format: "date",
+      minLength: 1,
+      readOnly: true,
+      description: "First UTC day of the bucket.",
+      example: "2026-07-19",
+    },
+    gmail_postmaster_spam_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description: "The bucket's Google Postmaster spam rate, as a percentage.",
+      example: 0.08,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsComplaintSeriesSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The complaint-rate series, at the grain named in `window.group_by`. Index by date, never by position.\n",
+  required: ["items", "status"],
+  properties: {
+    items: {
+      type: "array",
+      readOnly: true,
+      description: "One point per bucket.",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsComplaintSeriesPoint",
+      },
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsComplaintsSchema = {
+  description:
+    "How often the domain's mail is reported as spam, as Google Postmaster\nmeasures it. This is Google's number for Gmail-received mail only; the\nfeedback-loop complaint rate for all providers is a Bird-measured figure\nserved by the email statistics endpoints, and the two are different\nmeasurements of different mail.\n\nFor a domain without a completed Google Postmaster connection every section\nreports `not_configured`: an invitation to finish setup rather than a fault.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsEnvelope",
+    },
+    {
+      type: "object",
+      required: ["rate", "series"],
+      properties: {
+        rate: {
+          $ref: "#/components/schemas/EmailInboxInsightsComplaintRate",
+        },
+        series: {
+          $ref: "#/components/schemas/EmailInboxInsightsComplaintSeries",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsTrapTypeSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "What kind of spam trap was hit. `pristine` addresses were never used by a real person and never subscribed to anything, so a hit means the address was harvested or guessed rather than collected. `recycled` addresses belonged to a real person once and were retired, so hits point at stale list data. `typo` addresses catch misspellings of real domains, `parked` addresses sit on domains that are registered but not used for real mail, and `mixed` covers hits the trap network reports without a single kind. The trap network decides this set and can add to it, so treat an unrecognised value as a label to show rather than a case to exhaust. A hit whose kind is new is still a hit worth acting on.\n",
+  "x-extensible-enum": ["pristine", "recycled", "typo", "parked", "mixed"],
+  example: "recycled",
+} as const;
+
+export const EmailInboxInsightsSpamTrapTypeCountSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Trap hits of one kind.",
+  required: ["type", "hits"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/EmailInboxInsightsTrapType",
+      readOnly: true,
+    },
+    hits: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Hits of this kind over the period. A zero is a measured zero, not missing data: no pristine hits is a genuinely good result rather than an empty state.\n",
+      example: 3,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsTrapSourceSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "The trap network that observed a hit. The set grows as coverage does, so treat the values as labels rather than a closed list.\n",
+  "x-extensible-enum": ["cloudmark", "abusix"],
+  example: "cloudmark",
+} as const;
+
+export const EmailInboxInsightsSpamTrapSourceCountSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Trap hits attributed to one trap network.",
+  required: ["source", "hits"],
+  properties: {
+    source: {
+      $ref: "#/components/schemas/EmailInboxInsightsTrapSource",
+      readOnly: true,
+    },
+    hits: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Hits this network observed over the period.",
+      example: 2,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSpamTrapHitSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One trap address this domain's mail reached, with enough detail to trace where the address came from. A row can represent several hits on the same trap, so read `hit_count` rather than counting rows.\n",
+  required: [
+    "first_seen",
+    "last_seen",
+    "ip_address",
+    "source",
+    "type",
+    "trap_age_days",
+  ],
+  properties: {
+    first_seen: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When the trap network first observed mail from this domain at this trap.",
+      example: "2026-08-14T06:21:00Z",
+    },
+    last_seen: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "The most recent sighting, or null when the trap was seen only once. On a row with several hits this is the far end of the period they span.\n",
+      example: "2026-08-16T11:04:00Z",
+    },
+    ip_address: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The sending IP the message came from.",
+      example: "147.253.40.16",
+    },
+    source: {
+      $ref: "#/components/schemas/EmailInboxInsightsTrapSource",
+      readOnly: true,
+    },
+    type: {
+      $ref: "#/components/schemas/EmailInboxInsightsTrapType",
+      readOnly: true,
+    },
+    hit_count: {
+      type: "integer",
+      minimum: 1,
+      readOnly: true,
+      description:
+        "How many times this trap was hit over the period, so rows do not sum to `total` on their own: one repeatedly hit trap is one row. Absent when the trap network does not break the count out, which is not the same as one hit. A row exists because the trap was reached at least once either way.\n",
+      example: 2,
+    },
+    trap_age_days: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description:
+        "How long the trap address has been a trap, in days, or null when the network does not say. A high age on a recycled trap suggests the address has been dead in the list for a long time.\n",
+      example: 430,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSpamTrapHitsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The individual trap hits behind the totals. A sample rather than a guaranteed complete list, and its rows do not count hits: one row is one trap address, carrying a `hit_count` for how many times that address was reached. Neither the number of rows nor the sum of `hit_count` reconstructs `total`, because that field is absent wherever the trap network does not break the figure out. Read `truncated_types` for what the measurement capped rather than inferring completeness by comparing counts.\n",
+  required: ["items", "truncated_types", "status"],
+  properties: {
+    items: {
+      type: "array",
+      readOnly: true,
+      description: "One entry per trap reached, newest first.",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsSpamTrapHit",
+      },
+    },
+    truncated_types: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Trap kinds whose hits the measurement capped, so the rows shown for them are incomplete by design rather than by chance. Typo-trap hits, for instance, only ever cover the last seven days. An empty array means nothing was capped.\n",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsTrapType",
+      },
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSpamTrapsSchema = {
+  description:
+    "Whether the domain's mail is reaching spam traps: addresses that exist only\nto catch senders mailing lists they should not be mailing.\n\nZero hits is a measured zero and a good result, so the totals read as real\nfigures rather than as an empty state. The kind of trap matters more than\nthe count: pristine hits point at harvested or guessed addresses, while\nrecycled hits point at stale list data.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsEnvelope",
+    },
+    {
+      type: "object",
+      required: ["total", "by_type", "by_source", "hit_rows"],
+      properties: {
+        total: {
+          type: "integer",
+          minimum: 0,
+          readOnly: true,
+          description:
+            "Trap hits observed over the period, across every trap network. The authoritative count: `hit_rows` holds a sample of the rows behind it.\n",
+          example: 3,
+        },
+        delta: {
+          type: "integer",
+          readOnly: true,
+          description:
+            "How the hit count moved against the prior period, as a change in the number of hits rather than in percentage points. Negative is an improvement. Present only when the request asked for a comparison and the prior period had data; absence is not zero change.\n",
+          example: -2,
+        },
+        by_type: {
+          type: "array",
+          readOnly: true,
+          description:
+            "Hits split by kind, one entry per kind the trap network reported. Read counts from here rather than assuming a fixed set of kinds: the set can grow, and an entry that is absent was not reported rather than being a measured zero. These sum to `total`.\n",
+          items: {
+            $ref: "#/components/schemas/EmailInboxInsightsSpamTrapTypeCount",
+          },
+        },
+        by_source: {
+          type: "array",
+          readOnly: true,
+          description: "Hits split by the trap network that observed them.",
+          items: {
+            $ref: "#/components/schemas/EmailInboxInsightsSpamTrapSourceCount",
+          },
+        },
+        hit_rows: {
+          $ref: "#/components/schemas/EmailInboxInsightsSpamTrapHits",
+          readOnly: true,
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsBlocklistListingSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One listing of a target on one blocklist.",
+  required: [
+    "provider",
+    "is_active",
+    "reason_code",
+    "reason",
+    "first_detected",
+    "last_detected",
+  ],
+  properties: {
+    is_active: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this listing is in force now. A false entry is history: it shows the target was listed and has since cleared, which is why the target's `is_listed` can be false while listings are present.\n",
+      example: false,
+    },
+    reason_code: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "The provider's own short code for the listing reason, or null when it gives none. Stable where the prose in `reason` is not, so branch on this and display that.\n",
+      example: "CSS",
+    },
+    provider: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The blocklist that carries the listing. Providers publishing several lists are reported per list rather than under one combined name, because what a listing means and how it is cleared differ per list.\n",
+      example: "Spamhaus CSS",
+    },
+    reason: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "The reason the provider gives for the listing, or null when it publishes none.",
+      example: "Automated listing of a suspected snowshoe range",
+    },
+    first_detected: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When this listing was first observed.",
+      example: "2026-07-31T00:00:00Z",
+    },
+    last_detected: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        'When this listing was most recently observed, or null while the listing is still in force. A provider records a last sighting only once one exists, so a null here reads as "still listed" rather than "never seen".\n',
+      example: "2026-08-04T00:00:00Z",
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsBlocklistTargetSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    'One checked target, whether it is listed now, and the listings seen against it.\n\nRead `status` before `is_listed`. Each target is looked up independently and\nany one of them can fail while the rest succeed, so a target whose status is\nnot `ok` was not checked and `is_listed: false` on it means nothing. Rendering\nthat as "clear" is the one outcome this resource must never produce.\n',
+  required: [
+    "target",
+    "target_type",
+    "is_listed",
+    "status",
+    "checked_at",
+    "listings",
+  ],
+  properties: {
+    target: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The sending IP or domain that was checked.",
+      example: "147.253.40.18",
+    },
+    target_type: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Whether this target is an IP address or a hostname. Null when the measurement did not report a kind for it, which is possible on a target whose check did not complete.\n",
+      "x-extensible-enum": ["ip", "domain"],
+      example: "ip",
+    },
+    is_listed: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether the target is on at least one blocklist right now. Meaningful only when `status` is `ok`: on any other status this target was not checked, so the value carries no finding either way.\n",
+      example: false,
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+      description:
+        'Whether this target was actually checked. `unavailable` means the lookup failed or timed out for this target while others may have succeeded, so the honest rendering is "could not check" rather than a result.\n',
+    },
+    checked_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this target was looked up, or null when it was not. Per target rather than per response, because each is a separate live lookup.\n",
+      example: "2026-08-20T09:12:04Z",
+    },
+    listings: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Listings seen against this target, including ones that have since cleared, so a recent history is visible even when nothing is active. Read each listing's `is_active` rather than assuming every entry is current.\n",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsBlocklistListing",
+      },
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsBlocklistsSchema = {
+  description:
+    'Whether the domain\'s sending infrastructure is on any blocklist, checked\nwhen the request is made.\n\nThis is a live lookup rather than a measurement over a period, so it carries\nno window: `freshness.as_of` is null and only the lag hint applies.\n\n"Nothing found" and "could not look" must never render alike, and failure here\nhappens at two grains. If nothing at all could be checked the request fails\nrather than returning an empty result. If some targets were checked and others\nwere not, this is a normal response and each target\'s own `status` says which\nis which: read that before `is_listed`, because a target that was not checked\nreports `is_listed: false` and that value carries no finding. `active_count`\nis absent whenever no target could be checked, so an absent count is never a\nzero.\n',
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsEnvelopeBase",
+    },
+    {
+      type: "object",
+      required: ["active_count", "targets"],
+      properties: {
+        active_count: {
+          type: ["integer", "null"],
+          minimum: 0,
+          readOnly: true,
+          description:
+            "How many of the checked targets currently carry an active listing. A count of targets, not of listings: a target on three blocklists counts once. Null when no target could be checked at all, which is not the same as zero. Zero means every target was checked and none of them is listed.\n",
+          example: 0,
+        },
+        targets: {
+          type: "array",
+          readOnly: true,
+          description:
+            "One entry per sending IP or domain checked for this sending domain.",
+          items: {
+            $ref: "#/components/schemas/EmailInboxInsightsBlocklistTarget",
+          },
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsIndustrySchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "The industry a sending domain was classified into.",
+  required: ["id", "name"],
+  properties: {
+    id: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The measurement's own identifier for this industry, carried through so a client can tell two cohorts apart without comparing labels. No operation accepts it.\n",
+      example: "44",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Display name of the industry. The classification is broad, so bind this label rather than assuming a finer category exists.\n",
+      example: "Apparel",
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsIndustryBenchmarkSchema = {
+  description:
+    "How senders in a domain's industry place, as a median across the industry's\nmeasured senders.\n\nThe benchmark describes the industry, not the domain, so it carries no\ncomparison of its own: compute that against the domain's own placement rate.\nIts weighting is a general default rather than any one account's audience\nmix, which is a deliberate asymmetry with the placement figure it is\ncompared against.\n\nThe status is `no_data` when too few measured senders share the industry for\na median to be meaningful, when the domain's industry is not classified, or\nbefore the industry figures have been computed. Handle that state from the\nstart: it is the normal state for a young industry cohort rather than an\nedge case.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsEnvelopeBase",
+    },
+    {
+      type: "object",
+      required: [
+        "industry",
+        "median_inbox_rate_percent",
+        "cohort_size",
+        "status",
+      ],
+      properties: {
+        industry: {
+          oneOf: [
+            {
+              $ref: "#/components/schemas/EmailInboxInsightsIndustry",
+            },
+            {
+              type: "null",
+            },
+          ],
+          readOnly: true,
+          description:
+            "The cohort the median describes, or null when the domain is not classified into an industry. This description already names that as a `no_data` cause and a normal state for a young cohort, so it needs a representation: without one the only way to report an unclassified domain is a cohort with a blank name.\n",
+        },
+        median_inbox_rate_percent: {
+          type: ["number", "null"],
+          readOnly: true,
+          description: "The industry's median inbox rate, as a percentage.",
+          example: 92.1,
+        },
+        window_days: {
+          type: "integer",
+          minimum: 1,
+          readOnly: true,
+          description:
+            "How many days the cohort figure covers. Reported rather than assumed because the period is the one the nightly computation produced, not one the caller chose, so a label built from a requested window would be wrong. Absent when the computation does not report it, in which case a label must not name a period at all.\n",
+          example: 30,
+        },
+        cohort_size: {
+          type: ["integer", "null"],
+          minimum: 0,
+          readOnly: true,
+          description:
+            "How many measured senders the median was computed across.",
+          example: 214,
+        },
+        status: {
+          $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+          readOnly: true,
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsDomainSortSchema = {
+  type: "string",
+  minLength: 1,
+  description: "Field used to sort owned domains.",
+  enum: ["domain"],
+  default: "domain",
+  example: "domain",
+} as const;
+
+export const EmailInboxInsightsDomainSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One of the workspace's verified sending domains, and whether Inbox Insights is switched on for it.\n",
+  required: ["domain", "monitored"],
+  properties: {
+    domain: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The sending domain, lowercased, as it appears in your sending domains.",
+      example: "mail.acme.com",
+    },
+    monitored: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether Inbox Insights reports on this domain. Switching it off stops the reporting and keeps the measurement history, so switching it back on restores the full history rather than starting again.\n",
+      example: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsDomainsSchema = {
+  description:
+    "A page of sending domains this workspace can report on, and which of them Inbox Insights is switched on for.\n",
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          readOnly: true,
+          description:
+            "One entry per verified domain in this page, whether or not it is switched on. A domain that has not been verified does not appear, because verification is what proves the domain is yours to report on.\n",
+          items: {
+            $ref: "#/components/schemas/EmailInboxInsightsDomain",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailInboxInsightsDomainUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "The Inbox Insights setting to change for a sending domain.",
+  required: ["monitored"],
+  properties: {
+    monitored: {
+      type: "boolean",
+      description:
+        "Whether the workspace wants this domain monitored. Enabling enrolls it with eDataSource; disabling removes only the workspace preference and preserves vendor enrollment and measurement history. Verified ownership governs report access.\n",
+      example: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsDomainMonitoringOutcomeSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "What switching on the main sending domain did.\n\n- `enabled`: Inbox Insights is now switched on for the domain named alongside this.\n- `already_on`: at least one domain was already switched on, so nothing changed.\n- `choice_required`: the main sending domain could not be identified, most often\n  because the workspace has several verified domains and no sending to rank them\n  by. Ask the customer to choose.\n- `no_verified_domains`: the workspace has no verified sending domain, so there is\n  nothing to report on until one is verified.\n",
+  enum: ["enabled", "already_on", "choice_required", "no_verified_domains"],
+  example: "enabled",
+} as const;
+
+export const EmailInboxInsightsDomainMonitoringResultSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "What switching on the workspace's main sending domain did. There are four outcomes, because each one leaves the customer somewhere different: one domain is now reporting, one already was, we could not tell which domain is the main one, or there is no verified domain to report on at all.\n",
+  required: ["outcome", "domain"],
+  properties: {
+    outcome: {
+      readOnly: true,
+      $ref: "#/components/schemas/EmailInboxInsightsDomainMonitoringOutcome",
+    },
+    domain: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The sending domain this call switched on, lowercased. The server sends a domain with the `enabled` outcome and null with the other three, `already_on` included: that outcome says only that the workspace had already made its choice, not which domain it chose. Read the domain list for that. Check `outcome` first rather than treating a domain as present.\n",
+      example: "mail.acme.com",
+    },
+  },
+} as const;
+
 export const EmailStatsSeriesPeriodSchema = {
   type: "object",
   additionalProperties: false,
@@ -17375,6 +19758,185 @@ export const EmailStatsByBroadcastResponseSchema = {
   },
 } as const;
 
+export const EmailHealthSignalThresholdsSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "The boundaries this signal's status was judged against. Use them to classify your own slices, such as per-domain or per-tag rates, against the same bands. The `direction` field identifies the risky side of the boundaries: `above` means the status degrades as the value rises past a boundary, as with bounce and complaint rates, and `below` means it degrades as the value falls, as with delivery rate. The boundaries are exclusive, so a value exactly on one keeps the better status. Omitted for a metric with no risk boundaries, such as open rate.\n",
+  required: ["direction", "watching", "throttled"],
+  properties: {
+    direction: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Which side of the boundaries is at risk. `above` for higher-is-worse rates (bounce, complaint), `below` for lower-is-worse rates (delivery).",
+      enum: ["above", "below"],
+      "x-enum-varnames": [
+        "EmailHealthSignalThresholdsDirectionAbove",
+        "EmailHealthSignalThresholdsDirectionBelow",
+      ],
+      example: "above",
+    },
+    watching: {
+      type: "number",
+      minimum: 0,
+      maximum: 1,
+      readOnly: true,
+      description:
+        "Crossing this boundary in the risk direction moves the signal to `watching`, as a fraction.",
+      example: 0.004,
+    },
+    throttled: {
+      type: "number",
+      minimum: 0,
+      maximum: 1,
+      readOnly: true,
+      description:
+        "Crossing this boundary in the risk direction moves the signal to `throttled`, as a fraction.",
+      example: 0.006,
+    },
+  },
+} as const;
+
+export const EmailHealthSignalSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "The current value and verdict for a single sending-health metric over the window.",
+  required: ["metric", "value", "limit", "status"],
+  properties: {
+    metric: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "Which rate this signal reports.",
+      enum: ["delivery_rate", "open_rate", "bounce_rate", "complaint_rate"],
+      example: "bounce_rate",
+    },
+    value: {
+      type: ["number", "null"],
+      minimum: 0,
+      maximum: 1,
+      readOnly: true,
+      description:
+        "The current rate over the window, as a fraction. Null when its denominator is zero.",
+      example: 0.004,
+    },
+    limit: {
+      type: ["number", "null"],
+      minimum: 0,
+      maximum: 1,
+      readOnly: true,
+      description:
+        "The reference deliverability limit for this rate, as a fraction (for example `0.005` for a 0.5% bounce-rate limit). Null for metrics that have no limit, such as delivery rate and open rate. The verdict is classified using `thresholds`, which can differ from this reference limit.",
+      example: 0.005,
+    },
+    status: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "This metric's individual verdict, ordered best to worst: `strong`, `healthy`, `watching`, `throttled`. `strong` applies only to `open_rate`, for an open rate well above typical. For the other rates, `healthy`, `watching`, and `throttled` indicate how close the rate is to a level that risks deliverability. The verdict follows the `thresholds` boundaries rather than the displayed reference `limit`. A signal whose `value` is null, because its denominator was zero in the window, is reported as `healthy`.\n",
+      enum: ["strong", "healthy", "watching", "throttled"],
+      example: "healthy",
+    },
+    thresholds: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailHealthSignalThresholds",
+        },
+      ],
+    },
+  },
+} as const;
+
+export const EmailHealthSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The workspace's current sending-health verdict over the requested window, plus reference deliverability limits and classification boundaries. Use it to render a health badge, the bounce-rate and complaint-rate limit labels, and the risk lines on deliverability charts without hard-coding any thresholds of your own.\n",
+  required: ["period", "status", "signals"],
+  properties: {
+    period: {
+      $ref: "#/components/schemas/EmailStatsPeriod",
+      description:
+        "The date range the verdict was computed over, echoed back from the request.",
+    },
+    status: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Overall sending-health verdict for the window, taken as the worst status among the bounce-rate, complaint-rate, and delivery-rate signals. The open-rate signal, which can be `strong`, is not part of this roll-up. The overall verdict is one of `healthy`, `watching`, or `throttled`. It is `healthy` when the other three signals are each healthy or better. It is `watching` when at least one is watching, and `throttled` when at least one is throttled. This verdict describes deliverability risk. It never pauses your sending on its own.\n",
+      enum: ["healthy", "watching", "throttled"],
+      example: "healthy",
+    },
+    signals: {
+      type: "array",
+      minItems: 4,
+      readOnly: true,
+      description:
+        "The per-rate signals include `delivery_rate`, `open_rate`, `bounce_rate`, and `complaint_rate`. Read a signal by matching on its `metric`. Each entry carries its current value, a reference deliverability limit (null where no limit applies), and its own verdict. Delivery rate, bounce rate, and complaint rate also carry the thresholds their verdict was classified against; open rate does not, because a high open rate is never a risk.\n",
+      items: {
+        $ref: "#/components/schemas/EmailHealthSignal",
+      },
+    },
+  },
+  example: {
+    period: {
+      data_as_of: null,
+      from: "2026-05-25",
+      to: "2026-06-01",
+    },
+    status: "watching",
+    signals: [
+      {
+        metric: "delivery_rate",
+        value: 0.995,
+        limit: null,
+        status: "healthy",
+        thresholds: {
+          direction: "below",
+          throttled: 0.984,
+          watching: 0.99,
+        },
+      },
+      {
+        metric: "open_rate",
+        value: 0.20100503,
+        limit: null,
+        status: "healthy",
+      },
+      {
+        metric: "bounce_rate",
+        value: 0.005,
+        limit: 0.005,
+        status: "watching",
+        thresholds: {
+          direction: "above",
+          throttled: 0.006,
+          watching: 0.004,
+        },
+      },
+      {
+        metric: "complaint_rate",
+        value: 0.00010050251,
+        limit: 0.003,
+        status: "healthy",
+        thresholds: {
+          direction: "above",
+          throttled: 0.001,
+          watching: 0.0006,
+        },
+      },
+    ],
+  },
+} as const;
+
 export const DomainSettingsSchema = {
   type: "object",
   additionalProperties: false,
@@ -17710,12 +20272,14 @@ export const DomainSchema = {
     },
     created_at: {
       type: "string",
+      minLength: 1,
       format: "date-time",
       readOnly: true,
       description: "When the domain was added.",
     },
     updated_at: {
       type: "string",
+      minLength: 1,
       format: "date-time",
       readOnly: true,
       description:
@@ -17995,11 +20559,29 @@ export const ShareDomainDnsRequestSchema = {
   },
 } as const;
 
+export const SuppressionReasonFilterSchema = {
+  type: "string",
+  enum: ["hard_bounce", "complaint", "unsubscribe", "manual"],
+} as const;
+
+export const SuppressionScopeTypeFilterSchema = {
+  type: "string",
+  enum: ["workspace", "category", "audience", "topic", "contact", "domain"],
+} as const;
+
 export const SuppressionIDSchema = {
   type: "string",
   minLength: 1,
   pattern: "^sup_[0-9a-hjkmnp-tv-z]{26}$",
   example: "sup_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const SuppressionScopeTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["workspace", "category", "audience", "topic", "contact", "domain"],
+  description:
+    "How widely the email suppression applies. Responses use `workspace`. The values `category`, `audience`, `topic`, `contact`, and `domain` are reserved and have no records. The record's `applies_to` field determines which message categories are blocked.\n",
 } as const;
 
 export const SuppressionScopeSchema = {
@@ -18008,11 +20590,7 @@ export const SuppressionScopeSchema = {
   required: ["type", "id"],
   properties: {
     type: {
-      type: "string",
-      minLength: 1,
-      enum: ["workspace", "category", "audience", "topic", "contact", "domain"],
-      description:
-        "How widely the email suppression applies. Responses currently use `workspace`, which blocks the address for every email sent by the workspace. WhatsApp suppressions use a separate list.\n",
+      $ref: "#/components/schemas/SuppressionScopeType",
     },
     id: {
       type: "string",
@@ -18054,9 +20632,14 @@ export const SuppressionSchema = {
     reason: {
       type: "string",
       minLength: 1,
-      "x-extensible-enum": ["hard_bounce", "complaint", "manual"],
+      "x-extensible-enum": [
+        "hard_bounce",
+        "complaint",
+        "manual",
+        "unsubscribe",
+      ],
       description:
-        "Why the address is suppressed:\n\n- `hard_bounce`: A delivery permanently failed.\n- `complaint`: The recipient reported a message as spam.\n- `manual`: Added through the API or dashboard.\n\nAn address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
+        "Why the address is suppressed:\n\n- `hard_bounce`: A delivery permanently failed.\n- `complaint`: The recipient reported a message as spam.\n- `manual`: Added through the API or dashboard.\n- `unsubscribe`: The recipient opted out. Deprecated, and no new record carries it: an opt-out is a messaging preference rather than a suppression. Legacy records remain visible until they are moved to messaging preferences.\n\nAn address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
     },
     origin: {
       type: "string",
@@ -18066,9 +20649,11 @@ export const SuppressionSchema = {
         "complaint_event",
         "api_key",
         "user",
+        "unsubscribe_event",
+        "unsubscribe_link",
       ],
       description:
-        "How the suppression came to exist:\n\n- `bounce_event`: Created automatically from a hard bounce.\n- `complaint_event`: Created from a spam complaint.\n- `api_key`: Added through the API with an API key.\n- `user`: Added by a user in the dashboard.\n\nThis list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
+        "How the suppression came to exist:\n\n- `bounce_event`: Created automatically from a hard bounce.\n- `complaint_event`: Created from a spam complaint.\n- `api_key`: Added through the API with an API key.\n- `user`: Added by a user in the dashboard.\n- `unsubscribe_event`: The mailbox provider reported an opt-out. Deprecated with `reason: unsubscribe`.\n- `unsubscribe_link`: The recipient used a Bird unsubscribe link. Deprecated with `reason: unsubscribe`.\n\nThis list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
     },
     applies_to: {
       type: "string",
@@ -18103,6 +20688,7 @@ export const SuppressionSchema = {
     },
     created_at: {
       type: "string",
+      minLength: 1,
       format: "date-time",
       readOnly: true,
       description: "When the address was suppressed.",
@@ -18143,6 +20729,1170 @@ export const SuppressionCreateSchema = {
       description:
         "The address to stop sending to. Normalized before storage and matching: lowercased and trimmed of surrounding whitespace.\n",
       example: "user@example.com",
+    },
+  },
+} as const;
+
+export const EmailCompetitivePeriodSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The period every figure in the response covers, echoed back from the request.\n\nFigures are fetched when the request is made, so they are current as of `to`.\nThe period always ends at the moment of the request rather than at a cached\nboundary, which is why two requests a minute apart can differ slightly.\n",
+  required: ["days", "from", "to"],
+  properties: {
+    days: {
+      type: "integer",
+      readOnly: true,
+      description: "Length of the period in days.",
+      example: 30,
+    },
+    from: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "Start of the period, inclusive.",
+      example: "2026-07-13T09:00:00Z",
+    },
+    to: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "End of the period, exclusive. Daily figures therefore run through the previous whole UTC day and never include the one in progress.\n",
+      example: "2026-08-12T09:00:00Z",
+    },
+  },
+} as const;
+
+export const EmailCompetitiveWatchlistSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Where your sending sits against the brands you watch, over the same period as the\nrows.\n\nEvery figure here is derived from those rows rather than measured separately, so\nthe two always agree. As on a row, each is present and `null` when the rows cannot\nsupport it: the peer medians need at least one watched brand the panel reported\non, and the share figures need sending of your own to compare.\n",
+  required: [
+    "share_of_volume_percent",
+    "share_of_volume_change_points",
+    "competitor_sends",
+    "competitor_sends_change_percent",
+    "peer_cadence_median_per_week",
+    "peer_inbox_placement_median_rate",
+  ],
+  properties: {
+    share_of_volume_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Your share of everything the watched set sent over the period, your own sending included in the total. Your half of the ratio is an exact count of your own sending while the rest is the panel's estimate, so the two sides are measured differently.\n",
+      example: 10.5,
+    },
+    share_of_volume_change_points: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "How that share moved against the period immediately before, in percentage points. A share that went from 11.7 to 10.5 reports -1.2.\n",
+      example: -1.2,
+    },
+    competitor_sends: {
+      type: ["integer", "null"],
+      format: "int64",
+      readOnly: true,
+      description:
+        "Estimated volume the watched brands sent between them, excluding your own sending. A panel estimate, so read it as an order of magnitude rather than a count.\n",
+      example: 4240000,
+    },
+    competitor_sends_change_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Change in that volume against the period immediately before.",
+      example: 12,
+    },
+    peer_cadence_median_per_week: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Median campaigns per week across the brands you watch, per sending domain. Your own row is excluded, since it is the figure being held against this one.\n",
+      example: 4.4,
+    },
+    peer_inbox_placement_median_rate: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Median inbox placement across the brands you watch. Your own row is excluded, as with the cadence median.\n",
+      example: 0.892,
+    },
+  },
+} as const;
+
+export const CompetitiveWatchlistBrandIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^cwb_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "cwb_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EmailCompetitivePanelStatusSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Whether panel figures are available for a row, and when they are not, why.\n\n`ok` means the panel reported figures for the requested period. `not_in_panel`\nmeans the panel does not track the sending domain at all, which is common for\nsmaller and newer senders. `no_data` means the panel tracks the domain but\nobserved no mail from it in the period. `unavailable` means the figures could\nnot be retrieved this time and the same request may well succeed on a retry.\n",
+  enum: ["ok", "not_in_panel", "no_data", "unavailable"],
+  example: "ok",
+} as const;
+
+export const EmailCompetitiveCampaignSummarySchema = {
+  type: "object",
+  description: "The most recent campaign observed for a brand in the period.",
+  required: ["id", "subject", "sent_at", "image_url"],
+  properties: {
+    id: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The identifier for this campaign. Use it to fetch this one campaign on its own.\n\nIt is a string, and it needs to stay one. The values are long enough that\nJavaScript, and any other language that stores every number as a floating point\nvalue, will round them, and a rounded identifier matches no campaign at all.\nCompare it and pass it back as text.\n",
+      example: "3914827265",
+    },
+    subject: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The subject line the panel saw on this campaign.",
+      example: "The Summer Sale: 40% off everything",
+    },
+    sent_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the panel first saw this campaign arrive.",
+      example: "2026-08-09T14:02:00Z",
+    },
+    image_url: {
+      type: ["string", "null"],
+      format: "uri",
+      readOnly: true,
+      description:
+        "Where the panel's capture of the rendered email can be fetched, null when it captured none. Panels image only some of what they observe, so an absent creative is an ordinary outcome rather than a failed one. The image is served from the panel's own host rather than from ours, so a page embedding it has to allow that host.\n",
+      example:
+        "https://images.example.com/creatives/c154c8c4-6356-40e6-92d2-7c6727ec36ca.jpg",
+    },
+  },
+} as const;
+
+export const EmailCompetitiveFieldSourceSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Where a figure came from. `measured` means it is counted from your own\nsending. `panel` means it is an estimate from an email panel, which observes a\nsample of real inboxes and scales what it sees up to a whole audience. `none`\nmeans there is no figure for this field on this row, so there is nothing to\nattribute a source to.\n\nOnly your own row carries `measured` figures, and only where the metric is counted\nrather than estimated. Everything about a competitor is a panel estimate.\n",
+  enum: ["measured", "panel", "none"],
+  example: "panel",
+} as const;
+
+export const EmailCompetitiveWatchlistRowProvenanceSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Where each figure on the row came from, so a comparison can be labelled\nhonestly. Every field on a competitor's row is a panel estimate. On your own\nrow the source varies by field: what is counted directly is reported as measured,\nfalls back to the panel for what is not, and reports `none` for a field this row\nnever carries at all.\n\nRead rate is a panel estimate even on your own row. Comparing a measured rate\nagainst a panel estimate of the same rate is not a like for like\ncomparison, because the two count an open differently, so both sides of the\ncomparison come from the panel.\n",
+  required: [
+    "sends",
+    "cadence_per_week",
+    "inbox_placement_rate",
+    "read_rate",
+    "audience_overlap_rate",
+    "last_campaign",
+  ],
+  properties: {
+    sends: {
+      $ref: "#/components/schemas/EmailCompetitiveFieldSource",
+      description:
+        "Source of `sends` and of `sends_change_percent`, which is derived from it.",
+    },
+    cadence_per_week: {
+      $ref: "#/components/schemas/EmailCompetitiveFieldSource",
+      description: "Source of `cadence_per_week`.",
+    },
+    inbox_placement_rate: {
+      $ref: "#/components/schemas/EmailCompetitiveFieldSource",
+      description: "Source of `inbox_placement_rate`.",
+    },
+    read_rate: {
+      $ref: "#/components/schemas/EmailCompetitiveFieldSource",
+      description: "Source of `read_rate`.",
+    },
+    audience_overlap_rate: {
+      $ref: "#/components/schemas/EmailCompetitiveFieldSource",
+      description: "Source of `audience_overlap_rate`.",
+    },
+    last_campaign: {
+      $ref: "#/components/schemas/EmailCompetitiveFieldSource",
+      description: "Source of `last_campaign`.",
+    },
+  },
+} as const;
+
+export const EmailCompetitiveWatchlistRowSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One brand on the watchlist, with its figures for the requested period. Your own\nworkspace appears as a row too, so the table can be read as a single ranking.\n\nEvery metric is present on every row and is `null` when it is unavailable for\nthat brand, so a `0` is always a real measurement rather than a gap. Check\n`panel_status` for why a metric is null.\n\n`esp` and `list_size` are the exception. They are populated only when you read a\nsingle brand, and are always `null` on the watchlist whatever `panel_status`\nreports.\n",
+  required: [
+    "is_workspace",
+    "name",
+    "industry",
+    "sending_domains",
+    "esp",
+    "list_size",
+    "panel_status",
+    "sends",
+    "sends_change_percent",
+    "cadence_per_week",
+    "inbox_placement_rate",
+    "read_rate",
+    "audience_overlap_rate",
+    "last_campaign",
+    "provenance",
+  ],
+  properties: {
+    watchlist_brand_id: {
+      $ref: "#/components/schemas/CompetitiveWatchlistBrandID",
+      readOnly: true,
+      description:
+        "The watchlist entry, for removing the brand. Absent on your own row, which is not a watchlist entry.",
+    },
+    is_workspace: {
+      type: "boolean",
+      readOnly: true,
+      description: "True on the row describing your own workspace's sending.",
+      example: false,
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The brand's name as it was when the brand was added to the watchlist.",
+      example: "Everlane",
+    },
+    industry: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "The brand's industry as it was when the brand was added, or null when the brand is not classified.",
+      example: "DTC Apparel",
+    },
+    sending_domains: {
+      type: "array",
+      minItems: 1,
+      readOnly: true,
+      description:
+        "The domains the brand's figures describe. Always one domain today: a brand is tracked by the single one the panel sees the most of its mail from, so a brand that splits its mail across several domains reports less than its full volume.\n",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      example: ["everlane.com"],
+    },
+    esp: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "A sending platform observed on the domain, or null when the panel has none on record. A brand sending through more than one platform reports one of them rather than the list. This is frequently unavailable and updates monthly at best, so treat its absence as normal rather than as pending. Populated only when you read a single brand; on the watchlist it is always null.\n",
+      example: "Klaviyo",
+    },
+    list_size: {
+      type: ["integer", "null"],
+      format: "int64",
+      readOnly: true,
+      description:
+        "Estimated number of addresses the brand mails, or null when the panel has no estimate. Populated only when you read a single brand; on the watchlist it is always null.\n",
+      example: 1240000,
+    },
+    panel_status: {
+      $ref: "#/components/schemas/EmailCompetitivePanelStatus",
+      readOnly: true,
+      description:
+        "Whether panel figures were available for this row, and when they were not, why.",
+    },
+    sends: {
+      type: ["integer", "null"],
+      format: "int64",
+      readOnly: true,
+      description: "Messages sent in the period.",
+      example: 1240000,
+    },
+    sends_change_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Change in send volume against the period immediately before this one, as a percentage. Null when the earlier period has nothing to compare against.\n",
+      example: 18,
+    },
+    cadence_per_week: {
+      type: ["number", "null"],
+      readOnly: true,
+      description: "Average campaigns sent per week over the period.",
+      example: 5.2,
+    },
+    inbox_placement_rate: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of the brand's observed mail that reached an inbox rather than a spam folder.\n",
+      example: 0.889,
+    },
+    read_rate: {
+      type: ["number", "null"],
+      readOnly: true,
+      description: "Share of delivered mail that was read.",
+      example: 0.192,
+    },
+    audience_overlap_rate: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of your own audience the panel also sees receiving this brand's mail. Null on your own row, and null for a competitor the panel measured no overlap with, which is an answer rather than a gap.\n",
+      example: 0.24,
+    },
+    last_campaign: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailCompetitiveCampaignSummary",
+        },
+        {
+          type: "null",
+        },
+      ],
+      unevaluatedProperties: false,
+      readOnly: true,
+      description:
+        "The most recent campaign observed in the period, or null when none was. Always null on your own row.\n",
+    },
+    provenance: {
+      $ref: "#/components/schemas/EmailCompetitiveWatchlistRowProvenance",
+      readOnly: true,
+      description: "Where each figure on this row came from.",
+    },
+  },
+} as const;
+
+export const EmailCompetitiveWatchlistSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The workspace's competitor watchlist with its figures for the requested period.\n\nThe list is capped by the organization's competitor limit and is returned whole,\nso it is not paginated. Your own row is included and is always first.\n",
+  required: ["period", "summary", "data"],
+  properties: {
+    period: {
+      $ref: "#/components/schemas/EmailCompetitivePeriod",
+      description: "The period every figure covers.",
+    },
+    summary: {
+      $ref: "#/components/schemas/EmailCompetitiveWatchlistSummary",
+      description: "Where your sending sits against the brands you watch.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Your own row first, then each watched brand in the order it was added. Your row is present once your workspace has sent email, since before that there is no sending of yours to compare against. Empty for a workspace that has neither sent nor added a brand.\n",
+      items: {
+        $ref: "#/components/schemas/EmailCompetitiveWatchlistRow",
+      },
+    },
+  },
+} as const;
+
+export const EmailCompetitiveCampaignSignalSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Why this campaign was surfaced. The set is open and grows as new signals are added.\n\nEvery signal describes the campaign against its own brand's history, never against the\nother brands you watch, so several brands can carry the same signal in one period and\nnone of them is the top of anything.\n\n`biggest_send` is a send far above that brand's own median: unusual for the brand, not\nmerely large. `read_rate_standout` is a campaign read unusually well for its brand.\n`landing_in_spam` is one heavily filed as spam at a single mailbox provider, named in\n`mailbox_provider`, which is worth seeing even when the brand's overall placement looks healthy.\n",
+  "x-extensible-enum": [
+    "biggest_send",
+    "read_rate_standout",
+    "landing_in_spam",
+  ],
+  example: "read_rate_standout",
+} as const;
+
+export const EmailCompetitiveNotableClaimSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "What the panel itself asserts about a campaign, in its own words. Present only on the campaigns the panel chose to make a claim about, which is a minority of them: a campaign can be surfaced as notable without the panel putting a headline on it, and that is an ordinary outcome rather than missing data.\n",
+  required: ["text"],
+  properties: {
+    text: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        'The panel\'s own phrasing, which may name the window the claim was measured over ("Biggest send in 7 days") or not ("Best-read campaign"). Show it as written rather than rebuilding it from the signal, and do not parse a window out of it.\n',
+      example: "Biggest send in 7 days",
+    },
+  },
+} as const;
+
+export const EmailCompetitiveNotableEvidenceSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The figures behind a campaign's signal, for ordering or filtering the list yourself. Which field carries a value depends on the signal, and each is null both on the signals it does not describe and on a campaign of its own signal the panel published no figure for.\n",
+  required: [
+    "ratio_to_median",
+    "read_rate_observations",
+    "mailbox_provider_spam_rate",
+    "mailbox_provider_observations",
+  ],
+  properties: {
+    ratio_to_median: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "How many times the brand's own median volume this send was. A value of 29 means the send was twenty-nine times the brand's typical volume for the period. Null on every signal other than `biggest_send`, and on a `biggest_send` campaign the panel published no ratio for.\n",
+      example: 29.61,
+    },
+    read_rate_observations: {
+      type: ["integer", "null"],
+      format: "int64",
+      readOnly: true,
+      description:
+        "How many panel observations `campaign.read_rate` was measured over. A rate over thirty observations and one over a hundred and forty are not equally worth showing, and this is what separates them. Null on every signal other than `read_rate_standout`, and on a `read_rate_standout` campaign the panel published no denominator for.\n",
+      example: 66,
+    },
+    mailbox_provider_spam_rate: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this campaign filed as spam at the one provider named in `mailbox_provider`, as a value between 0 and 1. A different measurement from the campaign's overall `spam_rate`, and the one this signal is about. Null on every signal other than `landing_in_spam`, and on a `landing_in_spam` campaign whose provider counts the panel did not publish, so a spam entry can arrive without the rate behind it.\n",
+      example: 0.79,
+    },
+    mailbox_provider_observations: {
+      type: ["integer", "null"],
+      format: "int64",
+      readOnly: true,
+      description:
+        "How many observations at that provider `mailbox_provider_spam_rate` was measured over. Null on the same terms.\n",
+      example: 199,
+    },
+  },
+} as const;
+
+export const EmailCompetitivePanelMailboxProviderSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  description:
+    "A mailbox provider, as the email panel identifies it. A lowercase identifier rather than a\ndisplay name, so pick your own label for it, and treat the set as open: the panel reports\nwhichever providers it observed, and `gmail`, `hotmail`, `yahoo`, `aol` and `comcast` are the\nones it returns most. Apple never appears, because the panel does not measure it, so a surface\noffering an Apple row has no measurement behind it.\n\nThe panel's buckets are not the same as the ones the [mailbox-provider stats\nbreakdown](/docs/api/reference/get-email-stats-by-mailbox-provider) reports: Microsoft's\nproperties appear here as `hotmail` rather than `microsoft`, and Apple is absent, so the two\nare not a joinable dimension.\n",
+  example: "gmail",
+} as const;
+
+export const EmailCompetitiveCampaignSchema = {
+  description: "One campaign an email panel observed a brand sending.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailCompetitiveCampaignSummary",
+    },
+    {
+      type: "object",
+      required: [
+        "reach",
+        "read_rate",
+        "has_creative",
+        "discount_percent",
+        "inbox_rate",
+        "spam_rate",
+      ],
+      properties: {
+        reach: {
+          type: ["integer", "null"],
+          format: "int64",
+          readOnly: true,
+          description:
+            "Estimated recipients this campaign reached, null when the panel observed the campaign but published no estimate for it.\n",
+          example: 410000,
+        },
+        read_rate: {
+          type: ["number", "null"],
+          readOnly: true,
+          description:
+            "Estimated share of recipients who read this campaign, null when the panel published no rate for it. Panel read rates count dwell time, so they do not move with the automatic opens that inflate a sender's own open rate.\n",
+          example: 0.228,
+        },
+        has_creative: {
+          type: "boolean",
+          readOnly: true,
+          description:
+            "Whether the panel captured the rendered email for this campaign.",
+          example: true,
+        },
+        discount_percent: {
+          type: ["number", "null"],
+          readOnly: true,
+          description:
+            "The discount the subject line leads with, null when it names none. Read from the subject text, so it finds a stated offer and not one revealed inside the email.\n",
+          example: 40,
+        },
+        inbox_rate: {
+          type: ["number", "null"],
+          readOnly: true,
+          description:
+            "Share of this campaign that reached an inbox, null when the panel observed it without recording where it landed. It describes this send rather than the brand's domain, so a single bad campaign is visible against a brand whose overall placement still looks healthy.\n",
+          example: 0.879,
+        },
+        spam_rate: {
+          type: ["number", "null"],
+          readOnly: true,
+          description:
+            "Share of this campaign that was filed as spam, null on the same terms.",
+          example: 0.121,
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EmailCompetitiveNotableCampaignSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "A campaign the panel surfaced, and the reason it did.",
+  required: [
+    "watchlist_brand_id",
+    "brand_name",
+    "signal",
+    "claim",
+    "evidence",
+    "mailbox_provider",
+    "campaign",
+  ],
+  properties: {
+    watchlist_brand_id: {
+      $ref: "#/components/schemas/CompetitiveWatchlistBrandID",
+      readOnly: true,
+      description: "The watchlist entry that sent it.",
+    },
+    brand_name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The brand's name.",
+      example: "Allbirds",
+    },
+    signal: {
+      $ref: "#/components/schemas/EmailCompetitiveCampaignSignal",
+      readOnly: true,
+    },
+    claim: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailCompetitiveNotableClaim",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The panel's own headline for this campaign, or null where it surfaced the campaign without making one. Null is the common case and is not a fault.\n",
+    },
+    evidence: {
+      $ref: "#/components/schemas/EmailCompetitiveNotableEvidence",
+      readOnly: true,
+      description:
+        "The figures behind the signal, for ordering or filtering the list.",
+    },
+    mailbox_provider: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailCompetitivePanelMailboxProvider",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The provider a `landing_in_spam` campaign was heavily filed as spam at: spam placement is measured per provider, and this campaign's problem is at one of them. Null on every other signal.\n",
+    },
+    campaign: {
+      $ref: "#/components/schemas/EmailCompetitiveCampaign",
+      description:
+        "The campaign itself. Two of its fields behave differently here than on the brand's\ncampaign feed, because the panel sends less about a campaign it surfaced this way.\n\n`has_creative` reports whether a capture came back with this entry rather than whether\nthe panel ever captured the email, and captures are frequently absent here by design, so\nexpect `false` on campaigns the panel did image. `reach` is null on every entry, because\nthe panel does not estimate an audience for the campaigns it surfaces.\n",
+    },
+  },
+} as const;
+
+export const EmailCompetitiveNotableFeedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Campaigns worth a second look across the brands a workspace watches.",
+  required: ["period", "panel_status", "data", "truncated"],
+  properties: {
+    period: {
+      $ref: "#/components/schemas/EmailCompetitivePeriod",
+      description:
+        "The period the campaigns were observed in, as the panel resolved it.\n\nTwo things differ from the other competitive reads. It ends at the last instant of\nthe previous whole day rather than at the moment of the request, so a campaign sent\nthis morning is never among these. And the panel holds its selection for a period\nonce it has made it, so two requests a minute apart return the same campaigns rather\nthan differing slightly.\n",
+    },
+    panel_status: {
+      $ref: "#/components/schemas/EmailCompetitivePanelStatus",
+      description:
+        "Whether the panel could be read for this feed, and when it could not, why.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      maxItems: 100,
+      description:
+        "Up to 100 campaigns selected across watched brands. Selection takes turns across\nbrands in watchlist order until the response is full, prioritizing spam placement,\nbiggest sends, then read-rate standouts within each brand. Within one signal, rows\ncompare the matching spam rate, volume ratio, or read rate descending; missing values\nsort last and ties retain tracked-domain and source order. Selected rows are returned\nin watchlist order, then biggest-send, read-rate, and spam signal order, followed by\ntracked-domain and source order.\n\nOne campaign may appear once per signal because each row carries different evidence.\nEmpty when nothing qualified; check `panel_status` to distinguish that from an\nunavailable panel.\n",
+      items: {
+        $ref: "#/components/schemas/EmailCompetitiveNotableCampaign",
+      },
+    },
+    truncated: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether Bird omitted eligible panel findings to keep this response to 100 rows. False does not promise that the panel observed every qualifying campaign in the period.\n",
+      example: false,
+    },
+  },
+} as const;
+
+export const EmailCompetitiveBrandIDSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 19,
+  pattern: "^[0-9]+$",
+  description:
+    "Identifier of the brand in the panel's catalog, used to add it to the watchlist. It is a string for the same reason a campaign id is: the values are wide enough that a client storing every number as a floating point value would round them, and a rounded identifier matches no brand at all.\n",
+  example: "81531",
+} as const;
+
+export const EmailCompetitiveWatchlistBrandCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The brand to add to the watchlist. Obtained from a brand search, which only returns brands that can be watched.\n",
+  required: ["brand_id"],
+  properties: {
+    brand_id: {
+      $ref: "#/components/schemas/EmailCompetitiveBrandID",
+    },
+  },
+} as const;
+
+export const EmailCompetitiveWatchlistBrandSchema = {
+  description:
+    "A brand on the workspace's watchlist. This is the watchlist entry itself, with no figures on it; read the watchlist to get those.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+    {
+      type: "object",
+      required: ["id", "brand_id", "name", "industry", "sending_domains"],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/CompetitiveWatchlistBrandID",
+          readOnly: true,
+          description: "The watchlist entry.",
+        },
+        brand_id: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EmailCompetitiveBrandID",
+            },
+          ],
+        },
+        name: {
+          type: "string",
+          minLength: 1,
+          readOnly: true,
+          description:
+            "The brand's name when it was added. It is kept as it was so the row still reads correctly if the brand is later renamed or stops being tracked.\n",
+          example: "Everlane",
+        },
+        industry: {
+          type: ["string", "null"],
+          readOnly: true,
+          description:
+            "The brand's industry when it was added, or null when the brand is not classified.",
+          example: "DTC Apparel",
+        },
+        sending_domains: {
+          type: "array",
+          minItems: 1,
+          readOnly: true,
+          description:
+            "The domains this brand's figures describe. Always one domain today, chosen as the one the panel sees the most of its mail from.\n",
+          items: {
+            type: "string",
+            minLength: 1,
+          },
+          example: ["everlane.com"],
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EmailCompetitiveProviderPlacementSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "How one mailbox provider treated a brand's mail, beside your own.",
+  required: [
+    "mailbox_provider",
+    "inbox_rate",
+    "spam_rate",
+    "workspace_inbox_rate",
+  ],
+  properties: {
+    mailbox_provider: {
+      $ref: "#/components/schemas/EmailCompetitivePanelMailboxProvider",
+      readOnly: true,
+      description:
+        "The provider whose treatment of the brand's mail this row describes.",
+    },
+    inbox_rate: {
+      type: "number",
+      readOnly: true,
+      description:
+        "Share of the brand's mail this provider put in the inbox. Recomputed from what the panel observed across every domain the brand sends from, so a small subdomain cannot move it as much as the brand's main one.\n",
+      example: 0.862,
+    },
+    spam_rate: {
+      type: "number",
+      readOnly: true,
+      description: "Share of the brand's mail this provider put in spam.",
+      example: 0.091,
+    },
+    workspace_inbox_rate: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Your own inbox rate at this provider, null when you have not sent or the panel has no breakdown for your sending domain. It is the panel's view of your sending rather than from our own measurement of it, because a measured rate and a rate the panel estimated are not comparable, and this figure exists to be compared with the brand's.\n",
+      example: 0.921,
+    },
+  },
+} as const;
+
+export const EmailCompetitiveBrandProfileSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One watched brand's figures for the period, with its placement broken out by mailbox provider.",
+  required: ["period", "brand", "providers"],
+  properties: {
+    period: {
+      $ref: "#/components/schemas/EmailCompetitivePeriod",
+      description: "The period every figure covers.",
+    },
+    brand: {
+      $ref: "#/components/schemas/EmailCompetitiveWatchlistRow",
+      description:
+        "The figures the watchlist reports for this brand, derived the same way. Estimated\nvolume can differ very slightly between the two views, because each request asks the\npanel about a different set of domains and the panel scales its estimate per request.\n\n`esp` and `list_size` are populated here; the watchlist reports both as null.\n",
+    },
+    providers: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Placement per mailbox provider, in the order the panel returned them. Empty when the panel published no breakdown for the brand's domains.\n",
+      items: {
+        $ref: "#/components/schemas/EmailCompetitiveProviderPlacement",
+      },
+    },
+  },
+} as const;
+
+export const EmailCompetitiveCampaignSortSchema = {
+  type: "string",
+  minLength: 1,
+  description: "Field used to sort campaigns.",
+  enum: ["sent_at"],
+  default: "sent_at",
+  example: "sent_at",
+} as const;
+
+export const EmailCompetitiveCampaignFeedSchema = {
+  description:
+    "A page of campaigns returned for a watched brand over the period.",
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "period",
+        "panel_status",
+        "captured",
+        "promo_rate",
+        "truncated",
+        "data",
+      ],
+      properties: {
+        period: {
+          $ref: "#/components/schemas/EmailCompetitivePeriod",
+          description: "The rolling period used for this request.",
+        },
+        panel_status: {
+          $ref: "#/components/schemas/EmailCompetitivePanelStatus",
+          description:
+            "For this campaign feed, no_data means the requested page is empty; it does not mean the whole period has no campaigns.",
+        },
+        captured: {
+          type: "integer",
+          readOnly: true,
+          description:
+            "Number of eligible campaigns in the first 300 newest panel rows for each tracked domain. This sampled value is independent of the returned page.\n",
+          example: 38,
+        },
+        promo_rate: {
+          type: ["number", "null"],
+          readOnly: true,
+          description:
+            "Fraction of captured campaigns whose subject leads with a discount. Null when captured is zero. This sampled value is independent of the returned page.\n",
+          example: 0.64,
+        },
+        truncated: {
+          type: "boolean",
+          readOnly: true,
+          description:
+            "Whether the sampled statistics or returned page omit part of the requested collection. Use next_cursor to determine whether another page is available.\n",
+          example: false,
+        },
+        data: {
+          type: "array",
+          readOnly: true,
+          description: "Campaigns in this page, in the requested order.",
+          items: {
+            $ref: "#/components/schemas/EmailCompetitiveCampaign",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailCompetitiveWeekdaySchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "A day of the week. Named rather than numbered because the two common numberings disagree about which day the week starts on.\n",
+  enum: [
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+  ],
+  example: "tuesday",
+} as const;
+
+export const EmailCompetitiveSendTimeCellSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One weekday and hour of a brand's sending week.",
+  required: ["weekday", "hour", "share_percent", "intensity", "sample_days"],
+  properties: {
+    weekday: {
+      $ref: "#/components/schemas/EmailCompetitiveWeekday",
+      readOnly: true,
+      description: "The day of the week this hour falls on.",
+    },
+    hour: {
+      type: "integer",
+      readOnly: true,
+      minimum: 0,
+      maximum: 23,
+      description:
+        "The hour this cell covers, in the timezone the response reports. `13` covers 13:00 to 14:00.\n",
+      example: 13,
+    },
+    share_percent: {
+      type: "number",
+      readOnly: true,
+      description:
+        "Share of everything the brand sent over the period that fell in this hour. It is `0` for an hour the brand demonstrably did not send in, which on a disciplined sender is the most useful thing this grid says.\n",
+      example: 3.4,
+    },
+    intensity: {
+      type: "number",
+      readOnly: true,
+      minimum: 0,
+      maximum: 1,
+      description:
+        "How strongly the brand sends in this hour, against its own busiest hour at `1`.\nIt is this cell's sending per `sample_days` divided by the busiest cell's, so it\nis derivable from the two numbers beside it and reconciles with them rather than\ncompeting: it is published because that correction is easy to get wrong, not\nbecause it knows anything they do not.\n\nShade a cell by this rather than by `share_percent`: the period holds one more\nof some weekdays than others, so a share compares an hour that came round\nthirteen times against one that came round twelve.\n",
+      example: 0.55,
+    },
+    sample_days: {
+      type: "integer",
+      readOnly: true,
+      description:
+        "How many days of the period fell on this weekday, whether or not the brand sent on them. It is what separates an hour the brand is quiet in from one there was little chance to observe.\n",
+      example: 13,
+    },
+  },
+} as const;
+
+export const EmailCompetitiveSendTimePeakSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "The hour of the day a brand sends most of its mail in.",
+  required: ["start_hour", "end_hour", "share_percent"],
+  properties: {
+    start_hour: {
+      type: "integer",
+      readOnly: true,
+      minimum: 0,
+      maximum: 23,
+      description:
+        "The first hour of the window, in the timezone the response reports.",
+      example: 13,
+    },
+    end_hour: {
+      type: "integer",
+      readOnly: true,
+      minimum: 0,
+      maximum: 23,
+      description:
+        "The hour the window ends at, exclusive: a window of `13` to `14` covers 13:00 to\n14:00. The window is always one hour wide on this endpoint, so this is always the\nhour after `start_hour`. The pair is kept rather than collapsed because the panel\ncomputes the window at whatever width it was asked for, and only this endpoint\npins that to an hour.\n\nIt can therefore be lower than `start_hour` in exactly one case: a peak at 23:00,\nwhose window runs past midnight and ends at `0`.\n",
+      example: 14,
+    },
+    share_percent: {
+      type: "number",
+      readOnly: true,
+      description:
+        "Share of everything the brand sent over the period that fell in this window.\n\nThis is the panel's own figure, while a cell's `share_percent` is recomputed from\nthe cells in the response. Adding up this hour's seven cells should therefore land\non this number but is not guaranteed to; where they disagree, this one is the\npanel's answer about its own peak and the cells are the arithmetic behind the grid.\n",
+      example: 13.1,
+    },
+  },
+} as const;
+
+export const EmailCompetitiveSendTimeGridSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "When a watched brand sends, by weekday and hour of the day.",
+  required: ["period", "timezone", "panel_status", "cells", "peak_send_window"],
+  properties: {
+    period: {
+      $ref: "#/components/schemas/EmailCompetitivePeriod",
+      description:
+        "The period the grid covers. It is always the last 90 days, whatever range the\nrest of the brand's figures are shown over: an hour of the week comes round\nabout thirteen times in 90 days and once in a week, and a pattern drawn from\none observation per cell is noise.\n\nTwo things differ from the other competitive reads. It ends at the start of a\nday rather than at the moment of the request, and the panel answers repeat\nrequests from a cache it holds for a day, so two requests a minute apart return\nidentical figures and this grid can be up to a day behind the figures shown\nbeside it.\n",
+    },
+    timezone: {
+      $ref: "#/components/schemas/Timezone",
+      readOnly: true,
+      description:
+        "The timezone the hours are reported in. Label the grid from this rather than from what was requested: a response the panel could not answer reports UTC whatever was asked for.\n",
+    },
+    panel_status: {
+      $ref: "#/components/schemas/EmailCompetitivePanelStatus",
+      description: "Why the grid is empty, when it is.",
+    },
+    cells: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Every weekday and hour of the week, Monday first and hour ascending: 168 in all, whether or not the brand sent in them, so the grid needs no filling in. Empty when there was nothing to read, which `panel_status` explains.\n",
+      items: {
+        $ref: "#/components/schemas/EmailCompetitiveSendTimeCell",
+      },
+    },
+    peak_send_window: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailCompetitiveSendTimePeak",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The hour of the day the brand sends most of its mail in, totalled across the whole week, or null when nothing was observed. It carries no weekday: for most brands the hour of the day is where the pattern is and the day of the week barely moves, so naming a busiest weekday would give a figure more meaning than it has. It is also not always the darkest cell, on the same reasoning: one busy Wednesday can outweigh the hour the brand mails in every single day.\n",
+    },
+  },
+} as const;
+
+export const EmailCompetitiveBrandMatchSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "A brand matching a search, ready to be added to the watchlist.",
+  required: ["brand_id", "name", "sending_domains"],
+  properties: {
+    brand_id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailCompetitiveBrandID",
+        },
+      ],
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The brand's name.",
+      example: "Everlane",
+    },
+    sending_domains: {
+      type: "array",
+      minItems: 1,
+      readOnly: true,
+      description:
+        "The domains this brand's figures would describe. Always one domain today, chosen as the one the panel sees the most of its mail from.\n",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      example: ["everlane.com"],
+    },
+  },
+} as const;
+
+export const EmailCompetitiveBrandSearchResultsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Brands matching the search. Ranked by how well they match, best first, and capped at 8 results because this backs a type-ahead. The panel's own answer is often shorter than the cap, in which case the cap was never the reason the list is short.\n",
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Matching brands. Empty when nothing matched, which for an unusual brand name means the panel does not track it rather than that the search failed.\n",
+      items: {
+        $ref: "#/components/schemas/EmailCompetitiveBrandMatch",
+      },
+    },
+  },
+} as const;
+
+export const EmailCompetitiveVolumePointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One day of one line on the volume chart.",
+  required: ["date", "sends"],
+  properties: {
+    date: {
+      type: "string",
+      format: "date",
+      minLength: 1,
+      readOnly: true,
+      description: "The UTC day this point covers.",
+      example: "2026-08-09",
+    },
+    sends: {
+      type: "integer",
+      format: "int64",
+      readOnly: true,
+      description:
+        "Volume for the day. An estimate for a competitor and an exact count for your own line; `source` on the series records which. A day nothing was observed is `0` rather than a missing point, so every line shares one axis.\n",
+      example: 41800,
+    },
+  },
+} as const;
+
+export const EmailCompetitiveBrandSeriesSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One line on the volume chart: a watched brand's sending over time, or your own.\n",
+  required: [
+    "is_workspace",
+    "name",
+    "sending_domains",
+    "panel_status",
+    "source",
+    "points",
+  ],
+  properties: {
+    watchlist_brand_id: {
+      $ref: "#/components/schemas/CompetitiveWatchlistBrandID",
+      readOnly: true,
+      description:
+        "The watchlist entry this line describes. Absent on your own line, which is not a watchlist entry.",
+    },
+    is_workspace: {
+      type: "boolean",
+      readOnly: true,
+      description: "True on the line describing your own workspace's sending.",
+      example: false,
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Label for the line: the brand's name, or your sending domain on your own line.",
+      example: "Everlane",
+    },
+    sending_domains: {
+      type: "array",
+      minItems: 1,
+      readOnly: true,
+      description:
+        "The sending domains the line's figures describe. Always one domain today.",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      example: ["everlane.com"],
+    },
+    panel_status: {
+      $ref: "#/components/schemas/EmailCompetitivePanelStatus",
+      description:
+        "Why a line has no volume in it. Always `ok` on your own line, which is counted rather than read from the panel.\n",
+    },
+    source: {
+      $ref: "#/components/schemas/EmailCompetitiveFieldSource",
+      description:
+        "Where the line came from. Your own is an exact count of what was accepted for delivery; a competitor's is the panel's estimate of everything they sent. The two share an axis while resting on different measurements, so a chart that compares them should say so.\n",
+    },
+    points: {
+      type: "array",
+      readOnly: true,
+      description:
+        "One point per day of the period, oldest first, ending with the last whole UTC day rather than the one in progress. A domain the panel tracks but observed nothing for plots as zeros, which is a measured silence rather than a missing measurement. Points are empty only when there was nothing to plot at all, reported by `panel_status` as `not_in_panel` or `unavailable`.\n",
+      items: {
+        $ref: "#/components/schemas/EmailCompetitiveVolumePoint",
+      },
+    },
+  },
+} as const;
+
+export const EmailCompetitiveVolumeSeriesSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Volume over time for the requested watched brands, plus your own sending, on one shared daily axis.\n",
+  required: ["period", "data"],
+  properties: {
+    period: {
+      $ref: "#/components/schemas/EmailCompetitivePeriod",
+      description: "The period every line covers.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Your own line first, then the requested brands in the order they were asked for. Your line is present once your workspace has sent email. Every line carries the same days in the same order, so they can be plotted against one axis without aligning them first.\n",
+      items: {
+        $ref: "#/components/schemas/EmailCompetitiveBrandSeries",
+      },
     },
   },
 } as const;
@@ -20271,27 +24021,27 @@ export const InboundEmailMessageSchema = {
       type: ["string", "null"],
       enum: ["pass", "fail", "unknown", null],
       description:
-        "Whether the sender of the received message was authenticated:\n\n- `pass`: The sender's identity was verified.\n- `fail`: The sender's identity was checked and did not verify.\n- `unknown`: No verdict is available, so the sender should not be treated as verified.\n",
+        "DMARC result for the domain in the received message's `From` header.\n\n- `pass`: SPF or DKIM passed and aligned with that domain.\n- `fail`: DMARC was evaluated and did not pass.\n- `unknown`: no trustworthy verdict is available.\n\nThis follows `dmarc_pass` and does not verify a particular person. The receiving provider currently supplies no DMARC result, so received messages report `unknown`.\n",
     },
     spf_pass: {
       type: ["boolean", "null"],
       description:
-        "Whether SPF passed for the sender, parsed from the message's authentication results. `null` when the authentication results did not include an SPF verdict.",
+        "Whether the receiving provider reports that SPF authorized the envelope sender for the sending server. A soft failure is `false`. Missing, neutral and inconclusive results are `null`.",
     },
     dkim_pass: {
       type: ["boolean", "null"],
       description:
-        "Whether DKIM passed for the sender, parsed from the message's authentication results. `null` when the authentication results did not include a DKIM verdict.",
+        "Whether the receiving provider verified a DKIM signature. A passing signature makes this `true` even when another signature fails. Missing signatures and inconclusive verification results are `null`.",
     },
     dmarc_pass: {
       type: ["boolean", "null"],
       description:
-        "Whether DMARC passed for the sender, parsed from the message's authentication results. `null` when the authentication results did not include a DMARC verdict.",
+        "Whether SPF or DKIM passed and aligned with the domain in the message's `From` header. The receiving provider currently supplies no DMARC result, so this is `null`.",
     },
     spam_score: {
       type: ["number", "null"],
       description:
-        "Spam score on the received message, or `null` when no score is available.",
+        "Content spam score when available. The receiving provider currently supplies no score, so this is `null`.",
     },
     attachments: {
       type: "array",
@@ -20303,6 +24053,7 @@ export const InboundEmailMessageSchema = {
     },
     received_at: {
       type: "string",
+      minLength: 1,
       format: "date-time",
       readOnly: true,
       description: "When the message was received.",
@@ -20481,6 +24232,7 @@ export const MailboxSchema = {
     },
     retention_tier: {
       type: "string",
+      minLength: 1,
       enum: ["30d", "90d", "1y"],
       description:
         "How long message metadata, extracted text, and attachments are kept. Original bodies and inbound raw MIME are limited to 30 days on every tier.",
@@ -21327,7 +25079,7 @@ export const EmailThreadSchema = {
       },
       maxItems: 20,
       description:
-        "Labels on this conversation. Exactly one system placement label is always present, set by the message that started the conversation:\n\n- `inbox`: The conversation is in the inbox.\n- `archive`: The conversation was filed away and is done for now.\n- `spam`: The conversation's opening message failed sender authentication.\n- `blocked`: The conversation's opening message was rejected by the mailbox's receive policy or rules.\n\nMove a conversation by updating its labels. Add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox`, or remove `spam`, `blocked`, or `archive`, to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list, and a conversation has at most 20 labels in total.\n",
+        "Labels on this conversation. Exactly one system placement label is always present, set by the message that started the conversation:\n\n- `inbox`: The conversation is in the inbox.\n- `archive`: The conversation was filed away and is done for now.\n- `spam`: The conversation's opening message is filed in Spam.\n- `blocked`: The conversation's opening message was rejected by the mailbox's receive policy or rules.\n\nMove a conversation by updating its labels. Add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox`, or remove `spam`, `blocked`, or `archive`, to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list, and a conversation has at most 20 labels in total.\n",
       example: ["inbox", "urgent"],
     },
     created_at: {
@@ -21636,7 +25388,7 @@ export const EmailThreadMessageSchema = {
       },
       maxItems: 20,
       description:
-        "Labels on this message. A received message always has exactly one placement label:\n\n- `inbox`: Accepted mail.\n- `archive`: The message's conversation was filed away.\n- `spam`: The message failed sender authentication.\n- `blocked`: The message was rejected by the mailbox's receive policy or rules.\n\nA received message also has `unread` until it is read. `trash` marks a message in the trash, in either direction. Custom labels share the same list, and a message has at most 20 labels in total.\n",
+        "Labels on this message. A received message always has exactly one placement label:\n\n- `inbox`: Accepted mail.\n- `archive`: The message's conversation was filed away.\n- `spam`: The message is filed in Spam.\n- `blocked`: The message was rejected by the mailbox's receive policy or rules.\n\nA received message also has `unread` until it is read. `trash` marks a message in the trash, in either direction. Custom labels share the same list, and a message has at most 20 labels in total.\n",
       example: ["inbox", "unread"],
     },
     status: {
@@ -21659,25 +25411,25 @@ export const EmailThreadMessageSchema = {
       enum: ["pass", "fail", "unknown", null],
       readOnly: true,
       description:
-        "Whether the sender of a received message was authenticated.\n\n- `pass`: the sender's identity was verified.\n- `fail`: it was checked and did not verify.\n- `unknown`: no verdict could be determined, so do not treat the\n  sender as verified.\n\nNull for sent messages. This field is readable for the mailbox's full\nretention tier, so the verdict is still available after the 30-day\nreceived-message log has expired.\n",
+        "DMARC result for the domain in the received message's `From` header.\n\n- `pass`: SPF or DKIM passed and aligned with that domain.\n- `fail`: DMARC was evaluated and did not pass.\n- `unknown`: no trustworthy verdict is available.\n\nThis follows `dmarc_pass` and does not verify a particular person. The receiving provider currently supplies no DMARC result, so received messages report `unknown`.\n\nNull for sent messages. This field is readable for the mailbox's full\nretention tier, so the verdict is still available after the 30-day\nreceived-message log has expired.\n",
     },
     spf_pass: {
       type: ["boolean", "null"],
       readOnly: true,
       description:
-        "Whether SPF passed for the sender of a received message. Null for sent messages and when no verdict is available. This field is kept for the mailbox's retention tier.\n",
+        "Whether the receiving provider reports that SPF authorized the envelope sender for the sending server. A soft failure is `false`. Missing, neutral and inconclusive results are `null`. Sent messages have `null` results. Kept for the mailbox retention tier.",
     },
     dkim_pass: {
       type: ["boolean", "null"],
       readOnly: true,
       description:
-        "Whether DKIM passed for the sender of a received message. Null for sent messages and when no verdict is available. This field is kept for the mailbox's retention tier.\n",
+        "Whether the receiving provider verified a DKIM signature. A passing signature makes this `true` even when another signature fails. Missing signatures and inconclusive verification results are `null`. Sent messages have `null` results. Kept for the mailbox retention tier.",
     },
     dmarc_pass: {
       type: ["boolean", "null"],
       readOnly: true,
       description:
-        "Whether DMARC passed for the sender of a received message. Null for sent messages and when no verdict is available. This field is kept for the mailbox's retention tier.\n",
+        "Whether SPF or DKIM passed and aligned with the domain in the message's `From` header. The receiving provider currently supplies no DMARC result, so this is `null`. Sent messages have `null` results. Kept for the mailbox retention tier.",
     },
     purge_at: {
       type: "string",
@@ -23237,7 +26989,8 @@ export const EventEmailReceivedDataSchema = {
       type: "string",
       minLength: 1,
       format: "email",
-      description: "Envelope-from address.",
+      description:
+        "Address from the message's From header, with the relay's parsed sender and then the SMTP envelope sender as fallbacks when that header cannot be read.",
       example: "alice@example.com",
     },
     to: {
@@ -23265,27 +27018,27 @@ export const EventEmailReceivedDataSchema = {
       type: ["string", "null"],
       enum: ["pass", "fail", "unknown", null],
       description:
-        "Whether the sender of the received message was authenticated.\n\n- `pass`: the sender's identity was verified.\n- `fail`: it was checked and did not verify.\n- `unknown`: no verdict is available, so do not treat the sender\n  as verified.\n",
+        "DMARC result for the domain in the received message's `From` header.\n\n- `pass`: SPF or DKIM passed and aligned with that domain.\n- `fail`: DMARC was evaluated and did not pass.\n- `unknown`: no trustworthy verdict is available.\n\nThis follows `dmarc_pass` and does not verify a particular person. The receiving provider currently supplies no DMARC result, so received messages report `unknown`.\n",
     },
     spf_pass: {
       type: ["boolean", "null"],
       description:
-        "Whether SPF passed for the sender, or null when the result did not carry an SPF verdict.",
+        "Whether the receiving provider reports that SPF authorized the envelope sender for the sending server. A soft failure is `false`. Missing, neutral and inconclusive results are `null`.",
     },
     dkim_pass: {
       type: ["boolean", "null"],
       description:
-        "Whether DKIM passed for the sender, or null when the result did not carry a DKIM verdict.",
+        "Whether the receiving provider verified a DKIM signature. A passing signature makes this `true` even when another signature fails. Missing signatures and inconclusive verification results are `null`.",
     },
     dmarc_pass: {
       type: ["boolean", "null"],
       description:
-        "Whether DMARC passed for the sender, or null when the result did not carry a DMARC verdict.",
+        "Whether SPF or DKIM passed and aligned with the domain in the message's `From` header. The receiving provider currently supplies no DMARC result, so this is `null`.",
     },
     spam_score: {
       type: ["number", "null"],
       description:
-        "Spam score carried on the received message, or null when it carries no score.",
+        "Content spam score when available. The receiving provider currently supplies no score, so this is `null`.",
     },
   },
 } as const;
@@ -23659,22 +27412,22 @@ export const EventEmailMailboxMessageReceivedDataSchema = {
       type: ["string", "null"],
       enum: ["pass", "fail", "unknown", null],
       description:
-        "Whether the sender of the received message was authenticated.\n\n- `pass`: the sender's identity was verified.\n- `fail`: it was checked and did not verify.\n- `unknown`: no verdict is available, so do not treat the sender\n  as verified.\n",
+        "DMARC result for the domain in the received message's `From` header.\n\n- `pass`: SPF or DKIM passed and aligned with that domain.\n- `fail`: DMARC was evaluated and did not pass.\n- `unknown`: no trustworthy verdict is available.\n\nThis follows `dmarc_pass` and does not verify a particular person. The receiving provider currently supplies no DMARC result, so received messages report `unknown`.\n",
     },
     spf_pass: {
       type: ["boolean", "null"],
       description:
-        "Whether SPF passed for the sender, or null when no verdict was computable.",
+        "Whether the receiving provider reports that SPF authorized the envelope sender for the sending server. A soft failure is `false`. Missing, neutral and inconclusive results are `null`.",
     },
     dkim_pass: {
       type: ["boolean", "null"],
       description:
-        "Whether DKIM passed for the sender, or null when no verdict was computable.",
+        "Whether the receiving provider verified a DKIM signature. A passing signature makes this `true` even when another signature fails. Missing signatures and inconclusive verification results are `null`.",
     },
     dmarc_pass: {
       type: ["boolean", "null"],
       description:
-        "Whether DMARC passed for the sender, or null when no verdict was computable.",
+        "Whether SPF or DKIM passed and aligned with the domain in the message's `From` header. The receiving provider currently supplies no DMARC result, so this is `null`.",
     },
   },
 } as const;
@@ -24127,7 +27880,19 @@ export const EventPreferenceRevokedSchema = {
 export const EventSMSBaseSchema = {
   type: "object",
   description: "Identity fields shared by every SMS lifecycle event payload.",
-  required: ["sms_id", "workspace_id", "to", "from", "tags", "metadata"],
+  required: [
+    "sms_id",
+    "workspace_id",
+    "to",
+    "from",
+    "tags",
+    "metadata",
+    "requested_language",
+    "resolved_language",
+    "template_id",
+    "template_version_id",
+    "template_content_hash",
+  ],
   properties: {
     sms_id: {
       $ref: "#/components/schemas/SMSMessageID",
@@ -24167,6 +27932,66 @@ export const EventSMSBaseSchema = {
       example: {
         order_id: "ord_123",
       },
+    },
+    requested_language: {
+      description:
+        "The template language requested by the send, in canonical form. Null when the send named no language or used no template.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    resolved_language: {
+      description:
+        "The template language rendered at acceptance, in canonical form. Null when the send used no template.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    template_id: {
+      description:
+        "The template rendered at acceptance, or null for a free-text message.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    template_version_id: {
+      description:
+        "The workspace published version or synthetic built-in version rendered at acceptance, or null for a free-text message. For a built-in template, `template_content_hash` identifies the exact catalogue source.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    template_content_hash: {
+      description:
+        "The rendered language's source fingerprint, or null for a free-text message.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateContentHash",
+        },
+        {
+          type: "null",
+        },
+      ],
     },
     cost: {
       $ref: "#/components/schemas/MessageCost",
@@ -26515,9 +30340,9 @@ export const SIPTrunkIDSchema = {
 export const VoiceCallRouteTypeSchema = {
   type: "string",
   minLength: 1,
-  enum: ["reject", "trunk", "forward", "voicemail"],
+  enum: ["reject", "trunk", "forward"],
   description:
-    "Which answer a number carries.\n\n- `reject`: refuses the call. This is where every number starts.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n- `voicemail`: answers, plays your greeting, and records what the caller says.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
+    "Which answer a number carries.\n\n- `reject`: refuses the call. This is where every number starts.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
   example: "reject",
 } as const;
 
@@ -28375,7 +32200,7 @@ export const SMSMessageWritableSchema = {
         },
       ],
       description:
-        "Content classification supplied on the send. Null for inbound messages.",
+        "Content classification supplied for free text or derived from the template. Null for inbound messages.",
     },
     tags: {
       type: "array",
@@ -28467,21 +32292,93 @@ export const SMSEventListWritableSchema = {
   },
 } as const;
 
-export const SMSTemplateLanguageStateWritableSchema = {
+export const SMSTemplateSummaryWritableSchema = {
   type: "object",
   additionalProperties: false,
-  description:
-    "One language's state on a template: whether it is live for sends. Content is not here; the template carries the body of its default language, and a send resolves the rest.\n",
+  description: "An SMS template without content or draft concurrency settings.",
+  required: ["name", "description", "category"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description: "The template's display name.",
+    },
+    description: {
+      type: ["string", "null"],
+      description: "What the template is for. Null if it has no description.",
+    },
+    category: {
+      $ref: "#/components/schemas/SMSTemplateCategory",
+    },
+  },
+} as const;
+
+export const SMSTemplateListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "One page of SMS templates.",
+          items: {
+            $ref: "#/components/schemas/SMSTemplateSummaryWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
 } as const;
 
 export const SMSTemplateWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A message template: one identity holding a copy of the message per language, resolved to one at send. It declares the variable slots a send fills in, so the parts that change travel with the request and the wording does not.\n",
+    "One SMS template identity and its authoring state. Content and variables live on versions, so this resource stays shallow.\n",
+  required: ["name", "description", "category"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The template's display name. It defaults to the slug and can be changed on workspace templates.",
+      example: "Order shipped",
+    },
+    description: {
+      type: ["string", "null"],
+      description: "What the template is for. Null if it has no description.",
+    },
+    category: {
+      $ref: "#/components/schemas/SMSTemplateCategory",
+    },
+  },
 } as const;
 
-export const SMSTemplateListWritableSchema = {
+export const SMSTemplateVersionListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "One page of the template's versions, newest first.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const SMSTemplateLanguageListWritableSchema = {
   type: "object",
   additionalProperties: false,
   required: ["data"],
@@ -28489,10 +32386,7 @@ export const SMSTemplateListWritableSchema = {
     data: {
       type: "array",
       description:
-        "The templates available to your workspace. The catalog is returned in full and is not paginated.",
-      items: {
-        $ref: "#/components/schemas/SMSTemplateWritable",
-      },
+        "The version's languages ordered by canonical tag, without text.",
     },
   },
 } as const;
@@ -29730,6 +33624,67 @@ export const WhatsAppBusinessAccountListWritableSchema = {
   ],
 } as const;
 
+export const EmailInboxInsightsEnvelopeWritableSchema = {
+  type: "object",
+  description:
+    "The meta a windowed Inbox Insights resource carries: the common fields plus the period the figures cover and how they were measured.\n",
+} as const;
+
+export const EmailInboxInsightsPlacementWritableSchema = {
+  description:
+    "Where a sending domain's measured mail landed over the period: the\ndomain-wide summary, the per-provider table, the time series, the Gmail tab\nsplit, and optionally per-IP detail.\n\nPlacement figures are estimates from a measurement panel of real mailboxes,\nand every rate is a percentage of measured placements, never of delivered\nvolume. Each section carries its own status; a successful response never\nimplies every section is populated.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsEnvelopeWritable",
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsAuthenticationWritableSchema = {
+  description:
+    "Whether the domain's mail authenticates, and who sends as the domain: SPF\nand DKIM pass rates, the DMARC standing with its published policy, and the\nper-source table that shows every system observed sending under the\ndomain's name.\n\nWithout a completed Google Postmaster connection and without aggregate\nDMARC reporting, sections report `not_configured`: an invitation to finish\nsetup rather than a fault. Each section carries its own status.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsEnvelopeWritable",
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsComplaintsWritableSchema = {
+  description:
+    "How often the domain's mail is reported as spam, as Google Postmaster\nmeasures it. This is Google's number for Gmail-received mail only; the\nfeedback-loop complaint rate for all providers is a Bird-measured figure\nserved by the email statistics endpoints, and the two are different\nmeasurements of different mail.\n\nFor a domain without a completed Google Postmaster connection every section\nreports `not_configured`: an invitation to finish setup rather than a fault.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsEnvelopeWritable",
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsSpamTrapsWritableSchema = {
+  description:
+    "Whether the domain's mail is reaching spam traps: addresses that exist only\nto catch senders mailing lists they should not be mailing.\n\nZero hits is a measured zero and a good result, so the totals read as real\nfigures rather than as an empty state. The kind of trap matters more than\nthe count: pristine hits point at harvested or guessed addresses, while\nrecycled hits point at stale list data.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsEnvelopeWritable",
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsDomainsWritableSchema = {
+  description:
+    "A page of sending domains this workspace can report on, and which of them Inbox Insights is switched on for.\n",
+  allOf: [
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
 export const EmailLatencyStatsWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -29930,6 +33885,62 @@ export const EmailStatsByBroadcastResponseWritableSchema = {
     "Per-broadcast breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).",
 } as const;
 
+export const EmailHealthWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The workspace's current sending-health verdict over the requested window, plus reference deliverability limits and classification boundaries. Use it to render a health badge, the bounce-rate and complaint-rate limit labels, and the risk lines on deliverability charts without hard-coding any thresholds of your own.\n",
+  example: {
+    period: {
+      data_as_of: null,
+      from: "2026-05-25",
+      to: "2026-06-01",
+    },
+    status: "watching",
+    signals: [
+      {
+        metric: "delivery_rate",
+        value: 0.995,
+        limit: null,
+        status: "healthy",
+        thresholds: {
+          direction: "below",
+          throttled: 0.984,
+          watching: 0.99,
+        },
+      },
+      {
+        metric: "open_rate",
+        value: 0.20100503,
+        limit: null,
+        status: "healthy",
+      },
+      {
+        metric: "bounce_rate",
+        value: 0.005,
+        limit: 0.005,
+        status: "watching",
+        thresholds: {
+          direction: "above",
+          throttled: 0.006,
+          watching: 0.004,
+        },
+      },
+      {
+        metric: "complaint_rate",
+        value: 0.00010050251,
+        limit: 0.003,
+        status: "healthy",
+        thresholds: {
+          direction: "above",
+          throttled: 0.001,
+          watching: 0.0006,
+        },
+      },
+    ],
+  },
+} as const;
+
 export const DomainCapabilityWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -30128,9 +34139,14 @@ export const SuppressionWritableSchema = {
     reason: {
       type: "string",
       minLength: 1,
-      "x-extensible-enum": ["hard_bounce", "complaint", "manual"],
+      "x-extensible-enum": [
+        "hard_bounce",
+        "complaint",
+        "manual",
+        "unsubscribe",
+      ],
       description:
-        "Why the address is suppressed:\n\n- `hard_bounce`: A delivery permanently failed.\n- `complaint`: The recipient reported a message as spam.\n- `manual`: Added through the API or dashboard.\n\nAn address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
+        "Why the address is suppressed:\n\n- `hard_bounce`: A delivery permanently failed.\n- `complaint`: The recipient reported a message as spam.\n- `manual`: Added through the API or dashboard.\n- `unsubscribe`: The recipient opted out. Deprecated, and no new record carries it: an opt-out is a messaging preference rather than a suppression. Legacy records remain visible until they are moved to messaging preferences.\n\nAn address can hold one record per reason. This list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
     },
     origin: {
       type: "string",
@@ -30140,9 +34156,11 @@ export const SuppressionWritableSchema = {
         "complaint_event",
         "api_key",
         "user",
+        "unsubscribe_event",
+        "unsubscribe_link",
       ],
       description:
-        "How the suppression came to exist:\n\n- `bounce_event`: Created automatically from a hard bounce.\n- `complaint_event`: Created from a spam complaint.\n- `api_key`: Added through the API with an API key.\n- `user`: Added by a user in the dashboard.\n\nThis list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
+        "How the suppression came to exist:\n\n- `bounce_event`: Created automatically from a hard bounce.\n- `complaint_event`: Created from a spam complaint.\n- `api_key`: Added through the API with an API key.\n- `user`: Added by a user in the dashboard.\n- `unsubscribe_event`: The mailbox provider reported an opt-out. Deprecated with `reason: unsubscribe`.\n- `unsubscribe_link`: The recipient used a Bird unsubscribe link. Deprecated with `reason: unsubscribe`.\n\nThis list grows over time. Treat unknown values as informational rather than rejecting the record.\n",
     },
     applies_to: {
       type: "string",
@@ -30197,6 +34215,118 @@ export const SuppressionListWritableSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
+} as const;
+
+export const EmailCompetitiveWatchlistRowWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One brand on the watchlist, with its figures for the requested period. Your own\nworkspace appears as a row too, so the table can be read as a single ranking.\n\nEvery metric is present on every row and is `null` when it is unavailable for\nthat brand, so a `0` is always a real measurement rather than a gap. Check\n`panel_status` for why a metric is null.\n\n`esp` and `list_size` are the exception. They are populated only when you read a\nsingle brand, and are always `null` on the watchlist whatever `panel_status`\nreports.\n",
+} as const;
+
+export const EmailCompetitiveWatchlistWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The workspace's competitor watchlist with its figures for the requested period.\n\nThe list is capped by the organization's competitor limit and is returned whole,\nso it is not paginated. Your own row is included and is always first.\n",
+} as const;
+
+export const EmailCompetitiveNotableCampaignWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "A campaign the panel surfaced, and the reason it did.",
+} as const;
+
+export const EmailCompetitiveNotableFeedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Campaigns worth a second look across the brands a workspace watches.",
+  required: ["panel_status"],
+  properties: {
+    panel_status: {
+      $ref: "#/components/schemas/EmailCompetitivePanelStatus",
+      description:
+        "Whether the panel could be read for this feed, and when it could not, why.",
+    },
+  },
+} as const;
+
+export const EmailCompetitiveBrandProfileWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One watched brand's figures for the period, with its placement broken out by mailbox provider.",
+  required: ["brand"],
+  properties: {
+    brand: {
+      $ref: "#/components/schemas/EmailCompetitiveWatchlistRowWritable",
+      description:
+        "The figures the watchlist reports for this brand, derived the same way. Estimated\nvolume can differ very slightly between the two views, because each request asks the\npanel about a different set of domains and the panel scales its estimate per request.\n\n`esp` and `list_size` are populated here; the watchlist reports both as null.\n",
+    },
+  },
+} as const;
+
+export const EmailCompetitiveCampaignFeedWritableSchema = {
+  description:
+    "A page of campaigns returned for a watched brand over the period.",
+  allOf: [
+    {
+      type: "object",
+      required: ["panel_status"],
+      properties: {
+        panel_status: {
+          $ref: "#/components/schemas/EmailCompetitivePanelStatus",
+          description:
+            "For this campaign feed, no_data means the requested page is empty; it does not mean the whole period has no campaigns.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailCompetitiveSendTimeGridWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "When a watched brand sends, by weekday and hour of the day.",
+  required: ["panel_status"],
+  properties: {
+    panel_status: {
+      $ref: "#/components/schemas/EmailCompetitivePanelStatus",
+      description: "Why the grid is empty, when it is.",
+    },
+  },
+} as const;
+
+export const EmailCompetitiveBrandSeriesWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One line on the volume chart: a watched brand's sending over time, or your own.\n",
+  required: ["panel_status", "source"],
+  properties: {
+    panel_status: {
+      $ref: "#/components/schemas/EmailCompetitivePanelStatus",
+      description:
+        "Why a line has no volume in it. Always `ok` on your own line, which is counted rather than read from the panel.\n",
+    },
+    source: {
+      $ref: "#/components/schemas/EmailCompetitiveFieldSource",
+      description:
+        "Where the line came from. Your own is an exact count of what was accepted for delivery; a competitor's is the panel's estimate of everything they sent. The two share an axis while resting on different measurements, so a chart that compares them should say so.\n",
+    },
+  },
+} as const;
+
+export const EmailCompetitiveVolumeSeriesWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Volume over time for the requested watched brands, plus your own sending, on one shared daily axis.\n",
 } as const;
 
 export const EmailTemplateLanguageStateWritableSchema = {
@@ -30542,27 +34672,27 @@ export const InboundEmailMessageWritableSchema = {
       type: ["string", "null"],
       enum: ["pass", "fail", "unknown", null],
       description:
-        "Whether the sender of the received message was authenticated:\n\n- `pass`: The sender's identity was verified.\n- `fail`: The sender's identity was checked and did not verify.\n- `unknown`: No verdict is available, so the sender should not be treated as verified.\n",
+        "DMARC result for the domain in the received message's `From` header.\n\n- `pass`: SPF or DKIM passed and aligned with that domain.\n- `fail`: DMARC was evaluated and did not pass.\n- `unknown`: no trustworthy verdict is available.\n\nThis follows `dmarc_pass` and does not verify a particular person. The receiving provider currently supplies no DMARC result, so received messages report `unknown`.\n",
     },
     spf_pass: {
       type: ["boolean", "null"],
       description:
-        "Whether SPF passed for the sender, parsed from the message's authentication results. `null` when the authentication results did not include an SPF verdict.",
+        "Whether the receiving provider reports that SPF authorized the envelope sender for the sending server. A soft failure is `false`. Missing, neutral and inconclusive results are `null`.",
     },
     dkim_pass: {
       type: ["boolean", "null"],
       description:
-        "Whether DKIM passed for the sender, parsed from the message's authentication results. `null` when the authentication results did not include a DKIM verdict.",
+        "Whether the receiving provider verified a DKIM signature. A passing signature makes this `true` even when another signature fails. Missing signatures and inconclusive verification results are `null`.",
     },
     dmarc_pass: {
       type: ["boolean", "null"],
       description:
-        "Whether DMARC passed for the sender, parsed from the message's authentication results. `null` when the authentication results did not include a DMARC verdict.",
+        "Whether SPF or DKIM passed and aligned with the domain in the message's `From` header. The receiving provider currently supplies no DMARC result, so this is `null`.",
     },
     spam_score: {
       type: ["number", "null"],
       description:
-        "Spam score on the received message, or `null` when no score is available.",
+        "Content spam score when available. The receiving provider currently supplies no score, so this is `null`.",
     },
     attachments: {
       type: "array",
@@ -30649,6 +34779,7 @@ export const MailboxWritableSchema = {
     },
     retention_tier: {
       type: "string",
+      minLength: 1,
       enum: ["30d", "90d", "1y"],
       description:
         "How long message metadata, extracted text, and attachments are kept. Original bodies and inbound raw MIME are limited to 30 days on every tier.",
@@ -30840,7 +34971,7 @@ export const EmailThreadWritableSchema = {
       },
       maxItems: 20,
       description:
-        "Labels on this conversation. Exactly one system placement label is always present, set by the message that started the conversation:\n\n- `inbox`: The conversation is in the inbox.\n- `archive`: The conversation was filed away and is done for now.\n- `spam`: The conversation's opening message failed sender authentication.\n- `blocked`: The conversation's opening message was rejected by the mailbox's receive policy or rules.\n\nMove a conversation by updating its labels. Add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox`, or remove `spam`, `blocked`, or `archive`, to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list, and a conversation has at most 20 labels in total.\n",
+        "Labels on this conversation. Exactly one system placement label is always present, set by the message that started the conversation:\n\n- `inbox`: The conversation is in the inbox.\n- `archive`: The conversation was filed away and is done for now.\n- `spam`: The conversation's opening message is filed in Spam.\n- `blocked`: The conversation's opening message was rejected by the mailbox's receive policy or rules.\n\nMove a conversation by updating its labels. Add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox`, or remove `spam`, `blocked`, or `archive`, to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list, and a conversation has at most 20 labels in total.\n",
       example: ["inbox", "urgent"],
     },
   },
@@ -30882,7 +35013,7 @@ export const EmailThreadMessageWritableSchema = {
       },
       maxItems: 20,
       description:
-        "Labels on this message. A received message always has exactly one placement label:\n\n- `inbox`: Accepted mail.\n- `archive`: The message's conversation was filed away.\n- `spam`: The message failed sender authentication.\n- `blocked`: The message was rejected by the mailbox's receive policy or rules.\n\nA received message also has `unread` until it is read. `trash` marks a message in the trash, in either direction. Custom labels share the same list, and a message has at most 20 labels in total.\n",
+        "Labels on this message. A received message always has exactly one placement label:\n\n- `inbox`: Accepted mail.\n- `archive`: The message's conversation was filed away.\n- `spam`: The message is filed in Spam.\n- `blocked`: The message was rejected by the mailbox's receive policy or rules.\n\nA received message also has `unread` until it is read. `trash` marks a message in the trash, in either direction. Custom labels share the same list, and a message has at most 20 labels in total.\n",
       example: ["inbox", "unread"],
     },
     contact_id: {
@@ -31087,7 +35218,19 @@ export const WebhookEndpointCreatedWritableSchema = {
 export const EventSMSBaseWritableSchema = {
   type: "object",
   description: "Identity fields shared by every SMS lifecycle event payload.",
-  required: ["sms_id", "workspace_id", "to", "from", "tags", "metadata"],
+  required: [
+    "sms_id",
+    "workspace_id",
+    "to",
+    "from",
+    "tags",
+    "metadata",
+    "requested_language",
+    "resolved_language",
+    "template_id",
+    "template_version_id",
+    "template_content_hash",
+  ],
   properties: {
     sms_id: {
       $ref: "#/components/schemas/SMSMessageID",
@@ -31127,6 +35270,63 @@ export const EventSMSBaseWritableSchema = {
       example: {
         order_id: "ord_123",
       },
+    },
+    requested_language: {
+      description:
+        "The template language requested by the send, in canonical form. Null when the send named no language or used no template.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    resolved_language: {
+      description:
+        "The template language rendered at acceptance, in canonical form. Null when the send used no template.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    template_id: {
+      description:
+        "The template rendered at acceptance, or null for a free-text message.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    template_version_id: {
+      description:
+        "The workspace published version or synthetic built-in version rendered at acceptance, or null for a free-text message. For a built-in template, `template_content_hash` identifies the exact catalogue source.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    template_content_hash: {
+      description:
+        "The rendered language's source fingerprint, or null for a free-text message.",
+      oneOf: [
+        {
+          type: "null",
+        },
+      ],
     },
   },
 } as const;

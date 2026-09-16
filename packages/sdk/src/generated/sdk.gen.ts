@@ -39,6 +39,9 @@ import type {
   CreateEmailBroadcastData,
   CreateEmailBroadcastErrors,
   CreateEmailBroadcastResponses,
+  CreateEmailCompetitiveWatchlistBrandData,
+  CreateEmailCompetitiveWatchlistBrandErrors,
+  CreateEmailCompetitiveWatchlistBrandResponses,
   CreateEmailLookupData,
   CreateEmailLookupErrors,
   CreateEmailLookupResponses,
@@ -81,6 +84,9 @@ import type {
   CreateSmsSuppressionData,
   CreateSmsSuppressionErrors,
   CreateSmsSuppressionResponses,
+  CreateSuppressionData,
+  CreateSuppressionErrors,
+  CreateSuppressionResponses,
   CreateVerificationCheckData,
   CreateVerificationCheckErrors,
   CreateVerificationCheckResponses,
@@ -108,6 +114,9 @@ import type {
   DeleteEmailBroadcastData,
   DeleteEmailBroadcastErrors,
   DeleteEmailBroadcastResponses,
+  DeleteEmailCompetitiveWatchlistBrandData,
+  DeleteEmailCompetitiveWatchlistBrandErrors,
+  DeleteEmailCompetitiveWatchlistBrandResponses,
   DeleteEmailTemplateData,
   DeleteEmailTemplateErrors,
   DeleteEmailTemplateLanguageData,
@@ -135,6 +144,9 @@ import type {
   DeleteSmsSuppressionData,
   DeleteSmsSuppressionErrors,
   DeleteSmsSuppressionResponses,
+  DeleteSuppressionData,
+  DeleteSuppressionErrors,
+  DeleteSuppressionResponses,
   DeleteWebhookData,
   DeleteWebhookErrors,
   DeleteWebhookResponses,
@@ -174,6 +186,51 @@ import type {
   GetEmailBroadcastSendQuotaData,
   GetEmailBroadcastSendQuotaErrors,
   GetEmailBroadcastSendQuotaResponses,
+  GetEmailCompetitiveBrandCampaignData,
+  GetEmailCompetitiveBrandCampaignErrors,
+  GetEmailCompetitiveBrandCampaignResponses,
+  GetEmailCompetitiveBrandCampaignsData,
+  GetEmailCompetitiveBrandCampaignsErrors,
+  GetEmailCompetitiveBrandCampaignsResponses,
+  GetEmailCompetitiveBrandData,
+  GetEmailCompetitiveBrandErrors,
+  GetEmailCompetitiveBrandResponses,
+  GetEmailCompetitiveBrandSendTimeData,
+  GetEmailCompetitiveBrandSendTimeErrors,
+  GetEmailCompetitiveBrandSendTimeResponses,
+  GetEmailCompetitiveNotableCampaignsData,
+  GetEmailCompetitiveNotableCampaignsErrors,
+  GetEmailCompetitiveNotableCampaignsResponses,
+  GetEmailCompetitiveVolumeSeriesData,
+  GetEmailCompetitiveVolumeSeriesErrors,
+  GetEmailCompetitiveVolumeSeriesResponses,
+  GetEmailCompetitiveWatchlistData,
+  GetEmailCompetitiveWatchlistErrors,
+  GetEmailCompetitiveWatchlistResponses,
+  GetEmailHealthData,
+  GetEmailHealthErrors,
+  GetEmailHealthResponses,
+  GetEmailInboxInsightsAuthenticationData,
+  GetEmailInboxInsightsAuthenticationErrors,
+  GetEmailInboxInsightsAuthenticationResponses,
+  GetEmailInboxInsightsBlocklistsData,
+  GetEmailInboxInsightsBlocklistsErrors,
+  GetEmailInboxInsightsBlocklistsResponses,
+  GetEmailInboxInsightsComplaintsData,
+  GetEmailInboxInsightsComplaintsErrors,
+  GetEmailInboxInsightsComplaintsResponses,
+  GetEmailInboxInsightsDomainsData,
+  GetEmailInboxInsightsDomainsErrors,
+  GetEmailInboxInsightsDomainsResponses,
+  GetEmailInboxInsightsIndustryBenchmarkData,
+  GetEmailInboxInsightsIndustryBenchmarkErrors,
+  GetEmailInboxInsightsIndustryBenchmarkResponses,
+  GetEmailInboxInsightsPlacementData,
+  GetEmailInboxInsightsPlacementErrors,
+  GetEmailInboxInsightsPlacementResponses,
+  GetEmailInboxInsightsSpamTrapsData,
+  GetEmailInboxInsightsSpamTrapsErrors,
+  GetEmailInboxInsightsSpamTrapsResponses,
   GetEmailMessageData,
   GetEmailMessageErrors,
   GetEmailMessageResponses,
@@ -321,6 +378,15 @@ import type {
   GetSmsTemplateData,
   GetSmsTemplateErrors,
   GetSmsTemplateResponses,
+  GetSmsTemplateVersionData,
+  GetSmsTemplateVersionErrors,
+  GetSmsTemplateVersionLanguageData,
+  GetSmsTemplateVersionLanguageErrors,
+  GetSmsTemplateVersionLanguageResponses,
+  GetSmsTemplateVersionResponses,
+  GetSuppressionData,
+  GetSuppressionErrors,
+  GetSuppressionResponses,
   GetVoiceCallData,
   GetVoiceCallErrors,
   GetVoiceCallResponses,
@@ -485,6 +551,15 @@ import type {
   ListSmsTemplatesData,
   ListSmsTemplatesErrors,
   ListSmsTemplatesResponses,
+  ListSmsTemplateVersionLanguagesData,
+  ListSmsTemplateVersionLanguagesErrors,
+  ListSmsTemplateVersionLanguagesResponses,
+  ListSmsTemplateVersionsData,
+  ListSmsTemplateVersionsErrors,
+  ListSmsTemplateVersionsResponses,
+  ListSuppressionsData,
+  ListSuppressionsErrors,
+  ListSuppressionsResponses,
   ListVoiceCallsData,
   ListVoiceCallsErrors,
   ListVoiceCallsResponses,
@@ -548,6 +623,9 @@ import type {
   RotateWebhookSecretData,
   RotateWebhookSecretErrors,
   RotateWebhookSecretResponses,
+  SearchEmailCompetitiveBrandsData,
+  SearchEmailCompetitiveBrandsErrors,
+  SearchEmailCompetitiveBrandsResponses,
   SendEmailBroadcastData,
   SendEmailBroadcastErrors,
   SendEmailBroadcastResponses,
@@ -587,6 +665,9 @@ import type {
   UpdateEmailBroadcastData,
   UpdateEmailBroadcastErrors,
   UpdateEmailBroadcastResponses,
+  UpdateEmailInboxInsightsDomainData,
+  UpdateEmailInboxInsightsDomainErrors,
+  UpdateEmailInboxInsightsDomainResponses,
   UpdateEmailTemplateData,
   UpdateEmailTemplateErrors,
   UpdateEmailTemplateLanguageData,
@@ -605,6 +686,9 @@ import type {
   UpdateWebhookData,
   UpdateWebhookErrors,
   UpdateWebhookResponses,
+  UpsertEmailInboxInsightsDomainMonitoringData,
+  UpsertEmailInboxInsightsDomainMonitoringErrors,
+  UpsertEmailInboxInsightsDomainMonitoringResponses,
   UpsertEmailTemplateLanguageData,
   UpsertEmailTemplateLanguageErrors,
   UpsertEmailTemplateLanguageResponses,
@@ -2358,8 +2442,9 @@ export const listSmsMessages = <ThrowOnError extends boolean = false>(
  * Create an SMS message
  *
  * Sends one SMS to one recipient with exactly one content form: `text`, which
- * requires `category` and `from`, or a stored `template`, which selects both
- * for you. To submit up to 100 independent messages in one request, use
+ * requires `category` and `from`, or a stored `template`, which supplies its
+ * category. A workspace template requires `from`, while a built-in template
+ * selects its sender. To submit up to 100 independent messages in one request, use
  * [Send a batch of SMS messages](/docs/api/reference/create-sms-message-batch)
  * instead.
  *
@@ -2502,7 +2587,13 @@ export const listSmsMessageEvents = <ThrowOnError extends boolean = false>(
 /**
  * List SMS templates
  *
- * Returns the SMS templates you can send from, including our built-in templates. Filter by scope, category, or language; the catalog is small and returned in full, so this list is not paginated. To read one template's variables before sending with it, use [Get an SMS template](/docs/api/reference/get-sms-template).
+ * Returns SMS templates as a cursor-paginated list. The workspace's templates
+ * come first, newest first, followed by our built-in templates by default.
+ * Set `order=asc` to reverse this order.
+ *
+ * Filter by scope, category, status, or language. Use `q` for a
+ * case-insensitive substring match against slug, name, and description. The
+ * response is shallow; read a version to retrieve its content and variables.
  *
  */
 export const listSmsTemplates = <ThrowOnError extends boolean = false>(
@@ -2532,7 +2623,7 @@ export const listSmsTemplates = <ThrowOnError extends boolean = false>(
 /**
  * Get an SMS template
  *
- * Returns a single SMS template: its body preview, category, the `variables` it expects (each with its accepted format), and the languages it is available in. Fetch a template before sending with it to see which `parameters` keys are required; an unknown reference returns a `404`. To browse the whole catalog, use [List SMS templates](/docs/api/reference/list-sms-templates) instead.
+ * Returns one SMS template's metadata, policies, language states, draft revision, and draft and live version IDs. The response is shallow; read a version to retrieve content and variables. An unknown or deleted template returns `404`.
  *
  */
 export const getSmsTemplate = <ThrowOnError extends boolean = false>(
@@ -2552,6 +2643,130 @@ export const getSmsTemplate = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/sms/templates/{template_ref}",
+    ...options,
+  });
+
+/**
+ * List an SMS template's versions
+ *
+ * Returns a cursor-paginated version history, newest first. Each entry is shallow and names its variables and languages. Read a version item or one of its languages to retrieve text. A built-in template exposes its current catalogue content as one synthetic published version.
+ *
+ */
+export const listSmsTemplateVersions = <ThrowOnError extends boolean = false>(
+  options: Options<ListSmsTemplateVersionsData, ThrowOnError>,
+): RequestResult<
+  ListSmsTemplateVersionsResponses,
+  ListSmsTemplateVersionsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListSmsTemplateVersionsResponses,
+    ListSmsTemplateVersionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/sms/templates/{template_ref}/versions",
+    ...options,
+  });
+
+/**
+ * Get an SMS template version
+ *
+ * Returns one version with its variables and text in every language. A workspace draft is editable, while published workspace versions are immutable. A built-in template exposes its current catalogue content through a synthetic published version.
+ *
+ */
+export const getSmsTemplateVersion = <ThrowOnError extends boolean = false>(
+  options: Options<GetSmsTemplateVersionData, ThrowOnError>,
+): RequestResult<
+  GetSmsTemplateVersionResponses,
+  GetSmsTemplateVersionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetSmsTemplateVersionResponses,
+    GetSmsTemplateVersionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/sms/templates/{template_ref}/versions/{version_id}",
+    ...options,
+  });
+
+/**
+ * List an SMS template version's languages
+ *
+ * Returns the languages a version holds, ordered by canonical language tag, without their text. Each summary includes the revision and content hash needed to detect changes. A version holds at most 25 languages.
+ *
+ */
+export const listSmsTemplateVersionLanguages = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListSmsTemplateVersionLanguagesData, ThrowOnError>,
+): RequestResult<
+  ListSmsTemplateVersionLanguagesResponses,
+  ListSmsTemplateVersionLanguagesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListSmsTemplateVersionLanguagesResponses,
+    ListSmsTemplateVersionLanguagesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/sms/templates/{template_ref}/versions/{version_id}/languages",
+    ...options,
+  });
+
+/**
+ * Get an SMS template version's language
+ *
+ * Returns one language's full text, revision, content hash, and update time. The response echoes the language in its canonical BCP-47 form.
+ *
+ */
+export const getSmsTemplateVersionLanguage = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetSmsTemplateVersionLanguageData, ThrowOnError>,
+): RequestResult<
+  GetSmsTemplateVersionLanguageResponses,
+  GetSmsTemplateVersionLanguageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetSmsTemplateVersionLanguageResponses,
+    GetSmsTemplateVersionLanguageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/sms/templates/{template_ref}/versions/{version_id}/languages/{language}",
     ...options,
   });
 
@@ -4959,6 +5174,436 @@ export const getWhatsAppBusinessAccount = <
   });
 
 /**
+ * Get inbox placement for a sending domain
+ *
+ * Returns where a sending domain's measured mail landed over the period
+ * (inbox or spam): the domain-wide rates, a per-provider table, a time
+ * series, the Gmail tab split, and optionally per-IP detail for the domain's
+ * sending infrastructure.
+ *
+ * Placement figures are estimates from a measurement panel of real
+ * mailboxes. Every rate is a percentage of measured placements, never of
+ * delivered volume, and the domain-wide summary is weighted against the
+ * audience mix described in `measurement`, so it can legitimately differ
+ * from any single provider row. Delta fields appear only when the request
+ * asks for a comparison and the prior period has data; their absence means
+ * no comparable prior data, never zero change.
+ *
+ * The series is sparse: buckets with no measured placement are omitted, not
+ * returned as zeros, so charts index by date rather than by position. Each
+ * section carries its own status, and a successful response never implies
+ * every section is populated.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailInboxInsightsPlacement = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEmailInboxInsightsPlacementData, ThrowOnError>,
+): RequestResult<
+  GetEmailInboxInsightsPlacementResponses,
+  GetEmailInboxInsightsPlacementErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailInboxInsightsPlacementResponses,
+    GetEmailInboxInsightsPlacementErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/placement",
+    ...options,
+  });
+
+/**
+ * Get email authentication standing for a sending domain
+ *
+ * Returns whether the domain's mail authenticates and who sends as the
+ * domain: SPF and DKIM pass rates, the DMARC standing with its published
+ * policy and a conservative ready-for-reject judgement, and a per-source
+ * table showing every system observed sending under the domain's name,
+ * forwarders and unidentified senders included.
+ *
+ * The DMARC figures name their source: authoritative aggregate reporting
+ * that covers every sender, or Google Postmaster as a fallback covering
+ * only mail Google received. Aggregate reports arrive on reporters' own
+ * schedules, routinely a day or more behind, so the source table names its
+ * latest included day; label from it rather than reading the newest days'
+ * sparseness as a regression. For a domain with neither reporting source
+ * configured, sections report `not_configured` with a setup path, not an
+ * error.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailInboxInsightsAuthentication = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEmailInboxInsightsAuthenticationData, ThrowOnError>,
+): RequestResult<
+  GetEmailInboxInsightsAuthenticationResponses,
+  GetEmailInboxInsightsAuthenticationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailInboxInsightsAuthenticationResponses,
+    GetEmailInboxInsightsAuthenticationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/authentication",
+    ...options,
+  });
+
+/**
+ * Get the Google-reported spam rate for a sending domain
+ *
+ * Returns how often the domain's mail is reported as spam by Gmail
+ * recipients, as Google Postmaster measures it: the rate for the period and
+ * a time series for charting.
+ *
+ * This is Google's number for Gmail-received mail only. The feedback-loop
+ * complaint rate across all providers is a Bird-measured figure served by
+ * the email statistics endpoints; the two count different mail and are
+ * rendered as separate lines, never combined. For a domain without a
+ * completed Google Postmaster connection, sections report `not_configured`
+ * with a setup path, not an error.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailInboxInsightsComplaints = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEmailInboxInsightsComplaintsData, ThrowOnError>,
+): RequestResult<
+  GetEmailInboxInsightsComplaintsResponses,
+  GetEmailInboxInsightsComplaintsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailInboxInsightsComplaintsResponses,
+    GetEmailInboxInsightsComplaintsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/complaints",
+    ...options,
+  });
+
+/**
+ * Get spam-trap hits for a sending domain
+ *
+ * Returns the spam-trap hits recorded against a sending domain over the
+ * period: the total, a split by the kind of trap, a split by the trap
+ * network that observed them, and the individual hits with the sending IP
+ * and trap age behind each.
+ *
+ * Spam traps are addresses that exist only to catch senders mailing lists
+ * they should not be mailing, so the kind of trap says more than the count.
+ * Hits on pristine traps, which never belonged to a real person, point at
+ * harvested or guessed addresses; hits on recycled traps point at stale list
+ * data. Zero hits is a measured zero and a good result, so the totals are
+ * real figures rather than an empty state.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailInboxInsightsSpamTraps = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEmailInboxInsightsSpamTrapsData, ThrowOnError>,
+): RequestResult<
+  GetEmailInboxInsightsSpamTrapsResponses,
+  GetEmailInboxInsightsSpamTrapsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailInboxInsightsSpamTrapsResponses,
+    GetEmailInboxInsightsSpamTrapsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/spam-traps",
+    ...options,
+  });
+
+/**
+ * Check whether a sending domain's infrastructure is blocklisted
+ *
+ * Checks every sending IP behind a sending domain against the blocklists
+ * receivers consult, and returns what is listed now plus the listings seen
+ * recently against each target.
+ *
+ * The check runs when the request is made, so this is a live lookup rather
+ * than a measurement over a period: there is no window, and only the
+ * freshness lag hint applies. Providers that publish several lists are
+ * reported per list, because what a listing means and how it is cleared
+ * differ between them.
+ *
+ * Each target is looked up separately, so one can fail while the rest
+ * succeed. A target nobody managed to check comes back with its `status`
+ * reporting that and its `checked_at` null, rather than as a target that
+ * came back clear, and `active_count` is null rather than zero when no target
+ * could be checked at all. That is what keeps "nothing is listed" and "the
+ * check did not run" from being mistaken for each other. A `503` means Bird
+ * could not reach the lookup service at all, which is a different answer from
+ * a lookup that ran and reported nothing.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailInboxInsightsBlocklists = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEmailInboxInsightsBlocklistsData, ThrowOnError>,
+): RequestResult<
+  GetEmailInboxInsightsBlocklistsResponses,
+  GetEmailInboxInsightsBlocklistsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailInboxInsightsBlocklistsResponses,
+    GetEmailInboxInsightsBlocklistsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/blocklists",
+    ...options,
+  });
+
+/**
+ * Get the industry placement benchmark for a sending domain
+ *
+ * Returns how senders in a sending domain's industry place: the median inbox
+ * rate across the industry's measured senders, how many senders that median
+ * covers, and the industry the domain was classified into.
+ *
+ * The benchmark describes the industry rather than the domain, so it carries
+ * no comparison of its own. Compare it against the domain's own inbox rate
+ * from the placement resource. Its weighting is a general default rather than
+ * any one account's audience mix, a deliberate asymmetry with the placement
+ * figure it is compared against, and one worth naming wherever the two
+ * appear together.
+ *
+ * The status is `no_data` when too few measured senders share the industry
+ * for a median to be meaningful, when the domain's industry is not
+ * classified, or before the industry figures have been computed. That state
+ * is normal for a young cohort rather than an edge case, so handle it from
+ * the start.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailInboxInsightsIndustryBenchmark = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEmailInboxInsightsIndustryBenchmarkData, ThrowOnError>,
+): RequestResult<
+  GetEmailInboxInsightsIndustryBenchmarkResponses,
+  GetEmailInboxInsightsIndustryBenchmarkErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailInboxInsightsIndustryBenchmarkResponses,
+    GetEmailInboxInsightsIndustryBenchmarkErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/benchmarks/industry",
+    ...options,
+  });
+
+/**
+ * List sending domains and their Inbox Insights status
+ *
+ * Returns a page of sending domains this workspace can report on, in alphabetical
+ * order by default, and whether Inbox Insights is switched on for each.
+ *
+ * Only verified domains appear. Verifying a domain proves it is yours, which is
+ * what Inbox Insights needs before it will report on it, and a domain that loses
+ * its verification drops out of this list even if it was switched on.
+ *
+ * A domain does not have to be ready to send to appear here. Verification and
+ * sending readiness are reported separately on your sending domains, and this
+ * list follows the first.
+ *
+ * Use this list to select a verified domain for placement and reputation reports.
+ * The `monitored` field records the workspace's monitoring preference; report access
+ * depends on verified ownership and remains available when monitoring is off.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailInboxInsightsDomains = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetEmailInboxInsightsDomainsData, ThrowOnError>,
+): RequestResult<
+  GetEmailInboxInsightsDomainsResponses,
+  GetEmailInboxInsightsDomainsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetEmailInboxInsightsDomainsResponses,
+    GetEmailInboxInsightsDomainsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/domains",
+    ...options,
+  });
+
+/**
+ * Switch Inbox Insights on or off for a sending domain
+ *
+ * Changes the workspace's monitoring preference for one of its verified sending
+ * domains. Enabling enrolls the domain with eDataSource before saving the preference.
+ * Disabling removes the preference without removing vendor enrollment or history.
+ * Report reads remain available for verified owned domains regardless of this setting.
+ *
+ * A domain switched on for the first time has to be measured before it has
+ * anything to report, so its results start empty and fill in as its mail is
+ * seen. Switching off keeps everything measured so far: switching the domain
+ * back on restores it in full and takes effect immediately, rather than starting
+ * the domain over.
+ *
+ * Setting the value it already has changes nothing and answers normally, so this
+ * is safe to repeat.
+ *
+ * API-key and service-account calls require Insights preview access for your organization.
+ *
+ */
+export const updateEmailInboxInsightsDomain = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<UpdateEmailInboxInsightsDomainData, ThrowOnError>,
+): RequestResult<
+  UpdateEmailInboxInsightsDomainResponses,
+  UpdateEmailInboxInsightsDomainErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateEmailInboxInsightsDomainResponses,
+    UpdateEmailInboxInsightsDomainErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/domains/{sending_domain}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Switch Inbox Insights on for the workspace's main sending domain
+ *
+ * Switches Inbox Insights on for the workspace's main sending domain, so a
+ * workspace opening the product for the first time has something to read
+ * without having to pick a domain first.
+ *
+ * The main sending domain is the one verified domain if there is only one, and
+ * otherwise the verified domain that has sent the most mail over the last 30
+ * days. Where the main domain cannot be identified, nothing is switched on and
+ * the response says so. Which domain matters most is the customer's call, and
+ * not a guess worth making on their behalf.
+ *
+ * Safe to repeat. A workspace that already has a domain switched on is left
+ * exactly as it is, and the response says nothing changed.
+ *
+ * This chooses a starting point, not a permanent setting: the domain it picks
+ * is switched on the same way as one chosen by hand, and can be switched off
+ * or added to at any time.
+ *
+ * API-key and service-account calls require Insights preview access for your organization.
+ *
+ */
+export const upsertEmailInboxInsightsDomainMonitoring = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<UpsertEmailInboxInsightsDomainMonitoringData, ThrowOnError>,
+): RequestResult<
+  UpsertEmailInboxInsightsDomainMonitoringResponses,
+  UpsertEmailInboxInsightsDomainMonitoringErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).post<
+    UpsertEmailInboxInsightsDomainMonitoringResponses,
+    UpsertEmailInboxInsightsDomainMonitoringErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/domain-monitoring",
+    ...options,
+  });
+
+/**
  * Get daily sending statistics
  *
  * Returns one row of aggregate sending statistics per calendar day for the workspace: UTC days by default, or your local days when `timezone` is set. Days with no activity are included with zero counts, so the series charts without client-side gap handling. Suited to charts and trend lines; for per-message exact accounting use the message detail endpoints.
@@ -5513,6 +6158,36 @@ export const getEmailStatsByBroadcast = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Get sending health and deliverability limits
+ *
+ * Returns your workspace's sending-health verdict for the requested window, together with reference deliverability limits and the boundaries used to classify risk. Use it to render a health badge, label the bounce-rate and complaint-rate limits, and draw the risk lines on a deliverability chart without hard-coding thresholds that we may retune.
+ *
+ * The overall `status` is `healthy`, `watching`, or `throttled`, taken as the worst of the delivery-rate, bounce-rate, and complaint-rate signals. It describes deliverability risk and never pauses your sending on its own. For the counts and rates the verdict is derived from, call [Get aggregate email statistics](/docs/api/reference/get-email-stats-summary) over the same window.
+ *
+ * Rates follow each event's occurrence time. A bounce or complaint that occurred during the window counts toward it even when the message was sent earlier. When you omit both dates the window ends today (UTC) and starts 7 days earlier. A window longer than 365 days returns `422`.
+ *
+ */
+export const getEmailHealth = <ThrowOnError extends boolean = false>(
+  options?: Options<GetEmailHealthData, ThrowOnError>,
+): RequestResult<GetEmailHealthResponses, GetEmailHealthErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    GetEmailHealthResponses,
+    GetEmailHealthErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/health",
+    ...options,
+  });
+
+/**
  * List sending domains
  *
  * Returns all sending domains for the current workspace, newest first by default. Each item is the full domain object, including capability statuses and `dns_records`, so no per-domain follow-up read is needed. Filter with `name` to find a specific domain.
@@ -5707,6 +6382,609 @@ export const verifyDomain = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/email/domains/{domain_id}/verify",
+    ...options,
+  });
+
+/**
+ * List email suppressions
+ *
+ * Returns the workspace's suppressed email addresses as a paginated list, newest first. Pass an address in the `email` parameter to narrow the page to that address.
+ *
+ * The `email` filter matches by prefix rather than exactly, so `bob@example.com` also returns a suppressed `bob@example.com.au`. Compare the `email` on each record before treating the address you asked about as suppressed.
+ *
+ * An address can appear more than once because Bird keeps one suppression record per reason. Delivery stays blocked while any blocking record for the address remains.
+ *
+ */
+export const listSuppressions = <ThrowOnError extends boolean = false>(
+  options?: Options<ListSuppressionsData, ThrowOnError>,
+): RequestResult<
+  ListSuppressionsResponses,
+  ListSuppressionsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListSuppressionsResponses,
+    ListSuppressionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/suppressions",
+    ...options,
+  });
+
+/**
+ * Create an email suppression
+ *
+ * Adds an email address to the suppression list, stopping all email to it. The record is created with reason `manual` and blocks every message category, including transactional.
+ *
+ * Adding is idempotent: a `201` means a new record was created, and a `200` means a `manual` suppression for the address already existed and is returned unchanged. An address suppressed for another reason (for example `hard_bounce`) gets a separate `manual` record, and delivery stays blocked until every blocking record is removed.
+ *
+ */
+export const createSuppression = <ThrowOnError extends boolean = false>(
+  options: Options<CreateSuppressionData, ThrowOnError>,
+): RequestResult<
+  CreateSuppressionResponses,
+  CreateSuppressionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateSuppressionResponses,
+    CreateSuppressionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/suppressions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete an email suppression
+ *
+ * Permanently deletes the selected suppression record. Other blocking records for the address remain in effect. Deletion cannot be undone. If the address hard-bounces or the recipient complains again, a new suppression is created automatically.
+ *
+ * Most records exist because the address bounced or complained. Resuming delivery without cause can harm sender reputation. An address suppressed for several reasons has one record per reason. Delete each blocking record to re-enable delivery. To find a record by address, use `GET /v1/email/suppressions` with the `email` parameter. An ID that does not exist in the workspace returns `404`.
+ *
+ * A record with reason `complaint` can only be deleted by a signed-in dashboard user; an API key gets `422` (`SuppressionNotRemovableByAPIKey`). `hard_bounce` and `manual` records are unaffected and stay removable either way.
+ *
+ */
+export const deleteSuppression = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteSuppressionData, ThrowOnError>,
+): RequestResult<
+  DeleteSuppressionResponses,
+  DeleteSuppressionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteSuppressionResponses,
+    DeleteSuppressionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/suppressions/{suppression_id}",
+    ...options,
+  });
+
+/**
+ * Get an email suppression
+ *
+ * Returns one suppression record:
+ *
+ * - The address.
+ * - Why it is suppressed (`reason`).
+ * - How the record came to exist (`origin`).
+ * - Which message categories it blocks (`applies_to`).
+ *
+ * To find a record when you only know the address, use `GET /v1/email/suppressions` with the `email` parameter. An ID that does not exist in the workspace returns `404`.
+ *
+ */
+export const getSuppression = <ThrowOnError extends boolean = false>(
+  options: Options<GetSuppressionData, ThrowOnError>,
+): RequestResult<GetSuppressionResponses, GetSuppressionErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetSuppressionResponses,
+    GetSuppressionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/suppressions/{suppression_id}",
+    ...options,
+  });
+
+/**
+ * Get the competitor watchlist with its latest figures
+ *
+ * Returns every competitor brand on the workspace's watchlist, plus a row for
+ * your own sending, each with estimated send volume and how it changed against
+ * the previous period, how often the brand sends, inbox placement, estimated
+ * read rate, audience overlap with you, and the most recent campaign seen.
+ *
+ * Figures about a competitor are estimates from an email panel, which observes a
+ * sample of real inboxes and scales what it sees up to a whole audience. They
+ * are fetched while the request runs, so they are current rather than cached,
+ * and two requests minutes apart can differ slightly. Figures about your own
+ * sending are counted rather than estimated wherever that is possible. The
+ * `provenance` object on each row records which source each figure came from.
+ *
+ * A figure reads `null` when it is unavailable for that brand, so a `0` always
+ * means a real measurement. When a whole row has no figures, `panel_status` says
+ * why: the panel may not track the brand's sending domain, may track it but have
+ * seen no mail in the period, or may have been briefly unreachable.
+ *
+ * `esp` and `list_size` are the exception, and are always `null` here. Read a
+ * single brand to get them.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailCompetitiveWatchlist = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetEmailCompetitiveWatchlistData, ThrowOnError>,
+): RequestResult<
+  GetEmailCompetitiveWatchlistResponses,
+  GetEmailCompetitiveWatchlistErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetEmailCompetitiveWatchlistResponses,
+    GetEmailCompetitiveWatchlistErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/competitive/watchlist",
+    ...options,
+  });
+
+/**
+ * Get the notable campaigns across watched brands
+ *
+ * Returns the campaigns worth a second look across every brand the workspace watches,
+ * surfaced for what they did rather than for when they were sent.
+ *
+ * Each campaign carries the signal that surfaced it: an unusually big send for its brand,
+ * a campaign read unusually well for its brand, or heavy spam placement at one mailbox
+ * provider. Every signal compares a campaign against its own brand's history, never
+ * against your other brands, so several brands can carry the same signal in one period.
+ *
+ * Up to 100 findings are returned. Selection takes turns across brands in watchlist order
+ * until the response is full, prioritizing spam placement, biggest sends, then read-rate
+ * standouts within a brand. Returned findings retain watchlist, signal, domain, and source
+ * order. Your own sending is never included.
+ *
+ * An empty list is an ordinary answer, not a failure: a signal only fires on a campaign
+ * that stands out for its own brand, and a watchlist of steady senders produces nothing.
+ * Check `panel_status` to tell that apart from the panel being unreachable.
+ *
+ * This is a separate request from the watchlist on purpose, so a slow or degraded panel
+ * read cannot delay the watchlist itself.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailCompetitiveNotableCampaigns = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetEmailCompetitiveNotableCampaignsData, ThrowOnError>,
+): RequestResult<
+  GetEmailCompetitiveNotableCampaignsResponses,
+  GetEmailCompetitiveNotableCampaignsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetEmailCompetitiveNotableCampaignsResponses,
+    GetEmailCompetitiveNotableCampaignsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/competitive/watchlist/notable",
+    ...options,
+  });
+
+/**
+ * Add a competitor brand to the watchlist
+ *
+ * Adds a brand to the workspace's watchlist so its figures appear next to your
+ * own. Pass a `brand_id` from a brand search.
+ *
+ * Adding a brand records the one domain the panel sees the most of its mail
+ * from, and every figure reported for the brand describes that domain. A brand
+ * that mails from several domains therefore reports less than its full volume.
+ * A brand the panel has never seen send cannot be measured at all and is
+ * refused.
+ *
+ * How many brands can be watched is capped per organization, counted across
+ * every workspace it owns, so the same competitor watched from two workspaces
+ * uses two of the allowance.
+ *
+ * API-key, OAuth, and service-account calls require Insights preview access for your organization.
+ *
+ */
+export const createEmailCompetitiveWatchlistBrand = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateEmailCompetitiveWatchlistBrandData, ThrowOnError>,
+): RequestResult<
+  CreateEmailCompetitiveWatchlistBrandResponses,
+  CreateEmailCompetitiveWatchlistBrandErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateEmailCompetitiveWatchlistBrandResponses,
+    CreateEmailCompetitiveWatchlistBrandErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/competitive/watchlist/brands",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Remove a competitor brand from the watchlist
+ *
+ * Takes a brand off the workspace's watchlist and frees its place in the
+ * organization's allowance. Nothing about the brand is retained, so adding it
+ * again starts a fresh entry.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const deleteEmailCompetitiveWatchlistBrand = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<DeleteEmailCompetitiveWatchlistBrandData, ThrowOnError>,
+): RequestResult<
+  DeleteEmailCompetitiveWatchlistBrandResponses,
+  DeleteEmailCompetitiveWatchlistBrandErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteEmailCompetitiveWatchlistBrandResponses,
+    DeleteEmailCompetitiveWatchlistBrandErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/competitive/watchlist/brands/{watchlist_brand_id}",
+    ...options,
+  });
+
+/**
+ * Get a watched brand's figures
+ *
+ * Returns one watched brand's figures for the period, together with how each mailbox
+ * provider treated its mail and how that compares with your own.
+ *
+ * The headline figures are the ones the watchlist reports for this brand, derived the same
+ * way from the same fields. Estimated volume can differ very slightly between the two
+ * views, because each request asks the panel about a different set of domains and the panel
+ * scales its estimate per request. The figures the two views share are either rates or
+ * built from raw counts, and are identical. The per-provider breakdown, `esp`, and
+ * `list_size` are available only here.
+ *
+ * Every figure is an estimate from an email panel, fetched while the request runs,
+ * except your own inbox rate where noted.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailCompetitiveBrand = <ThrowOnError extends boolean = false>(
+  options: Options<GetEmailCompetitiveBrandData, ThrowOnError>,
+): RequestResult<
+  GetEmailCompetitiveBrandResponses,
+  GetEmailCompetitiveBrandErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailCompetitiveBrandResponses,
+    GetEmailCompetitiveBrandErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/competitive/watchlist/brands/{watchlist_brand_id}",
+    ...options,
+  });
+
+/**
+ * Get the campaigns a watched brand sent
+ *
+ * Returns a page of campaigns an email panel observed a watched brand sending over
+ * the period, in the requested order. Sampled statistics describe eligible campaigns
+ * in the first 300 newest panel rows for each tracked domain, independently of the page.
+ *
+ * Each campaign is one send the panel saw reach real inboxes, so the subject and
+ * timing are what the brand's subscribers received rather than anything the brand
+ * published. Volume and read rate are panel estimates, fetched while the request
+ * runs.
+ *
+ * The panel folds a day's low-volume sending into a single synthetic entry with no
+ * creative and no volume. Those are left out, so the count here is lower than the
+ * number of rows the panel holds and describes campaigns a person would recognise
+ * as campaigns.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailCompetitiveBrandCampaigns = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEmailCompetitiveBrandCampaignsData, ThrowOnError>,
+): RequestResult<
+  GetEmailCompetitiveBrandCampaignsResponses,
+  GetEmailCompetitiveBrandCampaignsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailCompetitiveBrandCampaignsResponses,
+    GetEmailCompetitiveBrandCampaignsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/competitive/watchlist/brands/{watchlist_brand_id}/campaigns",
+    ...options,
+  });
+
+/**
+ * Get one campaign a watched brand sent
+ *
+ * Returns one campaign an email panel observed a watched brand sending. It carries the
+ * same figures the brand's campaign list gives for that campaign, so a page can open one
+ * campaign without reading the whole list first.
+ *
+ * The campaign has to be one the brand in the path sent. An identifier that belongs to
+ * another brand's campaign comes back as not found, whether or not the panel holds it. A
+ * workspace can read the campaigns of the brands it watches, and no others.
+ *
+ * The panel folds a day of low-volume sending into one synthetic entry, and the campaign
+ * list leaves those out. They stand for a day of sending rather than for a campaign
+ * anyone sent, so they come back as not found here as well.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailCompetitiveBrandCampaign = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEmailCompetitiveBrandCampaignData, ThrowOnError>,
+): RequestResult<
+  GetEmailCompetitiveBrandCampaignResponses,
+  GetEmailCompetitiveBrandCampaignErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailCompetitiveBrandCampaignResponses,
+    GetEmailCompetitiveBrandCampaignErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/competitive/watchlist/brands/{watchlist_brand_id}/campaigns/{campaign_id}",
+    ...options,
+  });
+
+/**
+ * Get when a watched brand sends
+ *
+ * Returns how a watched brand's sending is spread across the week: one figure per
+ * weekday and hour of the day, over the last 90 days, with the hour of the day it
+ * sends most of its mail in.
+ *
+ * Each hour counts when the brand **sent**, not when its subscribers opened or
+ * received the mail. It answers "when does this brand mail its list", which is what
+ * a competing send has to be timed against. It says nothing about how busy a
+ * subscriber's inbox was at that hour.
+ *
+ * Hours are reported in the timezone you ask for, echoed back in `timezone`, and the
+ * week is folded into that zone before it is totalled, so a send at 02:00 UTC on
+ * Monday counts as Sunday evening for a reader in New York, which is when it arrived
+ * for them. Label an axis from `timezone` rather than from what you asked for: a
+ * response the panel could not answer reports UTC regardless.
+ *
+ * Expect the weekday axis to look flat. For most brands the hour of the day is where
+ * the pattern is, and which day of the week it is barely moves the figure; a grid
+ * with little variation down its rows is a real finding about how the brand mails
+ * rather than a gap in the data.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailCompetitiveBrandSendTime = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEmailCompetitiveBrandSendTimeData, ThrowOnError>,
+): RequestResult<
+  GetEmailCompetitiveBrandSendTimeResponses,
+  GetEmailCompetitiveBrandSendTimeErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailCompetitiveBrandSendTimeResponses,
+    GetEmailCompetitiveBrandSendTimeErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/competitive/watchlist/brands/{watchlist_brand_id}/send-time",
+    ...options,
+  });
+
+/**
+ * Search brands to add to the watchlist
+ *
+ * Searches for brands by name and returns the ones that can be watched, each
+ * with the domain its figures would describe and the identifier to add it with.
+ * Paste a domain instead of a name to find the brand that sends from it.
+ *
+ * Brands the panel has never seen send are left out, since no figure could be
+ * reported for them. An empty result for a real brand name therefore means the
+ * panel does not track that brand rather than that the search failed.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const searchEmailCompetitiveBrands = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<SearchEmailCompetitiveBrandsData, ThrowOnError>,
+): RequestResult<
+  SearchEmailCompetitiveBrandsResponses,
+  SearchEmailCompetitiveBrandsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    SearchEmailCompetitiveBrandsResponses,
+    SearchEmailCompetitiveBrandsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/competitive/brands/search",
+    ...options,
+  });
+
+/**
+ * Get send volume over time for watched brands
+ *
+ * Returns daily send volume for the watched brands you name, plus a line for your
+ * own sending, over one shared axis. Intended for a chart comparing a handful of
+ * competitors against yourself rather than the whole watchlist: each brand you name
+ * and each month of range adds to how long the request takes, so ask for the few
+ * you are plotting.
+ *
+ * Competitor volume is an estimate from an email panel, fetched while the request
+ * runs. Your own line counts messages accepted for delivery. The `source` field on each line records which of the two it is, and
+ * the two are not measuring the same thing, so a chart putting them on one axis
+ * should say so.
+ *
+ * Every line carries one point per day of the period, oldest first, with a `0` for
+ * a day nothing was observed, so the lines need no aligning before plotting. The last
+ * point is the last whole UTC day, not the one in progress, so your own line and a
+ * competitor's cover the same days. A line with no points at all has a `panel_status`
+ * saying why.
+ *
+ * API-key calls require Insights preview access for your organization.
+ *
+ */
+export const getEmailCompetitiveVolumeSeries = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetEmailCompetitiveVolumeSeriesData, ThrowOnError>,
+): RequestResult<
+  GetEmailCompetitiveVolumeSeriesResponses,
+  GetEmailCompetitiveVolumeSeriesErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetEmailCompetitiveVolumeSeriesResponses,
+    GetEmailCompetitiveVolumeSeriesErrors,
+    ThrowOnError
+  >({
+    querySerializer: {
+      parameters: { brand_ids: { array: { explode: false } } },
+    },
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/competitive/volume-series",
     ...options,
   });
 

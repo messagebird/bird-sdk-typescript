@@ -32,7 +32,7 @@ export class SmsResourceBase extends Resource {
    */
   list(query?: SmsListQuery, options?: RequestOptions): PaginatedPromise<SmsMessage> {
     return this.paginated<SmsMessage>("GET", options, ({ signal, headers }, cursor) =>
-      listSmsMessages({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listSmsMessages({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

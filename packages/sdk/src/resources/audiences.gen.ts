@@ -24,7 +24,7 @@ export class AudiencesResource extends Resource {
    */
   list(query?: AudienceListQuery, options?: RequestOptions): PaginatedPromise<Audience> {
     return this.paginated<Audience>("GET", options, ({ signal, headers }, cursor) =>
-      listAudiences({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listAudiences({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**
@@ -83,7 +83,7 @@ export class AudiencesResource extends Resource {
    */
   listContacts(audienceId: string, query?: AudienceListContactsQuery, options?: RequestOptions): PaginatedPromise<AudienceMember> {
     return this.paginated<AudienceMember>("GET", options, ({ signal, headers }, cursor) =>
-      listAudienceContacts({ client: this.client, path: { audience_id: audienceId }, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listAudienceContacts({ client: this.client, path: { audience_id: audienceId }, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

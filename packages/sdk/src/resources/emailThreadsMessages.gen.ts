@@ -21,7 +21,7 @@ export class EmailThreadsMessagesResource extends Resource {
    */
   list(threadId: string, query?: EmailThreadsMessagesListQuery, options?: RequestOptions): PaginatedPromise<EmailThreadMessage> {
     return this.paginated<EmailThreadMessage>("GET", options, ({ signal, headers }, cursor) =>
-      listEmailThreadMessages({ client: this.client, path: { thread_id: threadId }, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listEmailThreadMessages({ client: this.client, path: { thread_id: threadId }, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

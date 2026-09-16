@@ -18,7 +18,7 @@ export class WhatsappBusinessAccountsResource extends Resource {
    */
   list(query?: WhatsappBusinessAccountsListQuery, options?: RequestOptions): PaginatedPromise<WhatsAppBusinessAccount> {
     return this.paginated<WhatsAppBusinessAccount>("GET", options, ({ signal, headers }, cursor) =>
-      listWhatsAppBusinessAccounts({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listWhatsAppBusinessAccounts({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

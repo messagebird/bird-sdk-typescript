@@ -20,7 +20,7 @@ export class WhatsappNumbersResourceBase extends Resource {
    */
   list(query?: WhatsappNumbersListQuery, options?: RequestOptions): PaginatedPromise<WhatsAppNumber> {
     return this.paginated<WhatsAppNumber>("GET", options, ({ signal, headers }, cursor) =>
-      listWhatsAppNumbers({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listWhatsAppNumbers({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**
@@ -47,6 +47,6 @@ export class WhatsappNumbersResourceBase extends Resource {
    */
   listEvents(numberId: string, query?: WhatsappNumbersListEventsQuery, options?: RequestOptions): PaginatedPromise<WhatsAppNumberEvent> {
     return this.paginated<WhatsAppNumberEvent>("GET", options, ({ signal, headers }, cursor) =>
-      listWhatsAppNumberEvents({ client: this.client, path: { number_id: numberId }, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listWhatsAppNumberEvents({ client: this.client, path: { number_id: numberId }, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 }

@@ -18,7 +18,7 @@ export class EmailTemplatesVersionsResourceBase extends Resource {
    */
   list(templateRef: string, query?: EmailTemplatesVersionsListQuery, options?: RequestOptions): PaginatedPromise<EmailTemplateVersionSummary> {
     return this.paginated<EmailTemplateVersionSummary>("GET", options, ({ signal, headers }, cursor) =>
-      listEmailTemplateVersions({ client: this.client, path: { template_ref: templateRef }, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listEmailTemplateVersions({ client: this.client, path: { template_ref: templateRef }, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

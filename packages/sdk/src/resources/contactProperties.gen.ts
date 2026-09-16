@@ -21,7 +21,7 @@ export class ContactPropertiesResource extends Resource {
    */
   list(query?: ContactPropertyListQuery, options?: RequestOptions): PaginatedPromise<ContactProperty> {
     return this.paginated<ContactProperty>("GET", options, ({ signal, headers }, cursor) =>
-      listContactProperties({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listContactProperties({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

@@ -76,6 +76,20 @@ export const EmailCompatibilityRuleID = {
 export type EmailCompatibilityRuleIDValue = (typeof EmailCompatibilityRuleID)[keyof typeof EmailCompatibilityRuleID];
 
 /**
+ * Values of EmailCompetitiveCampaignSignal known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailCompetitiveCampaignSignal = {
+  BiggestSend: "biggest_send",
+  LandingInSpam: "landing_in_spam",
+  ReadRateStandout: "read_rate_standout",
+} as const;
+
+/** A known EmailCompetitiveCampaignSignal value. */
+export type EmailCompetitiveCampaignSignalValue = (typeof EmailCompetitiveCampaignSignal)[keyof typeof EmailCompetitiveCampaignSignal];
+
+/**
  * Values of EmailEventType known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -99,6 +113,82 @@ export const EmailEventType = {
 
 /** A known EmailEventType value. */
 export type EmailEventTypeValue = (typeof EmailEventType)[keyof typeof EmailEventType];
+
+/**
+ * Values of EmailInboxInsightsDmarcReadinessReason known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailInboxInsightsDmarcReadinessReason = {
+  DataTooStale: "data_too_stale",
+  NoPolicy: "no_policy",
+  NoRuaData: "no_rua_data",
+  SourceBelowThreshold: "source_below_threshold",
+} as const;
+
+/** A known EmailInboxInsightsDmarcReadinessReason value. */
+export type EmailInboxInsightsDmarcReadinessReasonValue = (typeof EmailInboxInsightsDmarcReadinessReason)[keyof typeof EmailInboxInsightsDmarcReadinessReason];
+
+/**
+ * Values of EmailInboxInsightsDmarcVerdict known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailInboxInsightsDmarcVerdict = {
+  Aligned: "aligned",
+  DkimOnly: "dkim_only",
+  FailsPolicy: "fails_policy",
+  SpfOnly: "spf_only",
+} as const;
+
+/** A known EmailInboxInsightsDmarcVerdict value. */
+export type EmailInboxInsightsDmarcVerdictValue = (typeof EmailInboxInsightsDmarcVerdict)[keyof typeof EmailInboxInsightsDmarcVerdict];
+
+/**
+ * Values of EmailInboxInsightsGmailTab known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailInboxInsightsGmailTab = {
+  Forums: "forums",
+  None: "none",
+  Primary: "primary",
+  Promotions: "promotions",
+  Social: "social",
+  Updates: "updates",
+} as const;
+
+/** A known EmailInboxInsightsGmailTab value. */
+export type EmailInboxInsightsGmailTabValue = (typeof EmailInboxInsightsGmailTab)[keyof typeof EmailInboxInsightsGmailTab];
+
+/**
+ * Values of EmailInboxInsightsTrapSource known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailInboxInsightsTrapSource = {
+  Abusix: "abusix",
+  Cloudmark: "cloudmark",
+} as const;
+
+/** A known EmailInboxInsightsTrapSource value. */
+export type EmailInboxInsightsTrapSourceValue = (typeof EmailInboxInsightsTrapSource)[keyof typeof EmailInboxInsightsTrapSource];
+
+/**
+ * Values of EmailInboxInsightsTrapType known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailInboxInsightsTrapType = {
+  Mixed: "mixed",
+  Parked: "parked",
+  Pristine: "pristine",
+  Recycled: "recycled",
+  Typo: "typo",
+} as const;
+
+/** A known EmailInboxInsightsTrapType value. */
+export type EmailInboxInsightsTrapTypeValue = (typeof EmailInboxInsightsTrapType)[keyof typeof EmailInboxInsightsTrapType];
 
 /**
  * Values of EmailLookupFlag known at this SDK version. The wire value is an open

@@ -24,7 +24,7 @@ export class EmailMailboxesResourceBase extends Resource {
    */
   list(query?: EmailMailboxesListQuery, options?: RequestOptions): PaginatedPromise<Mailbox> {
     return this.paginated<Mailbox>("GET", options, ({ signal, headers }, cursor) =>
-      listMailboxes({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listMailboxes({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

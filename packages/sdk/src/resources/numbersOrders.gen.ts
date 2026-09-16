@@ -38,7 +38,7 @@ export class NumbersOrdersResource extends Resource {
    */
   list(query?: NumbersOrdersListQuery, options?: RequestOptions): PaginatedPromise<NumbersOrder> {
     return this.paginated<NumbersOrder>("GET", options, ({ signal, headers }, cursor) =>
-      listNumbersOrders({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listNumbersOrders({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

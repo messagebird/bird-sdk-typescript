@@ -20,6 +20,6 @@ export class ContactsPreferencesResource extends Resource {
    */
   list(contactId: string, query?: ContactsPreferencesListQuery, options?: RequestOptions): PaginatedPromise<Preference> {
     return this.paginated<Preference>("GET", options, ({ signal, headers }, cursor) =>
-      listContactPreferences({ client: this.client, path: { contact_id: contactId }, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listContactPreferences({ client: this.client, path: { contact_id: contactId }, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 }

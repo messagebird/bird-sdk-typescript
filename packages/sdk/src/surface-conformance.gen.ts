@@ -4,8 +4,17 @@
 // Generated from backend/openapi/surfaces.ir.json.
 import type { BirdClient } from "./client.js";
 
-export type _Email = Pick<BirdClient["email"], "send" | "sendBatch" | "get" | "list" | "cancel">;
+export type _Email = Pick<BirdClient["email"], "send" | "sendBatch" | "get" | "list" | "cancel" | "health">;
 export type _EmailStats = Pick<BirdClient["email"]["stats"], "summary" | "daily" | "hourly" | "byTag" | "byCategory" | "bySendingIp" | "bySendingDomain" | "byRecipientDomain" | "byMailboxProvider" | "byMailboxProviderRegion" | "byTemplate" | "byLocation" | "byClient" | "byBounceCode" | "byComplaintType" | "byBroadcast">;
+export type _EmailCompetitiveBrands = Pick<BirdClient["email"]["competitive"]["brands"], "search">;
+export type _EmailCompetitiveWatchlist = Pick<BirdClient["email"]["competitive"]["watchlist"], "get" | "notable">;
+export type _EmailCompetitiveWatchlistBrands = Pick<BirdClient["email"]["competitive"]["watchlist"]["brands"], "create" | "delete" | "get" | "sendTime">;
+export type _EmailCompetitiveWatchlistBrandsCampaigns = Pick<BirdClient["email"]["competitive"]["watchlist"]["brands"]["campaigns"], "list" | "get">;
+export type _EmailCompetitive = Pick<BirdClient["email"]["competitive"], "volumeSeries">;
+export type _EmailInboxInsightsDomains = Pick<BirdClient["email"]["inboxInsights"]["domains"], "list" | "update">;
+export type _EmailInboxInsights = Pick<BirdClient["email"]["inboxInsights"], "placement" | "authentication" | "complaints" | "spamTraps" | "blocklists">;
+export type _EmailInboxInsightsBenchmarks = Pick<BirdClient["email"]["inboxInsights"]["benchmarks"], "industry">;
+export type _EmailInboxInsightsDomainMonitoring = Pick<BirdClient["email"]["inboxInsights"]["domainMonitoring"], "upsert">;
 export type _EmailTemplates = Pick<BirdClient["email"]["templates"], "create" | "list" | "get" | "update" | "delete" | "duplicate" | "preview">;
 export type _EmailTemplatesVersions = Pick<BirdClient["email"]["templates"]["versions"], "list" | "get" | "delete" | "submit" | "rollback">;
 export type _EmailTemplatesVersionsLanguages = Pick<BirdClient["email"]["templates"]["versions"]["languages"], "list" | "get" | "set" | "update" | "delete">;
@@ -13,6 +22,8 @@ export type _EmailTemplatesBroadcasts = Pick<BirdClient["email"]["templates"]["b
 export type _Broadcasts = Pick<BirdClient["broadcasts"], "create" | "list" | "get" | "update" | "delete" | "send" | "cancel" | "listEvents" | "listRecipients" | "counts" | "listClickedLinks" | "sendQuota">;
 export type _Sms = Pick<BirdClient["sms"], "send" | "sendBatch" | "get" | "list" | "listEvents">;
 export type _SmsTemplates = Pick<BirdClient["smsTemplates"], "list" | "get">;
+export type _SmsTemplatesVersions = Pick<BirdClient["smsTemplates"]["versions"], "list" | "get">;
+export type _SmsTemplatesVersionsLanguages = Pick<BirdClient["smsTemplates"]["versions"]["languages"], "list" | "get">;
 export type _SmsStats = Pick<BirdClient["sms"]["stats"], "summary" | "daily" | "hourly" | "byCountry" | "byCarrier" | "byCategory" | "byOriginator" | "byStatus" | "byErrorCode" | "byTag">;
 export type _SmsStatsInbound = Pick<BirdClient["sms"]["stats"]["inbound"], "summary" | "daily" | "hourly" | "byCountry" | "byOperator" | "byNumber">;
 export type _SmsSuppressions = Pick<BirdClient["smsSuppressions"], "list" | "get" | "add" | "remove">;
@@ -35,6 +46,7 @@ export type _Numbers = Pick<BirdClient["numbers"], "list" | "get" | "release">;
 export type _NumbersAvailable = Pick<BirdClient["numbers"]["available"], "list" | "get">;
 export type _NumbersOrders = Pick<BirdClient["numbers"]["orders"], "create" | "list" | "get">;
 export type _Domains = Pick<BirdClient["domains"], "list" | "get" | "create" | "verify" | "update" | "delete">;
+export type _Suppressions = Pick<BirdClient["suppressions"], "list" | "get" | "add" | "remove">;
 export type _Webhooks = Pick<BirdClient["webhooks"], "list" | "get" | "create" | "test" | "delete" | "attempts" | "rotateSecret" | "update" | "unwrap">;
 export type _Workspace = Pick<BirdClient["workspace"], "get">;
 export type _Preferences = Pick<BirdClient["preferences"], "list" | "get" | "create" | "delete">;

@@ -17,7 +17,8 @@ import type { APIPromise, RequestOptions } from "../core/result.js";
 
 /**
  * Body for `bird.sms.send`. Supply either `text` (with `category` and `from`)
- * or `template`.
+ * or `template`. A workspace template requires an owned `from`; a built-in
+ * template selects its sender and rejects `from`.
  */
 export type SmsSendParams = SmsMessageSendRequest;
 /** Body for `bird.sms.sendBatch`. Contains up to 100 sends. */
@@ -40,8 +41,10 @@ export class SmsResource extends SmsResourceBase {
 
   /**
    * Send one SMS to a single recipient. Supply either `text` (with a `category` and `from`)
-   * or a stored `template` (by `id` or `slug`, with its `parameters`). The API
-   * accepts the message for delivery. Read it back with `get` for the latest status.
+   * or a stored `template` (by `id` or `slug`, with its `parameters`). A workspace
+   * template requires an owned `from`; a built-in template selects its sender and
+   * rejects `from`. The API accepts the message for delivery. Read it back with
+   * `get` for the latest status.
    *
    * @example Send free text
    * const msg = await bird.sms.send({

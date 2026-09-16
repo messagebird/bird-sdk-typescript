@@ -19,7 +19,7 @@ export class NumbersResourceBase extends Resource {
    */
   list(query?: NumbersListQuery, options?: RequestOptions): PaginatedPromise<Number> {
     return this.paginated<Number>("GET", options, ({ signal, headers }, cursor) =>
-      listWorkspaceNumbers({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listWorkspaceNumbers({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

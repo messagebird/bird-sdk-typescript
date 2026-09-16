@@ -46,6 +46,6 @@ export class WhatsappReactionResource extends Resource {
    */
   listEvents(messageId: string, query?: WhatsappReactionListEventsQuery, options?: RequestOptions): PaginatedPromise<WhatsAppReactionEvent> {
     return this.paginated<WhatsAppReactionEvent>("GET", options, ({ signal, headers }, cursor) =>
-      listWhatsAppMessageReactionEvents({ client: this.client, path: { message_id: messageId }, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listWhatsAppMessageReactionEvents({ client: this.client, path: { message_id: messageId }, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 }

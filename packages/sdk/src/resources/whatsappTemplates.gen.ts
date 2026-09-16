@@ -18,7 +18,7 @@ export class WhatsappTemplatesResourceBase extends Resource {
    */
   list(query?: WhatsappTemplatesListQuery, options?: RequestOptions): PaginatedPromise<WhatsAppTemplate> {
     return this.paginated<WhatsAppTemplate>("GET", options, ({ signal, headers }, cursor) =>
-      listWhatsAppTemplates({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listWhatsAppTemplates({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

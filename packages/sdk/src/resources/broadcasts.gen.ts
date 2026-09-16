@@ -25,7 +25,7 @@ export class BroadcastsResourceBase extends Resource {
    */
   list(query?: BroadcastsListQuery, options?: RequestOptions): PaginatedPromise<EmailBroadcast> {
     return this.paginated<EmailBroadcast>("GET", options, ({ signal, headers }, cursor) =>
-      listEmailBroadcasts({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listEmailBroadcasts({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**
@@ -75,7 +75,7 @@ export class BroadcastsResourceBase extends Resource {
    */
   listEvents(broadcastId: string, query?: BroadcastsListEventsQuery, options?: RequestOptions): PaginatedPromise<EmailEvent> {
     return this.paginated<EmailEvent>("GET", options, ({ signal, headers }, cursor) =>
-      listEmailBroadcastEvents({ client: this.client, path: { broadcast_id: broadcastId }, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listEmailBroadcastEvents({ client: this.client, path: { broadcast_id: broadcastId }, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**
@@ -88,7 +88,7 @@ export class BroadcastsResourceBase extends Resource {
    */
   listRecipients(broadcastId: string, query?: BroadcastsListRecipientsQuery, options?: RequestOptions): PaginatedPromise<EmailRecipient> {
     return this.paginated<EmailRecipient>("GET", options, ({ signal, headers }, cursor) =>
-      listEmailBroadcastRecipients({ client: this.client, path: { broadcast_id: broadcastId }, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listEmailBroadcastRecipients({ client: this.client, path: { broadcast_id: broadcastId }, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

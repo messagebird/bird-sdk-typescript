@@ -19,7 +19,7 @@ export class EmailMailboxesReceiveRulesResource extends Resource {
    */
   list(mailboxId: string, query?: EmailMailboxesReceiveRulesListQuery, options?: RequestOptions): PaginatedPromise<ReceiveRule> {
     return this.paginated<ReceiveRule>("GET", options, ({ signal, headers }, cursor) =>
-      listMailboxReceiveRules({ client: this.client, path: { mailbox_id: mailboxId }, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listMailboxReceiveRules({ client: this.client, path: { mailbox_id: mailboxId }, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

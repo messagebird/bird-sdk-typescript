@@ -13,6 +13,6 @@ export class EmailTemplatesBroadcastsResource extends Resource {
    */
   list(templateRef: string, query?: EmailTemplatesBroadcastsListQuery, options?: RequestOptions): PaginatedPromise<EmailTemplateBroadcastSummary> {
     return this.paginated<EmailTemplateBroadcastSummary>("GET", options, ({ signal, headers }, cursor) =>
-      listEmailTemplateBroadcasts({ client: this.client, path: { template_ref: templateRef }, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listEmailTemplateBroadcasts({ client: this.client, path: { template_ref: templateRef }, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 }

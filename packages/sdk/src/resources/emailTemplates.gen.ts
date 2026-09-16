@@ -23,7 +23,7 @@ export class EmailTemplatesResourceBase extends Resource {
    */
   list(query?: EmailTemplatesListQuery, options?: RequestOptions): PaginatedPromise<EmailTemplateSummary> {
     return this.paginated<EmailTemplateSummary>("GET", options, ({ signal, headers }, cursor) =>
-      listEmailTemplates({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after }, headers, signal }));
+      listEmailTemplates({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**

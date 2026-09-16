@@ -18,6 +18,7 @@ import {
 import { EmailResource, type EmailChannelDefaults } from "./resources/email.js";
 import { AudiencesResource } from "./resources/audiences.gen.js";
 import { DomainsResource } from "./resources/domains.gen.js";
+import { SuppressionsResource } from "./resources/suppressions.gen.js";
 import { ContactPropertiesResource } from "./resources/contactProperties.gen.js";
 import { ContactsResource } from "./resources/contacts.js";
 import { PreferencesResource } from "./resources/preferences.js";
@@ -26,7 +27,7 @@ import { WorkspaceResource } from "./resources/workspace.gen.js";
 import { SmsResource } from "./resources/sms.js";
 import { SmsKeywordRulesResource } from "./resources/smsKeywordRules.gen.js";
 import { SmsSuppressionsResource } from "./resources/smsSuppressions.gen.js";
-import { SmsTemplatesResource } from "./resources/smsTemplates.gen.js";
+import { SmsTemplatesResource } from "./resources/smsTemplates.js";
 import { WhatsappResource } from "./resources/whatsapp.js";
 import { VoiceResource } from "./resources/voice.gen.js";
 import { VerifyResource } from "./resources/verify.js";
@@ -186,7 +187,6 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
   /** SMS channel: `bird.sms.send(...)`, `.get(...)`, `.list(...)`. */
   readonly sms: SmsResource;
 
-  /** SMS templates: `bird.smsTemplates.list(...)`, `.get(...)`. */
   readonly smsTemplates: SmsTemplatesResource;
 
   /** SMS suppressions: `bird.smsSuppressions.list(...)`, `.add(...)`, `.remove(...)`. */
@@ -225,6 +225,8 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
 
   /** Sending domains: `bird.domains.create(...)`, `.list(...)`, `.verify(...)`, … */
   readonly domains: DomainsResource;
+
+  readonly suppressions: SuppressionsResource;
 
   /** Recipient intelligence: `bird.lookup.email(...)`, `.phoneNumber(...)`. Every answer is billed. */
   readonly lookup: LookupResource;
@@ -320,6 +322,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
       this.#client,
     );
     this.domains = new DomainsResource(this.core, this.#client);
+    this.suppressions = new SuppressionsResource(this.core, this.#client);
     this.lookup = new LookupResource(this.core, this.#client);
     this.numbers = new NumbersResource(this.core, this.#client);
     this.webhooks = new WebhooksResource(this.core, this.#client, opts.webhooks);
