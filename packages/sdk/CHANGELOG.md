@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.65.0
+
+- Add `email.health`, which returns the workspace's sending-health verdict for a window: an overall `healthy`, `watching`, or `throttled` status, plus a signal per rate carrying its current value, its reference deliverability limit, and verdict boundaries where risk thresholds apply.
+- Add `suppressions.list`, `suppressions.get`, `suppressions.add` and `suppressions.remove`, so the addresses a workspace may not deliver to can be read and edited without dropping to raw HTTP. The `email` filter on `list` narrows a page by address prefix, so compare the `email` on each record before treating the address you asked about as suppressed.
+
 ## 0.64.0
 
 - Add Competitive Insights and non-seed Inbox Insights operations to the SDKs, CLI and MCP server. Discover competitors and owned sending domains, manage watchlists and monitoring, and read campaign and deliverability reports. Insights API-key calls require preview access for the organization.
