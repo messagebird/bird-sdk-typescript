@@ -265,6 +265,8 @@ export type {
   AudienceWritable,
   AvailableNumber,
   AvailableNumberList,
+  AvailableNumberListWritable,
+  AvailableNumberWritable,
   CancelEmailBroadcastData,
   CancelEmailBroadcastError,
   CancelEmailBroadcastErrors,

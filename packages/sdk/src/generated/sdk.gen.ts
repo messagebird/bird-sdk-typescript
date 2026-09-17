@@ -5360,9 +5360,13 @@ export const getEmailInboxInsightsSpamTraps = <
 /**
  * Check whether a sending domain's infrastructure is blocklisted
  *
- * Checks every sending IP behind a sending domain against the blocklists
+ * Checks the sending IPs behind a sending domain against the blocklists
  * receivers consult, and returns what is listed now plus the listings seen
- * recently against each target.
+ * recently against each target. The vendor's default target selection includes
+ * IPs seen sending in the last 30 days and the domain itself. The returned
+ * targets and their statuses describe the coverage of this lookup; an empty
+ * target list does not establish that the domain or its IPs are clear.
+ * The 30-day period selects targets; listing status reflects the current lookup.
  *
  * The check runs when the request is made, so this is a live lookup rather
  * than a measurement over a period: there is no window, and only the
@@ -5373,9 +5377,9 @@ export const getEmailInboxInsightsSpamTraps = <
  * Each target is looked up separately, so one can fail while the rest
  * succeed. A target nobody managed to check comes back with its `status`
  * reporting that and its `checked_at` null, rather than as a target that
- * came back clear, and `active_count` is null rather than zero when no target
- * could be checked at all. That is what keeps "nothing is listed" and "the
- * check did not run" from being mistaken for each other. A `503` means Bird
+ * came back clear. `active_count` is null when the lookup service supplies no
+ * count; do not treat null as zero. Zero does not establish complete coverage:
+ * inspect the returned targets and their statuses. A `503` means Bird
  * could not reach the lookup service at all, which is a different answer from
  * a lookup that ran and reported nothing.
  *

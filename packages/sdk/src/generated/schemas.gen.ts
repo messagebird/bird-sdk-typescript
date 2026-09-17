@@ -1509,6 +1509,13 @@ export const EmailTemplateVersionIDSchema = {
   example: "emv_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const EmailBroadcastIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^eb_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "eb_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const TagSchema = {
   type: "object",
   additionalProperties: false,
@@ -1589,6 +1596,8 @@ export const EmailAttachmentRefSchema = {
 
 export const EmailMessageSchema = {
   type: "object",
+  description:
+    "An email message, including a recipient's copy of a broadcast. `broadcast_id` identifies the broadcast that sent the message and is absent for other sends. A broadcast records one message per recipient; these copies share the same `broadcast_id`.\n",
   additionalProperties: false,
   required: [
     "id",
@@ -1610,6 +1619,34 @@ export const EmailMessageSchema = {
     "track_clicks",
     "created_at",
   ],
+  example: {
+    id: "em_01krdgeqcxet5s7t44vh8rt9mg",
+    from: {
+      email: "onboarding@messagebird.dev",
+      name: "Bird",
+    },
+    to: [
+      {
+        email: "delivered@messagebird.dev",
+      },
+    ],
+    subject: "Hello from Bird",
+    category: "marketing",
+    status: "accepted",
+    broadcast_id: "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    accepted_count: 1,
+    processed_count: 0,
+    delivered_count: 0,
+    bounced_count: 0,
+    complained_count: 0,
+    deferred_count: 0,
+    rejected_count: 0,
+    open_count: 0,
+    click_count: 0,
+    track_opens: false,
+    track_clicks: false,
+    created_at: "2026-07-01T12:00:00Z",
+  },
   properties: {
     id: {
       readOnly: true,
@@ -1803,6 +1840,12 @@ export const EmailMessageSchema = {
       readOnly: true,
       description:
         "The exact template version this send rendered from, or null for an inline send. A template's live version changes every time you submit it, so this is what identifies the wording that was actually delivered, together with `resolved_language`.\n",
+    },
+    broadcast_id: {
+      $ref: "#/components/schemas/EmailBroadcastID",
+      readOnly: true,
+      description:
+        "The broadcast that sent this message. Absent for a send that was not part of a broadcast. A broadcast records one message per recipient, and every one of them carries the same value here.\n",
     },
     tags: {
       type: "array",
@@ -2381,12 +2424,9 @@ export const EmailRecipientSchema = {
       description: "Recipient ID.",
     },
     parent_id: {
-      type: "string",
-      minLength: 1,
-      pattern: "^(em|eb)_[0-9a-hjkmnp-tv-z]{26}$",
+      $ref: "#/components/schemas/EmailID",
       description:
-        "ID of the message or broadcast this recipient belongs to. For a message send, this is the message's `em_`-prefixed ID. For a broadcast, this field is also `em_`-prefixed, but currently does not resolve to a retrievable message.",
-      example: "em_01krdgeqcxet5s7t44vh8rt9mg",
+        "ID of the message this recipient belongs to. For a message send, this is the message's own `em_`-prefixed ID. For a broadcast, it is the `em_`-prefixed ID of the copy addressed to this recipient. Read either one with [Get an email message](/docs/api/reference/get-email-message), which answers 404 for a broadcast copy the send has not recorded. No recipient status distinguishes a copy the send recorded from one it did not.",
     },
     role: {
       $ref: "#/components/schemas/RecipientRole",
@@ -3326,13 +3366,6 @@ export const EmailBroadcastUpdateRequestSchema = {
       id: "emt_01krdgeqcxet5s7t44vh8rt9mg",
     },
   },
-} as const;
-
-export const EmailBroadcastIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^eb_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "eb_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const EmailBroadcastCountsSchema = {
@@ -17110,7 +17143,7 @@ export const EmailInboxInsightsBlocklistTargetSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    'One checked target, whether it is listed now, and the listings seen against it.\n\nRead `status` before `is_listed`. Each target is looked up independently and\nany one of them can fail while the rest succeed, so a target whose status is\nnot `ok` was not checked and `is_listed: false` on it means nothing. Rendering\nthat as "clear" is the one outcome this resource must never produce.\n',
+    'One target lookup result, its current status, and the listings seen against it.\n\nRead `status` before `is_listed`. Each target is looked up independently and\nany one of them can fail while the rest succeed, so a target whose status is\nnot `ok` was not checked and `is_listed: false` on it means nothing. Rendering\nthat as "clear" is the one outcome this resource must never produce.\n',
   required: [
     "target",
     "target_type",
@@ -17124,7 +17157,7 @@ export const EmailInboxInsightsBlocklistTargetSchema = {
       type: "string",
       minLength: 1,
       readOnly: true,
-      description: "The sending IP or domain that was checked.",
+      description: "The sending IP or domain selected for lookup.",
       example: "147.253.40.18",
     },
     target_type: {
@@ -17171,7 +17204,7 @@ export const EmailInboxInsightsBlocklistTargetSchema = {
 
 export const EmailInboxInsightsBlocklistsSchema = {
   description:
-    'Whether the domain\'s sending infrastructure is on any blocklist, checked\nwhen the request is made.\n\nThis is a live lookup rather than a measurement over a period, so it carries\nno window: `freshness.as_of` is null and only the lag hint applies.\n\n"Nothing found" and "could not look" must never render alike, and failure here\nhappens at two grains. If nothing at all could be checked the request fails\nrather than returning an empty result. If some targets were checked and others\nwere not, this is a normal response and each target\'s own `status` says which\nis which: read that before `is_listed`, because a target that was not checked\nreports `is_listed: false` and that value carries no finding. `active_count`\nis absent whenever no target could be checked, so an absent count is never a\nzero.\n',
+    "Whether the domain's sending infrastructure is on any blocklist, checked\nwhen the request is made.\n\nThis is a live lookup rather than a measurement over a period, so it carries\nno window: `freshness.as_of` is null and only the lag hint applies.\n\nInspect each returned target's `status` before `is_listed`. A target whose\nlookup did not complete can report `is_listed: false`; that value carries no\nfinding. Partial failures are represented by the individual target statuses.\n\n`active_count` is null when the lookup service supplies no count. Zero reports\nno active target listings, but does not establish coverage: the response can\ncontain an empty `targets` array. Use the returned targets and their statuses\nto determine which addresses were checked. A failed request provides no\nlookup result.\n",
   unevaluatedProperties: false,
   allOf: [
     {
@@ -17186,14 +17219,14 @@ export const EmailInboxInsightsBlocklistsSchema = {
           minimum: 0,
           readOnly: true,
           description:
-            "How many of the checked targets currently carry an active listing. A count of targets, not of listings: a target on three blocklists counts once. Null when no target could be checked at all, which is not the same as zero. Zero means every target was checked and none of them is listed.\n",
+            "Number of successfully checked targets reported with an active listing. A target on three blocklists counts once. Null when the lookup service supplies no count; do not treat null as zero. Zero does not establish that the domain or its IPs were checked. Inspect `targets` and each target's `status` for lookup coverage, including partial failures.\n",
           example: 0,
         },
         targets: {
           type: "array",
           readOnly: true,
           description:
-            "One entry per sending IP or domain checked for this sending domain.",
+            "Returned sending IP or domain lookup results, including failed lookups. An empty array does not establish that the domain or its IPs are clear.",
           items: {
             $ref: "#/components/schemas/EmailInboxInsightsBlocklistTarget",
           },
@@ -30075,9 +30108,9 @@ export const NumberSchema = {
       type: "string",
       minLength: 1,
       readOnly: true,
-      enum: ["active", "pending_compliance", "released"],
+      enum: ["active", "pending_ownership_registration", "released"],
       description:
-        "Whether this number can carry traffic.\n\n- `active` means this number is allocated to your workspace and usable.\n- `pending_compliance` means this number is allocated to your workspace and billed,\n  but it cannot carry traffic until the ownership paperwork its country requires is\n  accepted. Read `ownership.next` for what advances it, and re-read later if\n  `ownership` is momentarily `null`.\n- `released` means this number is no longer allocated to your workspace.\n\nAn allocated number is not always enough to send from it: some destination\ncountries also require an approved registration for the sender.\n",
+        "The allocation and ownership-approval status of this number.\n\n- `active` means this number is allocated to your workspace and usable.\n- `pending_ownership_registration` means this number is allocated to your workspace and billed,\n  but outbound SMS and both inbound and outbound voice calls are blocked until the ownership paperwork\n  its country requires is accepted. This ownership status does not gate inbound SMS or WhatsApp.\n  Read `ownership.next` for what advances it, and re-read later if\n  `ownership` is momentarily `null`.\n- `released` means this number is no longer allocated to your workspace.\n\nAn allocated number is not always enough to send from it: some destination\ncountries also require an approved registration for the sender.\n",
     },
     allocated_at: {
       type: "string",
@@ -30096,7 +30129,7 @@ export const NumberSchema = {
     ownership: {
       readOnly: true,
       description:
-        "Where this number stands with the ownership paperwork its country requires. `null` when the country requires none, which is the usual case: a number with no `ownership` object is usable as soon as it is allocated. Also `null` when that standing cannot be established right now; `status` still reads `pending_compliance` while the number is blocked, so re-read this field rather than caching its absence. We manage the paperwork for shared short codes, so this field is always `null` for them.\n",
+        "Where this number stands with the ownership paperwork its country requires. `null` when the country requires none, which is the usual case: a number with no `ownership` object is usable as soon as it is allocated. Also `null` when that standing cannot be established right now; `status` still reads `pending_ownership_registration` while the number is blocked, so re-read this field rather than caching its absence. We manage the paperwork for shared short codes, so this field is always `null` for them.\n",
       oneOf: [
         {
           $ref: "#/components/schemas/NumberOwnership",
@@ -30131,8 +30164,15 @@ export const NumberListSchema = {
 
 export const AvailableNumberSchema = {
   type: "object",
+  readOnly: true,
   additionalProperties: false,
-  required: ["number", "country_code", "number_type", "capabilities"],
+  required: [
+    "number",
+    "country_code",
+    "number_type",
+    "capabilities",
+    "ownership_registration_required",
+  ],
   properties: {
     number: {
       type: "string",
@@ -30156,6 +30196,11 @@ export const AvailableNumberSchema = {
         $ref: "#/components/schemas/NumberCapability",
       },
       description: "Capabilities supported by this number.",
+    },
+    ownership_registration_required: {
+      type: "boolean",
+      description:
+        "Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any setup fee is charged during purchase. Monthly billing starts at assignment even while approval is pending; assignment may follow completion of a pending supplier order.",
     },
   },
 } as const;
@@ -31227,6 +31272,8 @@ export const EmailAttachmentRefWritableSchema = {
 
 export const EmailMessageWritableSchema = {
   type: "object",
+  description:
+    "An email message, including a recipient's copy of a broadcast. `broadcast_id` identifies the broadcast that sent the message and is absent for other sends. A broadcast records one message per recipient; these copies share the same `broadcast_id`.\n",
   additionalProperties: false,
   required: [
     "from",
@@ -31236,6 +31283,34 @@ export const EmailMessageWritableSchema = {
     "track_opens",
     "track_clicks",
   ],
+  example: {
+    id: "em_01krdgeqcxet5s7t44vh8rt9mg",
+    from: {
+      email: "onboarding@messagebird.dev",
+      name: "Bird",
+    },
+    to: [
+      {
+        email: "delivered@messagebird.dev",
+      },
+    ],
+    subject: "Hello from Bird",
+    category: "marketing",
+    status: "accepted",
+    broadcast_id: "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    accepted_count: 1,
+    processed_count: 0,
+    delivered_count: 0,
+    bounced_count: 0,
+    complained_count: 0,
+    deferred_count: 0,
+    rejected_count: 0,
+    open_count: 0,
+    click_count: 0,
+    track_opens: false,
+    track_clicks: false,
+    created_at: "2026-07-01T12:00:00Z",
+  },
   properties: {
     from: {
       $ref: "#/components/schemas/EmailAddress",
@@ -31373,12 +31448,9 @@ export const EmailRecipientWritableSchema = {
   required: ["parent_id", "role", "recipient"],
   properties: {
     parent_id: {
-      type: "string",
-      minLength: 1,
-      pattern: "^(em|eb)_[0-9a-hjkmnp-tv-z]{26}$",
+      $ref: "#/components/schemas/EmailID",
       description:
-        "ID of the message or broadcast this recipient belongs to. For a message send, this is the message's `em_`-prefixed ID. For a broadcast, this field is also `em_`-prefixed, but currently does not resolve to a retrievable message.",
-      example: "em_01krdgeqcxet5s7t44vh8rt9mg",
+        "ID of the message this recipient belongs to. For a message send, this is the message's own `em_`-prefixed ID. For a broadcast, it is the `em_`-prefixed ID of the copy addressed to this recipient. Read either one with [Get an email message](/docs/api/reference/get-email-message), which answers 404 for a broadcast copy the send has not recorded. No recipient status distinguishes a copy the send recorded from one it did not.",
     },
     role: {
       $ref: "#/components/schemas/RecipientRole",
@@ -36090,6 +36162,69 @@ export const NumberListWritableSchema = {
           type: "array",
           items: {
             $ref: "#/components/schemas/NumberWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const AvailableNumberWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: [
+    "number",
+    "country_code",
+    "number_type",
+    "capabilities",
+    "ownership_registration_required",
+  ],
+  properties: {
+    number: {
+      type: "string",
+      minLength: 1,
+      description: "Phone number in E.164 format.",
+    },
+    country_code: {
+      $ref: "#/components/schemas/CountryCode",
+    },
+    number_type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/NumberType",
+        },
+      ],
+      description: "Physical type of this phone number.",
+    },
+    capabilities: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/NumberCapability",
+      },
+      description: "Capabilities supported by this number.",
+    },
+    ownership_registration_required: {
+      type: "boolean",
+      description:
+        "Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any setup fee is charged during purchase. Monthly billing starts at assignment even while approval is pending; assignment may follow completion of a pending supplier order.",
+    },
+  },
+} as const;
+
+export const AvailableNumberListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/AvailableNumberWritable",
           },
         },
       },

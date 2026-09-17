@@ -856,6 +856,8 @@ export type EmailTemplateId = string;
 
 export type EmailTemplateVersionId = string;
 
+export type EmailBroadcastId = string;
+
 /**
  * Structured key/value label attached to a message or a call. Use tags for low-cardinality filtering dimensions (category, experiment ID, template ID); they surface in the list filter of whatever carries them.
  *
@@ -911,6 +913,10 @@ export type EmailAttachmentRef = {
   content_id?: string | null;
 };
 
+/**
+ * An email message, including a recipient's copy of a broadcast. `broadcast_id` identifies the broadcast that sent the message and is absent for other sends. A broadcast records one message per recipient; these copies share the same `broadcast_id`.
+ *
+ */
 export type EmailMessage = {
   /**
    * Message ID.
@@ -1015,6 +1021,11 @@ export type EmailMessage = {
    *
    */
   readonly template_version_id?: EmailTemplateVersionId | null;
+  /**
+   * The broadcast that sent this message. Absent for a send that was not part of a broadcast. A broadcast records one message per recipient, and every one of them carries the same value here.
+   *
+   */
+  readonly broadcast_id?: EmailBroadcastId;
   /**
    * Labels on this message, each one a `name` and a `value`, that you can filter and search messages by. Use tags for anything you want to find messages by later, and `metadata` for data you only want handed back to you.
    */
@@ -1324,9 +1335,9 @@ export type EmailRecipient = {
    */
   readonly id: RecipientId;
   /**
-   * ID of the message or broadcast this recipient belongs to. For a message send, this is the message's `em_`-prefixed ID. For a broadcast, this field is also `em_`-prefixed, but currently does not resolve to a retrievable message.
+   * ID of the message this recipient belongs to. For a message send, this is the message's own `em_`-prefixed ID. For a broadcast, it is the `em_`-prefixed ID of the copy addressed to this recipient. Read either one with [Get an email message](/docs/api/reference/get-email-message), which answers 404 for a broadcast copy the send has not recorded. No recipient status distinguishes a copy the send recorded from one it did not.
    */
-  parent_id: string;
+  parent_id: EmailId;
   /**
    * How this recipient appeared in the send request.
    */
@@ -1977,8 +1988,6 @@ export type EmailBroadcastUpdateRequest = {
    */
   category?: "marketing" | "transactional";
 };
-
-export type EmailBroadcastId = string;
 
 /**
  * How many people a broadcast would reach right now, narrowing from everyone in the audience down to the ones it could actually be sent to.
@@ -9555,7 +9564,7 @@ export type EmailInboxInsightsBlocklistListing = {
 };
 
 /**
- * One checked target, whether it is listed now, and the listings seen against it.
+ * One target lookup result, its current status, and the listings seen against it.
  *
  * Read `status` before `is_listed`. Each target is looked up independently and
  * any one of them can fail while the rest succeed, so a target whose status is
@@ -9565,7 +9574,7 @@ export type EmailInboxInsightsBlocklistListing = {
  */
 export type EmailInboxInsightsBlocklistTarget = {
   /**
-   * The sending IP or domain that was checked.
+   * The sending IP or domain selected for lookup.
    */
   readonly target: string;
   /**
@@ -9602,24 +9611,25 @@ export type EmailInboxInsightsBlocklistTarget = {
  * This is a live lookup rather than a measurement over a period, so it carries
  * no window: `freshness.as_of` is null and only the lag hint applies.
  *
- * "Nothing found" and "could not look" must never render alike, and failure here
- * happens at two grains. If nothing at all could be checked the request fails
- * rather than returning an empty result. If some targets were checked and others
- * were not, this is a normal response and each target's own `status` says which
- * is which: read that before `is_listed`, because a target that was not checked
- * reports `is_listed: false` and that value carries no finding. `active_count`
- * is absent whenever no target could be checked, so an absent count is never a
- * zero.
+ * Inspect each returned target's `status` before `is_listed`. A target whose
+ * lookup did not complete can report `is_listed: false`; that value carries no
+ * finding. Partial failures are represented by the individual target statuses.
+ *
+ * `active_count` is null when the lookup service supplies no count. Zero reports
+ * no active target listings, but does not establish coverage: the response can
+ * contain an empty `targets` array. Use the returned targets and their statuses
+ * to determine which addresses were checked. A failed request provides no
+ * lookup result.
  *
  */
 export type EmailInboxInsightsBlocklists = EmailInboxInsightsEnvelopeBase & {
   /**
-   * How many of the checked targets currently carry an active listing. A count of targets, not of listings: a target on three blocklists counts once. Null when no target could be checked at all, which is not the same as zero. Zero means every target was checked and none of them is listed.
+   * Number of successfully checked targets reported with an active listing. A target on three blocklists counts once. Null when the lookup service supplies no count; do not treat null as zero. Zero does not establish that the domain or its IPs were checked. Inspect `targets` and each target's `status` for lookup coverage, including partial failures.
    *
    */
   readonly active_count: number | null;
   /**
-   * One entry per sending IP or domain checked for this sending domain.
+   * Returned sending IP or domain lookup results, including failed lookups. An empty array does not establish that the domain or its IPs are clear.
    */
   readonly targets: Array<EmailInboxInsightsBlocklistTarget>;
 };
@@ -17083,12 +17093,13 @@ export type Number = {
    */
   readonly capabilities: Array<NumberCapability>;
   /**
-   * Whether this number can carry traffic.
+   * The allocation and ownership-approval status of this number.
    *
    * - `active` means this number is allocated to your workspace and usable.
-   * - `pending_compliance` means this number is allocated to your workspace and billed,
-   * but it cannot carry traffic until the ownership paperwork its country requires is
-   * accepted. Read `ownership.next` for what advances it, and re-read later if
+   * - `pending_ownership_registration` means this number is allocated to your workspace and billed,
+   * but outbound SMS and both inbound and outbound voice calls are blocked until the ownership paperwork
+   * its country requires is accepted. This ownership status does not gate inbound SMS or WhatsApp.
+   * Read `ownership.next` for what advances it, and re-read later if
    * `ownership` is momentarily `null`.
    * - `released` means this number is no longer allocated to your workspace.
    *
@@ -17096,7 +17107,7 @@ export type Number = {
    * countries also require an approved registration for the sender.
    *
    */
-  readonly status: "active" | "pending_compliance" | "released";
+  readonly status: "active" | "pending_ownership_registration" | "released";
   /**
    * When this number was allocated to your workspace.
    */
@@ -17106,7 +17117,7 @@ export type Number = {
    */
   readonly released_at?: string | null;
   /**
-   * Where this number stands with the ownership paperwork its country requires. `null` when the country requires none, which is the usual case: a number with no `ownership` object is usable as soon as it is allocated. Also `null` when that standing cannot be established right now; `status` still reads `pending_compliance` while the number is blocked, so re-read this field rather than caching its absence. We manage the paperwork for shared short codes, so this field is always `null` for them.
+   * Where this number stands with the ownership paperwork its country requires. `null` when the country requires none, which is the usual case: a number with no `ownership` object is usable as soon as it is allocated. Also `null` when that standing cannot be established right now; `status` still reads `pending_ownership_registration` while the number is blocked, so re-read this field rather than caching its absence. We manage the paperwork for shared short codes, so this field is always `null` for them.
    *
    */
   readonly ownership?: NumberOwnership | null;
@@ -17130,6 +17141,10 @@ export type AvailableNumber = {
    * Capabilities supported by this number.
    */
   capabilities: Array<NumberCapability>;
+  /**
+   * Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any setup fee is charged during purchase. Monthly billing starts at assignment even while approval is pending; assignment may follow completion of a pending supplier order.
+   */
+  ownership_registration_required: boolean;
 };
 
 export type AvailableNumberList = {
@@ -17752,6 +17767,10 @@ export type EmailAttachmentRefWritable = {
   content_id?: string | null;
 };
 
+/**
+ * An email message, including a recipient's copy of a broadcast. `broadcast_id` identifies the broadcast that sent the message and is absent for other sends. A broadcast records one message per recipient; these copies share the same `broadcast_id`.
+ *
+ */
 export type EmailMessageWritable = {
   /**
    * Sender address. `name` is present when a display name was provided on the send.
@@ -17826,9 +17845,9 @@ export type EmailMessageBatchResponseWritable = {
 
 export type EmailRecipientWritable = {
   /**
-   * ID of the message or broadcast this recipient belongs to. For a message send, this is the message's `em_`-prefixed ID. For a broadcast, this field is also `em_`-prefixed, but currently does not resolve to a retrievable message.
+   * ID of the message this recipient belongs to. For a message send, this is the message's own `em_`-prefixed ID. For a broadcast, it is the `em_`-prefixed ID of the copy addressed to this recipient. Read either one with [Get an email message](/docs/api/reference/get-email-message), which answers 404 for a broadcast copy the send has not recorded. No recipient status distinguishes a copy the send recorded from one it did not.
    */
-  parent_id: string;
+  parent_id: EmailId;
   /**
    * How this recipient appeared in the send request.
    */
@@ -20832,6 +20851,30 @@ export type NumberListWritable = {
   data: Array<NumberWritable>;
 } & ListEnvelope;
 
+export type AvailableNumberWritable = {
+  /**
+   * Phone number in E.164 format.
+   */
+  number: string;
+  country_code: CountryCode;
+  /**
+   * Physical type of this phone number.
+   */
+  number_type: NumberType;
+  /**
+   * Capabilities supported by this number.
+   */
+  capabilities: Array<NumberCapability>;
+  /**
+   * Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any setup fee is charged during purchase. Monthly billing starts at assignment even while approval is pending; assignment may follow completion of a pending supplier order.
+   */
+  ownership_registration_required: boolean;
+};
+
+export type AvailableNumberListWritable = {
+  data: Array<AvailableNumberWritable>;
+} & ListEnvelope;
+
 export type NumbersOrderListWritable = {
   data: Array<unknown>;
 } & ListEnvelope;
@@ -21876,7 +21919,7 @@ export type GetEmailMessageData = {
   body?: never;
   path: {
     /**
-     * ID of the message to fetch, from the send response's `id` field.
+     * ID of the message to fetch. A broadcast records one message per recipient, and [List email messages](/docs/api/reference/list-email-messages) returns those copies alongside ordinary sends. For a single send, this is the message's own ID, from the send response's `id` field.
      */
     message_id: EmailId;
   };
@@ -30883,7 +30926,7 @@ export type GetEmailInboxInsightsBlocklistsData = {
   path?: never;
   query: {
     /**
-     * The sending domain to check: one of the workspace's verified sending domains, exactly as it appears there. Every sending IP behind it is checked. A domain that is not verified in this workspace answers not-found.
+     * The sending domain to check: one of the workspace's verified sending domains, exactly as it appears there. Inspect the returned targets and their statuses for lookup coverage. A domain that is not verified in this workspace answers not-found.
      *
      */
     sending_domain: string;
