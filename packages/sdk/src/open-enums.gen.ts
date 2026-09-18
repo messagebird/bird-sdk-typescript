@@ -748,6 +748,19 @@ export const WhatsAppInteractiveType = {
 export type WhatsAppInteractiveTypeValue = (typeof WhatsAppInteractiveType)[keyof typeof WhatsAppInteractiveType];
 
 /**
+ * Values of WhatsAppKeywordOperation known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppKeywordOperation = {
+  OptIn: "opt_in",
+  OptOut: "opt_out",
+} as const;
+
+/** A known WhatsAppKeywordOperation value. */
+export type WhatsAppKeywordOperationValue = (typeof WhatsAppKeywordOperation)[keyof typeof WhatsAppKeywordOperation];
+
+/**
  * Values of WhatsAppNumberErrorCode known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.

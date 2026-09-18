@@ -37,6 +37,7 @@ export type _WhatsappTemplatesVersionsLanguages = Pick<BirdClient["whatsapp"]["t
 export type _WhatsappNumbers = Pick<BirdClient["whatsapp"]["numbers"], "list" | "get" | "listEvents">;
 export type _WhatsappBusinessAccounts = Pick<BirdClient["whatsapp"]["businessAccounts"], "list" | "get">;
 export type _WhatsappNumbersProfile = Pick<BirdClient["whatsapp"]["numbers"]["profile"], "get">;
+export type _WhatsappKeywordRules = Pick<BirdClient["whatsapp"]["keywordRules"], "list" | "get" | "create" | "update" | "delete">;
 export type _WhatsappStats = Pick<BirdClient["whatsapp"]["stats"], "summary" | "daily" | "hourly" | "byErrorCode" | "byTemplate" | "byTemplateCategory" | "byTag" | "byPhoneNumber" | "byCountry">;
 export type _WhatsappStatsInbound = Pick<BirdClient["whatsapp"]["stats"]["inbound"], "summary" | "daily" | "hourly" | "byPhoneNumber">;
 export type _Voice = Pick<BirdClient["voice"], "list" | "get">;

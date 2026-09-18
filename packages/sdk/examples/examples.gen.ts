@@ -1379,24 +1379,62 @@ msg.status; // "accepted" | "delivered" | …
 }
 
 export async function _ex_189() {
+const rule = await bird.whatsapp.keywordRules.create({
+  operation: "opt_out",
+  country: "US", // the SENDER's country, from their own number
+  reply: "You're off the list. ACME Courier won't message you again.",
+});
+// effective_keywords is Bird's set plus any of your own.
+console.log(rule.id, rule.effective_keywords);
+}
+
+export async function _ex_190() {
+// The next rule in the ladder answers the scope, which is another rule of yours if you hold a less specific one; STOP never stops working.
+await bird.whatsapp.keywordRules.delete("wkr_01m2kj8x4te9p0rr7e5w2n1abc");
+}
+
+export async function _ex_191() {
+// Bird's rules and yours share the `wkr_` id space; `scope` tells them apart.
+const rule = await bird.whatsapp.keywordRules.get("wkr_01m2kj8x4te9p0rr7e5w2n1abc");
+console.log(rule.scope, rule.reply);
+}
+
+export async function _ex_192() {
+const rules = await bird.whatsapp.keywordRules.list({ operation: "opt_out" });
+for (const rule of rules.data ?? []) {
+  console.log(rule.scope, rule.effective_keywords);
+}
+}
+
+export async function _ex_193() {
+// Omitting keywords leaves the set alone; an empty array clears your additions
+// back to Bird's. reply: null switches the auto-reply off and still records
+// the opt-out.
+const rule = await bird.whatsapp.keywordRules.update("wkr_01m2kj8x4te9p0rr7e5w2n1abc", {
+  keywords: ["no more texts", "remove me"],
+});
+console.log(rule.effective_keywords);
+}
+
+export async function _ex_194() {
 for await (const msg of bird.whatsapp.list({ status: ["delivered"] })) {
   console.log(msg.id, msg.status);
 }
 }
 
-export async function _ex_190() {
+export async function _ex_195() {
 const { data } = await bird.whatsapp.listEvents("wa_abc123");
 for (const event of data) console.log(event.type, event.occurred_at);
 }
 
-export async function _ex_191() {
+export async function _ex_196() {
 const ack = await bird.whatsapp.markRead("wam_01krdgeqcxet5s7t44vh8rt9mg", {
   typing_indicator: true,
 });
 ack.typing_indicator; // true
 }
 
-export async function _ex_192() {
+export async function _ex_197() {
 const media = await bird.whatsapp.messages.media(
   "wam_01kya19eknftrs2s6p82asmvnh",
   "waf_01kyb2m4xq7whs0d8n3prv6tez",
@@ -1404,18 +1442,18 @@ const media = await bird.whatsapp.messages.media(
 console.log(media.contentType, media.contentLength);
 }
 
-export async function _ex_193() {
+export async function _ex_198() {
 const number = await bird.whatsapp.numbers.get("wan_01krdgeqcxet5s7t44vh8rt9mg");
 console.log(number.status, number.quality_rating, number.messaging_limit);
 }
 
-export async function _ex_194() {
+export async function _ex_199() {
 for await (const number of bird.whatsapp.numbers.list({ status: ["connected"] })) {
   console.log(number.id, number.phone_number, number.status);
 }
 }
 
-export async function _ex_195() {
+export async function _ex_200() {
 for await (const event of bird.whatsapp.numbers.listEvents(
   "wan_01krdgeqcxet5s7t44vh8rt9mg",
 )) {
@@ -1423,29 +1461,29 @@ for await (const event of bird.whatsapp.numbers.listEvents(
 }
 }
 
-export async function _ex_196() {
+export async function _ex_201() {
 const profile = await bird.whatsapp.numbers.profile.get("wan_01krdgeqcxet5s7t44vh8rt9mg");
 console.log(profile.display_name, profile.description, profile.websites);
 }
 
-export async function _ex_197() {
+export async function _ex_202() {
 for await (const event of bird.whatsapp.reaction.listEvents("wam_01krdgeqcxet5s7t44vh8rt9mg")) {
   console.log(event.id, event.emoji, event.status);
 }
 }
 
-export async function _ex_198() {
+export async function _ex_203() {
 await bird.whatsapp.reaction.remove("wam_01krdgeqcxet5s7t44vh8rt9mg");
 }
 
-export async function _ex_199() {
+export async function _ex_204() {
 const reaction = await bird.whatsapp.reaction.set("wam_01krdgeqcxet5s7t44vh8rt9mg", {
   emoji: "\u{1F44D}",
 });
 console.log(reaction.id, reaction.emoji);
 }
 
-export async function _ex_200() {
+export async function _ex_205() {
 const msg = await bird.whatsapp.send({
   to: "+15551234567",
   template: {
@@ -1456,56 +1494,56 @@ const msg = await bird.whatsapp.send({
 console.log(msg.id, msg.status);
 }
 
-export async function _ex_201() {
+export async function _ex_206() {
 const stats = await bird.whatsapp.stats.byCountry({ from: "2026-08-01", to: "2026-08-31" });
 for (const row of stats.data ?? []) {
   console.log(row.country, row.delivery);
 }
 }
 
-export async function _ex_202() {
+export async function _ex_207() {
 const stats = await bird.whatsapp.stats.byErrorCode({ from: "2026-08-01", to: "2026-08-31" });
 for (const row of stats.data ?? []) {
   console.log(row.error_code, row.count);
 }
 }
 
-export async function _ex_203() {
+export async function _ex_208() {
 const stats = await bird.whatsapp.stats.byPhoneNumber({ from: "2026-08-01", to: "2026-08-31" });
 for (const row of stats.data ?? []) {
   console.log(row.phone_number, row.delivery);
 }
 }
 
-export async function _ex_204() {
+export async function _ex_209() {
 const stats = await bird.whatsapp.stats.byTag({ from: "2026-08-01", to: "2026-08-31" });
 for (const row of stats.data ?? []) {
   console.log(row.tag, row.delivery);
 }
 }
 
-export async function _ex_205() {
+export async function _ex_210() {
 const stats = await bird.whatsapp.stats.byTemplate({ from: "2026-08-01", to: "2026-08-31" });
 for (const row of stats.data ?? []) {
   console.log(row.template_id, row.delivery);
 }
 }
 
-export async function _ex_206() {
+export async function _ex_211() {
 const stats = await bird.whatsapp.stats.byTemplateCategory({ from: "2026-08-01", to: "2026-08-31" });
 for (const row of stats.data ?? []) {
   console.log(row.category, row.delivery);
 }
 }
 
-export async function _ex_207() {
+export async function _ex_212() {
 const stats = await bird.whatsapp.stats.daily({ from: "2026-08-01", to: "2026-08-31" });
 for (const point of stats.data ?? []) {
   console.log(point.bucket, point.delivery);
 }
 }
 
-export async function _ex_208() {
+export async function _ex_213() {
 const stats = await bird.whatsapp.stats.hourly({
   from: "2026-08-30T00:00:00Z",
   to: "2026-08-31T00:00:00Z",
@@ -1515,21 +1553,21 @@ for (const point of stats.data ?? []) {
 }
 }
 
-export async function _ex_209() {
+export async function _ex_214() {
 const stats = await bird.whatsapp.stats.inbound.byPhoneNumber({ from: "2026-05-01", to: "2026-05-31" });
 for (const row of stats.data ?? []) {
   console.log(row.phone_number, row.received);
 }
 }
 
-export async function _ex_210() {
+export async function _ex_215() {
 const stats = await bird.whatsapp.stats.inbound.daily({ from: "2026-05-01", to: "2026-05-31" });
 for (const point of stats.data ?? []) {
   console.log(point.bucket, point.received);
 }
 }
 
-export async function _ex_211() {
+export async function _ex_216() {
 const stats = await bird.whatsapp.stats.inbound.hourly({
   from: "2026-05-30T00:00:00Z",
   to: "2026-05-31T00:00:00Z",
@@ -1539,12 +1577,12 @@ for (const point of stats.data ?? []) {
 }
 }
 
-export async function _ex_212() {
+export async function _ex_217() {
 const summary = await bird.whatsapp.stats.inbound.summary({ from: "2026-05-01", to: "2026-05-31" });
 console.log(summary.received);
 }
 
-export async function _ex_213() {
+export async function _ex_218() {
 const summary = await bird.whatsapp.stats.summary({
   from: "2026-08-01",
   to: "2026-08-31",
@@ -1553,18 +1591,18 @@ const summary = await bird.whatsapp.stats.summary({
 console.log(summary.delivery, summary.latency);
 }
 
-export async function _ex_214() {
+export async function _ex_219() {
 const tpl = await bird.whatsapp.templates.get("bird_otp");
 console.log(tpl.default_language, tpl.live_version_id);
 }
 
-export async function _ex_215() {
+export async function _ex_220() {
 for await (const tpl of bird.whatsapp.templates.list()) {
   console.log(tpl.slug, tpl.status, tpl.available_languages);
 }
 }
 
-export async function _ex_216() {
+export async function _ex_221() {
 const version = await bird.whatsapp.templates.versions.get(
   "bird_otp",
   "wav_01ky4x8e4genzb7way45txfkm1",
@@ -1572,7 +1610,7 @@ const version = await bird.whatsapp.templates.versions.get(
 console.log(version.id, Object.keys(version.languages));
 }
 
-export async function _ex_217() {
+export async function _ex_222() {
 const language = await bird.whatsapp.templates.versions.languages.get(
   "bird_otp",
   "wav_01ky4x8e4genzb7way45txfkm1",
@@ -1581,7 +1619,7 @@ const language = await bird.whatsapp.templates.versions.languages.get(
 for (const component of language.components) console.log(component.type);
 }
 
-export async function _ex_218() {
+export async function _ex_223() {
 const { data } = await bird.whatsapp.templates.versions.languages.list(
   "bird_otp",
   "wav_01ky4x8e4genzb7way45txfkm1",
@@ -1589,13 +1627,13 @@ const { data } = await bird.whatsapp.templates.versions.languages.list(
 for (const language of data) console.log(language.language, language.status);
 }
 
-export async function _ex_219() {
+export async function _ex_224() {
 for await (const version of bird.whatsapp.templates.versions.list("bird_otp")) {
   console.log(version.id, version.version_number);
 }
 }
 
-export async function _ex_220() {
+export async function _ex_225() {
 const workspace = await bird.workspace.get();
 console.log(workspace.id, workspace.name); // "ws_…" "Production"
 }

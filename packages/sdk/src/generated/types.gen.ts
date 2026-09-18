@@ -417,6 +417,11 @@ export type DocsPage = {
 };
 
 /**
+ * ISO 4217 three-letter currency code.
+ */
+export type CurrencyCode = string;
+
+/**
  * ISO 3166-1 alpha-2 country code.
  */
 export type CountryCode = string;
@@ -2685,11 +2690,6 @@ export type SmsSegments = {
    */
   readonly characters: number;
 };
-
-/**
- * ISO 4217 three-letter currency code.
- */
-export type CurrencyCode = string;
 
 /**
  * What was charged for a message, split into the components that make it up. `null` until at least one component has been priced.
@@ -5260,6 +5260,8 @@ export type WhatsAppMessageStatus =
   | "canceled"
   | "received";
 
+export type WhatsAppGroupId = string;
+
 export type WhatsAppMessageId = string;
 
 /**
@@ -5275,6 +5277,11 @@ export type WhatsAppAddress = {
    *
    */
   bsuid?: string;
+  /**
+   * The group this address was addressed as, or reached through. It appears on a message's `to` and nowhere else: never on `from`, and never on an event's `recipient`. Outbound, it stands in for the recipient, because a group send names no single phone number. Inbound, it qualifies one: `to` carries the business `phone_number` that received the message and the group it arrived through, while `from` stays the participant who wrote it. Its presence on `to` is what tells a group message from a one-to-one one, in either direction.
+   *
+   */
+  group_id?: WhatsAppGroupId;
   /**
    * Present only on a message received from a WhatsApp user, on `from`; never on an outbound send's `to`, where the profile is not known. Absent when the contact has not adopted one, and on a message received before this workspace started recording them. Same form as a number's own username (`WhatsAppNumberProfile.username`), without a leading `@`; a message cannot be addressed by it.
    *
@@ -6090,6 +6097,56 @@ export type WhatsAppMessage = {
   readonly reactions?: Array<WhatsAppReaction>;
   readonly status: WhatsAppMessageStatus;
   /**
+   * How many recipients a group send was addressed to, taken when the send
+   * was accepted. It is the group's membership at that moment, not its
+   * membership now: someone joining through the invite link while the message
+   * is in flight does not receive it and does not change this count.
+   *
+   * Absent on a one-to-one message, along with `delivered_count` and
+   * `read_count`. A message with one recipient has no fan-out to report, and
+   * its delivery is what `status`, `delivered_at` and `read_at` already say.
+   * Absent for the same reason on a group message sent before Bird recorded
+   * the count, and on a send to a group nobody had joined yet: there is no
+   * denominator to report, and none can be recovered after the fact, since
+   * membership has moved on. `to.group_id` is what tells a group message from
+   * a one-to-one one in every case, including those two. With no denominator
+   * to resolve against, `status` is read as stored, the way a one-to-one
+   * message's is: it reaches `sent` when the message is handed to WhatsApp and
+   * stops there, because delivery is confirmed per participant and a send with
+   * no participants collects no confirmations.
+   *
+   * It is also the denominator `status` is resolved against: on a group
+   * message `status` reports the furthest point *every* recipient has
+   * reached, so it turns `delivered` only once `delivered_count` equals this
+   * number, and stays `sent` while some have confirmed and others have not.
+   * `failed` and `rejected` are never per recipient: there is one hand-off to
+   * the WhatsApp network and one way for that to be refused. `delivered_at`
+   * and `read_at` are the first recipient's, not the last.
+   *
+   */
+  readonly recipient_count?: number;
+  /**
+   * How many of the `recipient_count` recipients WhatsApp has confirmed the
+   * message reached. A recipient who reported only a read counts here too:
+   * WhatsApp skips the delivery receipt when someone is already looking at
+   * the chat, so waiting for one would leave that person uncounted for ever.
+   *
+   * Absent on a one-to-one message, which has no fan-out to count, and on a
+   * group message with no `recipient_count` to count against.
+   *
+   */
+  readonly delivered_count?: number;
+  /**
+   * How many of the `recipient_count` recipients have opened the message.
+   * Read receipts do not move `status`, which has no `read` value; they
+   * surface here and in `read_at`.
+   *
+   * Absent on a one-to-one message, which has no fan-out to count, and on a
+   * group message with no `recipient_count` to count against.
+   *
+   */
+  readonly read_count?: number;
+  /**
    * Failure detail for a message that did not reach the recipient. Present only when the message failed or was rejected.
    */
   last_error?: WhatsAppError;
@@ -6701,17 +6758,17 @@ export type WhatsAppContactCardSend = {
  */
 export type WhatsAppMessageSendRequest = {
   /**
-   * The message recipient: a phone number in E.164 format (for example `+31612345678`), or the recipient's business-scoped user ID (for example `US.13491208655302741918`), which addresses a WhatsApp user whose phone number you do not have. A value that is neither returns a `422` `WhatsAppInvalidRecipient`. One-time-passcode templates require a phone number and return a `422` `WhatsAppRecipientNotSupportedForTemplate` when sent to a business-scoped user ID.
+   * The message recipient: a phone number in E.164 format (for example `+31612345678`), the recipient's business-scoped user ID (for example `US.13491208655302741918`), which addresses a WhatsApp user whose phone number you do not have, or a WhatsApp group ID (for example `wag_01krdgeqcxet5s7t44vh8rt9mg`), which sends to every participant of that group. A value that is none of these returns a `422` `WhatsAppInvalidRecipient`. One-time-passcode templates require a phone number and return a `422` `WhatsAppRecipientNotSupportedForTemplate` when sent to a business-scoped user ID. A group ID naming no group this workspace holds returns a `404` `WhatsAppGroupNotFound`, and one whose group is not active returns a `409` `WhatsAppGroupNotActive`. Content a group cannot take is refused ahead of both, so a group ID paired with interactive content returns the `422` below whether or not the group exists.
    *
    */
   to: string;
   /**
-   * The business phone number to send from, in E.164 format. Omit it for a Bird-managed template, which selects its own number from its category: setting it there returns a `422` `WhatsAppSenderNotAllowed`. Every other send, whether free-form content of any kind or a template your workspace authored, requires it, and the number must be one this workspace owns. Omitting it returns a `422` `WhatsAppSenderRequired`, and naming a number this workspace cannot send from returns a `422` `WhatsAppSenderNotFound`. Naming a number this workspace owns but that sits on a different WhatsApp Business Account than an authored template returns a `422` `WhatsAppSenderWABAMismatch`. A number this workspace holds but has not finished connecting returns a `422` `WhatsAppSenderNotConnected`.
+   * The business phone number to send from, in E.164 format. Omit it for a Bird-managed template, which selects its own number from its category: setting it there returns a `422` `WhatsAppSenderNotAllowed`. Every other send, whether free-form content of any kind or a template your workspace authored, requires it, and the number must be one this workspace owns. Omitting it returns a `422` `WhatsAppSenderRequired`, and naming a number this workspace cannot send from returns a `422` `WhatsAppSenderNotFound`. Naming a number this workspace owns but that sits on a different WhatsApp Business Account than an authored template returns a `422` `WhatsAppSenderWABAMismatch`. A number this workspace holds but has not finished connecting returns a `422` `WhatsAppSenderNotConnected`. Omit it for a group send too: the group sends on its own number, so naming one returns a `422` `WhatsAppSenderNotAllowed`.
    *
    */
   from?: string;
   /**
-   * The template to send. A Bird-managed template selects the sender number from the template's category, so `from` must be omitted. A template is the only content deliverable outside a customer service window.
+   * The template to send. A Bird-managed template selects the sender number from the template's category, so `from` must be omitted. A template is the only content deliverable outside a customer service window. A group send takes a template your workspace authored in any category but authentication: WhatsApp does not deliver an authentication template to a group, which returns a `422` `WhatsAppGroupContentNotSupported`. A Bird-managed template sends from a Bird-owned number that no group is scoped to, so addressing one to a group returns a `422` `WhatsAppInvalidRecipient`.
    *
    */
   template?: WhatsAppTemplateSend;
@@ -6751,7 +6808,7 @@ export type WhatsAppMessageSendRequest = {
    */
   location?: WhatsAppLocationSend;
   /**
-   * Free-form interactive content to send instead of a template: body text plus reply buttons, a menu, a link button, media cards, or a single button asking the recipient to share their location or their phone number. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.
+   * Free-form interactive content to send instead of a template: body text plus reply buttons, a menu, a link button, media cards, or a single button asking the recipient to share their location or their phone number. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`. WhatsApp does not deliver interactive content to a group, so a group recipient returns a `422` `WhatsAppGroupContentNotSupported`.
    *
    */
   interactive?: WhatsAppInteractiveSend;
@@ -6840,6 +6897,11 @@ export type WhatsAppEvent = {
    * When this event occurred.
    */
   readonly occurred_at: string;
+  /**
+   * The participant this confirmation is about, on a group message. Present only on `whatsapp.delivered` and `whatsapp.read`, the two events a group send fans out: one per participant, so a group of eight produces up to eight of each. The rest describe the message as a whole and carry no recipient, because there is one hand-off to the WhatsApp network and one way for that to be refused. Absent on a one-to-one message, whose `to` already names its recipient. Never carries `group_id`: the group belongs to the message's `to`, not to a participant.
+   *
+   */
+  readonly recipient?: WhatsAppAddress;
   /**
    * Failure detail. Present only on `whatsapp.failed` and `whatsapp.rejected` events.
    */
@@ -6939,8 +7001,6 @@ export type WhatsAppReactionEventList = {
 } & ListEnvelope;
 
 export type WhatsAppNumberId = string;
-
-export type WhatsAppBusinessAccountId = string;
 
 export type WhatsAppTemplateExampleParameter = {
   /**
@@ -8191,6 +8251,8 @@ export type WhatsAppNumberStatus =
   | "restricted"
   | (string & {});
 
+export type WhatsAppBusinessAccountId = string;
+
 export type WhatsAppNumberScope = "system" | "workspace";
 
 /**
@@ -8693,6 +8755,141 @@ export type WhatsAppBusinessAccountList = {
 } & ListEnvelope;
 
 export type WhatsAppSuppressionId = string;
+
+/**
+ * What Bird does when an inbound message matches the rule.
+ *
+ * - `opt_out` records that the sender no longer consents to receive any messages from your
+ * WhatsApp Business Account, including transactional ones. Typing the word is the person's
+ * own statement, so it covers everything, unlike WhatsApp's built-in marketing opt-out
+ * control, which stops marketing alone.
+ * - `opt_in` records that they consent again.
+ *
+ * A rule's operation is fixed once created, and a keyword belongs to exactly one operation, so
+ * a keyword Bird ships for `opt_out` cannot be reused for `opt_in`.
+ *
+ * This is an open enum. Accept unrecognized values: SMS already answers `help`, `info`, `confirm`
+ * and `custom`, and WhatsApp gains an operation without a new API version. Sending one Bird does
+ * not answer yet is refused with `E15082`.
+ *
+ */
+export type WhatsAppKeywordOperation = "opt_in" | "opt_out" | (string & {});
+
+/**
+ * Whether the rule is one Bird ships (`system`) or one your workspace created (`workspace`). Both kinds carry a `wkr_` ID and can be read; only a `workspace` rule can be changed or deleted. A `workspace` rule takes precedence over Bird's at the same grain, so it is how you replace a reply without losing the keywords Bird ships.
+ *
+ */
+export type WhatsAppKeywordRuleScope = "system" | "workspace";
+
+export type WhatsAppKeywordRuleId = string;
+
+export type WhatsAppKeywordRule = {
+  id: WhatsAppKeywordRuleId;
+  scope: WhatsAppKeywordRuleScope;
+  operation: WhatsAppKeywordOperation;
+  /**
+   * The country the rule applies in, as an ISO 3166-1 alpha-2 code. It is the country of the person who messaged you, worked out from their phone number, not the country of the account they messaged. Null means the rule applies worldwide, which is what Bird's own rules do. A rule for a country outranks a worldwide rule for the people it covers.
+   *
+   */
+  country?: string | null;
+  /**
+   * The WhatsApp Business Account the rule is limited to, identified by its WhatsApp-issued account ID, or null when it covers every account in your workspace. Bird's own rules are always null.
+   *
+   */
+  waba?: string | null;
+  /**
+   * The keywords this rule adds. For one of Bird's own rules this is the full set Bird ships. For a rule you created it is only what you added on top: it never restates or removes Bird's keywords, so `effective_keywords` is what actually matches.
+   *
+   */
+  keywords: Array<string>;
+  /**
+   * Every keyword that matches this rule: Bird's keywords for the same operation and country, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.
+   * For a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.
+   *
+   */
+  effective_keywords: Array<string>;
+  /**
+   * The message sent back when one of the keywords matches, or null when no reply is sent. The reply goes out on the conversation the inbound message opened.
+   *
+   */
+  reply?: string | null;
+  /**
+   * When the rule was created. On one of Bird's own rules this is when Bird last shipped a change to it.
+   */
+  created_at: string;
+  /**
+   * When the rule was last changed. On one of Bird's own rules this is when Bird last shipped a change to it.
+   */
+  updated_at: string;
+};
+
+export type WhatsAppKeywordRuleList = {
+  /**
+   * The keyword rules that apply to your workspace, Bird's own included. Ordered most specific first, so the first rule whose keywords match an inbound message is the one that runs. The set is small and returned in full; this list is not paginated.
+   *
+   */
+  data: Array<WhatsAppKeywordRule>;
+};
+
+/**
+ * What Bird does when an inbound message matches the rule.
+ *
+ * - `opt_out` records that the sender no longer consents to receive any messages from your
+ * WhatsApp Business Account, including transactional ones. Typing the word is the person's
+ * own statement, so it covers everything, unlike WhatsApp's built-in marketing opt-out
+ * control, which stops marketing alone.
+ * - `opt_in` records that they consent again.
+ *
+ * A rule's operation is fixed once created, and a keyword belongs to exactly one operation, so
+ * a keyword Bird ships for `opt_out` cannot be reused for `opt_in`.
+ *
+ * Closed on the write side: an operation Bird does not answer is rejected here rather than
+ * stored as a rule that never fires. The read side is open, because Bird can gain an operation
+ * without a new API version.
+ *
+ */
+export type WhatsAppKeywordOperationWrite = "opt_in" | "opt_out";
+
+export type WhatsAppKeywordRuleCreate = {
+  operation: WhatsAppKeywordOperationWrite;
+  /**
+   * The country this rule applies in, as an ISO 3166-1 alpha-2 code. It matches the country of the person who messaged you, worked out from their phone number. Omit it to cover everyone, which is what Bird's own rules do.
+   *
+   */
+  country?: string;
+  /**
+   * Limit the rule to one WhatsApp Business Account, identified by its WhatsApp-issued account ID or by the `waa_` ID Bird gives it. Either form resolves to the same account, and the rule stores and returns the WhatsApp-issued one. Omit it to cover every account in your workspace. The account must be one of yours.
+   *
+   */
+  waba?: string;
+  /**
+   * Extra keywords to match, on top of the ones Bird already ships for this operation. Omit to keep Bird's keywords and change only the reply, including keywords Bird adds later. You cannot remove one of Bird's keywords, and a keyword Bird has bound to the other operation cannot be reused here.
+   *
+   */
+  keywords?: Array<string>;
+  /**
+   * The message to send back when a keyword matches. Omit it to send nothing.
+   *
+   */
+  reply?: string;
+};
+
+/**
+ * Changes the reply and the added keywords. What a rule applies to (its operation, country and WhatsApp Business Account) is fixed once created: those decide which inbound messages reach it, so changing one would make it a different rule. Delete it and create the one you want.
+ *
+ */
+export type WhatsAppKeywordRuleUpdate = {
+  /**
+   * Replaces the extra keywords this rule matches, on top of the ones Bird ships. Send an empty array to keep Bird's keywords only. Omit to leave the current ones unchanged.
+   *
+   */
+  keywords?: Array<string>;
+  /**
+   * Replaces the message sent back when a keyword matches. Set it to null to send nothing. Omit to leave it unchanged.
+   *
+   */
+  reply?: string | null;
+};
 
 /**
  * The bucket size a series is grouped by. Day suits the product's charts; wider grains suit long ranges.
@@ -13079,7 +13276,14 @@ export type Actor = {
    */
   id: string;
   /**
-   * Who or what performed the action: `user` for a member's own session, `oauth_token` for a token issued to a caller on a member's behalf, `api_key` for a workspace API key, `system` for our own automation, `sso` for an organization's SSO connection, and `service_account` for a workspace's connected Integration acting with no member behind it. Open enum: new actor types may be added over time, so treat any unrecognized value as a future type rather than an error.
+   * New actor types may be added. Treat unrecognized values as future types, not errors.
+   * - `user`: a member's own session.
+   * - `api_key`: a workspace API key.
+   * - `oauth_token`: a token issued to a caller on a member's behalf.
+   * - `system`: an action we perform without a customer actor.
+   * - `sso`: an organization's SSO connection.
+   * - `service_account`: a workspace's connected Integration acting with no member behind it.
+   * - `automation`: an automation execution in your workspace.
    */
   type: string;
   /**
@@ -15325,11 +15529,11 @@ export type EventEmailReceivedData = {
    */
   message_id: string | null;
   /**
-   * Address from the message's From header, with the relay's parsed sender and then the SMTP envelope sender as fallbacks when that header cannot be read.
+   * Address from the message's From header, with the relay's parsed sender and then the SMTP envelope sender as fallbacks when that header cannot be read. This field alone does not authenticate the sender.
    */
   from: string;
   /**
-   * Recipient addresses the message was sent to.
+   * Parsed recipient addresses from the message headers, not the envelope recipient used to route this delivery.
    */
   to: Array<string>;
   /**
@@ -16667,12 +16871,24 @@ export type EventWhatsAppAccepted = {
 /**
  * Payload of the whatsapp.delivered event.
  */
-export type EventWhatsAppDeliveredData = EventWhatsAppBase;
+export type EventWhatsAppDeliveredData = EventWhatsAppBase & {
+  /**
+   * The participant delivery was confirmed to, on a group message. A group send raises this event once per participant, so this is what tells the deliveries apart. Absent on a one-to-one message, whose `to` already names its recipient.
+   *
+   */
+  recipient?: WhatsAppAddress;
+};
 
 /**
  * Payload of the whatsapp.read event.
  */
-export type EventWhatsAppReadData = EventWhatsAppBase;
+export type EventWhatsAppReadData = EventWhatsAppBase & {
+  /**
+   * The participant who opened the message, on a group message. A group send raises this event once per participant, so this is what tells the deliveries apart. Absent on a one-to-one message, whose `to` already names its recipient.
+   *
+   */
+  recipient?: WhatsAppAddress;
+};
 
 /**
  * Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back.
@@ -19303,6 +19519,54 @@ export type WhatsAppBusinessAccountListWritable = {
   data: Array<unknown>;
 } & ListEnvelope;
 
+export type WhatsAppKeywordRuleWritable = {
+  id: WhatsAppKeywordRuleId;
+  scope: WhatsAppKeywordRuleScope;
+  operation: WhatsAppKeywordOperation;
+  /**
+   * The country the rule applies in, as an ISO 3166-1 alpha-2 code. It is the country of the person who messaged you, worked out from their phone number, not the country of the account they messaged. Null means the rule applies worldwide, which is what Bird's own rules do. A rule for a country outranks a worldwide rule for the people it covers.
+   *
+   */
+  country?: string | null;
+  /**
+   * The WhatsApp Business Account the rule is limited to, identified by its WhatsApp-issued account ID, or null when it covers every account in your workspace. Bird's own rules are always null.
+   *
+   */
+  waba?: string | null;
+  /**
+   * The keywords this rule adds. For one of Bird's own rules this is the full set Bird ships. For a rule you created it is only what you added on top: it never restates or removes Bird's keywords, so `effective_keywords` is what actually matches.
+   *
+   */
+  keywords: Array<string>;
+  /**
+   * Every keyword that matches this rule: Bird's keywords for the same operation and country, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.
+   * For a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.
+   *
+   */
+  effective_keywords: Array<string>;
+  /**
+   * The message sent back when one of the keywords matches, or null when no reply is sent. The reply goes out on the conversation the inbound message opened.
+   *
+   */
+  reply?: string | null;
+  /**
+   * When the rule was created. On one of Bird's own rules this is when Bird last shipped a change to it.
+   */
+  created_at: string;
+  /**
+   * When the rule was last changed. On one of Bird's own rules this is when Bird last shipped a change to it.
+   */
+  updated_at: string;
+};
+
+export type WhatsAppKeywordRuleListWritable = {
+  /**
+   * The keyword rules that apply to your workspace, Bird's own included. Ordered most specific first, so the first rule whose keywords match an inbound message is the one that runs. The set is small and returned in full; this list is not paginated.
+   *
+   */
+  data: Array<WhatsAppKeywordRuleWritable>;
+};
+
 /**
  * The meta a windowed Inbox Insights resource carries: the common fields plus the period the figures cover and how they were measured.
  *
@@ -19947,7 +20211,14 @@ export type ActorWritable = {
    */
   id: string;
   /**
-   * Who or what performed the action: `user` for a member's own session, `oauth_token` for a token issued to a caller on a member's behalf, `api_key` for a workspace API key, `system` for our own automation, `sso` for an organization's SSO connection, and `service_account` for a workspace's connected Integration acting with no member behind it. Open enum: new actor types may be added over time, so treat any unrecognized value as a future type rather than an error.
+   * New actor types may be added. Treat unrecognized values as future types, not errors.
+   * - `user`: a member's own session.
+   * - `api_key`: a workspace API key.
+   * - `oauth_token`: a token issued to a caller on a member's behalf.
+   * - `system`: an action we perform without a customer actor.
+   * - `sso`: an organization's SSO connection.
+   * - `service_account`: a workspace's connected Integration acting with no member behind it.
+   * - `automation`: an automation execution in your workspace.
    */
   type: string;
 };
@@ -28164,6 +28435,11 @@ export type ListWhatsAppMessagesData = {
      */
     category?: WhatsAppTemplateCategory;
     /**
+     * Filter by the WhatsApp group the message belongs to, in either direction: the group an outbound message was addressed to, or the group an inbound message arrived through. Matches the `group_id` on each message's `to`. It names one group, so there is no way to ask for the messages that belong to no group: omit it to list group and one-to-one messages together.
+     *
+     */
+    group_id?: WhatsAppGroupId;
+    /**
      * Filter by tag. Accepts `name` to match any record carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A record must match every tag listed to be returned.
      *
      */
@@ -28268,6 +28544,10 @@ export type CreateWhatsAppMessageErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -28615,6 +28895,10 @@ export type DeleteWhatsAppMessageReactionErrors = {
    */
   404: Error;
   /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -28701,6 +28985,10 @@ export type UpsertWhatsAppMessageReactionErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -30547,6 +30835,429 @@ export type GetWhatsAppBusinessAccountResponses = {
 
 export type GetWhatsAppBusinessAccountResponse =
   GetWhatsAppBusinessAccountResponses[keyof GetWhatsAppBusinessAccountResponses];
+
+export type ListWhatsAppKeywordRulesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Keep only rules that apply to someone messaging from this country, as an ISO 3166-1 alpha-2 code. Omit for every rule, whichever country it covers.
+     *
+     */
+    country?: string;
+    /**
+     * Keep only the rules that apply to this WhatsApp Business Account of yours, identified by its WhatsApp-issued account ID or by the `waa_` ID Bird gives it. Either form finds the same rules.
+     *
+     */
+    waba?: string;
+    /**
+     * Keep only rules for this operation. Omit for all of them. Open on the same terms as the response, so an operation Bird gains later can be filtered for without a client update; one Bird does not answer matches nothing rather than failing.
+     *
+     */
+    operation?: WhatsAppKeywordOperation;
+    /**
+     * Keep only Bird's own rules (`system`) or only the rules you created (`workspace`). Omit for both.
+     *
+     */
+    scope?: WhatsAppKeywordRuleScope;
+  };
+  url: "/v1/whatsapp/keyword-rules";
+};
+
+export type ListWhatsAppKeywordRulesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ListWhatsAppKeywordRulesError =
+  ListWhatsAppKeywordRulesErrors[keyof ListWhatsAppKeywordRulesErrors];
+
+export type ListWhatsAppKeywordRulesResponses = {
+  /**
+   * The keyword rules that apply to your workspace.
+   */
+  200: WhatsAppKeywordRuleList;
+};
+
+export type ListWhatsAppKeywordRulesResponse =
+  ListWhatsAppKeywordRulesResponses[keyof ListWhatsAppKeywordRulesResponses];
+
+export type CreateWhatsAppKeywordRuleData = {
+  body: WhatsAppKeywordRuleCreate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/whatsapp/keyword-rules";
+};
+
+export type CreateWhatsAppKeywordRuleErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateWhatsAppKeywordRuleError =
+  CreateWhatsAppKeywordRuleErrors[keyof CreateWhatsAppKeywordRuleErrors];
+
+export type CreateWhatsAppKeywordRuleResponses = {
+  /**
+   * The created rule.
+   */
+  201: WhatsAppKeywordRule;
+};
+
+export type CreateWhatsAppKeywordRuleResponse =
+  CreateWhatsAppKeywordRuleResponses[keyof CreateWhatsAppKeywordRuleResponses];
+
+export type DeleteWhatsAppKeywordRuleData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the keyword rule, as returned by the list operation. Bird's own rules and yours share one ID space.
+     */
+    id: WhatsAppKeywordRuleId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/keyword-rules/{id}";
+};
+
+export type DeleteWhatsAppKeywordRuleErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteWhatsAppKeywordRuleError =
+  DeleteWhatsAppKeywordRuleErrors[keyof DeleteWhatsAppKeywordRuleErrors];
+
+export type DeleteWhatsAppKeywordRuleResponses = {
+  /**
+   * The rule was deleted.
+   */
+  204: void;
+};
+
+export type DeleteWhatsAppKeywordRuleResponse =
+  DeleteWhatsAppKeywordRuleResponses[keyof DeleteWhatsAppKeywordRuleResponses];
+
+export type GetWhatsAppKeywordRuleData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the keyword rule, as returned by the list operation. Bird's own rules and yours share one ID space.
+     */
+    id: WhatsAppKeywordRuleId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/keyword-rules/{id}";
+};
+
+export type GetWhatsAppKeywordRuleErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppKeywordRuleError =
+  GetWhatsAppKeywordRuleErrors[keyof GetWhatsAppKeywordRuleErrors];
+
+export type GetWhatsAppKeywordRuleResponses = {
+  /**
+   * The keyword rule.
+   */
+  200: WhatsAppKeywordRule;
+};
+
+export type GetWhatsAppKeywordRuleResponse =
+  GetWhatsAppKeywordRuleResponses[keyof GetWhatsAppKeywordRuleResponses];
+
+export type UpdateWhatsAppKeywordRuleData = {
+  body: WhatsAppKeywordRuleUpdate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the keyword rule, as returned by the list operation. Bird's own rules and yours share one ID space.
+     */
+    id: WhatsAppKeywordRuleId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/keyword-rules/{id}";
+};
+
+export type UpdateWhatsAppKeywordRuleErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateWhatsAppKeywordRuleError =
+  UpdateWhatsAppKeywordRuleErrors[keyof UpdateWhatsAppKeywordRuleErrors];
+
+export type UpdateWhatsAppKeywordRuleResponses = {
+  /**
+   * The updated rule.
+   */
+  200: WhatsAppKeywordRule;
+};
+
+export type UpdateWhatsAppKeywordRuleResponse =
+  UpdateWhatsAppKeywordRuleResponses[keyof UpdateWhatsAppKeywordRuleResponses];
 
 export type GetEmailInboxInsightsPlacementData = {
   body?: never;

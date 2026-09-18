@@ -14,6 +14,7 @@ import { WhatsappReactionResource } from "./whatsappReaction.gen.js";
 import { WhatsappTemplatesResource } from "./whatsappTemplates.js";
 import { WhatsappNumbersResource } from "./whatsappNumbers.js";
 import { WhatsappBusinessAccountsResource } from "./whatsappBusinessAccounts.gen.js";
+import { WhatsappKeywordRulesResource } from "./whatsappKeywordRules.gen.js";
 import type { APIPromise, RequestOptions } from "../core/result.js";
 
 /** Body for `bird.whatsapp.send` — a template send, or one free-form content arm. */
@@ -34,6 +35,8 @@ export class WhatsappResource extends WhatsappResourceBase {
 
   readonly businessAccounts: WhatsappBusinessAccountsResource;
 
+  readonly keywordRules: WhatsappKeywordRulesResource;
+
   constructor(
     core: ConstructorParameters<typeof Resource>[0],
     client: ConstructorParameters<typeof Resource>[1],
@@ -45,6 +48,7 @@ export class WhatsappResource extends WhatsappResourceBase {
     this.reaction = new WhatsappReactionResource(core, client);
     this.numbers = new WhatsappNumbersResource(core, client);
     this.businessAccounts = new WhatsappBusinessAccountsResource(core, client);
+    this.keywordRules = new WhatsappKeywordRulesResource(core, client);
   }
 
   /**

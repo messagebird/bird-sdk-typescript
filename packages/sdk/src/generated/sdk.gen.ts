@@ -99,6 +99,9 @@ import type {
   CreateWebhookData,
   CreateWebhookErrors,
   CreateWebhookResponses,
+  CreateWhatsAppKeywordRuleData,
+  CreateWhatsAppKeywordRuleErrors,
+  CreateWhatsAppKeywordRuleResponses,
   CreateWhatsAppMessageData,
   CreateWhatsAppMessageErrors,
   CreateWhatsAppMessageResponses,
@@ -150,6 +153,9 @@ import type {
   DeleteWebhookData,
   DeleteWebhookErrors,
   DeleteWebhookResponses,
+  DeleteWhatsAppKeywordRuleData,
+  DeleteWhatsAppKeywordRuleErrors,
+  DeleteWhatsAppKeywordRuleResponses,
   DeleteWhatsAppMessageReactionData,
   DeleteWhatsAppMessageReactionErrors,
   DeleteWhatsAppMessageReactionResponses,
@@ -408,6 +414,9 @@ import type {
   GetWhatsAppInboundStatsSummaryData,
   GetWhatsAppInboundStatsSummaryErrors,
   GetWhatsAppInboundStatsSummaryResponses,
+  GetWhatsAppKeywordRuleData,
+  GetWhatsAppKeywordRuleErrors,
+  GetWhatsAppKeywordRuleResponses,
   GetWhatsAppMessageData,
   GetWhatsAppMessageErrors,
   GetWhatsAppMessageMediaData,
@@ -572,6 +581,9 @@ import type {
   ListWhatsAppBusinessAccountsData,
   ListWhatsAppBusinessAccountsErrors,
   ListWhatsAppBusinessAccountsResponses,
+  ListWhatsAppKeywordRulesData,
+  ListWhatsAppKeywordRulesErrors,
+  ListWhatsAppKeywordRulesResponses,
   ListWhatsAppMessageEventsData,
   ListWhatsAppMessageEventsErrors,
   ListWhatsAppMessageEventsResponses,
@@ -686,6 +698,9 @@ import type {
   UpdateWebhookData,
   UpdateWebhookErrors,
   UpdateWebhookResponses,
+  UpdateWhatsAppKeywordRuleData,
+  UpdateWhatsAppKeywordRuleErrors,
+  UpdateWhatsAppKeywordRuleResponses,
   UpsertEmailInboxInsightsDomainMonitoringData,
   UpsertEmailInboxInsightsDomainMonitoringErrors,
   UpsertEmailInboxInsightsDomainMonitoringResponses,
@@ -3828,10 +3843,13 @@ export const createVerificationNextChannel = <
  * message whose content WhatsApp models and we do not carries `unsupported`
  * instead, naming the type rather than reading back empty.
  * Filter by direction, status, recipient (`to`), sender (`from`),
- * business-scoped user ID (`bsuid`), template category, tag, or creation
+ * business-scoped user ID (`bsuid`), group (`group_id`), template category,
+ * tag, or creation
  * time. `to` and `from` name the same ends of the message the response
  * does, and each accepts an E.164 phone number or a business-scoped user
  * ID. Pair either with `direction` to search a single side of the message.
+ * Neither matches a group, so `group_id` is what narrows the list to one
+ * group's messages.
  * Pass the response's `next_cursor` back as
  * `starting_after` to fetch the next page. To follow a single message's
  * delivery, use
@@ -3913,6 +3931,15 @@ export const listWhatsAppMessages = <ThrowOnError extends boolean = false>(
  * `phone_number` in E.164 earns that card a button opening a chat with it.
  * Contact cards are free-form too, so the same window and `from` rules apply.
  *
+ * **A group send** addresses a WhatsApp group ID in `to` and carries no
+ * `from`: the group sends on its own number, and the response reports the
+ * fan-out.
+ * `recipient_count` is the group's membership when the send was accepted,
+ * `delivered_count` and `read_count` count against it, and `status` turns
+ * `delivered` only once every participant has it. WhatsApp delivers neither
+ * interactive content nor an authentication template to a group, and a
+ * Bird-managed template sends from a number no group is scoped to.
+ *
  * Set `in_reply_to_message_id` to quote a message the contact sees above this
  * one, the way replying in the WhatsApp client does. Any content quotes, and
  * the quoted message must be one from this same conversation.
@@ -3932,8 +3959,13 @@ export const listWhatsAppMessages = <ThrowOnError extends boolean = false>(
  * - A recipient that is neither a valid phone number nor a business-scoped user ID.
  * - Free-form content sent into a closed customer service window
  * (`WhatsAppServiceWindowClosed`).
+ * - Interactive content or an authentication template addressed to a group
+ * (`WhatsAppGroupContentNotSupported`).
  *
- * A send from a workspace with no wallet balance fails with a `402`.
+ * A group `to` naming no group this workspace holds fails with a `404`
+ * `WhatsAppGroupNotFound`, and one whose group is not active with a `409`
+ * `WhatsAppGroupNotActive`. A send from a workspace with no wallet balance
+ * fails with a `402`.
  *
  */
 export const createWhatsAppMessage = <ThrowOnError extends boolean = false>(
@@ -4139,7 +4171,10 @@ export const getWhatsAppMessageMedia = <ThrowOnError extends boolean = false>(
  * not supported either.
  *
  * A message Bird can no longer resolve returns a `404` instead, on the same
- * 15-day retention a placement is bounded by.
+ * 15-day retention a placement is bounded by. A reaction on a message
+ * received in a group addresses the group, so a group this workspace no
+ * longer holds returns a `404` `WhatsAppGroupNotFound` and one that is not
+ * active a `409` `WhatsAppGroupNotActive`, the same as placing one does.
  *
  * The `202` is the removal accepted rather than applied. The reaction stays in
  * the message's `reactions` until WhatsApp confirms the removal and then drops
@@ -4199,6 +4234,11 @@ export const deleteWhatsAppMessageReaction = <
  * provider id a reaction needs for **15 days**, so that is the practical age
  * limit. The message and its reaction log stay readable for 30; only the id
  * a placement needs is gone.
+ *
+ * Reacting to a message received in a group addresses the group, so the
+ * group's own state applies: a group this workspace no longer holds returns
+ * a `404` `WhatsAppGroupNotFound`, and one that is not active a `409`
+ * `WhatsAppGroupNotActive`.
  *
  * Reactions are not charged for.
  *
@@ -5171,6 +5211,170 @@ export const getWhatsAppBusinessAccount = <
     ],
     url: "/v1/whatsapp/business-accounts/{business_account_ref}",
     ...options,
+  });
+
+/**
+ * List WhatsApp keyword rules
+ *
+ * Returns the keyword rules that apply to inbound messages, most specific first. Bird's own rules are included, so opt-out and opt-in work on every inbound-capable number before you configure anything.
+ *
+ * Use the filters to narrow the full, unpaginated list. Set `scope=system` for Bird's rules only, or `scope=workspace` for the ones you created.
+ *
+ */
+export const listWhatsAppKeywordRules = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWhatsAppKeywordRulesData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppKeywordRulesResponses,
+  ListWhatsAppKeywordRulesErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListWhatsAppKeywordRulesResponses,
+    ListWhatsAppKeywordRulesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/keyword-rules",
+    ...options,
+  });
+
+/**
+ * Create a WhatsApp keyword rule
+ *
+ * Creates a keyword rule. Use it to replace the reply Bird sends for `opt_out` or `opt_in`, or to add keywords your customers actually type.
+ *
+ * Your rule takes precedence over Bird's at the same grain and keeps Bird's keywords unless you add more, so replacing a reply takes two fields. A keyword Bird has bound to one operation cannot be reused for the other.
+ *
+ */
+export const createWhatsAppKeywordRule = <ThrowOnError extends boolean = false>(
+  options: Options<CreateWhatsAppKeywordRuleData, ThrowOnError>,
+): RequestResult<
+  CreateWhatsAppKeywordRuleResponses,
+  CreateWhatsAppKeywordRuleErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateWhatsAppKeywordRuleResponses,
+    CreateWhatsAppKeywordRuleErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/keyword-rules",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a WhatsApp keyword rule
+ *
+ * Deletes a rule you created. The next rule in the ladder answers that scope straight away, so Bird's own keywords keep opting people out; the keywords the rule added go with it, and a word only that rule matched stops meaning anything. Which rule answers next is not always one of yours: the order runs from your rule for an account and country, through your rule for the account, your rule for the country, Bird's rule for the sender's country, your worldwide rule, and finally Bird's worldwide one. So deleting your rule for a country hands the scope to Bird's rule for that country before your own worldwide rule. List the rules to read the order for your workspace. Bird's own rules cannot be deleted.
+ *
+ */
+export const deleteWhatsAppKeywordRule = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteWhatsAppKeywordRuleData, ThrowOnError>,
+): RequestResult<
+  DeleteWhatsAppKeywordRuleResponses,
+  DeleteWhatsAppKeywordRuleErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteWhatsAppKeywordRuleResponses,
+    DeleteWhatsAppKeywordRuleErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/keyword-rules/{id}",
+    ...options,
+  });
+
+/**
+ * Get a WhatsApp keyword rule
+ *
+ * Returns one keyword rule, either one of Bird's own or one you created, with its `effective_keywords` and the reply it sends.
+ *
+ */
+export const getWhatsAppKeywordRule = <ThrowOnError extends boolean = false>(
+  options: Options<GetWhatsAppKeywordRuleData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppKeywordRuleResponses,
+  GetWhatsAppKeywordRuleErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWhatsAppKeywordRuleResponses,
+    GetWhatsAppKeywordRuleErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/keyword-rules/{id}",
+    ...options,
+  });
+
+/**
+ * Update a WhatsApp keyword rule
+ *
+ * Changes the reply or the added keywords of a rule you created. Bird's own rules cannot be changed. To replace one, create a rule with the same operation and country and yours takes precedence.
+ *
+ * What the rule applies to is fixed once created, so this changes the reply and the keywords only.
+ *
+ */
+export const updateWhatsAppKeywordRule = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateWhatsAppKeywordRuleData, ThrowOnError>,
+): RequestResult<
+  UpdateWhatsAppKeywordRuleResponses,
+  UpdateWhatsAppKeywordRuleErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateWhatsAppKeywordRuleResponses,
+    UpdateWhatsAppKeywordRuleErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/keyword-rules/{id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**

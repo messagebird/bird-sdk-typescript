@@ -223,3 +223,41 @@ export async function whatsappStatsInboundByPhoneNumber() {
     console.log(row.phone_number, row.received);
   }
 }
+
+export async function whatsappKeywordRulesList() {
+  const rules = await bird.whatsapp.keywordRules.list({ operation: "opt_out" });
+  for (const rule of rules.data ?? []) {
+    console.log(rule.scope, rule.effective_keywords);
+  }
+}
+
+export async function whatsappKeywordRulesGet() {
+  // Bird's rules and yours share the `wkr_` id space; `scope` tells them apart.
+  const rule = await bird.whatsapp.keywordRules.get("wkr_01m2kj8x4te9p0rr7e5w2n1abc");
+  console.log(rule.scope, rule.reply);
+}
+
+export async function whatsappKeywordRulesCreate() {
+  const rule = await bird.whatsapp.keywordRules.create({
+    operation: "opt_out",
+    country: "US", // the SENDER's country, from their own number
+    reply: "You're off the list. ACME Courier won't message you again.",
+  });
+  // effective_keywords is Bird's set plus any of your own.
+  console.log(rule.id, rule.effective_keywords);
+}
+
+export async function whatsappKeywordRulesUpdate() {
+  // Omitting keywords leaves the set alone; an empty array clears your additions
+  // back to Bird's. reply: null switches the auto-reply off and still records
+  // the opt-out.
+  const rule = await bird.whatsapp.keywordRules.update("wkr_01m2kj8x4te9p0rr7e5w2n1abc", {
+    keywords: ["no more texts", "remove me"],
+  });
+  console.log(rule.effective_keywords);
+}
+
+export async function whatsappKeywordRulesDelete() {
+  // The next rule in the ladder answers the scope, which is another rule of yours if you hold a less specific one; STOP never stops working.
+  await bird.whatsapp.keywordRules.delete("wkr_01m2kj8x4te9p0rr7e5w2n1abc");
+}

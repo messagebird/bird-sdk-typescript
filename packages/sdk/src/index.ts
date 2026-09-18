@@ -177,6 +177,13 @@ export type {
   WhatsappBusinessAccountsListQuery,
 } from "./resources/whatsappBusinessAccounts.gen.js";
 export type {
+  WhatsAppKeywordRule,
+  WhatsAppKeywordRuleList,
+  WhatsappKeywordRulesListQuery,
+  WhatsappKeywordRulesCreateParams,
+  WhatsappKeywordRulesUpdateParams,
+} from "./resources/whatsappKeywordRules.gen.js";
+export type {
   WhatsAppTemplate,
   WhatsappTemplatesListQuery,
 } from "./resources/whatsappTemplates.gen.js";
@@ -387,6 +394,7 @@ export {
   WhatsAppInteractiveHeaderType,
   WhatsAppInteractiveReplyType,
   WhatsAppInteractiveType,
+  WhatsAppKeywordOperation,
   WhatsAppNumberErrorCode,
   WhatsAppNumberMessagingLimit,
   WhatsAppNumberQualityRating,
@@ -445,6 +453,7 @@ export type {
   WhatsAppInteractiveHeaderTypeValue,
   WhatsAppInteractiveReplyTypeValue,
   WhatsAppInteractiveTypeValue,
+  WhatsAppKeywordOperationValue,
   WhatsAppNumberErrorCodeValue,
   WhatsAppNumberMessagingLimitValue,
   WhatsAppNumberQualityRatingValue,
