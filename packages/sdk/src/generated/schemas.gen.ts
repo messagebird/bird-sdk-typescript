@@ -6870,6 +6870,13 @@ export const SMSKeywordRuleUpdateSchema = {
   },
 } as const;
 
+export const ComplianceSubmissionIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^csb_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "csb_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const StatsComparePeriodSchema = {
   type: "string",
   description:
@@ -30269,6 +30276,22 @@ export const WebhookAttemptListSchema = {
   },
 } as const;
 
+export const SIPTrunkIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^spt_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "spt_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoiceInboundForwardAsSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["dialed_number", "calling_number"],
+  description:
+    'Which of a forwarded call\'s two numbers it shows as the caller.\n\n"dialed_number" is the number the caller dialled, which is one of yours.\nCarriers treat it as fully yours, so it is the least likely to be altered or\nscreened. Whoever answers sees which of your numbers was called, not who called\nit. It needs your workspace approved to place calls from numbers you bought from\nus; where it is not, this value is refused and the call shows the calling\nnumber.\n\n"calling_number" is the caller\'s own number, so the phone rings as though they\nhad dialled it directly and the call can be returned from the call log. Because\nthe number is not one you own, some carriers (most often in the US and parts of\nEurope) mark such calls as unverified, replace the number, or screen them.\n',
+  example: "dialed_number",
+} as const;
+
 export const NumberTypeSchema = {
   type: "string",
   minLength: 1,
@@ -30292,31 +30315,59 @@ export const NumberCapabilitySchema = {
     "A capability supported by a phone number. New capabilities may be added over time, so treat unrecognized values as supported capabilities rather than errors.",
 } as const;
 
+export const NumberOwnershipStatusSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  enum: [
+    "needs_input",
+    "under_review",
+    "approval_pending",
+    "approved",
+    "not_required",
+    "rejected",
+    "unknown",
+  ],
+  description:
+    "Current ownership registration approval status. Operational activation is separate:\n`blocked_at` records the ownership block on number use, and `next` describes remaining work.\n\n- `needs_input` means ownership details or a submission correction are needed.\n- `under_review` means your current answers are being reviewed.\n- `approval_pending` means your paperwork is accepted but registration approval is still pending.\n- `approved` means ownership registration is approved. Number activation can still be pending while `blocked_at` is non-null.\n- `not_required` means no active ownership requirement applies, including after a requirement is withdrawn.\n- `rejected` means the submission was closed or the verifier correction deadline passed. Corrections are no longer accepted for this submission.\n- `unknown` means current approval status could not be determined. Read `blocked_at` for any recorded ownership block. Retry the read.\n",
+} as const;
+
 export const NumberOwnershipSchema = {
   type: "object",
+  readOnly: true,
   additionalProperties: false,
-  required: ["satisfied", "next"],
+  required: ["satisfied", "status", "next"],
   description:
-    "Where this number stands with the ownership paperwork its country requires before it may carry traffic. Present only for a number whose country requires any, so its absence means no paperwork was ever asked for and this number is unconditionally usable. Absent as well when the requirement cannot be established right now, since reporting either answer would state something about your paperwork that has not been checked.\n",
+    "Ownership paperwork and registration approval progress for this number. Reported when ownership requirements or a recorded ownership block or decision apply. If requirements or progress cannot be read, a recorded block or decision preserves this object; without either, the object is absent. Other sending requirements can apply even when ownership is approved.\n",
   properties: {
-    satisfied: {
-      type: "boolean",
+    submission_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceSubmissionID",
+        },
+      ],
       readOnly: true,
       description:
-        "Whether the paperwork is accepted. Read `next` for what advances it while this is false. Whether sending is currently refused is reported by `blocked_at` instead: a number bought before its country asked for anything is unsatisfied and still usable until a review says otherwise.\n",
+        "The most recent ownership submission for this number, including after approval. Users with compliance read access can view the filed answers and their review status from the number's details in the dashboard. This may be a newer filing than the one that cleared the number for use. Absent when no submission was found or submission progress could not be read.",
+    },
+    satisfied: {
+      type: "boolean",
+      description:
+        "Whether the ownership paperwork is accepted or is no longer required. This can remain true while an external verifier asks for a correction or activation is pending. Read `status` and `next` for the current step, and `blocked_at` for the ownership block on outbound SMS and inbound and outbound voice.\n",
+    },
+    status: {
+      $ref: "#/components/schemas/NumberOwnershipStatus",
     },
     blocked_at: {
       type: ["string", "null"],
       format: "date-time",
-      readOnly: true,
       description:
-        "When the number stopped being able to carry traffic, and null while it can. Always null when `satisfied` is true, but null does not imply it: a number whose country began asking after you bought it is usable with its paperwork still outstanding. A number can also arrive blocked, and one that was usable can be blocked again if its approval is withdrawn.\n",
+        "When ownership requirements began blocking outbound SMS and inbound and outbound voice calls. Null when that block is clear. Accepted paperwork can still await activation with a block in place. A number bought before ownership requirements were introduced can have outstanding paperwork without a block.\n",
     },
     next: {
       type: "array",
-      readOnly: true,
       description:
-        "What you do about it, in the order to do it. Empty only when `satisfied` is true, so while anything is outstanding there is always at least one step. When what you already sent is being reviewed and nothing is needed from you, that step has kind `wait` and says so. Re-read it after each call rather than caching the first list you saw.\n",
+        "Actions that advance ownership registration or activation, in order. Empty when neither needs further action. A `wait` step means no customer action is needed now, including while accepted paperwork awaits activation. Read this list again after each change.\n",
       items: {
         $ref: "#/components/schemas/NextAction",
       },
@@ -30393,7 +30444,7 @@ export const NumberSchema = {
       readOnly: true,
       enum: ["active", "pending_ownership_registration", "released"],
       description:
-        "The allocation and ownership-approval status of this number.\n\n- `active` means this number is allocated to your workspace and usable.\n- `pending_ownership_registration` means this number is allocated to your workspace and billed,\n  but outbound SMS and both inbound and outbound voice calls are blocked until the ownership paperwork\n  its country requires is accepted. This ownership status does not gate inbound SMS or WhatsApp.\n  Read `ownership.next` for what advances it, and re-read later if\n  `ownership` is momentarily `null`.\n- `released` means this number is no longer allocated to your workspace.\n\nAn allocated number is not always enough to send from it: some destination\ncountries also require an approved registration for the sender.\n",
+        "The allocation and ownership-approval status of this number.\n\n- `active` means this number is allocated to your workspace and usable.\n- `pending_ownership_registration` means this number is allocated to your workspace and billed,\n  but outbound SMS and both inbound and outbound voice calls are blocked until ownership registration\n  is approved and activation completes, or the ownership requirement is withdrawn.\n  This ownership status does not gate inbound SMS or WhatsApp.\n  Read `ownership.status` and `ownership.next` for the current decision and remaining work.\n- `released` means this number is no longer allocated to your workspace.\n\nAn allocated number is not always enough to send from it: some destination\ncountries also require an approved registration for the sender.\n",
     },
     allocated_at: {
       type: "string",
@@ -30412,7 +30463,7 @@ export const NumberSchema = {
     ownership: {
       readOnly: true,
       description:
-        "Where this number stands with the ownership paperwork its country requires. `null` when the country requires none, which is the usual case: a number with no `ownership` object is usable as soon as it is allocated. Also `null` when that standing cannot be established right now; `status` still reads `pending_ownership_registration` while the number is blocked, so re-read this field rather than caching its absence. We manage the paperwork for shared short codes, so this field is always `null` for them.\n",
+        "Ownership paperwork and activation progress. `null` when no ownership requirements, recorded block, or recorded decision apply, or when requirements or progress cannot be read and no ownership block or decision has been recorded. A recorded block still returns an ownership object with `status: unknown` when progress cannot be read; retry the read. We manage the paperwork for shared short codes, so this field is always `null` for them. Other sending requirements can apply even when ownership registration is complete.\n",
       oneOf: [
         {
           $ref: "#/components/schemas/NumberOwnership",
@@ -30658,13 +30709,6 @@ export const NumbersOrderCreateSchema = {
   },
 } as const;
 
-export const SIPTrunkIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^spt_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "spt_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
 export const VoiceCallRouteTypeSchema = {
   type: "string",
   minLength: 1,
@@ -30672,15 +30716,6 @@ export const VoiceCallRouteTypeSchema = {
   description:
     "Which answer a number carries.\n\n- `reject`: refuses the call. This is where every number starts.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
   example: "reject",
-} as const;
-
-export const VoiceInboundForwardAsSchema = {
-  type: "string",
-  minLength: 1,
-  enum: ["dialed_number", "calling_number"],
-  description:
-    'Which of a forwarded call\'s two numbers it shows as the caller.\n\n"dialed_number" is the number the caller dialled, which is one of yours.\nCarriers treat it as fully yours, so it is the least likely to be altered or\nscreened. Whoever answers sees which of your numbers was called, not who called\nit. It needs your workspace approved to place calls from numbers you bought from\nus; where it is not, this value is refused and the call shows the calling\nnumber.\n\n"calling_number" is the caller\'s own number, so the phone rings as though they\nhad dialled it directly and the call can be returned from the call log. Because\nthe number is not one you own, some carriers (most often in the US and parts of\nEurope) mark such calls as unverified, replace the number, or screen them.\n',
-  example: "dialed_number",
 } as const;
 
 export const VoiceCallRejectionReasonSchema = {
@@ -36525,9 +36560,32 @@ export const WebhookAttemptListWritableSchema = {
 
 export const NumberOwnershipWritableSchema = {
   type: "object",
+  readOnly: true,
   additionalProperties: false,
+  required: ["satisfied", "next"],
   description:
-    "Where this number stands with the ownership paperwork its country requires before it may carry traffic. Present only for a number whose country requires any, so its absence means no paperwork was ever asked for and this number is unconditionally usable. Absent as well when the requirement cannot be established right now, since reporting either answer would state something about your paperwork that has not been checked.\n",
+    "Ownership paperwork and registration approval progress for this number. Reported when ownership requirements or a recorded ownership block or decision apply. If requirements or progress cannot be read, a recorded block or decision preserves this object; without either, the object is absent. Other sending requirements can apply even when ownership is approved.\n",
+  properties: {
+    satisfied: {
+      type: "boolean",
+      description:
+        "Whether the ownership paperwork is accepted or is no longer required. This can remain true while an external verifier asks for a correction or activation is pending. Read `status` and `next` for the current step, and `blocked_at` for the ownership block on outbound SMS and inbound and outbound voice.\n",
+    },
+    blocked_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When ownership requirements began blocking outbound SMS and inbound and outbound voice calls. Null when that block is clear. Accepted paperwork can still await activation with a block in place. A number bought before ownership requirements were introduced can have outstanding paperwork without a block.\n",
+    },
+    next: {
+      type: "array",
+      description:
+        "Actions that advance ownership registration or activation, in order. Empty when neither needs further action. A `wait` step means no customer action is needed now, including while accepted paperwork awaits activation. Read this list again after each change.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+  },
 } as const;
 
 export const NumberWritableSchema = {

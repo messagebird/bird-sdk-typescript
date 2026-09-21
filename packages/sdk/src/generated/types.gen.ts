@@ -3862,6 +3862,8 @@ export type SmsKeywordRuleUpdate = {
   confirmed_self_managed?: boolean;
 };
 
+export type ComplianceSubmissionId = string;
+
 /**
  * Set to `previous_period` to also return the same figures for the immediately preceding window of equal length, plus the change between the two, so you can show "+X% vs last period" without a second request.
  *
@@ -17247,6 +17249,26 @@ export type WebhookAttemptList = {
   data: Array<WebhookAttempt>;
 };
 
+export type SipTrunkId = string;
+
+/**
+ * Which of a forwarded call's two numbers it shows as the caller.
+ *
+ * "dialed_number" is the number the caller dialled, which is one of yours.
+ * Carriers treat it as fully yours, so it is the least likely to be altered or
+ * screened. Whoever answers sees which of your numbers was called, not who called
+ * it. It needs your workspace approved to place calls from numbers you bought from
+ * us; where it is not, this value is refused and the call shows the calling
+ * number.
+ *
+ * "calling_number" is the caller's own number, so the phone rings as though they
+ * had dialled it directly and the call can be returned from the call log. Because
+ * the number is not one you own, some carriers (most often in the US and parts of
+ * Europe) mark such calls as unverified, replace the number, or screen them.
+ *
+ */
+export type VoiceInboundForwardAs = "dialed_number" | "calling_number";
+
 /**
  * Physical type of a phone number. New number types may be added over time, so treat unrecognized values as supported types rather than errors.
  */
@@ -17265,25 +17287,52 @@ export type NumberType =
 export type NumberCapability = "sms" | "mms" | "voice" | (string & {});
 
 /**
- * Where this number stands with the ownership paperwork its country requires before it may carry traffic. Present only for a number whose country requires any, so its absence means no paperwork was ever asked for and this number is unconditionally usable. Absent as well when the requirement cannot be established right now, since reporting either answer would state something about your paperwork that has not been checked.
+ * Current ownership registration approval status. Operational activation is separate:
+ * `blocked_at` records the ownership block on number use, and `next` describes remaining work.
+ *
+ * - `needs_input` means ownership details or a submission correction are needed.
+ * - `under_review` means your current answers are being reviewed.
+ * - `approval_pending` means your paperwork is accepted but registration approval is still pending.
+ * - `approved` means ownership registration is approved. Number activation can still be pending while `blocked_at` is non-null.
+ * - `not_required` means no active ownership requirement applies, including after a requirement is withdrawn.
+ * - `rejected` means the submission was closed or the verifier correction deadline passed. Corrections are no longer accepted for this submission.
+ * - `unknown` means current approval status could not be determined. Read `blocked_at` for any recorded ownership block. Retry the read.
+ *
+ */
+export type NumberOwnershipStatus =
+  | "needs_input"
+  | "under_review"
+  | "approval_pending"
+  | "approved"
+  | "not_required"
+  | "rejected"
+  | "unknown";
+
+/**
+ * Ownership paperwork and registration approval progress for this number. Reported when ownership requirements or a recorded ownership block or decision apply. If requirements or progress cannot be read, a recorded block or decision preserves this object; without either, the object is absent. Other sending requirements can apply even when ownership is approved.
  *
  */
 export type NumberOwnership = {
   /**
-   * Whether the paperwork is accepted. Read `next` for what advances it while this is false. Whether sending is currently refused is reported by `blocked_at` instead: a number bought before its country asked for anything is unsatisfied and still usable until a review says otherwise.
-   *
+   * The most recent ownership submission for this number, including after approval. Users with compliance read access can view the filed answers and their review status from the number's details in the dashboard. This may be a newer filing than the one that cleared the number for use. Absent when no submission was found or submission progress could not be read.
    */
-  readonly satisfied: boolean;
+  readonly submission_id?: ComplianceSubmissionId;
   /**
-   * When the number stopped being able to carry traffic, and null while it can. Always null when `satisfied` is true, but null does not imply it: a number whose country began asking after you bought it is usable with its paperwork still outstanding. A number can also arrive blocked, and one that was usable can be blocked again if its approval is withdrawn.
+   * Whether the ownership paperwork is accepted or is no longer required. This can remain true while an external verifier asks for a correction or activation is pending. Read `status` and `next` for the current step, and `blocked_at` for the ownership block on outbound SMS and inbound and outbound voice.
    *
    */
-  readonly blocked_at?: string | null;
+  satisfied: boolean;
+  status: NumberOwnershipStatus;
   /**
-   * What you do about it, in the order to do it. Empty only when `satisfied` is true, so while anything is outstanding there is always at least one step. When what you already sent is being reviewed and nothing is needed from you, that step has kind `wait` and says so. Re-read it after each call rather than caching the first list you saw.
+   * When ownership requirements began blocking outbound SMS and inbound and outbound voice calls. Null when that block is clear. Accepted paperwork can still await activation with a block in place. A number bought before ownership requirements were introduced can have outstanding paperwork without a block.
    *
    */
-  readonly next: Array<NextAction>;
+  blocked_at?: string | null;
+  /**
+   * Actions that advance ownership registration or activation, in order. Empty when neither needs further action. A `wait` step means no customer action is needed now, including while accepted paperwork awaits activation. Read this list again after each change.
+   *
+   */
+  next: Array<NextAction>;
 };
 
 export type Number = {
@@ -17313,10 +17362,10 @@ export type Number = {
    *
    * - `active` means this number is allocated to your workspace and usable.
    * - `pending_ownership_registration` means this number is allocated to your workspace and billed,
-   * but outbound SMS and both inbound and outbound voice calls are blocked until the ownership paperwork
-   * its country requires is accepted. This ownership status does not gate inbound SMS or WhatsApp.
-   * Read `ownership.next` for what advances it, and re-read later if
-   * `ownership` is momentarily `null`.
+   * but outbound SMS and both inbound and outbound voice calls are blocked until ownership registration
+   * is approved and activation completes, or the ownership requirement is withdrawn.
+   * This ownership status does not gate inbound SMS or WhatsApp.
+   * Read `ownership.status` and `ownership.next` for the current decision and remaining work.
    * - `released` means this number is no longer allocated to your workspace.
    *
    * An allocated number is not always enough to send from it: some destination
@@ -17333,7 +17382,7 @@ export type Number = {
    */
   readonly released_at?: string | null;
   /**
-   * Where this number stands with the ownership paperwork its country requires. `null` when the country requires none, which is the usual case: a number with no `ownership` object is usable as soon as it is allocated. Also `null` when that standing cannot be established right now; `status` still reads `pending_ownership_registration` while the number is blocked, so re-read this field rather than caching its absence. We manage the paperwork for shared short codes, so this field is always `null` for them.
+   * Ownership paperwork and activation progress. `null` when no ownership requirements, recorded block, or recorded decision apply, or when requirements or progress cannot be read and no ownership block or decision has been recorded. A recorded block still returns an ownership object with `status: unknown` when progress cannot be read; retry the read. We manage the paperwork for shared short codes, so this field is always `null` for them. Other sending requirements can apply even when ownership registration is complete.
    *
    */
   readonly ownership?: NumberOwnership | null;
@@ -17429,8 +17478,6 @@ export type NumbersOrderCreate = {
   number: string;
 };
 
-export type SipTrunkId = string;
-
 /**
  * Which answer a number carries.
  *
@@ -17443,24 +17490,6 @@ export type SipTrunkId = string;
  *
  */
 export type VoiceCallRouteType = "reject" | "trunk" | "forward";
-
-/**
- * Which of a forwarded call's two numbers it shows as the caller.
- *
- * "dialed_number" is the number the caller dialled, which is one of yours.
- * Carriers treat it as fully yours, so it is the least likely to be altered or
- * screened. Whoever answers sees which of your numbers was called, not who called
- * it. It needs your workspace approved to place calls from numbers you bought from
- * us; where it is not, this value is refused and the call shows the calling
- * number.
- *
- * "calling_number" is the caller's own number, so the phone rings as though they
- * had dialled it directly and the call can be returned from the call log. Because
- * the number is not one you own, some carriers (most often in the US and parts of
- * Europe) mark such calls as unverified, replace the number, or screen them.
- *
- */
-export type VoiceInboundForwardAs = "dialed_number" | "calling_number";
 
 /**
  * Why we rejected the call. Use `rejection_reason` to identify the cause;
@@ -21107,11 +21136,25 @@ export type WebhookAttemptListWritable = {
 };
 
 /**
- * Where this number stands with the ownership paperwork its country requires before it may carry traffic. Present only for a number whose country requires any, so its absence means no paperwork was ever asked for and this number is unconditionally usable. Absent as well when the requirement cannot be established right now, since reporting either answer would state something about your paperwork that has not been checked.
+ * Ownership paperwork and registration approval progress for this number. Reported when ownership requirements or a recorded ownership block or decision apply. If requirements or progress cannot be read, a recorded block or decision preserves this object; without either, the object is absent. Other sending requirements can apply even when ownership is approved.
  *
  */
 export type NumberOwnershipWritable = {
-  [key: string]: never;
+  /**
+   * Whether the ownership paperwork is accepted or is no longer required. This can remain true while an external verifier asks for a correction or activation is pending. Read `status` and `next` for the current step, and `blocked_at` for the ownership block on outbound SMS and inbound and outbound voice.
+   *
+   */
+  satisfied: boolean;
+  /**
+   * When ownership requirements began blocking outbound SMS and inbound and outbound voice calls. Null when that block is clear. Accepted paperwork can still await activation with a block in place. A number bought before ownership requirements were introduced can have outstanding paperwork without a block.
+   *
+   */
+  blocked_at?: string | null;
+  /**
+   * Actions that advance ownership registration or activation, in order. Empty when neither needs further action. A `wait` step means no customer action is needed now, including while accepted paperwork awaits activation. Read this list again after each change.
+   *
+   */
+  next: Array<NextAction>;
 };
 
 export type NumberWritable = {
@@ -21162,7 +21205,7 @@ export type VoiceCallListWritable = {
  * Client-supplied key. On operations supporting request deduplication, a retained
  * response is replayed for duplicate requests with the same key within the
  * idempotency window (3 hours by default). This protection requires a workspace,
- * organization, or staff-account scope. User-only and unauthenticated operations,
+ * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
  * streams, and operations with a separate replay contract do not use this
  * response replay.
  *
@@ -21348,7 +21391,7 @@ export type PublishRealtimeAppEventData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -21440,7 +21483,7 @@ export type PublishRealtimeAppBatchData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -21743,7 +21786,7 @@ export type DisconnectRealtimeAppMemberData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -21839,7 +21882,7 @@ export type SendRealtimeAppMemberEventData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -22019,7 +22062,7 @@ export type CreateEmailMessageData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -22106,7 +22149,7 @@ export type CreateEmailMessageBatchData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -22246,7 +22289,7 @@ export type CancelEmailMessageData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -22418,7 +22461,7 @@ export type CreateEmailBroadcastData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -22505,7 +22548,7 @@ export type DeleteEmailBroadcastData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -22646,7 +22689,7 @@ export type UpdateEmailBroadcastData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -23037,7 +23080,7 @@ export type SendEmailBroadcastData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -23133,7 +23176,7 @@ export type CancelEmailBroadcastData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -23301,7 +23344,7 @@ export type CreateContactData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -23383,7 +23426,7 @@ export type CreateContactBatchData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -23462,7 +23505,7 @@ export type DeleteContactData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -23596,7 +23639,7 @@ export type UpdateContactData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -23819,7 +23862,7 @@ export type CreatePreferenceData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -23902,7 +23945,7 @@ export type DeletePreferenceData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -24097,7 +24140,7 @@ export type CreateContactPropertyData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -24233,7 +24276,7 @@ export type UpdateContactPropertyData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -24321,7 +24364,7 @@ export type ArchiveContactPropertyData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -24409,7 +24452,7 @@ export type UnarchiveContactPropertyData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -24557,7 +24600,7 @@ export type CreateAudienceData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -24636,7 +24679,7 @@ export type DeleteAudienceData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -24776,7 +24819,7 @@ export type UpdateAudienceData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -24934,7 +24977,7 @@ export type AssignAudienceContactsData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -25022,7 +25065,7 @@ export type UnassignAudienceContactsData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -25110,7 +25153,7 @@ export type UnassignAudienceContactData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -25299,7 +25342,7 @@ export type CreateSmsMessageData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -25382,7 +25425,7 @@ export type CreateSmsMessageBatchData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -26050,7 +26093,7 @@ export type CreateSmsSuppressionData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -26133,7 +26176,7 @@ export type DeleteSmsSuppressionData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -26351,7 +26394,7 @@ export type CreateSmsKeywordRuleData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -26438,7 +26481,7 @@ export type DeleteSmsKeywordRuleData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -26585,7 +26628,7 @@ export type UpdateSmsKeywordRuleData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -27947,7 +27990,7 @@ export type CreatePhoneNumberLookupData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -28034,7 +28077,7 @@ export type CreateEmailLookupData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -28121,7 +28164,7 @@ export type CreateVerificationData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -28208,7 +28251,7 @@ export type CreateVerificationCheckData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -28295,7 +28338,7 @@ export type CreateVerificationNextChannelData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -28497,7 +28540,7 @@ export type CreateWhatsAppMessageData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -28646,7 +28689,7 @@ export type SendWhatsAppReadReceiptData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -28849,7 +28892,7 @@ export type DeleteWhatsAppMessageReactionData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -28936,7 +28979,7 @@ export type UpsertWhatsAppMessageReactionData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -30927,7 +30970,7 @@ export type CreateWhatsAppKeywordRuleData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -31014,7 +31057,7 @@ export type DeleteWhatsAppKeywordRuleData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -31174,7 +31217,7 @@ export type UpdateWhatsAppKeywordRuleData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -31860,7 +31903,7 @@ export type UpdateEmailInboxInsightsDomainData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -31953,7 +31996,7 @@ export type UpsertEmailInboxInsightsDomainMonitoringData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -33607,7 +33650,7 @@ export type CreateDomainData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -33689,7 +33732,7 @@ export type DeleteDomainData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -33827,7 +33870,7 @@ export type UpdateDomainData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -33918,7 +33961,7 @@ export type VerifyDomainData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -34086,7 +34129,7 @@ export type CreateSuppressionData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -34169,7 +34212,7 @@ export type DeleteSuppressionData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -34434,7 +34477,7 @@ export type CreateEmailCompetitiveWatchlistBrandData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -34521,7 +34564,7 @@ export type DeleteEmailCompetitiveWatchlistBrandData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -35103,7 +35146,7 @@ export type CreateEmailTemplateData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -35186,7 +35229,7 @@ export type DeleteEmailTemplateData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -35329,7 +35372,7 @@ export type UpdateEmailTemplateData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -35422,7 +35465,7 @@ export type DuplicateEmailTemplateData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -35515,7 +35558,7 @@ export type GetEmailTemplatePreviewData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -35738,7 +35781,7 @@ export type DeleteEmailTemplateVersionData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -35938,7 +35981,7 @@ export type DeleteEmailTemplateLanguageData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -36085,7 +36128,7 @@ export type UpdateEmailTemplateLanguageData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -36180,7 +36223,7 @@ export type UpsertEmailTemplateLanguageData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -36275,7 +36318,7 @@ export type RollbackEmailTemplateData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -36369,7 +36412,7 @@ export type SubmitEmailTemplateVersionData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -36539,7 +36582,7 @@ export type CreateMailboxData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -36625,7 +36668,7 @@ export type DeleteMailboxData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -36763,7 +36806,7 @@ export type UpdateMailboxData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -36863,7 +36906,7 @@ export type RestoreMailboxData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -37034,7 +37077,7 @@ export type ResumeMailboxData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -37191,7 +37234,7 @@ export type CreateMailboxReceiveRuleData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -37283,7 +37326,7 @@ export type DeleteMailboxReceiveRuleData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -37462,7 +37505,7 @@ export type DeleteEmailThreadData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -37612,7 +37655,7 @@ export type UpdateEmailThreadData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -37970,7 +38013,7 @@ export type ReplyEmailThreadMessageData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -38074,7 +38117,7 @@ export type CreateMailboxMessageData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -38289,7 +38332,7 @@ export type CreateWebhookData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -38367,7 +38410,7 @@ export type DeleteWebhookData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -38501,7 +38544,7 @@ export type UpdateWebhookData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -38588,7 +38631,7 @@ export type RotateWebhookSecretData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -38672,7 +38715,7 @@ export type TestWebhookData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -39121,7 +39164,7 @@ export type CreateNumbersOrderData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
@@ -39279,7 +39322,7 @@ export type ReleaseWorkspaceNumberData = {
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unauthenticated operations,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
      * streams, and operations with a separate replay contract do not use this
      * response replay.
      *
