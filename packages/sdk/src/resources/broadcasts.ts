@@ -117,9 +117,12 @@ export class BroadcastsResource extends BroadcastsResourceBase {
   /**
    * Change a broadcast that is still a draft or is scheduled, and return it as
    * it now stands. Omitted fields keep their current value; `template`,
-   * `reply_to` and `ip_pool_id` take an explicit `null` to clear. A broadcast
-   * that has started sending can no longer be edited and is refused with a
-   * `409`.
+   * `reply_to` and `ip_pool_id` take an explicit `null` to clear. The template
+   * and its language change independently: `{ template: { language: "nl" } }`
+   * keeps the template and the version the broadcast is fixed to, while an `id`
+   * moves the broadcast and lets the next send fix on that template's published
+   * version. A broadcast that has started sending can no longer be edited and is
+   * refused with a `409`.
    *
    * @example Point a draft at a different template
    * const broadcast = await bird.broadcasts.update(

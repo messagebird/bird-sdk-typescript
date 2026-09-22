@@ -761,12 +761,29 @@ export const WhatsAppKeywordOperation = {
 export type WhatsAppKeywordOperationValue = (typeof WhatsAppKeywordOperation)[keyof typeof WhatsAppKeywordOperation];
 
 /**
+ * Values of WhatsAppMetaHealthEntityType known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppMetaHealthEntityType = {
+  App: "app",
+  Business: "business",
+  MessageTemplate: "message_template",
+  PhoneNumber: "phone_number",
+  Waba: "waba",
+} as const;
+
+/** A known WhatsAppMetaHealthEntityType value. */
+export type WhatsAppMetaHealthEntityTypeValue = (typeof WhatsAppMetaHealthEntityType)[keyof typeof WhatsAppMetaHealthEntityType];
+
+/**
  * Values of WhatsAppNumberErrorCode known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
  */
 export const WhatsAppNumberErrorCode = {
   BusinessAccountLocked: "business_account_locked",
+  BusinessVerificationRequired: "business_verification_required",
   CreditCurrencyMismatch: "credit_currency_mismatch",
   InternalError: "internal_error",
   InvalidRequest: "invalid_request",

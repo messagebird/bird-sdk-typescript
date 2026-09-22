@@ -12,9 +12,11 @@ import { WhatsappStatsResource } from "./whatsappStats.js";
 import { WhatsappMessagesResource } from "./whatsappMessages.js";
 import { WhatsappReactionResource } from "./whatsappReaction.gen.js";
 import { WhatsappTemplatesResource } from "./whatsappTemplates.js";
+import { WhatsappGroupsResource } from "./whatsappGroups.js";
 import { WhatsappNumbersResource } from "./whatsappNumbers.js";
 import { WhatsappBusinessAccountsResource } from "./whatsappBusinessAccounts.gen.js";
 import { WhatsappKeywordRulesResource } from "./whatsappKeywordRules.gen.js";
+import { WhatsappSuppressionsResource } from "./whatsappSuppressions.gen.js";
 import type { APIPromise, RequestOptions } from "../core/result.js";
 
 /** Body for `bird.whatsapp.send` — a template send, or one free-form content arm. */
@@ -29,6 +31,8 @@ export class WhatsappResource extends WhatsappResourceBase {
   /** The workspace's template registry — `bird.whatsapp.templates.list(...)`. */
   readonly templates: WhatsappTemplatesResource;
 
+  readonly groups: WhatsappGroupsResource;
+
   readonly reaction: WhatsappReactionResource;
 
   readonly numbers: WhatsappNumbersResource;
@@ -36,6 +40,8 @@ export class WhatsappResource extends WhatsappResourceBase {
   readonly businessAccounts: WhatsappBusinessAccountsResource;
 
   readonly keywordRules: WhatsappKeywordRulesResource;
+
+  readonly suppressions: WhatsappSuppressionsResource;
 
   constructor(
     core: ConstructorParameters<typeof Resource>[0],
@@ -45,10 +51,12 @@ export class WhatsappResource extends WhatsappResourceBase {
     this.stats = new WhatsappStatsResource(core, client);
     this.messages = new WhatsappMessagesResource(core, client);
     this.templates = new WhatsappTemplatesResource(core, client);
+    this.groups = new WhatsappGroupsResource(core, client);
     this.reaction = new WhatsappReactionResource(core, client);
     this.numbers = new WhatsappNumbersResource(core, client);
     this.businessAccounts = new WhatsappBusinessAccountsResource(core, client);
     this.keywordRules = new WhatsappKeywordRulesResource(core, client);
+    this.suppressions = new WhatsappSuppressionsResource(core, client);
   }
 
   /**

@@ -29,10 +29,13 @@ import { SmsKeywordRulesResource } from "./resources/smsKeywordRules.gen.js";
 import { SmsSuppressionsResource } from "./resources/smsSuppressions.gen.js";
 import { SmsTemplatesResource } from "./resources/smsTemplates.js";
 import { WhatsappResource } from "./resources/whatsapp.js";
-import { VoiceResource } from "./resources/voice.gen.js";
+import { VoiceResource } from "./resources/voice.js";
 import { VerifyResource } from "./resources/verify.js";
 import { WebhooksResource, type WebhookOptions } from "./resources/webhooks.js";
-import { RealtimeResource, type RealtimeOptions } from "./resources/realtime.js";
+import {
+  RealtimeResource,
+  type RealtimeOptions,
+} from "./resources/realtime.js";
 import { LookupResource } from "./resources/lookup.gen.js";
 import { NumbersResource } from "./resources/numbers.js";
 import { BirdError, BirdMissingApiKeyError } from "./errors.js";
@@ -183,7 +186,6 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
   /** Email channel: `bird.email.send(...)`, `.get(...)`, `.list(...)`. */
   readonly email: EmailResource<EmailDefaultsOf<O>>;
 
-
   /** SMS channel: `bird.sms.send(...)`, `.get(...)`, `.list(...)`. */
   readonly sms: SmsResource;
 
@@ -195,11 +197,9 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
   /** SMS keyword rules: `bird.smsKeywordRules.list(...)`, `.create(...)`, … */
   readonly smsKeywordRules: SmsKeywordRulesResource;
 
-
   /** WhatsApp channel: `bird.whatsapp.send(...)`, `.get(...)`, `.list(...)`, `.listEvents(...)`. */
   readonly whatsapp: WhatsappResource;
 
-  /** Voice call log: `bird.voice.list(...)`, `.get(...)`. Your SIP equipment places calls, so this is a read surface. */
   readonly voice: VoiceResource;
 
   /** Verify: `bird.verify.verifications.create(...)`, `.check(...)`. */
@@ -236,9 +236,6 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
 
   /** Webhooks: `bird.webhooks.unwrap(payload, headers)` verifies an inbound delivery. */
   readonly webhooks: WebhooksResource;
-
-
-
 
   /** Realtime: `bird.realtime.publish(...)`, `.channels.list(...)`, `.members.disconnect(...)`, … */
   readonly realtime: RealtimeResource;
@@ -325,8 +322,16 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
     this.suppressions = new SuppressionsResource(this.core, this.#client);
     this.lookup = new LookupResource(this.core, this.#client);
     this.numbers = new NumbersResource(this.core, this.#client);
-    this.webhooks = new WebhooksResource(this.core, this.#client, opts.webhooks);
-    this.realtime = new RealtimeResource(this.core, this.#client, opts.realtime);
+    this.webhooks = new WebhooksResource(
+      this.core,
+      this.#client,
+      opts.webhooks,
+    );
+    this.realtime = new RealtimeResource(
+      this.core,
+      this.#client,
+      opts.realtime,
+    );
   }
 
   /**

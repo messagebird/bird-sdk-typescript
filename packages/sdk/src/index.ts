@@ -87,6 +87,7 @@ export type {
   SmsSendBatchResult,
 } from "./resources/sms.js";
 export type { SmsMessage, SmsListQuery } from "./resources/sms.gen.js";
+export type { VoiceLeg, VoiceLegsListQuery } from "./resources/voiceLegs.gen.js";
 export type {
   SmsTemplate,
   SmsTemplateSummary,
@@ -173,6 +174,36 @@ export type {
 } from "./resources/whatsappNumbers.gen.js";
 export type { WhatsAppNumberProfile } from "./resources/whatsappNumbersProfile.gen.js";
 export type {
+  WhatsappGroupsCreateParams,
+  WhatsappGroupsListQuery,
+  WhatsappGroupsUpdateParams,
+} from "./resources/whatsappGroups.gen.js";
+export type { WhatsappGroupsPinsCreateParams } from "./resources/whatsappGroupsPins.gen.js";
+export type {
+  WhatsappGroupsJoinRequestsApproveParams,
+  WhatsappGroupsJoinRequestsListQuery,
+  WhatsappGroupsJoinRequestsRejectParams,
+} from "./resources/whatsappGroupsJoinRequests.gen.js";
+export type {
+  WhatsAppGroup,
+  WhatsAppGroupList,
+  WhatsAppGroupStatus,
+  WhatsAppGroupJoinApprovalMode,
+  WhatsAppGroupParticipant,
+  WhatsAppGroupInviteLink,
+  WhatsAppGroupPinnedMessage,
+  WhatsAppGroupJoinRequest,
+  WhatsAppGroupJoinRequestList,
+  WhatsAppGroupJoinRequestDecisionResult,
+  WhatsAppGroupJoinRequestFailure,
+  WhatsAppGroupOperation,
+  WhatsAppGroupOperationField,
+  WhatsAppGroupOperationResult,
+  WhatsAppGroupOperationStatus,
+  WhatsAppGroupOperationType,
+  WhatsAppGroupError,
+} from "./generated/types.gen.js";
+export type {
   WhatsAppBusinessAccount,
   WhatsappBusinessAccountsListQuery,
 } from "./resources/whatsappBusinessAccounts.gen.js";
@@ -183,6 +214,11 @@ export type {
   WhatsappKeywordRulesCreateParams,
   WhatsappKeywordRulesUpdateParams,
 } from "./resources/whatsappKeywordRules.gen.js";
+export type {
+  WhatsAppSuppression,
+  WhatsappSuppressionsListQuery,
+  WhatsappSuppressionsAddParams,
+} from "./resources/whatsappSuppressions.gen.js";
 export type {
   WhatsAppTemplate,
   WhatsappTemplatesListQuery,
@@ -395,6 +431,7 @@ export {
   WhatsAppInteractiveReplyType,
   WhatsAppInteractiveType,
   WhatsAppKeywordOperation,
+  WhatsAppMetaHealthEntityType,
   WhatsAppNumberErrorCode,
   WhatsAppNumberMessagingLimit,
   WhatsAppNumberQualityRating,
@@ -454,6 +491,7 @@ export type {
   WhatsAppInteractiveReplyTypeValue,
   WhatsAppInteractiveTypeValue,
   WhatsAppKeywordOperationValue,
+  WhatsAppMetaHealthEntityTypeValue,
   WhatsAppNumberErrorCodeValue,
   WhatsAppNumberMessagingLimitValue,
   WhatsAppNumberQualityRatingValue,

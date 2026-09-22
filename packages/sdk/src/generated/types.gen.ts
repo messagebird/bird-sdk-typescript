@@ -1666,7 +1666,7 @@ export type EmailBroadcastStatus =
 export type AudienceId = string;
 
 /**
- * The template a broadcast sends, and the exact version of it the broadcast is fixed to. The template cannot be one that requires every send to name a language, because a broadcast never names one, so a template that insists on it has nothing to work with.
+ * The template a broadcast sends, the exact version of it the broadcast is fixed to, and which of that version's languages goes out.
  *
  */
 export type EmailBroadcastTemplate = {
@@ -1675,6 +1675,11 @@ export type EmailBroadcastTemplate = {
    *
    */
   id: EmailTemplateId;
+  /**
+   * The BCP-47 language tag selected for the whole audience, such as `en` or `pt-BR`. `null` means no language is selected, so the broadcast uses the published version's default language, unless the template has `language_source_required` set. Send `template.language` in an update to change or clear the selection.
+   *
+   */
+  language?: LanguageTag | null;
   /**
    * The template version this broadcast is fixed to. It is chosen when the broadcast is prepared for sending, so publishing a new version while the broadcast is going out cannot change what the rest of the recipients get. Null until the broadcast is prepared.
    *
@@ -1696,11 +1701,11 @@ export type EmailBroadcast = {
    */
   audience_id?: AudienceId;
   /**
-   * The template this broadcast sends. A broadcast sends the template's published version, and the exact version is fixed when the broadcast is prepared for sending, so publishing a new version afterwards does not change what this broadcast sends. Null on a draft that has not chosen a template yet.
+   * The template this broadcast sends, and the language it sends in. A broadcast sends the template's published version, and the exact version is fixed when the broadcast is prepared for sending, so publishing a new version afterwards does not change what this broadcast sends. Null on a draft that has not chosen a template yet.
    */
   template?: EmailBroadcastTemplate | null;
   /**
-   * Size of the HTML body this broadcast sends, in bytes, or 0 when its content has no HTML part. Measured on the template version the broadcast sends, so this is the real body we send and differs per recipient only by that recipient's own merge values. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending or canceling one returns, none of which measure the content. Absent too when the broadcast has no template or its content can no longer be read.
+   * Size of the HTML body this broadcast sends, in bytes, or 0 when its content has no HTML part. Measured on the template version the broadcast sends, using the selected language. Recipient merge values can change its size. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending or canceling one returns, none of which measure the content. Absent too when the broadcast has no template or its content can no longer be read.
    *
    */
   readonly html_bytes?: number;
@@ -1744,14 +1749,15 @@ export type EmailBroadcast = {
    *
    * - `empty_audience`: There was nobody to send to. Either the audience has no members, or every address in it is suppressed.
    * - `audience_unavailable`: The audience no longer exists, so there was nothing to resolve.
-   * - `content_invalid`: The broadcast could not be set up to send. `failure_detail` says exactly what was wrong. It is one of these:
-   * - The broadcast has no template, or its template has been deleted.
-   * - The template has no published version, or no sendable content.
-   * - The template uses a loop that a broadcast cannot fill.
-   * - The template requires every send to name a language.
-   * - The sending domain is no longer verified.
-   * - The IP pool has nothing to send from.
-   * - The message could not be handed off for delivery.
+   * - `content_invalid`: The broadcast could not be set up to send. `failure_detail` explains what went wrong. It is one of these:
+   * - The broadcast has no template, or the template it uses no longer exists. Choose an existing template and send the broadcast again.
+   * - The template has no published version, or its published version has no subject and no body. Publish the template, or add content and publish it.
+   * - The template uses a loop or reads a value that a broadcast cannot provide. Remove it, or use a contact property instead, then publish the template again.
+   * - The template requires a language, but the broadcast has not selected one. Set `template.language` to one of the template's languages and send the broadcast again.
+   * - The selected language is not available on the published template version. Choose one of that version's languages, or publish a version that includes the selected language.
+   * - The sending domain is no longer verified. Verify the domain again.
+   * - The configured IP pool has no usable IP address.
+   * - We could not hand the prepared message to the delivery system. This is a problem on our side.
    * - `insufficient_funds`: There was not enough in the workspace balance to pay for the send.
    * - `quota_exceeded`: The send would have gone past your organization's daily or monthly email allowance, whichever runs out first. This can happen when the broadcast is being prepared, or partway through sending if the remaining recipients no longer fit. `failure_detail` gives you the count and the limit.
    * - `internal_error`: Something went wrong on our side. Retry, and open a support ticket if it keeps happening.
@@ -1866,6 +1872,23 @@ export type EmailBroadcastList = {
 } & ListEnvelope;
 
 /**
+ * The template a new broadcast sends, and which of that template's languages goes out.
+ *
+ */
+export type EmailBroadcastTemplateCreate = {
+  /**
+   * Which template the broadcast sends. The version it is fixed to is chosen when the broadcast is prepared for sending, and you read it back as `template.version_id`.
+   *
+   */
+  id: EmailTemplateId;
+  /**
+   * The BCP-47 language tag that goes to the whole audience, such as `en` or `pt-BR`. It must be an exact match for a language on the template's published version, so `fr-CA` does not select `fr`. If you leave it out, the broadcast uses the version's default language, unless the template has `language_source_required` set, in which case sending fails until you select a language. Send `template.language` in an update to change or clear it later.
+   *
+   */
+  language?: LanguageTag;
+};
+
+/**
  * A broadcast sends one email to a whole audience. Every field here is optional, so you can create an empty draft and fill it in later. To actually send, a broadcast needs three things: a `from` address on a verified domain, an `audience_id`, and a `template`.
  *
  * Leave `send` false, which is the default, and you get a draft. Update it as often as you like, then send it when you are ready. Set `send` to true and the broadcast goes out as soon as it is created, or at `scheduled_at` if you set one.
@@ -1881,9 +1904,9 @@ export type EmailBroadcastCreateRequest = {
    */
   audience_id?: AudienceId;
   /**
-   * The template the broadcast sends. You can leave it out on a draft, but a broadcast cannot send without one. The template's published version is fixed when the broadcast is prepared for sending, and each recipient's contact properties are filled into the content as the email goes out.
+   * The template the broadcast sends, and the language to send it in. You can leave it out on a draft, but a broadcast cannot send without one. The template's published version is fixed when the broadcast is prepared for sending, and each recipient's contact properties are filled into the content as the email goes out.
    */
-  template?: EmailBroadcastTemplate;
+  template?: EmailBroadcastTemplateCreate;
   /**
    * Where replies to this broadcast should go. Give each address as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. You can list more than one.
    */
@@ -1936,6 +1959,23 @@ export type EmailBroadcastCreateRequest = {
 };
 
 /**
+ * A change to the template a broadcast sends, the language it sends in, or both. Each property is independent: what you leave out keeps the value the broadcast already had.
+ *
+ */
+export type EmailBroadcastTemplateUpdate = {
+  /**
+   * Move the broadcast to this template. Sending an `id` releases the version the broadcast was fixed to, so the next send fixes on the template's published version at that point; repeating the `id` the broadcast already has does the same thing, which is how you take a newly published version, and keeps the language already selected. Leave it out to keep the template and the version it is fixed to, and send a `language` on its own to change only the language. To take the template off a draft, set `template` itself to null.
+   *
+   */
+  id?: EmailTemplateId;
+  /**
+   * The BCP-47 language tag that goes to the whole audience, such as `en` or `pt-BR`. It must be an exact match for a language on the template's published version, so `fr-CA` does not select `fr`. Leave it out to keep the language already selected. If you change the template `id` in the same request, the old language is cleared with the old template. Set this to `null` to use the published version's default language, unless the template has `language_source_required` set.
+   *
+   */
+  language?: LanguageTag | null;
+};
+
+/**
  * Changes a broadcast that is still a draft or is scheduled. Whatever you send here is applied, and anything you leave out keeps the value it already had. Once a broadcast has started sending it can no longer be edited.
  *
  */
@@ -1949,9 +1989,10 @@ export type EmailBroadcastUpdateRequest = {
    */
   audience_id?: AudienceId;
   /**
-   * The template the broadcast sends. Its published version is fixed when the broadcast is prepared for sending. Set this to null to take the template off a draft, or leave it out to keep the one already set.
+   * The template the broadcast sends, and the language to send it in, each changeable on its own. Set this to null to take the template and its language off a draft, or leave it out to keep the template, language and fixed version already set.
+   *
    */
-  template?: EmailBroadcastTemplate | null;
+  template?: EmailBroadcastTemplateUpdate | null;
   /**
    * Where replies to this broadcast should go. Set this to null to remove the addresses already set.
    */
@@ -7002,7 +7043,404 @@ export type WhatsAppReactionEventList = {
   data: Array<WhatsAppReactionEvent>;
 } & ListEnvelope;
 
+/**
+ * Sortable fields for a WhatsApp group list.
+ */
+export type WhatsAppGroupSortField = "created_at";
+
+/**
+ * Where the group stands. Values, in lifecycle order:
+ *
+ * - `pending` means the request to create the group has been accepted and WhatsApp has not confirmed it yet. The group has no invite link, and it cannot be messaged or changed.
+ * - `active` means the group exists at WhatsApp and carries an invite link. Only an active group can be messaged.
+ * - `suspended` means WhatsApp has stopped activity in the group, which it does when a group breaks its policies. Sends fail while it lasts, and WhatsApp can lift it on its own.
+ * - `deleted` means the group is gone, either because you deleted it or because WhatsApp removed it. Every participant lost access, and the state is terminal.
+ * - `failed` means WhatsApp refused to create the group; `last_operation.last_error` says why. The state is terminal, so create another group rather than retrying this one.
+ *
+ */
+export type WhatsAppGroupStatus =
+  "pending" | "active" | "suspended" | "deleted" | "failed";
+
 export type WhatsAppNumberId = string;
+
+/**
+ * How someone opening the invite link gets in:
+ *
+ * - `auto_approve` means they join the moment they open the link. This is the default when the group is created.
+ * - `approval_required` means opening the link raises a join request you approve or reject.
+ *
+ * Fixed when the group is created.
+ *
+ */
+export type WhatsAppGroupJoinApprovalMode =
+  "auto_approve" | "approval_required";
+
+/**
+ * What was asked of the thing carrying the operation:
+ *
+ * - `create` and `delete` act on the group itself.
+ * - `settings_update` changes the group's subject, description or picture.
+ * - `remove` takes one participant out of the group.
+ *
+ */
+export type WhatsAppGroupOperationType =
+  "create" | "settings_update" | "delete" | "remove";
+
+/**
+ * How the operation ended:
+ *
+ * - `pending` means WhatsApp accepted the request and has not reported back. Another
+ * operation on the same thing is refused while this lasts.
+ * - `success` means WhatsApp applied everything asked of it. A change whose success
+ * removes its own carrier is never seen in this state: a removed participant and an
+ * unpinned message leave their lists, and the entry going away is the confirmation.
+ * - `failed` means WhatsApp applied none of it, or only part: `last_error` says why,
+ * and on a `settings_update` the per-field `results` say which fields did apply.
+ *
+ */
+export type WhatsAppGroupOperationStatus = "pending" | "success" | "failed";
+
+/**
+ * Which of the group's settings a `settings_update` result reports on.
+ */
+export type WhatsAppGroupOperationField =
+  "subject" | "description" | "profile_picture_url";
+
+/**
+ * Why a change to a group did not take effect. Meta documents no code vocabulary for a group refusal, since every sample payload carries an undocumented `code` beside its message, so this relays what it said rather than classifying it, the way a template submission failure does.
+ *
+ */
+export type WhatsAppGroupError = {
+  /**
+   * WhatsApp's own explanation of the refusal, passed through. Show it to the person who asked for the change; never match on its text. Carries Bird's own words instead when the failure was Bird's verdict, such as a confirmation that never arrived.
+   *
+   */
+  readonly description: string;
+  /**
+   * WhatsApp's most specific code for the refusal: its error subcode where it sent one, otherwise its top-level code. Treat it as an opaque string. Null when the failure was Bird's own verdict rather than a WhatsApp refusal.
+   *
+   */
+  readonly meta_error_code?: string | null;
+};
+
+/**
+ * What became of one field in a `settings_update`. WhatsApp applies each field separately, so a single update can leave some applied and others refused.
+ *
+ */
+export type WhatsAppGroupOperationResult = {
+  /**
+   * The setting this result reports on.
+   */
+  readonly field: WhatsAppGroupOperationField;
+  /**
+   * Whether WhatsApp applied this field. False when it refused this one, whatever it did with the others.
+   */
+  readonly applied: boolean;
+  /**
+   * Why WhatsApp refused this field. Present only when `applied` is false.
+   */
+  readonly error?: WhatsAppGroupError;
+};
+
+/**
+ * The last change asked of this group or participant, and where it got to. WhatsApp confirms a change on a webhook rather than in its reply, so an operation is `pending` until that arrives. While it is, another change to the same thing is refused with a `409` `WhatsAppGroupUpdateInProgress`; a change to a different participant is not, so several removals can be in flight at once. Absent on something nothing has been asked of yet.
+ *
+ */
+export type WhatsAppGroupOperation = {
+  /**
+   * What was asked.
+   */
+  readonly type: WhatsAppGroupOperationType;
+  /**
+   * Where it got to. `pending` is what a client shows as in-progress, and what refuses the next change.
+   */
+  readonly status: WhatsAppGroupOperationStatus;
+  /**
+   * When Bird accepted the request.
+   */
+  readonly requested_at: string;
+  /**
+   * When WhatsApp reported the outcome. Null while `pending`.
+   */
+  readonly settled_at?: string | null;
+  /**
+   * Per-field outcomes, on a `settings_update` that has settled. One entry per field the update carried, so a client can put a refusal next to the input it came from. Absent on every other operation type, which change one thing and report it on `status`.
+   *
+   */
+  readonly results?: Array<WhatsAppGroupOperationResult>;
+  /**
+   * Why the operation failed as a whole. Present when `status` is `failed`, including when the confirmation never arrived and Bird gave up waiting. A `settings_update` that failed on some fields and not others carries the per-field detail in `results`.
+   *
+   */
+  readonly last_error?: WhatsAppGroupError;
+};
+
+/**
+ * Someone who joined the group. The business number that created the group is its admin and is not listed.
+ */
+export type WhatsAppGroupParticipant = {
+  /**
+   * Business-scoped user ID, Meta's identifier for this person against your business. The one identifier every participant has: WhatsApp always sends it, and it is stable for as long as they are in the group.
+   *
+   */
+  readonly bsuid: string;
+  /**
+   * Phone number in E.164 format. Absent when WhatsApp withholds it, which it does for anyone who has not shared their number with your business, so a group is normally a mix of participants with one and without.
+   *
+   */
+  readonly phone_number?: string;
+  /**
+   * The WhatsApp username this person chose. Absent when they have none, and not an identifier to address them by: it is theirs to change, so it names them in a list rather than keying anything.
+   *
+   */
+  readonly username?: string;
+  /**
+   * A removal asked of this participant that has not taken effect: `pending` while WhatsApp has yet to confirm it, or `failed` when WhatsApp refused. Never `success`, because a removal that succeeds takes the participant off this list: the entry disappearing is what says it worked. A `pending` removal refuses a second removal of the same person while leaving other participants free to be removed at the same time.
+   *
+   */
+  readonly last_operation?: WhatsAppGroupOperation;
+};
+
+/**
+ * A message pinned at the top of a group's chat.
+ */
+export type WhatsAppGroupPinnedMessage = {
+  /**
+   * The pinned message, as returned in the send response's `id`.
+   */
+  readonly message_id: WhatsAppMessageId;
+  /**
+   * When the pin is due to lapse, projected from the `duration_days` the pin was asked for. An entry stays listed until it is unpinned, so a time in the past means WhatsApp has already taken the message off the chat.
+   *
+   */
+  readonly pinned_until: string;
+};
+
+export type WhatsAppGroup = {
+  /**
+   * Unique identifier for the group. Accepted by every `/v1/whatsapp/groups/{group_id}` operation, and as `to` when sending a message to the group.
+   */
+  readonly id: WhatsAppGroupId;
+  /**
+   * The business number that created the group. It is the group's admin and the number every message to the group is sent from. Fixed when the group is created.
+   *
+   */
+  readonly whatsapp_number_id: WhatsAppNumberId;
+  /**
+   * Meta's identifier for the WhatsApp Business Account recorded when the group was created. This is a historical snapshot, not a live account directory projection. Null for a number we operate on your behalf, whose account is not yours to see.
+   *
+   */
+  readonly waba: string | null;
+  /**
+   * The group's name, shown to participants and to anyone who opens the invite link.
+   */
+  subject: string;
+  /**
+   * The group's description, shown alongside the subject. Null when the group has none.
+   */
+  description?: string | null;
+  /**
+   * Where the group stands. A group is messageable only while it is `active`.
+   */
+  readonly status: WhatsAppGroupStatus;
+  /**
+   * Whether opening the invite link joins the group outright or raises a join request to approve.
+   */
+  readonly join_approval_mode: WhatsAppGroupJoinApprovalMode;
+  /**
+   * The link that lets someone join the group, which is the only way in. A group has one link at a time. Null while the group is `pending`, since WhatsApp issues the link when it confirms the group. Rotating it through `POST /v1/whatsapp/groups/{group_id}/invite-link/rotate` replaces it, and every link the group had before then stops working.
+   *
+   */
+  readonly invite_link?: string | null;
+  /**
+   * Who is in the group, as of the last update WhatsApp sent, and the whole set rather than a page: WhatsApp holds a group to a handful of people, so there is never a page's worth to return. The business number that created the group is its admin and is not listed.
+   *
+   */
+  readonly participants?: Array<WhatsAppGroupParticipant>;
+  /**
+   * How many people are in the group, excluding your business.
+   */
+  readonly participant_count: number;
+  /**
+   * The group's pins, newest first. WhatsApp holds a few at once, and pinning past that unpins the oldest rather than refusing. No entry here is merely requested. An entry stays listed until it is unpinned, so one whose `pinned_until` has passed is still listed after WhatsApp has taken it off the chat.
+   *
+   */
+  readonly pinned_messages?: Array<WhatsAppGroupPinnedMessage>;
+  /**
+   * Address of the group's picture, as WhatsApp serves it. Null when the group has none.
+   */
+  readonly profile_picture_url?: string | null;
+  /**
+   * The last create, settings change or delete asked of the group. `pending` while WhatsApp has yet to confirm it, which is what a client shows as in-progress and what refuses the next change to the group. A settings change carries per-field `results`, since WhatsApp can refuse one field and apply the others. A removal reports on the participant's own entry rather than here, so several can be in flight at once. Pinning is synchronous and reports nothing.
+   *
+   */
+  readonly last_operation?: WhatsAppGroupOperation;
+  /**
+   * When WhatsApp suspended the group. Present only while the group is `suspended`, and gone once WhatsApp lifts the suspension.
+   */
+  readonly suspended_at?: string;
+} & Timestamps;
+
+export type WhatsAppGroupList = {
+  /**
+   * The groups your workspace created, newest first.
+   */
+  data: Array<WhatsAppGroup>;
+} & ListEnvelope;
+
+/**
+ * The group to create. WhatsApp issues the invite link, and people join by opening it, so a create request names no participants.
+ *
+ */
+export type WhatsAppGroupCreate = {
+  /**
+   * The business number that will own and administer the group, as its id in `GET /v1/whatsapp/numbers`. It must be a number your workspace can send from, and WhatsApp must have granted it Official Business Account status; a number without that status returns a `412` `WhatsAppGroupsNotEligible`. The number cannot be changed afterwards, and every message to the group is sent from it.
+   *
+   */
+  whatsapp_number_id: WhatsAppNumberId;
+  /**
+   * The group's name, shown to participants and to anyone who opens the invite link. Surrounding whitespace is trimmed.
+   */
+  subject: string;
+  /**
+   * The group's description, shown alongside the subject.
+   */
+  description?: string;
+  /**
+   * Whether opening the invite link joins the group outright, or raises a join request for you to approve. Defaults to `auto_approve`. It cannot be changed once the group exists.
+   *
+   */
+  join_approval_mode?: WhatsAppGroupJoinApprovalMode;
+};
+
+/**
+ * The changes to make. Fields you omit are left as they are. WhatsApp applies each field separately, so one can be rejected while the others take effect; the group's `updated_at` moves when a change lands.
+ *
+ */
+export type WhatsAppGroupUpdate = {
+  /**
+   * A new name for the group. Participants see the change in the group's chat.
+   */
+  subject?: string;
+  /**
+   * A new description for the group. Send `null` to clear it; an empty string is a `422` rather than a second way to clear.
+   */
+  description?: string | null;
+  /**
+   * A new picture for the group, naming a file in your workspace's media library. WhatsApp takes a square JPEG of at least 192 by 192 pixels and up to 5 MB; anything else returns a `422`. Sending `null` clears the picture Bird stores, and an empty string is a `422` rather than a second way to clear it; WhatsApp has no operation for removing a group's photo, so the one participants see stays until another picture replaces it.
+   *
+   */
+  profile_picture_url?: string | null;
+};
+
+/**
+ * A group's invite link.
+ */
+export type WhatsAppGroupInviteLink = {
+  /**
+   * The group's one invite link. Every link the group had before this one stops working.
+   */
+  readonly invite_link: string;
+};
+
+/**
+ * A message to pin at the top of the group's chat.
+ */
+export type WhatsAppGroupPinnedMessageCreate = {
+  /**
+   * The message to pin. It has to be one this group carries: a message in another group, or a one-to-one message, returns a `422` `WhatsAppMessageNotInGroup`.
+   *
+   */
+  message_id: WhatsAppMessageId;
+  /**
+   * How many days the message stays pinned before WhatsApp unpins it, from 1 to 30.
+   */
+  duration_days?: number;
+};
+
+/**
+ * Sortable fields for a WhatsApp group join-request list.
+ */
+export type WhatsAppGroupJoinRequestSortField = "created_at";
+
+export type WhatsAppGroupJoinRequestId = string;
+
+/**
+ * Someone waiting to be let into a group that requires approval.
+ */
+export type WhatsAppGroupJoinRequest = {
+  /**
+   * Unique identifier for the join request. Pass it to the batch-approve and batch-reject operations.
+   */
+  readonly id: WhatsAppGroupJoinRequestId;
+  /**
+   * Business-scoped user ID, Meta's identifier for this person against your business. The one identifier every request has, and the one that carries over to `participants` if you approve it.
+   *
+   */
+  readonly bsuid: string;
+  /**
+   * Phone number in E.164 format. Absent when WhatsApp withholds it, which it does for anyone who has not shared their number with your business.
+   *
+   */
+  readonly phone_number?: string;
+  /**
+   * The WhatsApp username this person chose. Absent when they have none, and theirs to change, so it names them in a list rather than keying anything.
+   *
+   */
+  readonly username?: string;
+  /**
+   * When the request was made.
+   */
+  readonly created_at: string;
+};
+
+export type WhatsAppGroupJoinRequestList = {
+  /**
+   * The join requests still waiting for a decision, oldest first.
+   */
+  data: Array<WhatsAppGroupJoinRequest>;
+} & ListEnvelope;
+
+/**
+ * The join requests to decide on.
+ */
+export type WhatsAppGroupJoinRequestDecision = {
+  /**
+   * The join requests to act on, as returned by `GET /v1/whatsapp/groups/{group_id}/join-requests`. Each is decided on its own, so one can fail while the rest succeed. An ID that names no waiting request returns a `422` `WhatsAppGroupJoinRequestNotFound`. The 50 is Bird's own request bound, not a WhatsApp one: how many people the group can hold does not limit how many can queue at its link, so a rejection sweep is not held to the size of the group it is refusing entry to.
+   *
+   */
+  join_request_ids: Array<WhatsAppGroupJoinRequestId>;
+};
+
+/**
+ * A join request the decision could not be applied to.
+ */
+export type WhatsAppGroupJoinRequestFailure = {
+  /**
+   * The join request that was not decided.
+   */
+  readonly join_request_id: WhatsAppGroupJoinRequestId;
+  /**
+   * Why WhatsApp refused. The common one is a person who has not accepted WhatsApp's current terms, which no retry fixes.
+   *
+   */
+  readonly error: WhatsAppGroupError;
+};
+
+/**
+ * What happened to each join request in the batch. WhatsApp decides them one by one, so a batch can be part-applied: the requests it accepted are in `decided`, and the rest are in `failed` with the reason.
+ *
+ */
+export type WhatsAppGroupJoinRequestDecisionResult = {
+  /**
+   * The join requests WhatsApp accepted the decision for. A person approved here can enter the group; a person rejected here sees the join button again.
+   */
+  readonly decided: Array<WhatsAppGroupJoinRequestId>;
+  /**
+   * The join requests WhatsApp refused, each with its reason. Empty when the whole batch was applied.
+   */
+  readonly failed: Array<WhatsAppGroupJoinRequestFailure>;
+};
 
 export type WhatsAppTemplateExampleParameter = {
   /**
@@ -8267,7 +8705,7 @@ export type WhatsAppNumberSortField = "created_at";
  *
  * - `registration_pin_rejected`: WhatsApp refused the two-step verification PIN.
  * - `registration_pin_rate_limited`: Too many PIN attempts occurred recently.
- * - `registration_attempts_exhausted`: Registration is blocked for 72 hours.
+ * - `registration_attempts_exhausted`: The number has no registration attempts left. WhatsApp's own lockout clears after 72 hours; the number's attempt budget does not, so contact support if repair keeps ending here.
  * - `number_verification_required`: WhatsApp requires the number to be verified again.
  * - `number_not_registered`: WhatsApp does not hold the number as registered.
  * - `number_already_linked`: Another WhatsApp integration uses the number.
@@ -8275,6 +8713,7 @@ export type WhatsAppNumberSortField = "created_at";
  * - `verification_code_not_received`: The verification text did not arrive.
  * - `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.
  * - `business_account_locked`: WhatsApp locked the business account.
+ * - `business_verification_required`: WhatsApp refused to register the number because the business portfolio is not verified, usually because an unverified portfolio may hold only a few registered numbers. Verify the business or free a registered number on the portfolio, then repair the number.
  * - `credit_currency_mismatch`: WhatsApp bills the business account in a currency your organization is not billed in. Connect the number under a business account WhatsApp bills in that same currency, or one WhatsApp has set no currency on: an account's billing currency cannot be changed once WhatsApp sets it.
  * - `permission_denied`: WhatsApp refused access to the account.
  * - `invalid_request`: WhatsApp rejected the connection details.
@@ -8294,6 +8733,7 @@ export type WhatsAppNumberErrorCode =
   | "verification_code_not_received"
   | "verification_rate_limited"
   | "business_account_locked"
+  | "business_verification_required"
   | "credit_currency_mismatch"
   | "permission_denied"
   | "invalid_request"
@@ -8697,6 +9137,94 @@ export type WhatsAppBusinessAccountBan = {
   readonly appeal_url?: string;
 };
 
+/**
+ * Meta's health verdict for one entity, or for the whole chain when read at the top
+ * level. Values are Meta's own tokens, lower-cased:
+ *
+ * - `available`: the entity meets every messaging or calling requirement.
+ * - `limited`: it can be used, but with a limitation Meta describes in `additional_info`
+ * when it gave one.
+ * - `blocked`: it cannot be used. `errors` says why when Meta named a reason, and each
+ * error carries `possible_solution` when Meta suggested one.
+ *
+ */
+export type WhatsAppMetaHealthVerdict = "available" | "limited" | "blocked";
+
+/**
+ * Which node in Meta's messaging chain an entry describes. Values are Meta's own tokens,
+ * lower-cased.
+ *
+ * - `waba`: the WhatsApp Business Account.
+ * - `business`: the Meta business portfolio that owns the account.
+ * - `app`: the app the account messages through.
+ * - `phone_number`: a business phone number. An account read never carries one: Meta reports it only when a phone number is the node asked about.
+ * - `message_template`: a message template. An account read never carries one: Meta reports it only when a template is the node asked about.
+ *
+ */
+export type WhatsAppMetaHealthEntityType =
+  | "waba"
+  | "business"
+  | "app"
+  | "phone_number"
+  | "message_template"
+  | (string & {});
+
+/**
+ * One reason Meta gives for a verdict that is not `available`. Field names are Meta's own. They are not Bird error codes and do not appear in Bird's error catalog.
+ */
+export type WhatsAppMetaHealthError = {
+  /**
+   * Meta's numeric health error code, for example `141006` (payment method error), `141010` (business not verified), `141014` (account banned).
+   */
+  readonly error_code: number;
+  /**
+   * Meta's own sentence describing the block.
+   */
+  readonly error_description: string;
+  /**
+   * Meta's own suggested remedy. Absent when Meta gave none.
+   */
+  readonly possible_solution?: string;
+};
+
+/**
+ * Meta's verdict for one node in the chain a message passes through.
+ */
+export type WhatsAppMetaHealthEntity = {
+  readonly entity_type: WhatsAppMetaHealthEntityType;
+  /**
+   * Meta's identifier for the node. Treat it as an opaque string.
+   */
+  readonly meta_id: string;
+  /**
+   * Whether this node lets messages through.
+   */
+  readonly can_send_message: WhatsAppMetaHealthVerdict;
+  /**
+   * Whether this node can receive a WhatsApp call over SIP, which Meta reports on `phone_number` and `app` entities. Absent on an account read: Meta reports it only when a phone number or template is the node asked about.
+   */
+  readonly can_receive_call_sip?: WhatsAppMetaHealthVerdict;
+  /**
+   * Meta's own notes on a `limited` verdict. Absent on an account read: Meta reports it only when a phone number or template is the node asked about.
+   */
+  readonly additional_info?: Array<string>;
+  /**
+   * Why this node is not `available`. Absent when Meta gave no reason.
+   */
+  readonly errors?: Array<WhatsAppMetaHealthError>;
+};
+
+/**
+ * Meta's own messaging health for this account. `can_send_message` is Meta's aggregate: `blocked` if any entity is blocked, else `limited` if any is limited, else `available`. Read `entities` to see which node carries the verdict and why.
+ */
+export type WhatsAppMetaHealthStatus = {
+  readonly can_send_message: WhatsAppMetaHealthVerdict;
+  /**
+   * One entry per node Meta evaluated. Order is Meta's.
+   */
+  readonly entities: Array<WhatsAppMetaHealthEntity>;
+};
+
 export type WhatsAppBusinessAccount = {
   /**
    * Unique identifier for the WhatsApp Business Account.
@@ -8736,7 +9264,11 @@ export type WhatsAppBusinessAccount = {
    */
   readonly ban?: WhatsAppBusinessAccountBan;
   /**
-   * When Bird last read this account's state from WhatsApp. `status`, `account_review_status`, `business_verification_status`, `marketing_messages_onboarding_status` and `portfolio` are all that reading rather than live values; Bird re-reads roughly hourly. Absent for an account Bird has never read back.
+   * Meta's own messaging health for this account as of `meta_synced_at`. Absent until Bird has read it, and absent again when the stored reading did not parse at all. An entity whose verdict falls outside this vocabulary is dropped on its own and the rest of the report still ships, so `entities` can be shorter than Meta's. A `blocked` verdict on the `waba` entity is why template sends fail with Meta's `#200` even though the number reads `active`: for example `error_code` `141006` names a payment method Meta rejected on the account.
+   */
+  readonly meta_health_status?: WhatsAppMetaHealthStatus;
+  /**
+   * When Bird last read this account's state from WhatsApp. `status`, `account_review_status`, `business_verification_status`, `marketing_messages_onboarding_status`, `portfolio` and `meta_health_status` are all that reading rather than live values; Bird re-reads roughly hourly. Absent for an account Bird has never read back.
    */
   readonly meta_synced_at?: string;
   /**
@@ -8756,7 +9288,80 @@ export type WhatsAppBusinessAccountList = {
   data: Array<WhatsAppBusinessAccount>;
 } & ListEnvelope;
 
+export type WhatsAppSuppressionReasonFilter = "manual";
+
 export type WhatsAppSuppressionId = string;
+
+/**
+ * One period during which an address is suppressed: when it started and, once it is over, what ended it. An address suppressed, ended and suppressed again has two of these on record rather than one current state. The list returns the periods in force; fetch one by ID to read one that has ended.
+ *
+ */
+export type WhatsAppSuppression = {
+  /**
+   * Unique identifier for the suppression record.
+   */
+  readonly id: WhatsAppSuppressionId;
+  /**
+   * The suppressed WhatsApp address. For a phone number this is canonical E.164 with a leading plus sign, such as `+5511977670804`.
+   *
+   */
+  address: string;
+  /**
+   * The WhatsApp Business Account the suppression is limited to, identified by its WhatsApp-issued account ID, or null when it covers the whole workspace.
+   *
+   */
+  readonly waba?: string | null;
+  /**
+   * Why the address is suppressed. `manual` means it was added directly rather than created automatically from a delivery outcome. This list grows over time, so treat an unknown value as informational rather than rejecting the record.
+   *
+   */
+  reason: string;
+  /**
+   * How the suppression came to exist: `api_key` (added through the API with an API key) or `user` (added by a user in the dashboard). This list grows over time, so treat an unknown value as informational rather than rejecting the record.
+   *
+   */
+  origin: string;
+  /**
+   * Blocking policy. `all` blocks every message category. Treat an unrecognized value as blocking.
+   *
+   */
+  applies_to: string;
+  /**
+   * ID of the WhatsApp message that caused this address to be suppressed, when the suppression was created automatically. Omitted for addresses added manually.
+   */
+  source_whatsapp_id?: WhatsAppMessageId;
+  /**
+   * When this stopped applying. Null while it is still stopping messages, which is the case for every record in the list.
+   *
+   */
+  readonly ended_at?: string | null;
+  /**
+   * What ended it: `api_key` (deleted through the API with an API key) or `user` (deleted by a user in the dashboard). Null while it is still stopping messages. This list grows over time, so treat an unknown value as informational rather than rejecting the record.
+   *
+   */
+  readonly ended_reason?: string | null;
+  /**
+   * When the suppression was created.
+   */
+  readonly created_at: string;
+};
+
+export type WhatsAppSuppressionList = {
+  data: Array<WhatsAppSuppression>;
+} & ListEnvelope;
+
+export type WhatsAppSuppressionCreate = {
+  /**
+   * WhatsApp address to suppress. For a phone number, supply canonical E.164 with a leading plus sign, such as `+5511977670804`. A value that is not a valid phone number returns a `422`.
+   *
+   */
+  address: string;
+  /**
+   * Limit the suppression to messages sent from this WhatsApp Business Account, identified by its WhatsApp-issued account ID. Omit it to block the address for the whole workspace, whichever account sends.
+   *
+   */
+  waba?: string;
+};
 
 /**
  * What Bird does when an inbound message matches the rule.
@@ -12780,7 +13385,7 @@ export type EmailTemplateCreate = {
    */
   on_missing_language?: TemplateOnMissingLanguage;
   /**
-   * Whether a send has to name a language. Set it to true to reject a send that names none instead of serving the default language. Pair it with `on_missing_language: fail` when every send must pick a language deliberately: on its own, `fail` is bypassed by naming no language at all. A template with this set cannot be used for a broadcast, which has no way to name one. Defaults to false.
+   * Whether a send has to name a language. Set it to true to reject a send that names none instead of serving the default language. Pair it with `on_missing_language: fail` when every send must pick a language deliberately: on its own, `fail` is bypassed by naming no language at all. A broadcast must select a template language when this is set. Defaults to false.
    *
    */
   language_source_required?: boolean;
@@ -12871,7 +13476,7 @@ export type EmailTemplate = {
    */
   readonly on_missing_language: TemplateOnMissingLanguage;
   /**
-   * Whether a send has to name a language. When true, a send that names none is rejected instead of being served the default language, and the template cannot be used for a broadcast, which has no way to name one.
+   * Whether a send has to name a language. When true, a send that names none is rejected instead of being served the default language. A broadcast must select a template language when this is set.
    *
    */
   readonly language_source_required: boolean;
@@ -12922,7 +13527,7 @@ export type EmailTemplateUpdate = {
    */
   on_missing_language?: TemplateOnMissingLanguage;
   /**
-   * Whether a send has to name a language. Turning it on rejects a send that names none instead of serving the default language, and makes the template unusable for a broadcast, which has no way to name one.
+   * Whether a send has to name a language. Turning it on rejects a send that names none instead of serving the default language. A broadcast must select a template language when this is set.
    *
    */
   language_source_required?: boolean;
@@ -17492,35 +18097,35 @@ export type NumbersOrderCreate = {
 export type VoiceCallRouteType = "reject" | "trunk" | "forward";
 
 /**
- * Why we rejected the call. Use `rejection_reason` to identify the cause;
+ * Why we rejected the leg. Use `rejection_reason` to identify the cause;
  * `sip_response_code` alone cannot distinguish these reasons.
  *
  * You can resolve these issues:
  *
- * - `source_not_allowed`: The call came from an IP address that is not in the
+ * - `source_not_allowed`: The leg came from an IP address that is not in the
  * trunk's allowed-address list. Add the address your PBX sends from.
  * - `caller_id_not_verified`: The number in the `From` header is not a verified
  * caller ID for this workspace. Verify it or use a verified caller ID.
  * - `number_ownership_not_verified`: The ownership documents for this purchased
  * number have not yet been accepted under its country's requirements. We
- * block outgoing and incoming calls on the number until verification is
- * complete. Blocked incoming calls never reach your PBX, and their route type
+ * block outgoing and incoming legs on the number until verification is
+ * complete. Blocked incoming legs never reach your PBX, and their route type
  * is `reject` regardless of the number's configuration. Open the number
  * under **Numbers** and complete its ownership requirements, then retry
- * the call.
+ * the leg.
  * - `destination_not_enabled`: Calling to this destination country is disabled.
  * Enable it in your voice destination settings.
- * - `insufficient_balance`: Your wallet balance was too low for the call.
+ * - `insufficient_balance`: Your wallet balance was too low for the leg.
  * Top up or enable automatic top-ups.
- * - `daily_spend_exceeded`: The call would exceed your organization's daily
+ * - `daily_spend_exceeded`: The leg would exceed your organization's daily
  * voice spend limit. Retry after the limit resets at the start of the next
  * UTC day.
- * - `concurrent_calls_exceeded`: You already have as many calls in progress as
+ * - `concurrent_calls_exceeded`: You already have as many legs in progress as
  * your account allows. Wait for one to end or ask support to raise the limit.
- * - `calls_per_second_exceeded`: You placed calls faster than your account
+ * - `calls_per_second_exceeded`: You placed legs faster than your account
  * allows. Reduce your dialing rate and retry.
  *
- * For all other reasons, contact support and provide the call `id`:
+ * For all other reasons, contact support and provide the leg `id`:
  *
  * - `routing_not_configured`: This trunk has no dial plan, which can happen on
  * a new trunk.
@@ -17528,10 +18133,10 @@ export type VoiceCallRouteType = "reject" | "trunk" | "forward";
  * destination.
  * - `destination_blocked`: The destination is blocked by our routing
  * configuration.
- * - `call_not_permitted`: The call could not be priced for your account.
+ * - `call_not_permitted`: The leg could not be priced for your account.
  *
  */
-export type VoiceCallRejectionReason =
+export type VoiceLegRejectionReason =
   | "source_not_allowed"
   | "caller_id_not_verified"
   | "routing_not_configured"
@@ -17545,59 +18150,59 @@ export type VoiceCallRejectionReason =
   | "call_not_permitted"
   | "number_ownership_not_verified";
 
-export type VoiceCallInboundRouteReject = {
+export type VoiceLegInboundRouteReject = {
   /**
-   * The number turned the call away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.
+   * The number turned the leg away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.
    *
    */
   type: VoiceCallRouteType;
 };
 
-export type VoiceCallInboundRouteTrunk = {
+export type VoiceLegInboundRouteTrunk = {
   /**
-   * The call was delivered to one of your SIP trunks.
+   * The leg was delivered to one of your SIP trunks.
    */
   type: VoiceCallRouteType;
   /**
-   * The SIP trunk the call was delivered to. Recorded as it was at the time, so it may name a trunk you have since changed or deleted.
+   * The SIP trunk the leg was delivered to. Recorded as it was at the time, so it may name a trunk you have since changed or deleted.
    *
    */
   trunk_id: SipTrunkId;
 };
 
-export type VoiceCallInboundRouteForward = {
+export type VoiceLegInboundRouteForward = {
   /**
-   * The call was forwarded to another of your numbers.
+   * The leg was forwarded to another of your numbers.
    */
   type: VoiceCallRouteType;
   /**
-   * The number the call was forwarded to, in E.164 format. Recorded as it was at the time, so it may name a number you have since stopped verifying.
+   * The number the leg was forwarded to, in E.164 format. Recorded as it was at the time, so it may name a number you have since stopped verifying.
    *
    */
   forward_to: string;
   /**
-   * Which of the call's two numbers the forwarded leg presented as its caller. The value that went on the wire, not the one the number is set to now.
+   * Which of the leg's two numbers the forwarded leg presented as its caller. The value that went on the wire, not the one the number is set to now.
    *
    */
   forward_as: VoiceInboundForwardAs;
 };
 
 /**
- * The routing choice recorded for an incoming call. A recorded route does not
- * guarantee that the call connected. Check `status` for the outcome and
+ * The routing choice recorded for an incoming leg. A recorded route does not
+ * guarantee that the leg connected. Check `status` for the outcome and
  * `rejection_reason` for the cause when present.
  *
  */
-export type VoiceCallInboundRoute =
+export type VoiceLegInboundRoute =
   | ({
       type: "reject";
-    } & VoiceCallInboundRouteReject)
+    } & VoiceLegInboundRouteReject)
   | ({
       type: "trunk";
-    } & VoiceCallInboundRouteTrunk)
+    } & VoiceLegInboundRouteTrunk)
   | ({
       type: "forward";
-    } & VoiceCallInboundRouteForward);
+    } & VoiceLegInboundRouteForward);
 
 export type VoiceMediaQuality = {
   /**
@@ -17620,10 +18225,10 @@ export type VoiceMediaQuality = {
 };
 
 /**
- * What was charged for a call, split into the components that make it up.
+ * What was charged for a leg, split into the components that make it up.
  *
  */
-export type VoiceCallCost = {
+export type VoiceLegCost = {
   /**
    * Total charged, as a decimal string: the sum of the components below. Net of tax, which applies to your wallet balance rather than to an individual charge.
    *
@@ -17634,12 +18239,12 @@ export type VoiceCallCost = {
    */
   readonly currency_code: CurrencyCode;
   /**
-   * What we charged to carry the call to the destination network, as a decimal string. `null` until this component is priced.
+   * What we charged to carry the leg to the destination network, as a decimal string. `null` until this component is priced.
    *
    */
   readonly outbound_amount: string | null;
   /**
-   * What we charged to receive the call from the originating network, as a decimal string. Only a call that arrived at your number can carry it. `null` until this component is priced.
+   * What we charged to receive the leg from the originating network, as a decimal string. Only a leg that arrived at your number can carry it. `null` until this component is priced.
    *
    */
   readonly inbound_amount: string | null;
@@ -17649,26 +18254,26 @@ export type VoiceCallCost = {
    */
   readonly call_handling_amount: string | null;
   /**
-   * What we charged to record the call, as a decimal string, billed per second over the same billable time as the rest of the call. `null` until this component is priced.
+   * What we charged to record the leg, as a decimal string, billed per second over the same billable time as the rest of the leg. `null` until this component is priced.
    *
    */
   readonly recording_amount: string | null;
   /**
-   * What we charged to transcribe the call's audio, as a decimal string, billed per second of recorded audio rather than for the length of the call. A transcript is produced after the call ends, so this can appear after the rest of the cost. `null` until this component is priced.
+   * What we charged to transcribe the leg's audio, as a decimal string, billed per second of recorded audio rather than for the length of the leg. A transcript is produced after the leg ends, so this can appear after the rest of the cost. `null` until this component is priced.
    *
    */
   readonly transcription_amount: string | null;
 };
 
-export type VoiceCall = {
+export type VoiceLeg = {
   /**
-   * Unique identifier for this call record.
+   * Unique identifier for this leg record.
    */
   readonly id: VoiceCallId;
   /**
-   * Session identifier shared across all legs of a multi-party or transferred call. Use this to correlate related call records. `null` when session correlation is not available for the call.
+   * Call identifier shared across all legs of a multi-party or transferred call. Use this to correlate related leg records. `null` when call correlation is not available for the leg.
    */
-  readonly session_id?: VoiceSessionId | null;
+  readonly call_id?: VoiceSessionId | null;
   readonly workspace_id: WorkspaceId;
   readonly direction: VoiceCallDirection;
   /**
@@ -17680,11 +18285,11 @@ export type VoiceCall = {
    */
   readonly to: string;
   /**
-   * Who placed the call: the API key whose credentials it used, the integration acting for the workspace, or the user who placed it from a browser or the CLI. Absent when the call was admitted only by its source IP address, or when no actor was recorded.
+   * Who placed the leg: the API key whose credentials it used, the integration acting for the workspace, or the user who placed it from a browser or the CLI. Absent when the leg was admitted only by its source IP address, or when no actor was recorded.
    */
   readonly actor?: Actor;
   /**
-   * Identifier of the SIP trunk that originated this call. `null` when no trunk is associated.
+   * Identifier of the SIP trunk that originated this leg. `null` when no trunk is associated.
    */
   readonly sip_trunk_id?: SipTrunkId | null;
   readonly status: VoiceCallStatus;
@@ -17693,61 +18298,61 @@ export type VoiceCall = {
    */
   readonly sip_response_code?: number | null;
   /**
-   * Why we rejected the call. Absent on connected calls and calls rejected
+   * Why we rejected the leg. Absent on connected legs and legs rejected
    * by the carrier or recipient. For carrier or recipient rejections, see
-   * `sip_response_code`; a `6xx` decline gives the call a `rejected` status.
+   * `sip_response_code`; a `6xx` decline gives the leg a `rejected` status.
    *
    * Read alongside `route` when present. A refusal caused by the number's
    * configuration has no rejection reason; the route records that
    * configuration.
    *
    */
-  readonly rejection_reason?: VoiceCallRejectionReason;
+  readonly rejection_reason?: VoiceLegRejectionReason;
   /**
-   * Which answer your number gave an incoming call: a SIP trunk, a forward, or a refusal. Recorded when the call was handled, so changing the number's setup afterwards does not change what its past calls say. Absent on outbound calls, and on calls recorded before this field existed.
+   * Which answer your number gave an incoming leg: a SIP trunk, a forward, or a refusal. Recorded when the leg was handled, so changing the number's setup afterwards does not change what its past legs say. Absent on outbound legs, and on legs recorded before this field existed.
    */
-  readonly route?: VoiceCallInboundRoute;
+  readonly route?: VoiceLegInboundRoute;
   /**
-   * Your own `{name, value}` labels for this call, taken from the `X-Bird-Call-Tag` headers on the INVITE that placed it. Set them to organise calls by a dimension of your own (campaign, queue, agent, cost centre), then filter this list by them with `tag`. Read-only here: a call is labelled when it is placed, and never afterwards. What is here may be less than what was sent, and the call still goes through either way: a tag whose name or value breaks the rules below is dropped, anything past the first five is ignored, and a name sent more than once keeps its first value. Absent when the call carried none, and on calls recorded before this field existed.
+   * Your own `{name, value}` labels for this leg, taken from the `X-Bird-Call-Tag` headers on the INVITE that placed it. Set them to organise legs by a dimension of your own (campaign, queue, agent, cost centre), then filter this list by them with `tag`. Read-only here: a leg is labelled when it is placed, and never afterwards. What is here may be less than what was sent, and the leg still goes through either way: a tag whose name or value breaks the rules below is dropped, anything past the first five is ignored, and a name sent more than once keeps its first value. Absent when the leg carried none, and on legs recorded before this field existed.
    */
   readonly tags?: Array<Tag>;
   /**
-   * When the call was initiated.
+   * When the leg was initiated.
    */
   readonly started_at: string;
   /**
-   * When the call was answered (`200` OK received). `null` for unanswered calls.
+   * When the leg was answered (`200` OK received). `null` for unanswered legs.
    */
   readonly answered_at?: string | null;
   /**
-   * When the call ended (BYE or final non-2xx response). `null` for calls that ended abnormally without a recorded end event.
+   * When the leg ended (BYE or final non-2xx response). `null` for legs that ended abnormally without a recorded end event.
    */
   readonly ended_at?: string | null;
   /**
-   * Total call duration in milliseconds, measured from the first INVITE to the BYE or final response. `null` while the call is still in progress and has no final duration yet.
+   * Total leg duration in milliseconds, measured from the first INVITE to the BYE or final response. `null` while the leg is still in progress and has no final duration yet.
    */
   readonly duration_ms?: number | null;
   /**
-   * Post-dial delay in milliseconds: how long the caller heard nothing between dialing and the phone starting to ring at the other end. High values are what callers experience as the call `not going through`. Absent when the call never rang, either because it failed first or because the carrier answered it immediately.
+   * Post-dial delay in milliseconds: how long the caller heard nothing between dialing and the phone starting to ring at the other end. High values are what callers experience as the leg `not going through`. Absent when the leg never rang, either because it failed first or because the carrier answered it immediately.
    *
    */
   readonly pdd_ms?: number;
   /**
-   * Billable duration in milliseconds, measured from answer to call end. Zero for unanswered calls, and `null` while the call is still in progress.
+   * Billable duration in milliseconds, measured from answer to leg end. Zero for unanswered legs, and `null` while the leg is still in progress.
    */
   readonly billable_ms?: number | null;
   /**
-   * How the audio sounded, as opposed to whether the call connected. Absent when the call carried no audio, or when the far end reported nothing to measure from.
+   * How the audio sounded, as opposed to whether the leg connected. Absent when the leg carried no audio, or when the far end reported nothing to measure from.
    */
-  media_quality?: VoiceMediaQuality;
+  readonly media_quality?: VoiceMediaQuality;
   /**
-   * What the call cost, net of tax, at full precision, split into the components that make it up. Absent until the call has been rated; unanswered or unpriced calls have no cost.
+   * What the leg cost, net of tax, at full precision, split into the components that make it up. Absent until the leg has been rated; unanswered or unpriced legs have no cost.
    */
-  cost?: VoiceCallCost;
+  readonly cost?: VoiceLegCost;
 };
 
-export type VoiceCallList = {
-  data: Array<VoiceCall>;
+export type VoiceLegList = {
+  data: Array<VoiceLeg>;
 } & ListEnvelope;
 
 /**
@@ -18225,7 +18830,7 @@ export type EmailEventListWritable = {
 } & ListEnvelope;
 
 /**
- * The template a broadcast sends, and the exact version of it the broadcast is fixed to. The template cannot be one that requires every send to name a language, because a broadcast never names one, so a template that insists on it has nothing to work with.
+ * The template a broadcast sends, the exact version of it the broadcast is fixed to, and which of that version's languages goes out.
  *
  */
 export type EmailBroadcastTemplateWritable = {
@@ -18234,6 +18839,11 @@ export type EmailBroadcastTemplateWritable = {
    *
    */
   id: EmailTemplateId;
+  /**
+   * The BCP-47 language tag selected for the whole audience, such as `en` or `pt-BR`. `null` means no language is selected, so the broadcast uses the published version's default language, unless the template has `language_source_required` set. Send `template.language` in an update to change or clear the selection.
+   *
+   */
+  language?: LanguageTag | null;
 };
 
 export type EmailBroadcastWritable = {
@@ -18246,7 +18856,7 @@ export type EmailBroadcastWritable = {
    */
   audience_id?: AudienceId;
   /**
-   * The template this broadcast sends. A broadcast sends the template's published version, and the exact version is fixed when the broadcast is prepared for sending, so publishing a new version afterwards does not change what this broadcast sends. Null on a draft that has not chosen a template yet.
+   * The template this broadcast sends, and the language it sends in. A broadcast sends the template's published version, and the exact version is fixed when the broadcast is prepared for sending, so publishing a new version afterwards does not change what this broadcast sends. Null on a draft that has not chosen a template yet.
    */
   template?: EmailBroadcastTemplateWritable | null;
   /**
@@ -18293,135 +18903,6 @@ export type EmailBroadcastListWritable = {
    */
   data: Array<EmailBroadcastWritable>;
 } & ListEnvelope;
-
-/**
- * A broadcast sends one email to a whole audience. Every field here is optional, so you can create an empty draft and fill it in later. To actually send, a broadcast needs three things: a `from` address on a verified domain, an `audience_id`, and a `template`.
- *
- * Leave `send` false, which is the default, and you get a draft. Update it as often as you like, then send it when you are ready. Set `send` to true and the broadcast goes out as soon as it is created, or at `scheduled_at` if you set one.
- *
- */
-export type EmailBroadcastCreateRequestWritable = {
-  /**
-   * The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.
-   */
-  from?: EmailAddressInput;
-  /**
-   * The audience this broadcast sends to. We take the audience's contacts as they stand when the send starts and drop any suppressed addresses, and what is left is who gets the email.
-   */
-  audience_id?: AudienceId;
-  /**
-   * The template the broadcast sends. You can leave it out on a draft, but a broadcast cannot send without one. The template's published version is fixed when the broadcast is prepared for sending, and each recipient's contact properties are filled into the content as the email goes out.
-   */
-  template?: EmailBroadcastTemplateWritable;
-  /**
-   * Where replies to this broadcast should go. Give each address as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. You can list more than one.
-   */
-  reply_to?: Array<EmailAddressInput>;
-  /**
-   * Custom email headers to set on the broadcast, as name and value pairs. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.
-   *
-   */
-  headers?: {
-    [key: string]: string;
-  };
-  /**
-   * Labels on this broadcast, each one a `name` and a `value`, up to 20 of them. You can filter the broadcast list by a tag, break your stats down by one, and read them back off webhook payloads. Use tags for anything you want to find broadcasts by later, and `metadata` for data you only want handed back to you.
-   */
-  tags?: Array<Tag>;
-  /**
-   * Any JSON you want to keep on the broadcast. We store it, hand it back when you read the broadcast, and include it in webhook payloads, and you can break stats down by a path inside it such as `metadata.order_id`. It can be up to 2 KB once serialized.
-   */
-  metadata?: {
-    [key: string]: unknown;
-  };
-  /**
-   * Whether to track opens for this broadcast.
-   */
-  track_opens?: boolean;
-  /**
-   * Whether to track link clicks for this broadcast.
-   */
-  track_clicks?: boolean;
-  /**
-   * The IP pool to send this broadcast from. Pass a pool ID, or `ipp_shared` to send through the shared pool on purpose. Leave it out and the broadcast uses your organization's default pool. A pool we do not recognize, or one with no IPs available to send from, is refused with a `422`.
-   */
-  ip_pool_id?: string;
-  /**
-   * What kind of email this is. A broadcast sets this itself rather than taking it from its template, and it decides two things: which suppressions apply, and whether we add an unsubscribe header.
-   *
-   * `marketing`, the default, is held back from every suppressed address and has the one-click unsubscribe headers. `transactional` still goes to addresses suppressed for a complaint or an unsubscribe, and has no unsubscribe header. Only use `transactional` for genuine operational mail such as a terms-of-service update or a service outage notice. Marketing content sent this way still reaches people who have already unsubscribed from you.
-   *
-   */
-  category?: "marketing" | "transactional";
-  /**
-   * Whether to send the broadcast as soon as it is created. Set it to true and the broadcast goes out immediately, or at `scheduled_at` if you set one. Leave it false, which is the default, and you get a draft you can update and send later.
-   */
-  send?: boolean;
-  /**
-   * When to send the broadcast. It has to be at least 30 seconds and at most 365 days from now. It requires `send` to be true, so a `scheduled_at` on its own is refused rather than saved on the draft.
-   *
-   */
-  scheduled_at?: string;
-};
-
-/**
- * Changes a broadcast that is still a draft or is scheduled. Whatever you send here is applied, and anything you leave out keeps the value it already had. Once a broadcast has started sending it can no longer be edited.
- *
- */
-export type EmailBroadcastUpdateRequestWritable = {
-  /**
-   * The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.
-   */
-  from?: EmailAddressInput;
-  /**
-   * The audience this broadcast sends to. We take the audience's contacts as they stand when the send starts and drop any suppressed addresses, and what is left is who gets the email.
-   */
-  audience_id?: AudienceId;
-  /**
-   * The template the broadcast sends. Its published version is fixed when the broadcast is prepared for sending. Set this to null to take the template off a draft, or leave it out to keep the one already set.
-   */
-  template?: EmailBroadcastTemplateWritable | null;
-  /**
-   * Where replies to this broadcast should go. Set this to null to remove the addresses already set.
-   */
-  reply_to?: Array<EmailAddressInput> | null;
-  /**
-   * Custom email headers to set on the broadcast, as name and value pairs. What you send replaces the headers the draft already had rather than adding to them. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.
-   *
-   */
-  headers?: {
-    [key: string]: string;
-  };
-  /**
-   * Labels on this broadcast, each one a `name` and a `value`, that you can filter and search broadcasts by. What you send replaces the tags the draft already had rather than adding to them.
-   */
-  tags?: Array<Tag>;
-  /**
-   * Any JSON you want to keep on the broadcast, up to 2 KB once serialized. What you send replaces the metadata the draft already had rather than merging into it.
-   */
-  metadata?: {
-    [key: string]: unknown;
-  };
-  /**
-   * Whether to track opens for this broadcast.
-   */
-  track_opens?: boolean;
-  /**
-   * Whether to track link clicks for this broadcast.
-   */
-  track_clicks?: boolean;
-  /**
-   * The IP pool to send this broadcast from. Pass a pool ID, or `ipp_shared` to send through the shared pool on purpose. Set it to null to fall back to your organization's default pool.
-   */
-  ip_pool_id?: string | null;
-  /**
-   * What kind of email this is. It decides two things: which suppressions apply, and whether we add an unsubscribe header.
-   *
-   * `marketing` is held back from every suppressed address and has the one-click unsubscribe headers. `transactional` still goes to addresses suppressed for a complaint or an unsubscribe, and has no unsubscribe header. Only use `transactional` for genuine operational mail such as a terms-of-service update or a service outage notice. Marketing content sent this way reaches people who have already unsubscribed from you.
-   *
-   */
-  category?: "marketing" | "transactional";
-};
 
 /**
  * How many people a broadcast would reach right now, narrowing from everyone in the audience down to the ones it could actually be sent to.
@@ -19104,6 +19585,35 @@ export type WhatsAppReactionEventListWritable = {
 } & ListEnvelope;
 
 /**
+ * A WhatsApp group your business created and administers. People join by opening its invite link, not by being added.
+ *
+ */
+export type WhatsAppGroupWritable = {
+  /**
+   * The group's name, shown to participants and to anyone who opens the invite link.
+   */
+  subject: string;
+  /**
+   * The group's description, shown alongside the subject. Null when the group has none.
+   */
+  description?: string | null;
+};
+
+export type WhatsAppGroupListWritable = {
+  /**
+   * The groups your workspace created, newest first.
+   */
+  data: Array<WhatsAppGroupWritable>;
+} & ListEnvelope;
+
+export type WhatsAppGroupJoinRequestListWritable = {
+  /**
+   * The join requests still waiting for a decision, oldest first.
+   */
+  data: Array<unknown>;
+} & ListEnvelope;
+
+/**
  * Why Meta refused a language's content, and what it says about fixing it. Present when `status` is `rejected`.
  *
  */
@@ -19546,6 +20056,41 @@ export type WhatsAppBusinessAccountListWritable = {
    * The WhatsApp Business Accounts your workspace has connected.
    */
   data: Array<unknown>;
+} & ListEnvelope;
+
+/**
+ * One period during which an address is suppressed: when it started and, once it is over, what ended it. An address suppressed, ended and suppressed again has two of these on record rather than one current state. The list returns the periods in force; fetch one by ID to read one that has ended.
+ *
+ */
+export type WhatsAppSuppressionWritable = {
+  /**
+   * The suppressed WhatsApp address. For a phone number this is canonical E.164 with a leading plus sign, such as `+5511977670804`.
+   *
+   */
+  address: string;
+  /**
+   * Why the address is suppressed. `manual` means it was added directly rather than created automatically from a delivery outcome. This list grows over time, so treat an unknown value as informational rather than rejecting the record.
+   *
+   */
+  reason: string;
+  /**
+   * How the suppression came to exist: `api_key` (added through the API with an API key) or `user` (added by a user in the dashboard). This list grows over time, so treat an unknown value as informational rather than rejecting the record.
+   *
+   */
+  origin: string;
+  /**
+   * Blocking policy. `all` blocks every message category. Treat an unrecognized value as blocking.
+   *
+   */
+  applies_to: string;
+  /**
+   * ID of the WhatsApp message that caused this address to be suppressed, when the suppression was created automatically. Omitted for addresses added manually.
+   */
+  source_whatsapp_id?: WhatsAppMessageId;
+};
+
+export type WhatsAppSuppressionListWritable = {
+  data: Array<WhatsAppSuppressionWritable>;
 } & ListEnvelope;
 
 export type WhatsAppKeywordRuleWritable = {
@@ -21193,12 +21738,12 @@ export type NumbersOrderListWritable = {
   data: Array<unknown>;
 } & ListEnvelope;
 
-export type VoiceCallWritable = {
+export type VoiceLegWritable = {
   [key: string]: never;
 };
 
-export type VoiceCallListWritable = {
-  data: Array<VoiceCallWritable>;
+export type VoiceLegListWritable = {
+  data: Array<VoiceLegWritable>;
 } & ListEnvelope;
 
 /**
@@ -22455,7 +23000,7 @@ export type ListEmailBroadcastsResponse =
   ListEmailBroadcastsResponses[keyof ListEmailBroadcastsResponses];
 
 export type CreateEmailBroadcastData = {
-  body: EmailBroadcastCreateRequestWritable;
+  body: EmailBroadcastCreateRequest;
   headers?: {
     /**
      * Client-supplied key. On operations supporting request deduplication, a retained
@@ -22683,7 +23228,7 @@ export type GetEmailBroadcastResponse =
   GetEmailBroadcastResponses[keyof GetEmailBroadcastResponses];
 
 export type UpdateEmailBroadcastData = {
-  body: EmailBroadcastUpdateRequestWritable;
+  body: EmailBroadcastUpdateRequest;
   headers?: {
     /**
      * Client-supplied key. On operations supporting request deduplication, a retained
@@ -29137,6 +29682,1042 @@ export type ListWhatsAppMessageReactionEventsResponses = {
 export type ListWhatsAppMessageReactionEventsResponse =
   ListWhatsAppMessageReactionEventsResponses[keyof ListWhatsAppMessageReactionEventsResponses];
 
+export type ListWhatsAppGroupsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by.
+     */
+    sort?: WhatsAppGroupSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Filter by the business number that administers the group, as either the number in E.164 format or the number's `id` (`wan_` prefix). A value that parses as a valid ID resolves by ID; any other value must be an E.164 number, and anything else is a `422`. The E.164 form is matched against the group's stored record of the number it was created on.
+     *
+     */
+    number?: string;
+    /**
+     * Filter by the WABA identifier returned on the group. Groups with `waba: null` do not match this filter.
+     *
+     */
+    waba?: string;
+    /**
+     * Case-insensitive substring match against the group's subject or description.
+     */
+    q?: string;
+    /**
+     * Filter by status. Repeat the parameter to match any of several statuses.
+     */
+    status?: Array<WhatsAppGroupStatus>;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * Limits the response to resources created at or after this timestamp. Combine it with `created_before` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_after?: string;
+    /**
+     * Limits the response to resources created before this timestamp. Combine it with `created_after` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_before?: string;
+  };
+  url: "/v1/whatsapp/groups";
+};
+
+export type ListWhatsAppGroupsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppGroupsError =
+  ListWhatsAppGroupsErrors[keyof ListWhatsAppGroupsErrors];
+
+export type ListWhatsAppGroupsResponses = {
+  /**
+   * A page of the WhatsApp groups your workspace created.
+   */
+  200: WhatsAppGroupList;
+};
+
+export type ListWhatsAppGroupsResponse =
+  ListWhatsAppGroupsResponses[keyof ListWhatsAppGroupsResponses];
+
+export type CreateWhatsAppGroupData = {
+  body: WhatsAppGroupCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/whatsapp/groups";
+};
+
+export type CreateWhatsAppGroupErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateWhatsAppGroupError =
+  CreateWhatsAppGroupErrors[keyof CreateWhatsAppGroupErrors];
+
+export type CreateWhatsAppGroupResponses = {
+  /**
+   * Group accepted for creation at WhatsApp.
+   */
+  202: WhatsAppGroup;
+};
+
+export type CreateWhatsAppGroupResponse =
+  CreateWhatsAppGroupResponses[keyof CreateWhatsAppGroupResponses];
+
+export type DeleteWhatsAppGroupData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the group to delete.
+     */
+    group_id: WhatsAppGroupId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/groups/{group_id}";
+};
+
+export type DeleteWhatsAppGroupErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteWhatsAppGroupError =
+  DeleteWhatsAppGroupErrors[keyof DeleteWhatsAppGroupErrors];
+
+export type DeleteWhatsAppGroupResponses = {
+  /**
+   * Deletion accepted; the group as Bird holds it. Re-read to confirm it went through.
+   */
+  202: WhatsAppGroup;
+};
+
+export type DeleteWhatsAppGroupResponse =
+  DeleteWhatsAppGroupResponses[keyof DeleteWhatsAppGroupResponses];
+
+export type GetWhatsAppGroupData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the group, as returned when it was created.
+     */
+    group_id: WhatsAppGroupId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/groups/{group_id}";
+};
+
+export type GetWhatsAppGroupErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWhatsAppGroupError =
+  GetWhatsAppGroupErrors[keyof GetWhatsAppGroupErrors];
+
+export type GetWhatsAppGroupResponses = {
+  /**
+   * The group.
+   */
+  200: WhatsAppGroup;
+};
+
+export type GetWhatsAppGroupResponse =
+  GetWhatsAppGroupResponses[keyof GetWhatsAppGroupResponses];
+
+export type UpdateWhatsAppGroupData = {
+  body: WhatsAppGroupUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the group to change.
+     */
+    group_id: WhatsAppGroupId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/groups/{group_id}";
+};
+
+export type UpdateWhatsAppGroupErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateWhatsAppGroupError =
+  UpdateWhatsAppGroupErrors[keyof UpdateWhatsAppGroupErrors];
+
+export type UpdateWhatsAppGroupResponses = {
+  /**
+   * Change accepted; the group as Bird holds it. Re-read for what WhatsApp applied.
+   */
+  202: WhatsAppGroup;
+};
+
+export type UpdateWhatsAppGroupResponse =
+  UpdateWhatsAppGroupResponses[keyof UpdateWhatsAppGroupResponses];
+
+export type RotateWhatsAppGroupInviteLinkData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the group whose invite link is being replaced.
+     */
+    group_id: WhatsAppGroupId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/groups/{group_id}/invite-link/rotate";
+};
+
+export type RotateWhatsAppGroupInviteLinkErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type RotateWhatsAppGroupInviteLinkError =
+  RotateWhatsAppGroupInviteLinkErrors[keyof RotateWhatsAppGroupInviteLinkErrors];
+
+export type RotateWhatsAppGroupInviteLinkResponses = {
+  /**
+   * The group's new invite link.
+   */
+  200: WhatsAppGroupInviteLink;
+};
+
+export type RotateWhatsAppGroupInviteLinkResponse =
+  RotateWhatsAppGroupInviteLinkResponses[keyof RotateWhatsAppGroupInviteLinkResponses];
+
+export type DeleteWhatsAppGroupParticipantData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the group to remove someone from.
+     */
+    group_id: WhatsAppGroupId;
+    /**
+     * The person to remove, named by either identifier the group lists them under: their `bsuid`, or their `phone_number` in E.164 format (`+16505551234`) when WhatsApp gives you one. Pass the value as it reads: percent-encode the leading `+` as `%2B` only when your client does not do that for you. A value naming someone who is not in the group returns a `422` `WhatsAppGroupParticipantNotFound`.
+     *
+     */
+    participant_ref: string;
+  };
+  query?: never;
+  url: "/v1/whatsapp/groups/{group_id}/participants/{participant_ref}";
+};
+
+export type DeleteWhatsAppGroupParticipantErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteWhatsAppGroupParticipantError =
+  DeleteWhatsAppGroupParticipantErrors[keyof DeleteWhatsAppGroupParticipantErrors];
+
+export type DeleteWhatsAppGroupParticipantResponses = {
+  /**
+   * Removal accepted; the group as Bird holds it. Re-read for who is left.
+   */
+  202: WhatsAppGroup;
+};
+
+export type DeleteWhatsAppGroupParticipantResponse =
+  DeleteWhatsAppGroupParticipantResponses[keyof DeleteWhatsAppGroupParticipantResponses];
+
+export type CreateWhatsAppGroupPinnedMessageData = {
+  body: WhatsAppGroupPinnedMessageCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the group to pin a message in.
+     */
+    group_id: WhatsAppGroupId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/groups/{group_id}/pinned-messages";
+};
+
+export type CreateWhatsAppGroupPinnedMessageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateWhatsAppGroupPinnedMessageError =
+  CreateWhatsAppGroupPinnedMessageErrors[keyof CreateWhatsAppGroupPinnedMessageErrors];
+
+export type CreateWhatsAppGroupPinnedMessageResponses = {
+  /**
+   * The applied pin: the message and when its pin expires.
+   */
+  200: WhatsAppGroupPinnedMessage;
+};
+
+export type CreateWhatsAppGroupPinnedMessageResponse =
+  CreateWhatsAppGroupPinnedMessageResponses[keyof CreateWhatsAppGroupPinnedMessageResponses];
+
+export type DeleteWhatsAppGroupPinnedMessageData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the group to unpin a message in.
+     */
+    group_id: WhatsAppGroupId;
+    /**
+     * ID of the message to unpin, as returned in the send response's `id`.
+     */
+    message_id: WhatsAppMessageId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/groups/{group_id}/pinned-messages/{message_id}";
+};
+
+export type DeleteWhatsAppGroupPinnedMessageErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteWhatsAppGroupPinnedMessageError =
+  DeleteWhatsAppGroupPinnedMessageErrors[keyof DeleteWhatsAppGroupPinnedMessageErrors];
+
+export type DeleteWhatsAppGroupPinnedMessageResponses = {
+  /**
+   * The unpin applied; the group as Bird holds it.
+   */
+  200: WhatsAppGroup;
+};
+
+export type DeleteWhatsAppGroupPinnedMessageResponse =
+  DeleteWhatsAppGroupPinnedMessageResponses[keyof DeleteWhatsAppGroupPinnedMessageResponses];
+
+export type ListWhatsAppGroupJoinRequestsData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the group whose join requests are being listed.
+     */
+    group_id: WhatsAppGroupId;
+  };
+  query?: {
+    /**
+     * Field to sort by.
+     */
+    sort?: WhatsAppGroupJoinRequestSortField;
+    /**
+     * Sort direction. Defaults to `asc`, which sorts alphabetically or from oldest to newest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/groups/{group_id}/join-requests";
+};
+
+export type ListWhatsAppGroupJoinRequestsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppGroupJoinRequestsError =
+  ListWhatsAppGroupJoinRequestsErrors[keyof ListWhatsAppGroupJoinRequestsErrors];
+
+export type ListWhatsAppGroupJoinRequestsResponses = {
+  /**
+   * A page of the group's pending join requests.
+   */
+  200: WhatsAppGroupJoinRequestList;
+};
+
+export type ListWhatsAppGroupJoinRequestsResponse =
+  ListWhatsAppGroupJoinRequestsResponses[keyof ListWhatsAppGroupJoinRequestsResponses];
+
+export type ApproveWhatsAppGroupJoinRequestsData = {
+  body: WhatsAppGroupJoinRequestDecision;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the group whose join requests are being decided.
+     */
+    group_id: WhatsAppGroupId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/groups/{group_id}/join-requests/batch-approve";
+};
+
+export type ApproveWhatsAppGroupJoinRequestsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ApproveWhatsAppGroupJoinRequestsError =
+  ApproveWhatsAppGroupJoinRequestsErrors[keyof ApproveWhatsAppGroupJoinRequestsErrors];
+
+export type ApproveWhatsAppGroupJoinRequestsResponses = {
+  /**
+   * What happened to each join request in the batch.
+   */
+  202: WhatsAppGroupJoinRequestDecisionResult;
+};
+
+export type ApproveWhatsAppGroupJoinRequestsResponse =
+  ApproveWhatsAppGroupJoinRequestsResponses[keyof ApproveWhatsAppGroupJoinRequestsResponses];
+
+export type RejectWhatsAppGroupJoinRequestsData = {
+  body: WhatsAppGroupJoinRequestDecision;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the group whose join requests are being decided.
+     */
+    group_id: WhatsAppGroupId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/groups/{group_id}/join-requests/batch-reject";
+};
+
+export type RejectWhatsAppGroupJoinRequestsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type RejectWhatsAppGroupJoinRequestsError =
+  RejectWhatsAppGroupJoinRequestsErrors[keyof RejectWhatsAppGroupJoinRequestsErrors];
+
+export type RejectWhatsAppGroupJoinRequestsResponses = {
+  /**
+   * What happened to each join request in the batch.
+   */
+  202: WhatsAppGroupJoinRequestDecisionResult;
+};
+
+export type RejectWhatsAppGroupJoinRequestsResponse =
+  RejectWhatsAppGroupJoinRequestsResponses[keyof RejectWhatsAppGroupJoinRequestsResponses];
+
 export type ListWhatsAppTemplatesData = {
   body?: never;
   path?: never;
@@ -30878,6 +32459,289 @@ export type GetWhatsAppBusinessAccountResponses = {
 
 export type GetWhatsAppBusinessAccountResponse =
   GetWhatsAppBusinessAccountResponses[keyof GetWhatsAppBusinessAccountResponses];
+
+export type ListWhatsAppSuppressionsData = {
+  body?: never;
+  path?: never;
+  query?: {
+    /**
+     * Address prefix filter (case-insensitive). A complete address returns only that address; a partial value returns all matches.
+     *
+     */
+    address?: string;
+    /**
+     * Return only suppressions with this reason:
+     *
+     * - `manual`: Added through the API or dashboard.
+     *
+     */
+    reason?: WhatsAppSuppressionReasonFilter;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/suppressions";
+};
+
+export type ListWhatsAppSuppressionsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppSuppressionsError =
+  ListWhatsAppSuppressionsErrors[keyof ListWhatsAppSuppressionsErrors];
+
+export type ListWhatsAppSuppressionsResponses = {
+  /**
+   * Paginated list of suppressions.
+   */
+  200: WhatsAppSuppressionList;
+};
+
+export type ListWhatsAppSuppressionsResponse =
+  ListWhatsAppSuppressionsResponses[keyof ListWhatsAppSuppressionsResponses];
+
+export type CreateWhatsAppSuppressionData = {
+  body: WhatsAppSuppressionCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/whatsapp/suppressions";
+};
+
+export type CreateWhatsAppSuppressionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateWhatsAppSuppressionError =
+  CreateWhatsAppSuppressionErrors[keyof CreateWhatsAppSuppressionErrors];
+
+export type CreateWhatsAppSuppressionResponses = {
+  /**
+   * Address was already suppressed. Existing record returned.
+   */
+  200: WhatsAppSuppression;
+  /**
+   * Suppression created.
+   */
+  201: WhatsAppSuppression;
+};
+
+export type CreateWhatsAppSuppressionResponse =
+  CreateWhatsAppSuppressionResponses[keyof CreateWhatsAppSuppressionResponses];
+
+export type DeleteWhatsAppSuppressionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    suppression_id: WhatsAppSuppressionId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/suppressions/{suppression_id}";
+};
+
+export type DeleteWhatsAppSuppressionErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteWhatsAppSuppressionError =
+  DeleteWhatsAppSuppressionErrors[keyof DeleteWhatsAppSuppressionErrors];
+
+export type DeleteWhatsAppSuppressionResponses = {
+  /**
+   * Suppression deleted.
+   */
+  204: void;
+};
+
+export type DeleteWhatsAppSuppressionResponse =
+  DeleteWhatsAppSuppressionResponses[keyof DeleteWhatsAppSuppressionResponses];
+
+export type GetWhatsAppSuppressionData = {
+  body?: never;
+  path: {
+    suppression_id: WhatsAppSuppressionId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/suppressions/{suppression_id}";
+};
+
+export type GetWhatsAppSuppressionErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWhatsAppSuppressionError =
+  GetWhatsAppSuppressionErrors[keyof GetWhatsAppSuppressionErrors];
+
+export type GetWhatsAppSuppressionResponses = {
+  /**
+   * The suppression record for the requested ID.
+   */
+  200: WhatsAppSuppression;
+};
+
+export type GetWhatsAppSuppressionResponse =
+  GetWhatsAppSuppressionResponses[keyof GetWhatsAppSuppressionResponses];
 
 export type ListWhatsAppKeywordRulesData = {
   body?: never;
@@ -39462,40 +41326,40 @@ export type GetWorkspaceNumberResponses = {
 export type GetWorkspaceNumberResponse =
   GetWorkspaceNumberResponses[keyof GetWorkspaceNumberResponses];
 
-export type ListVoiceCallsData = {
+export type ListVoiceLegsData = {
   body?: never;
   path?: never;
   query?: {
     /**
-     * Return only calls in this direction.
+     * Return only legs in this direction.
      */
     direction?: VoiceCallDirection;
     /**
-     * Return only calls with one of these statuses, comma-separated.
+     * Return only legs with one of these statuses, comma-separated.
      * In-flight and final statuses may be combined freely.
      *
      */
     status?: Array<VoiceCallStatus>;
     /**
-     * Return only calls belonging to this session, which is how the legs of one multi-party or transferred call are correlated.
+     * Return only legs belonging to this call, which is how the legs of one multi-party or transferred call are correlated.
      */
-    session_id?: VoiceSessionId;
+    call_id?: VoiceSessionId;
     /**
-     * Return only calls carried by this SIP trunk.
+     * Return only legs carried by this SIP trunk.
      */
     sip_trunk_id?: SipTrunkId;
     /**
-     * Return only calls placed from this calling party number, matched as a whole number rather than as a fragment. Give it in international form: `+14155551234`, `14155551234`, and `0014155551234` all select the same calls. A number given without a country code is read as an international one, so give the country code to be sure of what you are matching. Use `number` instead to match part of a number, or either side of the call.
+     * Return only legs placed from this calling party number, matched as a whole number rather than as a fragment. Give it in international form: `+14155551234`, `14155551234`, and `0014155551234` all select the same legs. A number given without a country code is read as an international one, so give the country code to be sure of what you are matching. Use `number` instead to match part of a number, or either side of the leg.
      *
      */
     from?: string;
     /**
-     * Return only calls placed to this called party number, matched as a whole number rather than as a fragment. Give it in international form: `+16505559876`, `16505559876`, and `0016505559876` all select the same calls. A number given without a country code is read as an international one, so give the country code to be sure of what you are matching. Use `number` instead to match part of a number, or either side of the call.
+     * Return only legs placed to this called party number, matched as a whole number rather than as a fragment. Give it in international form: `+16505559876`, `16505559876`, and `0016505559876` all select the same legs. A number given without a country code is read as an international one, so give the country code to be sure of what you are matching. Use `number` instead to match part of a number, or either side of the leg.
      *
      */
     to?: string;
     /**
-     * Return only calls where the calling or called number contains this value. Matches a partial number, so a country or area-code prefix returns every call to or from it. Combines with `from`/`to`, which match one side exactly.
+     * Return only legs where the calling or called number contains this value. Matches a partial number, so a country or area-code prefix returns every leg to or from it. Combines with `from`/`to`, which match one side exactly.
      */
     number?: string;
     /**
@@ -39504,11 +41368,11 @@ export type ListVoiceCallsData = {
      */
     tag?: Array<string>;
     /**
-     * Return only calls that started at or after this instant, inclusive. RFC 3339 timestamp.
+     * Return only legs that started at or after this instant, inclusive. RFC 3339 timestamp.
      */
     started_after?: string;
     /**
-     * Return only calls that started at or before this instant, inclusive. RFC 3339 timestamp.
+     * Return only legs that started at or before this instant, inclusive. RFC 3339 timestamp.
      */
     started_before?: string;
     /**
@@ -39524,10 +41388,10 @@ export type ListVoiceCallsData = {
      */
     ending_before?: string;
   };
-  url: "/v1/voice/calls";
+  url: "/v1/voice/legs";
 };
 
-export type ListVoiceCallsErrors = {
+export type ListVoiceLegsErrors = {
   /**
    * Authentication required
    */
@@ -39551,29 +41415,28 @@ export type ListVoiceCallsErrors = {
   500: Error;
 };
 
-export type ListVoiceCallsError =
-  ListVoiceCallsErrors[keyof ListVoiceCallsErrors];
+export type ListVoiceLegsError = ListVoiceLegsErrors[keyof ListVoiceLegsErrors];
 
-export type ListVoiceCallsResponses = {
+export type ListVoiceLegsResponses = {
   /**
-   * Paginated list of call records.
+   * Paginated list of leg records.
    */
-  200: VoiceCallList;
+  200: VoiceLegList;
 };
 
-export type ListVoiceCallsResponse =
-  ListVoiceCallsResponses[keyof ListVoiceCallsResponses];
+export type ListVoiceLegsResponse =
+  ListVoiceLegsResponses[keyof ListVoiceLegsResponses];
 
-export type GetVoiceCallData = {
+export type GetVoiceLegData = {
   body?: never;
   path: {
-    call_id: VoiceCallId;
+    leg_id: VoiceCallId;
   };
   query?: never;
-  url: "/v1/voice/calls/{call_id}";
+  url: "/v1/voice/legs/{leg_id}";
 };
 
-export type GetVoiceCallErrors = {
+export type GetVoiceLegErrors = {
   /**
    * Authentication required
    */
@@ -39601,14 +41464,14 @@ export type GetVoiceCallErrors = {
   500: Error;
 };
 
-export type GetVoiceCallError = GetVoiceCallErrors[keyof GetVoiceCallErrors];
+export type GetVoiceLegError = GetVoiceLegErrors[keyof GetVoiceLegErrors];
 
-export type GetVoiceCallResponses = {
+export type GetVoiceLegResponses = {
   /**
-   * Call leg with its current status, timing, and routing details.
+   * The leg's current status, timing, and routing details.
    */
-  200: VoiceCall;
+  200: VoiceLeg;
 };
 
-export type GetVoiceCallResponse =
-  GetVoiceCallResponses[keyof GetVoiceCallResponses];
+export type GetVoiceLegResponse =
+  GetVoiceLegResponses[keyof GetVoiceLegResponses];

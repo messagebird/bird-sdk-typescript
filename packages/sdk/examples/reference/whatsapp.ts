@@ -224,6 +224,91 @@ export async function whatsappStatsInboundByPhoneNumber() {
   }
 }
 
+export async function whatsappGroupsCreate() {
+  const group = await bird.whatsapp.groups.create({
+    whatsapp_number_id: "wan_01krdgeqcxet5s7t44vh8rt9mg",
+    subject: "Norwood Fleet — Tuesday route",
+  });
+  console.log(group.id, group.status); // pending; read it back for the invite link
+}
+
+export async function whatsappGroupsList() {
+  for await (const group of bird.whatsapp.groups.list()) {
+    console.log(group.id, group.subject, group.participant_count);
+  }
+}
+
+export async function whatsappGroupsGet() {
+  const group = await bird.whatsapp.groups.get("wag_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(group.status, group.invite_link);
+}
+
+export async function whatsappGroupsUpdate() {
+  const group = await bird.whatsapp.groups.update("wag_01krdgeqcxet5s7t44vh8rt9mg", {
+    subject: "Norwood Fleet — Wednesday route",
+  });
+  console.log(group.last_operation?.status); // pending until WhatsApp reports back
+}
+
+export async function whatsappGroupsDelete() {
+  const group = await bird.whatsapp.groups.delete("wag_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(group.last_operation?.status); // pending until WhatsApp confirms it
+}
+
+export async function whatsappGroupsInviteLinkRotate() {
+  const link = await bird.whatsapp.groups.inviteLink.rotate("wag_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(link.invite_link); // every earlier link has stopped working
+}
+
+export async function whatsappGroupsParticipantsRemove() {
+  const group = await bird.whatsapp.groups.participants.remove(
+    "wag_01krdgeqcxet5s7t44vh8rt9mg",
+    "BR.1566655121691972",
+  );
+  console.log(group.participants?.length);
+}
+
+export async function whatsappGroupsJoinRequestsList() {
+  for await (const request of bird.whatsapp.groups.joinRequests.list(
+    "wag_01krdgeqcxet5s7t44vh8rt9mg",
+  )) {
+    console.log(request.id, request.bsuid);
+  }
+}
+
+export async function whatsappGroupsJoinRequestsApprove() {
+  const result = await bird.whatsapp.groups.joinRequests.approve(
+    "wag_01krdgeqcxet5s7t44vh8rt9mg",
+    { join_request_ids: ["wgj_01krdgeqcxet5s7t44vh8rt9mg"] },
+  );
+  console.log(result.decided.length, result.failed.length);
+}
+
+export async function whatsappGroupsJoinRequestsReject() {
+  const result = await bird.whatsapp.groups.joinRequests.reject(
+    "wag_01krdgeqcxet5s7t44vh8rt9mg",
+    { join_request_ids: ["wgj_01krdgeqcxet5s7t44vh8rt9mg"] },
+  );
+  for (const failure of result.failed) {
+    console.log(failure.join_request_id, failure.error.description);
+  }
+}
+
+export async function whatsappGroupsPinsCreate() {
+  const pin = await bird.whatsapp.groups.pins.create("wag_01krdgeqcxet5s7t44vh8rt9mg", {
+    message_id: "wam_01kya19eknftrs2s6p82asmvnh",
+  });
+  console.log(pin.pinned_until);
+}
+
+export async function whatsappGroupsPinsDelete() {
+  const group = await bird.whatsapp.groups.pins.delete(
+    "wag_01krdgeqcxet5s7t44vh8rt9mg",
+    "wam_01kya19eknftrs2s6p82asmvnh",
+  );
+  console.log(group.pinned_messages?.length);
+}
+
 export async function whatsappKeywordRulesList() {
   const rules = await bird.whatsapp.keywordRules.list({ operation: "opt_out" });
   for (const rule of rules.data ?? []) {
@@ -260,4 +345,35 @@ export async function whatsappKeywordRulesUpdate() {
 export async function whatsappKeywordRulesDelete() {
   // The next rule in the ladder answers the scope, which is another rule of yours if you hold a less specific one; STOP never stops working.
   await bird.whatsapp.keywordRules.delete("wkr_01m2kj8x4te9p0rr7e5w2n1abc");
+}
+
+export async function whatsappSuppressionsList() {
+  // address is a prefix, so a partial value matches every address under it.
+  const suppressions = await bird.whatsapp.suppressions.list({ address: "+1555" });
+  for (const suppression of suppressions.data ?? []) {
+    console.log(suppression.address, suppression.waba ?? "every account");
+  }
+}
+
+export async function whatsappSuppressionsGet() {
+  // Resolves a record that has already ended, which the list leaves out.
+  const suppression = await bird.whatsapp.suppressions.get("was_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(suppression.reason, suppression.ended_at ?? "still in force");
+}
+
+export async function whatsappSuppressionsAdd() {
+  // Omit waba to block the address for the whole workspace, whichever account
+  // sends. With it, your other accounts keep reaching them, and the same
+  // address for two accounts is two records.
+  const suppression = await bird.whatsapp.suppressions.add({
+    address: "+15550001234",
+    waba: "102290129340398",
+  });
+  console.log(suppression.id, suppression.applies_to);
+}
+
+export async function whatsappSuppressionsRemove() {
+  // Only a manual suppression can be ended; a recipient's own opt-out is
+  // theirs to reverse. The record is kept and still reads back by id.
+  await bird.whatsapp.suppressions.remove("was_01krdgeqcxet5s7t44vh8rt9mg");
 }

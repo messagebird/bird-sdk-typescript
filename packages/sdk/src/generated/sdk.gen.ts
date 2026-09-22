@@ -9,6 +9,9 @@ import type {
 } from "./client";
 import { client } from "./client.gen";
 import type {
+  ApproveWhatsAppGroupJoinRequestsData,
+  ApproveWhatsAppGroupJoinRequestsErrors,
+  ApproveWhatsAppGroupJoinRequestsResponses,
   ArchiveContactPropertyData,
   ArchiveContactPropertyErrors,
   ArchiveContactPropertyResponses,
@@ -99,12 +102,21 @@ import type {
   CreateWebhookData,
   CreateWebhookErrors,
   CreateWebhookResponses,
+  CreateWhatsAppGroupData,
+  CreateWhatsAppGroupErrors,
+  CreateWhatsAppGroupPinnedMessageData,
+  CreateWhatsAppGroupPinnedMessageErrors,
+  CreateWhatsAppGroupPinnedMessageResponses,
+  CreateWhatsAppGroupResponses,
   CreateWhatsAppKeywordRuleData,
   CreateWhatsAppKeywordRuleErrors,
   CreateWhatsAppKeywordRuleResponses,
   CreateWhatsAppMessageData,
   CreateWhatsAppMessageErrors,
   CreateWhatsAppMessageResponses,
+  CreateWhatsAppSuppressionData,
+  CreateWhatsAppSuppressionErrors,
+  CreateWhatsAppSuppressionResponses,
   DeleteAudienceData,
   DeleteAudienceErrors,
   DeleteAudienceResponses,
@@ -153,12 +165,24 @@ import type {
   DeleteWebhookData,
   DeleteWebhookErrors,
   DeleteWebhookResponses,
+  DeleteWhatsAppGroupData,
+  DeleteWhatsAppGroupErrors,
+  DeleteWhatsAppGroupParticipantData,
+  DeleteWhatsAppGroupParticipantErrors,
+  DeleteWhatsAppGroupParticipantResponses,
+  DeleteWhatsAppGroupPinnedMessageData,
+  DeleteWhatsAppGroupPinnedMessageErrors,
+  DeleteWhatsAppGroupPinnedMessageResponses,
+  DeleteWhatsAppGroupResponses,
   DeleteWhatsAppKeywordRuleData,
   DeleteWhatsAppKeywordRuleErrors,
   DeleteWhatsAppKeywordRuleResponses,
   DeleteWhatsAppMessageReactionData,
   DeleteWhatsAppMessageReactionErrors,
   DeleteWhatsAppMessageReactionResponses,
+  DeleteWhatsAppSuppressionData,
+  DeleteWhatsAppSuppressionErrors,
+  DeleteWhatsAppSuppressionResponses,
   DisconnectRealtimeAppMemberData,
   DisconnectRealtimeAppMemberErrors,
   DisconnectRealtimeAppMemberResponses,
@@ -393,15 +417,18 @@ import type {
   GetSuppressionData,
   GetSuppressionErrors,
   GetSuppressionResponses,
-  GetVoiceCallData,
-  GetVoiceCallErrors,
-  GetVoiceCallResponses,
+  GetVoiceLegData,
+  GetVoiceLegErrors,
+  GetVoiceLegResponses,
   GetWebhookData,
   GetWebhookErrors,
   GetWebhookResponses,
   GetWhatsAppBusinessAccountData,
   GetWhatsAppBusinessAccountErrors,
   GetWhatsAppBusinessAccountResponses,
+  GetWhatsAppGroupData,
+  GetWhatsAppGroupErrors,
+  GetWhatsAppGroupResponses,
   GetWhatsAppInboundStatsByPhoneNumberData,
   GetWhatsAppInboundStatsByPhoneNumberErrors,
   GetWhatsAppInboundStatsByPhoneNumberResponses,
@@ -455,6 +482,9 @@ import type {
   GetWhatsAppStatsSummaryData,
   GetWhatsAppStatsSummaryErrors,
   GetWhatsAppStatsSummaryResponses,
+  GetWhatsAppSuppressionData,
+  GetWhatsAppSuppressionErrors,
+  GetWhatsAppSuppressionResponses,
   GetWhatsAppTemplateData,
   GetWhatsAppTemplateErrors,
   GetWhatsAppTemplateResponses,
@@ -569,9 +599,9 @@ import type {
   ListSuppressionsData,
   ListSuppressionsErrors,
   ListSuppressionsResponses,
-  ListVoiceCallsData,
-  ListVoiceCallsErrors,
-  ListVoiceCallsResponses,
+  ListVoiceLegsData,
+  ListVoiceLegsErrors,
+  ListVoiceLegsResponses,
   ListWebhookAttemptsData,
   ListWebhookAttemptsErrors,
   ListWebhookAttemptsResponses,
@@ -581,6 +611,12 @@ import type {
   ListWhatsAppBusinessAccountsData,
   ListWhatsAppBusinessAccountsErrors,
   ListWhatsAppBusinessAccountsResponses,
+  ListWhatsAppGroupJoinRequestsData,
+  ListWhatsAppGroupJoinRequestsErrors,
+  ListWhatsAppGroupJoinRequestsResponses,
+  ListWhatsAppGroupsData,
+  ListWhatsAppGroupsErrors,
+  ListWhatsAppGroupsResponses,
   ListWhatsAppKeywordRulesData,
   ListWhatsAppKeywordRulesErrors,
   ListWhatsAppKeywordRulesResponses,
@@ -599,6 +635,9 @@ import type {
   ListWhatsAppNumbersData,
   ListWhatsAppNumbersErrors,
   ListWhatsAppNumbersResponses,
+  ListWhatsAppSuppressionsData,
+  ListWhatsAppSuppressionsErrors,
+  ListWhatsAppSuppressionsResponses,
   ListWhatsAppTemplatesData,
   ListWhatsAppTemplatesErrors,
   ListWhatsAppTemplatesResponses,
@@ -617,6 +656,9 @@ import type {
   PublishRealtimeAppEventData,
   PublishRealtimeAppEventErrors,
   PublishRealtimeAppEventResponses,
+  RejectWhatsAppGroupJoinRequestsData,
+  RejectWhatsAppGroupJoinRequestsErrors,
+  RejectWhatsAppGroupJoinRequestsResponses,
   ReleaseWorkspaceNumberData,
   ReleaseWorkspaceNumberErrors,
   ReleaseWorkspaceNumberResponses,
@@ -635,6 +677,9 @@ import type {
   RotateWebhookSecretData,
   RotateWebhookSecretErrors,
   RotateWebhookSecretResponses,
+  RotateWhatsAppGroupInviteLinkData,
+  RotateWhatsAppGroupInviteLinkErrors,
+  RotateWhatsAppGroupInviteLinkResponses,
   SearchEmailCompetitiveBrandsData,
   SearchEmailCompetitiveBrandsErrors,
   SearchEmailCompetitiveBrandsResponses,
@@ -698,6 +743,9 @@ import type {
   UpdateWebhookData,
   UpdateWebhookErrors,
   UpdateWebhookResponses,
+  UpdateWhatsAppGroupData,
+  UpdateWhatsAppGroupErrors,
+  UpdateWhatsAppGroupResponses,
   UpdateWhatsAppKeywordRuleData,
   UpdateWhatsAppKeywordRuleErrors,
   UpdateWhatsAppKeywordRuleResponses,
@@ -4328,6 +4376,583 @@ export const listWhatsAppMessageReactionEvents = <
   });
 
 /**
+ * List WhatsApp groups
+ *
+ * Returns the WhatsApp groups your workspace created as a cursor-paginated
+ * list, newest first. Each group carries the number that administers it, its
+ * subject, its status, its invite link once WhatsApp has issued one, its
+ * participant count, and its participant list.
+ *
+ * Filter by the business number that administers the groups (`number`), by
+ * the WhatsApp Business Account that number sends under (`waba`),
+ * or by `status`. `q` searches the subject and the description for a
+ * substring, case-insensitively.
+ *
+ * A group stays in the list after it is deleted, with `status` `deleted`, so
+ * filter it out to see only the groups you can still message.
+ *
+ */
+export const listWhatsAppGroups = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWhatsAppGroupsData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppGroupsResponses,
+  ListWhatsAppGroupsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListWhatsAppGroupsResponses,
+    ListWhatsAppGroupsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/groups",
+    ...options,
+  });
+
+/**
+ * Create a WhatsApp group
+ *
+ * Creates a WhatsApp group administered by one of your business numbers. The
+ * number must hold Official Business Account status, which WhatsApp grants a
+ * number whose business is verified and whose display name is approved;
+ * without it the request returns a `412` `WhatsAppGroupsNotEligible`.
+ * `GET /v1/whatsapp/numbers` reports it per number as
+ * `is_official_business_account`, so read it there rather than discovering it
+ * from the refusal. A group
+ * holds 8 people besides your business, and a number can own 10,000 groups;
+ * a number already at that limit returns a `409` `WhatsAppGroupLimitReached`.
+ *
+ * The `202` response is the accepted group, with `status` `pending`. WhatsApp
+ * confirms the group moments later, and that is when it issues the invite link
+ * and the group becomes messageable, so the response carries no
+ * `invite_link`. Read the group back until its `status` is `active`. If WhatsApp refuses, the
+ * group ends at `failed` with `last_operation.last_error` set, and creating
+ * another group is the way forward.
+ *
+ * Nobody is added at create time, and there is no way to add someone later:
+ * people join by opening the group's invite link. Send the link with the group
+ * invite template, and choose at create time whether opening it joins the
+ * group outright or raises a join request you approve.
+ *
+ */
+export const createWhatsAppGroup = <ThrowOnError extends boolean = false>(
+  options: Options<CreateWhatsAppGroupData, ThrowOnError>,
+): RequestResult<
+  CreateWhatsAppGroupResponses,
+  CreateWhatsAppGroupErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateWhatsAppGroupResponses,
+    CreateWhatsAppGroupErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/groups",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a WhatsApp group
+ *
+ * Deletes the group at WhatsApp. Every participant loses access, your business
+ * included, and the invite link stops working. This cannot be undone. To run
+ * the conversation again, create a new group and send its link.
+ *
+ * The `202` response is the accepted deletion. The group is readable
+ * afterwards with `status` `deleted`, so a stored reference to it still
+ * resolves rather than turning into a `404`.
+ *
+ * A `failed` group can be deleted too, and that one does not reach WhatsApp:
+ * the create never produced a group there, so the row is Bird's own
+ * bookkeeping and clearing it reaches no external system. It answers `202`
+ * like any other delete, and the row stays readable at `deleted` rather than
+ * leaving the list. Every other
+ * status refuses with a `409` `WhatsAppGroupNotActive`: a `deleted` group is
+ * already gone, a `suspended` one is WhatsApp's to release, and a `pending`
+ * one has an outcome still coming, which is why a create that never confirms
+ * is given up on and moved to `failed` rather than left pending.
+ *
+ */
+export const deleteWhatsAppGroup = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteWhatsAppGroupData, ThrowOnError>,
+): RequestResult<
+  DeleteWhatsAppGroupResponses,
+  DeleteWhatsAppGroupErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteWhatsAppGroupResponses,
+    DeleteWhatsAppGroupErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/groups/{group_id}",
+    ...options,
+  });
+
+/**
+ * Get a WhatsApp group
+ *
+ * Returns one group as it currently stands, including who is in it. The business
+ * number that administers the group is not counted among the participants.
+ *
+ * Read the group back after creating it to watch `status` move from `pending`
+ * to `active`, which is when WhatsApp has issued the `invite_link`. A
+ * `suspended` group is one WhatsApp has stopped activity in; a `deleted` one is
+ * kept here so a reference to it still resolves.
+ *
+ */
+export const getWhatsAppGroup = <ThrowOnError extends boolean = false>(
+  options: Options<GetWhatsAppGroupData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppGroupResponses,
+  GetWhatsAppGroupErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWhatsAppGroupResponses,
+    GetWhatsAppGroupErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/groups/{group_id}",
+    ...options,
+  });
+
+/**
+ * Update a WhatsApp group
+ *
+ * Changes what participants see at the top of the group: its subject, its
+ * description, and its picture. Fields you omit are left as they are; send
+ * `null` to clear the description. A `null` picture clears the one Bird
+ * stores, but WhatsApp offers no way to take a group's photo down, so
+ * participants keep seeing the current one until a new picture replaces it.
+ *
+ * WhatsApp applies each field separately, so a change can be part-applied:
+ * one field refused while the others take effect. The `202` response is the
+ * change accepted, not applied: it echoes the group as Bird holds it, with
+ * `last_operation` at `pending`. WhatsApp reports the outcome on the
+ * `group_settings_update` webhook, which settles `last_operation` to `success`
+ * or `failed` and fills its `results` with one entry per field, so a part-apply
+ * says which field was refused and why. Re-read the group to see what took
+ * effect.
+ *
+ * Two `409`s guard this, and `status` is checked first: a group that is not
+ * `active` returns `WhatsAppGroupNotActive`, whatever its `last_operation` says.
+ * That matters for a group still being created, which is `pending` on both counts
+ * at once, and the group-level answer is the more useful one, since no change can
+ * land until it exists. Once the group is `active`, a change already outstanding
+ * returns `WhatsAppGroupUpdateInProgress` while `last_operation.status` is
+ * `pending`.
+ *
+ * The picture names a file in your workspace's media library, and WhatsApp
+ * takes only a square JPEG. `join_approval_mode` and the administering number
+ * are fixed when the group is created and cannot be changed here.
+ *
+ */
+export const updateWhatsAppGroup = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateWhatsAppGroupData, ThrowOnError>,
+): RequestResult<
+  UpdateWhatsAppGroupResponses,
+  UpdateWhatsAppGroupErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateWhatsAppGroupResponses,
+    UpdateWhatsAppGroupErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/groups/{group_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Rotate a WhatsApp group's invite link
+ *
+ * Issues a new invite link for the group. Every link issued before stops
+ * working, so anyone still holding one cannot join. Rotate the link when a
+ * link has spread further than you intended, or after removing someone you do
+ * not want back.
+ *
+ * Rotating is not how you read the current link: the group carries its
+ * `invite_link`, so
+ * `GET /v1/whatsapp/groups/{group_id}` is the read.
+ * Only an `active` group has a link to rotate; any other status returns a `409`
+ * `WhatsAppGroupNotActive`.
+ *
+ * Like pinning and unpinning, this answers `200` rather than `202`.
+ * WhatsApp issues the new link in its own reply and sends no webhook for a
+ * rotation, so the link in the response is the rotation itself having
+ * happened, not an acknowledgement that it will.
+ *
+ */
+export const rotateWhatsAppGroupInviteLink = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<RotateWhatsAppGroupInviteLinkData, ThrowOnError>,
+): RequestResult<
+  RotateWhatsAppGroupInviteLinkResponses,
+  RotateWhatsAppGroupInviteLinkErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RotateWhatsAppGroupInviteLinkResponses,
+    RotateWhatsAppGroupInviteLinkErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/groups/{group_id}/invite-link/rotate",
+    ...options,
+  });
+
+/**
+ * Remove a participant from a WhatsApp group
+ *
+ * Removes one person from the group. Name them by either identifier the
+ * group's `participants` list them under: `bsuid`, which everyone has, or
+ * `phone_number`, which is there only when WhatsApp shares it.
+ *
+ * **Removal cannot be undone.** WhatsApp blocks a removed person from joining
+ * the group by invite link, and the block follows the person rather than the
+ * link they were removed under: rotating the invite link does not let them
+ * back in. There is no add operation to pair with this one either, because
+ * WhatsApp lets nobody be added directly and people join only by opening the
+ * link. So nothing returns someone to this group once they are out, and
+ * reaching them again means creating another group and inviting them to it.
+ *
+ * The `202` response is the removal accepted, not applied: WhatsApp can still
+ * refuse it, which arrives on the `group_participants_update` webhook. The
+ * outcome lands on that participant's own `last_operation`, `pending` until the
+ * webhook settles it, so removing several people at once gives each their own
+ * state and their own failure rather than one shared verdict. Re-read the group
+ * to see who is left.
+ *
+ * A second removal of the same participant while theirs is `pending` returns a
+ * `409` `WhatsAppGroupUpdateInProgress`; removing a different participant does
+ * not. Only an `active` group can be changed; any other status returns a `409`
+ * `WhatsAppGroupNotActive`.
+ *
+ */
+export const deleteWhatsAppGroupParticipant = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<DeleteWhatsAppGroupParticipantData, ThrowOnError>,
+): RequestResult<
+  DeleteWhatsAppGroupParticipantResponses,
+  DeleteWhatsAppGroupParticipantErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteWhatsAppGroupParticipantResponses,
+    DeleteWhatsAppGroupParticipantErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/groups/{group_id}/participants/{participant_ref}",
+    ...options,
+  });
+
+/**
+ * Pin a message in a WhatsApp group
+ *
+ * Pins one of the group's messages at the top of its chat, where it stays for
+ * the number of days you give, from 1 to 30. Pin the message a conversation
+ * keeps coming back to, so a participant joining later does not have to
+ * scroll for it.
+ *
+ * The message has to be one this group carries: a message in another group, or
+ * a one-to-one message, returns a `422` `WhatsAppMessageNotInGroup`. A
+ * `message_id` naming no message the workspace still holds returns a `404`
+ * instead, which is also what an id older than the 30 days messages stay
+ * readable for gets. Only an
+ * `active` group can be changed; any other status returns a `409`
+ * `WhatsAppGroupNotActive`.
+ *
+ * A group holds 3 pinned messages at once, and pinning a fourth unpins the
+ * oldest rather than failing. Pinning an already-pinned message replaces its
+ * expiry. What the group currently pins is on the group itself, as
+ * `pinned_messages`.
+ *
+ * WhatsApp confirms a pin in its reply rather than on a webhook, so the
+ * response is the applied pin and the entry appears in the group's
+ * `pinned_messages` straight away. Nothing about a pin is left in flight, so a
+ * pin never blocks the next pin or unpin.
+ *
+ */
+export const createWhatsAppGroupPinnedMessage = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateWhatsAppGroupPinnedMessageData, ThrowOnError>,
+): RequestResult<
+  CreateWhatsAppGroupPinnedMessageResponses,
+  CreateWhatsAppGroupPinnedMessageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateWhatsAppGroupPinnedMessageResponses,
+    CreateWhatsAppGroupPinnedMessageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/groups/{group_id}/pinned-messages",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Unpin a message in a WhatsApp group
+ *
+ * Takes the message off the top of the group's chat before its pin would have
+ * expired. WhatsApp unpins a message on its own once the days you gave have
+ * passed, so unpin only to take one down early.
+ *
+ * The message has to be one this group carries: a message in another group, or
+ * a one-to-one message, returns a `422` `WhatsAppMessageNotInGroup`. Past the
+ * 30 days messages stay readable for, that check can no longer run, so a
+ * message holding no pin answers `200` whichever group it belonged to. Only an
+ * `active` group can be changed; any other status returns a `409`
+ * `WhatsAppGroupNotActive`.
+ *
+ * Unpinning a message this group carries that is not currently pinned changes
+ * nothing and still answers `200`, so a repeated call is safe. WhatsApp
+ * confirms a successful unpin in its reply rather than on a webhook, so the
+ * entry is gone from `pinned_messages` by the time the response returns.
+ *
+ */
+export const deleteWhatsAppGroupPinnedMessage = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<DeleteWhatsAppGroupPinnedMessageData, ThrowOnError>,
+): RequestResult<
+  DeleteWhatsAppGroupPinnedMessageResponses,
+  DeleteWhatsAppGroupPinnedMessageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteWhatsAppGroupPinnedMessageResponses,
+    DeleteWhatsAppGroupPinnedMessageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/groups/{group_id}/pinned-messages/{message_id}",
+    ...options,
+  });
+
+/**
+ * List a WhatsApp group's join requests
+ *
+ * Returns the join requests still waiting for a decision, oldest first. Each
+ * carries the person who asked and when they asked.
+ *
+ * Only a group created with `join_approval_mode` `approval_required` collects
+ * join requests; on any other group the list is empty. A request leaves the
+ * list once you decide it, and also when the person cancels it themselves.
+ *
+ * Decide requests with
+ * `POST /v1/whatsapp/groups/{group_id}/join-requests/batch-approve`
+ * or
+ * `POST /v1/whatsapp/groups/{group_id}/join-requests/batch-reject`.
+ *
+ */
+export const listWhatsAppGroupJoinRequests = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListWhatsAppGroupJoinRequestsData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppGroupJoinRequestsResponses,
+  ListWhatsAppGroupJoinRequestsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListWhatsAppGroupJoinRequestsResponses,
+    ListWhatsAppGroupJoinRequestsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/groups/{group_id}/join-requests",
+    ...options,
+  });
+
+/**
+ * Approve WhatsApp group join requests
+ *
+ * Approves the named join requests, up to 50 in one call.
+ *
+ * WhatsApp decides each request on its own, so the batch can be part-applied:
+ * the response lists the ones it accepted in `decided` and the rest in
+ * `failed` with the reason each was refused. A refusal is usually a person
+ * who has not accepted WhatsApp's current terms, which no retry fixes.
+ *
+ * Each person approved can enter the group through its invite link. Re-read the
+ * group to see who has arrived.
+ *
+ * A group holds 8 participants besides your business. Approving more than the
+ * group has room for does not refuse the call: the requests that fit are
+ * decided and the rest come back in `failed`, each saying the approval would
+ * take the group past its participant limit. A group that is not `active`
+ * does refuse the whole call, with a `409` `WhatsAppGroupNotActive`.
+ *
+ */
+export const approveWhatsAppGroupJoinRequests = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ApproveWhatsAppGroupJoinRequestsData, ThrowOnError>,
+): RequestResult<
+  ApproveWhatsAppGroupJoinRequestsResponses,
+  ApproveWhatsAppGroupJoinRequestsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    ApproveWhatsAppGroupJoinRequestsResponses,
+    ApproveWhatsAppGroupJoinRequestsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/groups/{group_id}/join-requests/batch-approve",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Reject WhatsApp group join requests
+ *
+ * Rejects the named join requests, up to 50 in one call.
+ *
+ * WhatsApp decides each request on its own, so the batch can be part-applied:
+ * the response lists the ones it accepted in `decided` and the rest in
+ * `failed` with the reason each was refused. A refusal is usually a person
+ * who has not accepted WhatsApp's current terms, which no retry fixes.
+ *
+ * A group that is not `active` refuses the whole call, with a `409`
+ * `WhatsAppGroupNotActive`, rather than returning per-request failures.
+ *
+ * Each person rejected sees the option to ask again the next time they open the invite link, so a rejection is not a ban. Remove someone through the participants operation if they should not be able to come back.
+ *
+ */
+export const rejectWhatsAppGroupJoinRequests = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<RejectWhatsAppGroupJoinRequestsData, ThrowOnError>,
+): RequestResult<
+  RejectWhatsAppGroupJoinRequestsResponses,
+  RejectWhatsAppGroupJoinRequestsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RejectWhatsAppGroupJoinRequestsResponses,
+    RejectWhatsAppGroupJoinRequestsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/groups/{group_id}/join-requests/batch-reject",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * List available message templates
  *
  * Returns the WhatsApp message templates available to your workspace: both the workspace's own templates (`scope: workspace`) and our built-in, Meta-approved templates (`scope: system`); filter to one tier with `scope`. Each entry carries the template's `slug` (the handle you reference when sending), its aggregated `status`, and the languages a send can currently resolve. It also summarizes where every language stands at Meta, so a list page can show an accurate row without another request. Content is not here: it lives under [a version](/docs/api/reference/get-whatsapp-template-version). The list is cursor-paginated. With no `scope`, the workspace's own templates come first, newest first, followed by our built-in templates.
@@ -5210,6 +5835,130 @@ export const getWhatsAppBusinessAccount = <
       },
     ],
     url: "/v1/whatsapp/business-accounts/{business_account_ref}",
+    ...options,
+  });
+
+/**
+ * List WhatsApp suppressions
+ *
+ * Returns a paginated list of the WhatsApp addresses the workspace is currently suppressing. Records that have ended are left out; fetch one by ID to read it. Use the address parameter for prefix lookup.
+ *
+ */
+export const listWhatsAppSuppressions = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWhatsAppSuppressionsData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppSuppressionsResponses,
+  ListWhatsAppSuppressionsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListWhatsAppSuppressionsResponses,
+    ListWhatsAppSuppressionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/suppressions",
+    ...options,
+  });
+
+/**
+ * Create a WhatsApp suppression
+ *
+ * Manually adds a WhatsApp address to the suppression list with reason `manual`. If the address is already suppressed, the API returns `200` with the existing record.
+ *
+ */
+export const createWhatsAppSuppression = <ThrowOnError extends boolean = false>(
+  options: Options<CreateWhatsAppSuppressionData, ThrowOnError>,
+): RequestResult<
+  CreateWhatsAppSuppressionResponses,
+  CreateWhatsAppSuppressionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateWhatsAppSuppressionResponses,
+    CreateWhatsAppSuppressionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/suppressions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * End a WhatsApp suppression
+ *
+ * Ends the suppression, so the address can be messaged again. The record itself is kept and stays readable by ID, reporting when it ended. Dropping it from the list does not destroy the history of what was suppressed when. Only suppressions you added yourself, which carry reason `manual`, can be ended: a recipient's own opt-out is theirs to reverse, and attempts to end one return `422`. Calling this again on a suppression that has already ended succeeds and changes nothing; an ID that does not exist still returns 404. To end one by address, first look up the ID with [List WhatsApp suppressions](/docs/api/reference/list-whatsapp-suppressions).
+ *
+ */
+export const deleteWhatsAppSuppression = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteWhatsAppSuppressionData, ThrowOnError>,
+): RequestResult<
+  DeleteWhatsAppSuppressionResponses,
+  DeleteWhatsAppSuppressionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteWhatsAppSuppressionResponses,
+    DeleteWhatsAppSuppressionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/suppressions/{suppression_id}",
+    ...options,
+  });
+
+/**
+ * Get a WhatsApp suppression
+ *
+ * Returns the suppression record for the given ID, including one that has already ended. An ended record keeps its dates and reports when and how it ended.
+ *
+ */
+export const getWhatsAppSuppression = <ThrowOnError extends boolean = false>(
+  options: Options<GetWhatsAppSuppressionData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppSuppressionResponses,
+  GetWhatsAppSuppressionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWhatsAppSuppressionResponses,
+    GetWhatsAppSuppressionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/suppressions/{suppression_id}",
     ...options,
   });
 
@@ -9035,28 +9784,28 @@ export const getWorkspaceNumber = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * List calls
+ * List legs
  *
- * Returns a paginated list of the workspace's calls, ordered by start time
+ * Returns a paginated list of the workspace's legs, ordered by start time
  * descending.
  *
  * The `status` filter selects where in the lifecycle you look, and any
  * combination is a single page: in-flight statuses (`ringing`,
  * `in_progress`), final ones, or both together. Omit it and you get
- * completed calls, which is what this list has always returned.
+ * completed legs, which is what this list has always returned.
  *
- * A call in flight carries no economics yet: `duration_ms`, `billable_ms`,
+ * A leg in flight carries no economics yet: `duration_ms`, `billable_ms`,
  * `ended_at`, and `cost` are null until it ends. It keeps the same `id`
- * throughout, so the same call answers under one identity from the first
+ * throughout, so the same leg answers under one identity from the first
  * ring to settlement.
  *
  */
-export const listVoiceCalls = <ThrowOnError extends boolean = false>(
-  options?: Options<ListVoiceCallsData, ThrowOnError>,
-): RequestResult<ListVoiceCallsResponses, ListVoiceCallsErrors, ThrowOnError> =>
+export const listVoiceLegs = <ThrowOnError extends boolean = false>(
+  options?: Options<ListVoiceLegsData, ThrowOnError>,
+): RequestResult<ListVoiceLegsResponses, ListVoiceLegsErrors, ThrowOnError> =>
   (options?.client ?? client).get<
-    ListVoiceCallsResponses,
-    ListVoiceCallsErrors,
+    ListVoiceLegsResponses,
+    ListVoiceLegsErrors,
     ThrowOnError
   >({
     querySerializer: { parameters: { status: { array: { explode: false } } } },
@@ -9068,22 +9817,22 @@ export const listVoiceCalls = <ThrowOnError extends boolean = false>(
         type: "apiKey",
       },
     ],
-    url: "/v1/voice/calls",
+    url: "/v1/voice/legs",
     ...options,
   });
 
 /**
- * Get a call
+ * Get a leg
  *
- * Returns a single call at any point in its lifecycle. A call that is still ringing or connected answers with its in-flight `status` and no economics: `duration_ms`, `billable_ms`, `ended_at`, and `cost` fill in once it ends, at this same URL. Returns a 404 `not_found_error` if the call does not exist in the workspace.
+ * Returns a single leg at any point in its lifecycle. A leg that is still ringing or connected answers with its in-flight `status` and no economics: `duration_ms`, `billable_ms`, `ended_at`, and `cost` fill in once it ends, at this same URL. Returns a 404 `not_found_error` if the leg does not exist in the workspace.
  *
  */
-export const getVoiceCall = <ThrowOnError extends boolean = false>(
-  options: Options<GetVoiceCallData, ThrowOnError>,
-): RequestResult<GetVoiceCallResponses, GetVoiceCallErrors, ThrowOnError> =>
+export const getVoiceLeg = <ThrowOnError extends boolean = false>(
+  options: Options<GetVoiceLegData, ThrowOnError>,
+): RequestResult<GetVoiceLegResponses, GetVoiceLegErrors, ThrowOnError> =>
   (options.client ?? client).get<
-    GetVoiceCallResponses,
-    GetVoiceCallErrors,
+    GetVoiceLegResponses,
+    GetVoiceLegErrors,
     ThrowOnError
   >({
     security: [
@@ -9094,6 +9843,6 @@ export const getVoiceCall = <ThrowOnError extends boolean = false>(
         type: "apiKey",
       },
     ],
-    url: "/v1/voice/calls/{call_id}",
+    url: "/v1/voice/legs/{leg_id}",
     ...options,
   });

@@ -2818,12 +2818,24 @@ export const EmailBroadcastTemplateSchema = {
   additionalProperties: false,
   required: ["id"],
   description:
-    "The template a broadcast sends, and the exact version of it the broadcast is fixed to. The template cannot be one that requires every send to name a language, because a broadcast never names one, so a template that insists on it has nothing to work with.\n",
+    "The template a broadcast sends, the exact version of it the broadcast is fixed to, and which of that version's languages goes out.\n",
   properties: {
     id: {
       $ref: "#/components/schemas/EmailTemplateID",
       description:
         "Which template the broadcast sends. Which version of it the send is fixed to is `version_id`.\n",
+    },
+    language: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The BCP-47 language tag selected for the whole audience, such as `en` or `pt-BR`. `null` means no language is selected, so the broadcast uses the published version's default language, unless the template has `language_source_required` set. Send `template.language` in an update to change or clear the selection.\n",
     },
     version_id: {
       oneOf: [
@@ -2883,7 +2895,7 @@ export const EmailBroadcastSchema = {
         },
       ],
       description:
-        "The template this broadcast sends. A broadcast sends the template's published version, and the exact version is fixed when the broadcast is prepared for sending, so publishing a new version afterwards does not change what this broadcast sends. Null on a draft that has not chosen a template yet.",
+        "The template this broadcast sends, and the language it sends in. A broadcast sends the template's published version, and the exact version is fixed when the broadcast is prepared for sending, so publishing a new version afterwards does not change what this broadcast sends. Null on a draft that has not chosen a template yet.",
     },
     html_bytes: {
       type: "integer",
@@ -2892,7 +2904,7 @@ export const EmailBroadcastSchema = {
       format: "int64",
       example: 18432,
       description:
-        "Size of the HTML body this broadcast sends, in bytes, or 0 when its content has no HTML part. Measured on the template version the broadcast sends, so this is the real body we send and differs per recipient only by that recipient's own merge values. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending or canceling one returns, none of which measure the content. Absent too when the broadcast has no template or its content can no longer be read.\n",
+        "Size of the HTML body this broadcast sends, in bytes, or 0 when its content has no HTML part. Measured on the template version the broadcast sends, using the selected language. Recipient merge values can change its size. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending or canceling one returns, none of which measure the content. Absent too when the broadcast has no template or its content can no longer be read.\n",
     },
     text_bytes: {
       type: "integer",
@@ -2967,7 +2979,7 @@ export const EmailBroadcastSchema = {
       ],
       example: null,
       description:
-        "Why the broadcast failed. Set when `status` is `failed`, and `null` the rest of the time.\n\n- `empty_audience`: There was nobody to send to. Either the audience has no members, or every address in it is suppressed.\n- `audience_unavailable`: The audience no longer exists, so there was nothing to resolve.\n- `content_invalid`: The broadcast could not be set up to send. `failure_detail` says exactly what was wrong. It is one of these:\n  - The broadcast has no template, or its template has been deleted.\n  - The template has no published version, or no sendable content.\n  - The template uses a loop that a broadcast cannot fill.\n  - The template requires every send to name a language.\n  - The sending domain is no longer verified.\n  - The IP pool has nothing to send from.\n  - The message could not be handed off for delivery.\n- `insufficient_funds`: There was not enough in the workspace balance to pay for the send.\n- `quota_exceeded`: The send would have gone past your organization's daily or monthly email allowance, whichever runs out first. This can happen when the broadcast is being prepared, or partway through sending if the remaining recipients no longer fit. `failure_detail` gives you the count and the limit.\n- `internal_error`: Something went wrong on our side. Retry, and open a support ticket if it keeps happening.\n",
+        "Why the broadcast failed. Set when `status` is `failed`, and `null` the rest of the time.\n\n- `empty_audience`: There was nobody to send to. Either the audience has no members, or every address in it is suppressed.\n- `audience_unavailable`: The audience no longer exists, so there was nothing to resolve.\n- `content_invalid`: The broadcast could not be set up to send. `failure_detail` explains what went wrong. It is one of these:\n  - The broadcast has no template, or the template it uses no longer exists. Choose an existing template and send the broadcast again.\n  - The template has no published version, or its published version has no subject and no body. Publish the template, or add content and publish it.\n  - The template uses a loop or reads a value that a broadcast cannot provide. Remove it, or use a contact property instead, then publish the template again.\n  - The template requires a language, but the broadcast has not selected one. Set `template.language` to one of the template's languages and send the broadcast again.\n  - The selected language is not available on the published template version. Choose one of that version's languages, or publish a version that includes the selected language.\n  - The sending domain is no longer verified. Verify the domain again.\n  - The configured IP pool has no usable IP address.\n  - We could not hand the prepared message to the delivery system. This is a problem on our side.\n- `insufficient_funds`: There was not enough in the workspace balance to pay for the send.\n- `quota_exceeded`: The send would have gone past your organization's daily or monthly email allowance, whichever runs out first. This can happen when the broadcast is being prepared, or partway through sending if the remaining recipients no longer fit. `failure_detail` gives you the count and the limit.\n- `internal_error`: Something went wrong on our side. Retry, and open a support ticket if it keeps happening.\n",
     },
     failure_detail: {
       type: ["string", "null"],
@@ -3174,6 +3186,30 @@ export const EmailBroadcastListSchema = {
   ],
 } as const;
 
+export const EmailBroadcastTemplateCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id"],
+  description:
+    "The template a new broadcast sends, and which of that template's languages goes out.\n",
+  properties: {
+    id: {
+      $ref: "#/components/schemas/EmailTemplateID",
+      description:
+        "Which template the broadcast sends. The version it is fixed to is chosen when the broadcast is prepared for sending, and you read it back as `template.version_id`.\n",
+    },
+    language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+      ],
+      description:
+        "The BCP-47 language tag that goes to the whole audience, such as `en` or `pt-BR`. It must be an exact match for a language on the template's published version, so `fr-CA` does not select `fr`. If you leave it out, the broadcast uses the version's default language, unless the template has `language_source_required` set, in which case sending fails until you select a language. Send `template.language` in an update to change or clear it later.\n",
+    },
+  },
+} as const;
+
 export const EmailBroadcastCreateRequestSchema = {
   type: "object",
   additionalProperties: false,
@@ -3191,9 +3227,9 @@ export const EmailBroadcastCreateRequestSchema = {
         "The audience this broadcast sends to. We take the audience's contacts as they stand when the send starts and drop any suppressed addresses, and what is left is who gets the email.",
     },
     template: {
-      $ref: "#/components/schemas/EmailBroadcastTemplate",
+      $ref: "#/components/schemas/EmailBroadcastTemplateCreate",
       description:
-        "The template the broadcast sends. You can leave it out on a draft, but a broadcast cannot send without one. The template's published version is fixed when the broadcast is prepared for sending, and each recipient's contact properties are filled into the content as the email goes out.",
+        "The template the broadcast sends, and the language to send it in. You can leave it out on a draft, but a broadcast cannot send without one. The template's published version is fixed when the broadcast is prepared for sending, and each recipient's contact properties are filled into the content as the email goes out.",
     },
     reply_to: {
       type: "array",
@@ -3271,6 +3307,7 @@ export const EmailBroadcastCreateRequestSchema = {
     audience_id: "adn_01krdgeqcxet5s7t44vh8rt9mg",
     template: {
       id: "emt_01krdgeqcxet5s7t44vh8rt9mg",
+      language: "nl",
     },
     category: "marketing",
     tags: [
@@ -3281,6 +3318,36 @@ export const EmailBroadcastCreateRequestSchema = {
     ],
     metadata: {
       campaign_id: "12345",
+    },
+  },
+} as const;
+
+export const EmailBroadcastTemplateUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A change to the template a broadcast sends, the language it sends in, or both. Each property is independent: what you leave out keeps the value the broadcast already had.\n",
+  properties: {
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateID",
+        },
+      ],
+      description:
+        "Move the broadcast to this template. Sending an `id` releases the version the broadcast was fixed to, so the next send fixes on the template's published version at that point; repeating the `id` the broadcast already has does the same thing, which is how you take a newly published version, and keeps the language already selected. Leave it out to keep the template and the version it is fixed to, and send a `language` on its own to change only the language. To take the template off a draft, set `template` itself to null.\n",
+    },
+    language: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The BCP-47 language tag that goes to the whole audience, such as `en` or `pt-BR`. It must be an exact match for a language on the template's published version, so `fr-CA` does not select `fr`. Leave it out to keep the language already selected. If you change the template `id` in the same request, the old language is cleared with the old template. Set this to `null` to use the published version's default language, unless the template has `language_source_required` set.\n",
     },
   },
 } as const;
@@ -3304,14 +3371,14 @@ export const EmailBroadcastUpdateRequestSchema = {
     template: {
       oneOf: [
         {
-          $ref: "#/components/schemas/EmailBroadcastTemplate",
+          $ref: "#/components/schemas/EmailBroadcastTemplateUpdate",
         },
         {
           type: "null",
         },
       ],
       description:
-        "The template the broadcast sends. Its published version is fixed when the broadcast is prepared for sending. Set this to null to take the template off a draft, or leave it out to keep the one already set.",
+        "The template the broadcast sends, and the language to send it in, each changeable on its own. Set this to null to take the template and its language off a draft, or leave it out to keep the template, language and fixed version already set.\n",
     },
     reply_to: {
       type: ["array", "null"],
@@ -3372,7 +3439,7 @@ export const EmailBroadcastUpdateRequestSchema = {
   example: {
     category: "marketing",
     template: {
-      id: "emt_01krdgeqcxet5s7t44vh8rt9mg",
+      language: "nl",
     },
   },
 } as const;
@@ -12585,11 +12652,695 @@ export const WhatsAppReactionEventListSchema = {
   ],
 } as const;
 
+export const WhatsAppGroupSortFieldSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Sortable fields for a WhatsApp group list.",
+} as const;
+
+export const WhatsAppGroupStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["pending", "active", "suspended", "deleted", "failed"],
+  description:
+    "Where the group stands. Values, in lifecycle order:\n\n- `pending` means the request to create the group has been accepted and WhatsApp has not confirmed it yet. The group has no invite link, and it cannot be messaged or changed.\n- `active` means the group exists at WhatsApp and carries an invite link. Only an active group can be messaged.\n- `suspended` means WhatsApp has stopped activity in the group, which it does when a group breaks its policies. Sends fail while it lasts, and WhatsApp can lift it on its own.\n- `deleted` means the group is gone, either because you deleted it or because WhatsApp removed it. Every participant lost access, and the state is terminal.\n- `failed` means WhatsApp refused to create the group; `last_operation.last_error` says why. The state is terminal, so create another group rather than retrying this one.\n",
+  example: "active",
+} as const;
+
 export const WhatsAppNumberIDSchema = {
   type: "string",
   minLength: 1,
   pattern: "^wan_[0-9a-hjkmnp-tv-z]{26}$",
   example: "wan_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppGroupJoinApprovalModeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["auto_approve", "approval_required"],
+  description:
+    "How someone opening the invite link gets in:\n\n- `auto_approve` means they join the moment they open the link. This is the default when the group is created.\n- `approval_required` means opening the link raises a join request you approve or reject.\n\nFixed when the group is created.\n",
+  example: "auto_approve",
+} as const;
+
+export const WhatsAppGroupOperationTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["create", "settings_update", "delete", "remove"],
+  description:
+    "What was asked of the thing carrying the operation:\n\n- `create` and `delete` act on the group itself.\n- `settings_update` changes the group's subject, description or picture.\n- `remove` takes one participant out of the group.\n",
+  example: "settings_update",
+} as const;
+
+export const WhatsAppGroupOperationStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["pending", "success", "failed"],
+  description:
+    "How the operation ended:\n\n- `pending` means WhatsApp accepted the request and has not reported back. Another\n  operation on the same thing is refused while this lasts.\n- `success` means WhatsApp applied everything asked of it. A change whose success\n  removes its own carrier is never seen in this state: a removed participant and an\n  unpinned message leave their lists, and the entry going away is the confirmation.\n- `failed` means WhatsApp applied none of it, or only part: `last_error` says why,\n  and on a `settings_update` the per-field `results` say which fields did apply.\n",
+  example: "pending",
+} as const;
+
+export const WhatsAppGroupOperationFieldSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["subject", "description", "profile_picture_url"],
+  description:
+    "Which of the group's settings a `settings_update` result reports on.",
+  example: "subject",
+} as const;
+
+export const WhatsAppGroupErrorSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["description"],
+  description:
+    "Why a change to a group did not take effect. Meta documents no code vocabulary for a group refusal, since every sample payload carries an undocumented `code` beside its message, so this relays what it said rather than classifying it, the way a template submission failure does.\n",
+  properties: {
+    description: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "WhatsApp's own explanation of the refusal, passed through. Show it to the person who asked for the change; never match on its text. Carries Bird's own words instead when the failure was Bird's verdict, such as a confirmation that never arrived.\n",
+      example: "Group subject contains content that cannot be used.",
+    },
+    meta_error_code: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "WhatsApp's most specific code for the refusal: its error subcode where it sent one, otherwise its top-level code. Treat it as an opaque string. Null when the failure was Bird's own verdict rather than a WhatsApp refusal.\n",
+      example: "2388024",
+    },
+  },
+} as const;
+
+export const WhatsAppGroupOperationResultSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["field", "applied"],
+  description:
+    "What became of one field in a `settings_update`. WhatsApp applies each field separately, so a single update can leave some applied and others refused.\n",
+  properties: {
+    field: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppGroupOperationField",
+        },
+      ],
+      readOnly: true,
+      description: "The setting this result reports on.",
+    },
+    applied: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether WhatsApp applied this field. False when it refused this one, whatever it did with the others.",
+      example: false,
+    },
+    error: {
+      $ref: "#/components/schemas/WhatsAppGroupError",
+      readOnly: true,
+      description:
+        "Why WhatsApp refused this field. Present only when `applied` is false.",
+    },
+  },
+} as const;
+
+export const WhatsAppGroupOperationSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["type", "status", "requested_at"],
+  description:
+    "The last change asked of this group or participant, and where it got to. WhatsApp confirms a change on a webhook rather than in its reply, so an operation is `pending` until that arrives. While it is, another change to the same thing is refused with a `409` `WhatsAppGroupUpdateInProgress`; a change to a different participant is not, so several removals can be in flight at once. Absent on something nothing has been asked of yet.\n",
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppGroupOperationType",
+        },
+      ],
+      readOnly: true,
+      description: "What was asked.",
+    },
+    status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppGroupOperationStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Where it got to. `pending` is what a client shows as in-progress, and what refuses the next change.",
+    },
+    requested_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When Bird accepted the request.",
+      example: "2026-08-27T14:02:11Z",
+    },
+    settled_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description: "When WhatsApp reported the outcome. Null while `pending`.",
+      example: "2026-08-27T14:02:14Z",
+    },
+    results: {
+      type: "array",
+      readOnly: true,
+      maxItems: 3,
+      description:
+        "Per-field outcomes, on a `settings_update` that has settled. One entry per field the update carried, so a client can put a refusal next to the input it came from. Absent on every other operation type, which change one thing and report it on `status`.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppGroupOperationResult",
+      },
+    },
+    last_error: {
+      $ref: "#/components/schemas/WhatsAppGroupError",
+      readOnly: true,
+      description:
+        "Why the operation failed as a whole. Present when `status` is `failed`, including when the confirmation never arrived and Bird gave up waiting. A `settings_update` that failed on some fields and not others carries the per-field detail in `results`.\n",
+    },
+  },
+} as const;
+
+export const WhatsAppGroupParticipantSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["bsuid"],
+  description:
+    "Someone who joined the group. The business number that created the group is its admin and is not listed.",
+  properties: {
+    bsuid: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Business-scoped user ID, Meta's identifier for this person against your business. The one identifier every participant has: WhatsApp always sends it, and it is stable for as long as they are in the group.\n",
+      example: "BR.1566655121691972",
+    },
+    phone_number: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Phone number in E.164 format. Absent when WhatsApp withholds it, which it does for anyone who has not shared their number with your business, so a group is normally a mix of participants with one and without.\n",
+      example: "+16505551234",
+    },
+    username: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The WhatsApp username this person chose. Absent when they have none, and not an identifier to address them by: it is theirs to change, so it names them in a list rather than keying anything.\n",
+      example: "jim.almeida",
+    },
+    last_operation: {
+      $ref: "#/components/schemas/WhatsAppGroupOperation",
+      readOnly: true,
+      description:
+        "A removal asked of this participant that has not taken effect: `pending` while WhatsApp has yet to confirm it, or `failed` when WhatsApp refused. Never `success`, because a removal that succeeds takes the participant off this list: the entry disappearing is what says it worked. A `pending` removal refuses a second removal of the same person while leaving other participants free to be removed at the same time.\n",
+    },
+  },
+} as const;
+
+export const WhatsAppGroupPinnedMessageSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "A message pinned at the top of a group's chat.",
+  required: ["message_id", "pinned_until"],
+  properties: {
+    message_id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMessageID",
+        },
+      ],
+      description:
+        "The pinned message, as returned in the send response's `id`.",
+    },
+    pinned_until: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When the pin is due to lapse, projected from the `duration_days` the pin was asked for. An entry stays listed until it is unpinned, so a time in the past means WhatsApp has already taken the message off the chat.\n",
+      example: "2026-09-01T09:14:52Z",
+    },
+  },
+} as const;
+
+export const WhatsAppGroupSchema = {
+  allOf: [
+    {
+      type: "object",
+      description:
+        "A WhatsApp group your business created and administers. People join by opening its invite link, not by being added.\n",
+      required: [
+        "id",
+        "whatsapp_number_id",
+        "waba",
+        "subject",
+        "status",
+        "join_approval_mode",
+        "participant_count",
+      ],
+      properties: {
+        id: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppGroupID",
+            },
+          ],
+          readOnly: true,
+          description:
+            "Unique identifier for the group. Accepted by every `/v1/whatsapp/groups/{group_id}` operation, and as `to` when sending a message to the group.",
+        },
+        whatsapp_number_id: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppNumberID",
+            },
+          ],
+          readOnly: true,
+          description:
+            "The business number that created the group. It is the group's admin and the number every message to the group is sent from. Fixed when the group is created.\n",
+        },
+        waba: {
+          type: ["string", "null"],
+          minLength: 1,
+          readOnly: true,
+          description:
+            "Meta's identifier for the WhatsApp Business Account recorded when the group was created. This is a historical snapshot, not a live account directory projection. Null for a number we operate on your behalf, whose account is not yours to see.\n",
+          example: "102290129340398",
+        },
+        subject: {
+          type: "string",
+          minLength: 1,
+          maxLength: 128,
+          description:
+            "The group's name, shown to participants and to anyone who opens the invite link.",
+          example: "New Purchase Inquiry",
+        },
+        description: {
+          type: ["string", "null"],
+          maxLength: 2048,
+          description:
+            "The group's description, shown alongside the subject. Null when the group has none.",
+          example:
+            "Jim would like to learn about new car purchase options for current year models.",
+        },
+        status: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppGroupStatus",
+            },
+          ],
+          readOnly: true,
+          description:
+            "Where the group stands. A group is messageable only while it is `active`.",
+        },
+        join_approval_mode: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppGroupJoinApprovalMode",
+            },
+          ],
+          readOnly: true,
+          description:
+            "Whether opening the invite link joins the group outright or raises a join request to approve.",
+        },
+        invite_link: {
+          type: ["string", "null"],
+          readOnly: true,
+          description:
+            "The link that lets someone join the group, which is the only way in. A group has one link at a time. Null while the group is `pending`, since WhatsApp issues the link when it confirms the group. Rotating it through `POST /v1/whatsapp/groups/{group_id}/invite-link/rotate` replaces it, and every link the group had before then stops working.\n",
+          example: "https://chat.whatsapp.com/JZm4S9tCkQx2LpVr7Ny8Ab",
+        },
+        participants: {
+          type: "array",
+          readOnly: true,
+          description:
+            "Who is in the group, as of the last update WhatsApp sent, and the whole set rather than a page: WhatsApp holds a group to a handful of people, so there is never a page's worth to return. The business number that created the group is its admin and is not listed.\n",
+          items: {
+            $ref: "#/components/schemas/WhatsAppGroupParticipant",
+          },
+        },
+        participant_count: {
+          type: "integer",
+          readOnly: true,
+          minimum: 0,
+          description:
+            "How many people are in the group, excluding your business.",
+          example: 6,
+        },
+        pinned_messages: {
+          type: "array",
+          readOnly: true,
+          description:
+            "The group's pins, newest first. WhatsApp holds a few at once, and pinning past that unpins the oldest rather than refusing. No entry here is merely requested. An entry stays listed until it is unpinned, so one whose `pinned_until` has passed is still listed after WhatsApp has taken it off the chat.\n",
+          items: {
+            $ref: "#/components/schemas/WhatsAppGroupPinnedMessage",
+          },
+        },
+        profile_picture_url: {
+          type: ["string", "null"],
+          readOnly: true,
+          description:
+            "Address of the group's picture, as WhatsApp serves it. Null when the group has none.",
+          example: "https://media.example.com/whatsapp/groups/JZm4S9tCkQx2.jpg",
+        },
+        last_operation: {
+          $ref: "#/components/schemas/WhatsAppGroupOperation",
+          readOnly: true,
+          description:
+            "The last create, settings change or delete asked of the group. `pending` while WhatsApp has yet to confirm it, which is what a client shows as in-progress and what refuses the next change to the group. A settings change carries per-field `results`, since WhatsApp can refuse one field and apply the others. A removal reports on the participant's own entry rather than here, so several can be in flight at once. Pinning is synchronous and reports nothing.\n",
+        },
+        suspended_at: {
+          type: "string",
+          format: "date-time",
+          minLength: 1,
+          readOnly: true,
+          description:
+            "When WhatsApp suspended the group. Present only while the group is `suspended`, and gone once WhatsApp lifts the suspension.",
+          example: "2026-08-20T11:04:00Z",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+} as const;
+
+export const WhatsAppGroupListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "The groups your workspace created, newest first.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppGroup",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppGroupCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The group to create. WhatsApp issues the invite link, and people join by opening it, so a create request names no participants.\n",
+  required: ["whatsapp_number_id", "subject"],
+  properties: {
+    whatsapp_number_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberID",
+        },
+      ],
+      description:
+        "The business number that will own and administer the group, as its id in `GET /v1/whatsapp/numbers`. It must be a number your workspace can send from, and WhatsApp must have granted it Official Business Account status; a number without that status returns a `412` `WhatsAppGroupsNotEligible`. The number cannot be changed afterwards, and every message to the group is sent from it.\n",
+    },
+    subject: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+      description:
+        "The group's name, shown to participants and to anyone who opens the invite link. Surrounding whitespace is trimmed.",
+      example: "New Purchase Inquiry",
+    },
+    description: {
+      type: "string",
+      maxLength: 2048,
+      description: "The group's description, shown alongside the subject.",
+      example:
+        "Jim would like to learn about new car purchase options for current year models.",
+    },
+    join_approval_mode: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppGroupJoinApprovalMode",
+        },
+      ],
+      description:
+        "Whether opening the invite link joins the group outright, or raises a join request for you to approve. Defaults to `auto_approve`. It cannot be changed once the group exists.\n",
+    },
+  },
+} as const;
+
+export const WhatsAppGroupUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The changes to make. Fields you omit are left as they are. WhatsApp applies each field separately, so one can be rejected while the others take effect; the group's `updated_at` moves when a change lands.\n",
+  properties: {
+    subject: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+      description:
+        "A new name for the group. Participants see the change in the group's chat.",
+      example: "Watch Enthusiasts",
+    },
+    description: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 2048,
+      description:
+        "A new description for the group. Send `null` to clear it; an empty string is a `422` rather than a second way to clear.",
+      example: "Discuss the latest timepieces and share reviews.",
+    },
+    profile_picture_url: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "A new picture for the group, naming a file in your workspace's media library. WhatsApp takes a square JPEG of at least 192 by 192 pixels and up to 5 MB; anything else returns a `422`. Sending `null` clears the picture Bird stores, and an empty string is a `422` rather than a second way to clear it; WhatsApp has no operation for removing a group's photo, so the one participants see stays until another picture replaces it.\n",
+      example: "https://media.example.com/whatsapp/groups/square.jpg",
+    },
+  },
+} as const;
+
+export const WhatsAppGroupInviteLinkSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "A group's invite link.",
+  required: ["invite_link"],
+  properties: {
+    invite_link: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The group's one invite link. Every link the group had before this one stops working.",
+      example: "https://chat.whatsapp.com/JZm4S9tCkQx2LpVr7Ny8Ab",
+    },
+  },
+} as const;
+
+export const WhatsAppGroupPinnedMessageCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "A message to pin at the top of the group's chat.",
+  required: ["message_id"],
+  properties: {
+    message_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMessageID",
+        },
+      ],
+      description:
+        "The message to pin. It has to be one this group carries: a message in another group, or a one-to-one message, returns a `422` `WhatsAppMessageNotInGroup`.\n",
+    },
+    duration_days: {
+      type: "integer",
+      minimum: 1,
+      maximum: 30,
+      default: 7,
+      description:
+        "How many days the message stays pinned before WhatsApp unpins it, from 1 to 30.",
+      example: 7,
+    },
+  },
+} as const;
+
+export const WhatsAppGroupJoinRequestSortFieldSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Sortable fields for a WhatsApp group join-request list.",
+} as const;
+
+export const WhatsAppGroupJoinRequestIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^wgj_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "wgj_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppGroupJoinRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Someone waiting to be let into a group that requires approval.",
+  required: ["id", "bsuid", "created_at"],
+  properties: {
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppGroupJoinRequestID",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Unique identifier for the join request. Pass it to the batch-approve and batch-reject operations.",
+    },
+    bsuid: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Business-scoped user ID, Meta's identifier for this person against your business. The one identifier every request has, and the one that carries over to `participants` if you approve it.\n",
+      example: "BR.1566655121691972",
+    },
+    phone_number: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Phone number in E.164 format. Absent when WhatsApp withholds it, which it does for anyone who has not shared their number with your business.\n",
+      example: "+16505551234",
+    },
+    username: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The WhatsApp username this person chose. Absent when they have none, and theirs to change, so it names them in a list rather than keying anything.\n",
+      example: "jim.almeida",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the request was made.",
+      example: "2026-08-24T10:07:57Z",
+    },
+  },
+} as const;
+
+export const WhatsAppGroupJoinRequestListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "The join requests still waiting for a decision, oldest first.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppGroupJoinRequest",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppGroupJoinRequestDecisionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "The join requests to decide on.",
+  required: ["join_request_ids"],
+  properties: {
+    join_request_ids: {
+      type: "array",
+      minItems: 1,
+      maxItems: 50,
+      description:
+        "The join requests to act on, as returned by `GET /v1/whatsapp/groups/{group_id}/join-requests`. Each is decided on its own, so one can fail while the rest succeed. An ID that names no waiting request returns a `422` `WhatsAppGroupJoinRequestNotFound`. The 50 is Bird's own request bound, not a WhatsApp one: how many people the group can hold does not limit how many can queue at its link, so a rejection sweep is not held to the size of the group it is refusing entry to.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppGroupJoinRequestID",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppGroupJoinRequestFailureSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "A join request the decision could not be applied to.",
+  required: ["join_request_id", "error"],
+  properties: {
+    join_request_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppGroupJoinRequestID",
+        },
+      ],
+      readOnly: true,
+      description: "The join request that was not decided.",
+    },
+    error: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppGroupError",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Why WhatsApp refused. The common one is a person who has not accepted WhatsApp's current terms, which no retry fixes.\n",
+    },
+  },
+} as const;
+
+export const WhatsAppGroupJoinRequestDecisionResultSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "What happened to each join request in the batch. WhatsApp decides them one by one, so a batch can be part-applied: the requests it accepted are in `decided`, and the rest are in `failed` with the reason.\n",
+  required: ["decided", "failed"],
+  properties: {
+    decided: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The join requests WhatsApp accepted the decision for. A person approved here can enter the group; a person rejected here sees the join button again.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppGroupJoinRequestID",
+      },
+    },
+    failed: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The join requests WhatsApp refused, each with its reason. Empty when the whole batch was applied.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppGroupJoinRequestFailure",
+      },
+    },
+  },
 } as const;
 
 export const WhatsAppTemplateExampleParameterSchema = {
@@ -14948,13 +15699,14 @@ export const WhatsAppNumberErrorCodeSchema = {
     "verification_code_not_received",
     "verification_rate_limited",
     "business_account_locked",
+    "business_verification_required",
     "credit_currency_mismatch",
     "permission_denied",
     "invalid_request",
     "internal_error",
   ],
   description:
-    "Standardized number-connection failure:\n\n- `registration_pin_rejected`: WhatsApp refused the two-step verification PIN.\n- `registration_pin_rate_limited`: Too many PIN attempts occurred recently.\n- `registration_attempts_exhausted`: Registration is blocked for 72 hours.\n- `number_verification_required`: WhatsApp requires the number to be verified again.\n- `number_not_registered`: WhatsApp does not hold the number as registered.\n- `number_already_linked`: Another WhatsApp integration uses the number.\n- `number_already_in_use`: WhatsApp cannot accept the number.\n- `verification_code_not_received`: The verification text did not arrive.\n- `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.\n- `business_account_locked`: WhatsApp locked the business account.\n- `credit_currency_mismatch`: WhatsApp bills the business account in a currency your organization is not billed in. Connect the number under a business account WhatsApp bills in that same currency, or one WhatsApp has set no currency on: an account's billing currency cannot be changed once WhatsApp sets it.\n- `permission_denied`: WhatsApp refused access to the account.\n- `invalid_request`: WhatsApp rejected the connection details.\n- `internal_error`: The service could not classify or resolve the failure.\n\nThis is an open enum. Accept unrecognized values.\n",
+    "Standardized number-connection failure:\n\n- `registration_pin_rejected`: WhatsApp refused the two-step verification PIN.\n- `registration_pin_rate_limited`: Too many PIN attempts occurred recently.\n- `registration_attempts_exhausted`: The number has no registration attempts left. WhatsApp's own lockout clears after 72 hours; the number's attempt budget does not, so contact support if repair keeps ending here.\n- `number_verification_required`: WhatsApp requires the number to be verified again.\n- `number_not_registered`: WhatsApp does not hold the number as registered.\n- `number_already_linked`: Another WhatsApp integration uses the number.\n- `number_already_in_use`: WhatsApp cannot accept the number.\n- `verification_code_not_received`: The verification text did not arrive.\n- `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.\n- `business_account_locked`: WhatsApp locked the business account.\n- `business_verification_required`: WhatsApp refused to register the number because the business portfolio is not verified, usually because an unverified portfolio may hold only a few registered numbers. Verify the business or free a registered number on the portfolio, then repair the number.\n- `credit_currency_mismatch`: WhatsApp bills the business account in a currency your organization is not billed in. Connect the number under a business account WhatsApp bills in that same currency, or one WhatsApp has set no currency on: an account's billing currency cannot be changed once WhatsApp sets it.\n- `permission_denied`: WhatsApp refused access to the account.\n- `invalid_request`: WhatsApp rejected the connection details.\n- `internal_error`: The service could not classify or resolve the failure.\n\nThis is an open enum. Accept unrecognized values.\n",
   example: "registration_pin_rejected",
 } as const;
 
@@ -15635,6 +16387,197 @@ export const WhatsAppBusinessAccountBanSchema = {
   },
 } as const;
 
+export const WhatsAppMetaHealthVerdictSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["available", "limited", "blocked"],
+  description:
+    "Meta's health verdict for one entity, or for the whole chain when read at the top\nlevel. Values are Meta's own tokens, lower-cased:\n\n- `available`: the entity meets every messaging or calling requirement.\n- `limited`: it can be used, but with a limitation Meta describes in `additional_info`\n  when it gave one.\n- `blocked`: it cannot be used. `errors` says why when Meta named a reason, and each\n  error carries `possible_solution` when Meta suggested one.\n",
+  example: "available",
+} as const;
+
+export const WhatsAppMetaHealthEntityTypeSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "waba",
+    "business",
+    "app",
+    "phone_number",
+    "message_template",
+  ],
+  description:
+    "Which node in Meta's messaging chain an entry describes. Values are Meta's own tokens,\nlower-cased.\n\n- `waba`: the WhatsApp Business Account.\n- `business`: the Meta business portfolio that owns the account.\n- `app`: the app the account messages through.\n- `phone_number`: a business phone number. An account read never carries one: Meta reports it only when a phone number is the node asked about.\n- `message_template`: a message template. An account read never carries one: Meta reports it only when a template is the node asked about.\n",
+  example: "waba",
+} as const;
+
+export const WhatsAppMetaHealthErrorSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["error_code", "error_description"],
+  description:
+    "One reason Meta gives for a verdict that is not `available`. Field names are Meta's own. They are not Bird error codes and do not appear in Bird's error catalog.",
+  properties: {
+    error_code: {
+      type: "integer",
+      readOnly: true,
+      description:
+        "Meta's numeric health error code, for example `141006` (payment method error), `141010` (business not verified), `141014` (account banned).",
+      example: 141006,
+    },
+    error_description: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "Meta's own sentence describing the block.",
+      example:
+        "There is an error with the payment method. This will block business initiated conversations.",
+    },
+    possible_solution: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "Meta's own suggested remedy. Absent when Meta gave none.",
+      example:
+        "There was an error with your payment method. Please add a new payment method to the account.",
+    },
+  },
+} as const;
+
+export const WhatsAppMetaHealthEntitySchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["entity_type", "meta_id", "can_send_message"],
+  description:
+    "Meta's verdict for one node in the chain a message passes through.",
+  properties: {
+    entity_type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMetaHealthEntityType",
+        },
+      ],
+      readOnly: true,
+    },
+    meta_id: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Meta's identifier for the node. Treat it as an opaque string.",
+      example: "1028574859896003",
+    },
+    can_send_message: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMetaHealthVerdict",
+        },
+      ],
+      readOnly: true,
+      description: "Whether this node lets messages through.",
+    },
+    can_receive_call_sip: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMetaHealthVerdict",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Whether this node can receive a WhatsApp call over SIP, which Meta reports on `phone_number` and `app` entities. Absent on an account read: Meta reports it only when a phone number or template is the node asked about.",
+    },
+    additional_info: {
+      type: "array",
+      readOnly: true,
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      description:
+        "Meta's own notes on a `limited` verdict. Absent on an account read: Meta reports it only when a phone number or template is the node asked about.",
+      example: [
+        "Your display name has not been approved yet. Your message limit will increase after the display name is approved.",
+      ],
+    },
+    errors: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/WhatsAppMetaHealthError",
+      },
+      description:
+        "Why this node is not `available`. Absent when Meta gave no reason.",
+    },
+  },
+} as const;
+
+export const WhatsAppMetaHealthStatusSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["can_send_message", "entities"],
+  description:
+    "Meta's own messaging health for this account. `can_send_message` is Meta's aggregate: `blocked` if any entity is blocked, else `limited` if any is limited, else `available`. Read `entities` to see which node carries the verdict and why.",
+  properties: {
+    can_send_message: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMetaHealthVerdict",
+        },
+      ],
+      readOnly: true,
+    },
+    entities: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/WhatsAppMetaHealthEntity",
+      },
+      description: "One entry per node Meta evaluated. Order is Meta's.",
+    },
+  },
+  example: {
+    can_send_message: "blocked",
+    entities: [
+      {
+        entity_type: "waba",
+        meta_id: "1028574859896003",
+        can_send_message: "blocked",
+        errors: [
+          {
+            error_code: 141006,
+            error_description:
+              "There is an error with the payment method. This will block business initiated conversations.",
+            possible_solution:
+              "There was an error with your payment method. Please add a new payment method to the account.",
+          },
+        ],
+      },
+      {
+        entity_type: "business",
+        meta_id: "4392746181043198",
+        can_send_message: "limited",
+        errors: [
+          {
+            error_code: 141010,
+            error_description:
+              "The Business has not passed business verification.",
+            possible_solution:
+              "Visit business settings and start or resolve the business verification request.",
+          },
+        ],
+      },
+      {
+        entity_type: "app",
+        meta_id: "497937228432800",
+        can_send_message: "available",
+      },
+    ],
+  },
+} as const;
+
 export const WhatsAppBusinessAccountSchema = {
   type: "object",
   additionalProperties: false,
@@ -15724,13 +16667,23 @@ export const WhatsAppBusinessAccountSchema = {
       description:
         "WhatsApp's ban on this account, absent unless Bird was told of one. `status` is what the account said when Bird last read it; this is what WhatsApp announced, which arrives only on the webhook that announces it and is never re-read.",
     },
+    meta_health_status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMetaHealthStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Meta's own messaging health for this account as of `meta_synced_at`. Absent until Bird has read it, and absent again when the stored reading did not parse at all. An entity whose verdict falls outside this vocabulary is dropped on its own and the rest of the report still ships, so `entities` can be shorter than Meta's. A `blocked` verdict on the `waba` entity is why template sends fail with Meta's `#200` even though the number reads `active`: for example `error_code` `141006` names a payment method Meta rejected on the account.",
+    },
     meta_synced_at: {
       type: "string",
       format: "date-time",
       minLength: 1,
       readOnly: true,
       description:
-        "When Bird last read this account's state from WhatsApp. `status`, `account_review_status`, `business_verification_status`, `marketing_messages_onboarding_status` and `portfolio` are all that reading rather than live values; Bird re-reads roughly hourly. Absent for an account Bird has never read back.",
+        "When Bird last read this account's state from WhatsApp. `status`, `account_review_status`, `business_verification_status`, `marketing_messages_onboarding_status`, `portfolio` and `meta_health_status` are all that reading rather than live values; Bird re-reads roughly hourly. Absent for an account Bird has never read back.",
     },
     created_at: {
       type: "string",
@@ -15771,11 +16724,139 @@ export const WhatsAppBusinessAccountListSchema = {
   ],
 } as const;
 
+export const WhatsAppSuppressionReasonFilterSchema = {
+  type: "string",
+  enum: ["manual"],
+} as const;
+
 export const WhatsAppSuppressionIDSchema = {
   type: "string",
   minLength: 1,
   pattern: "^was_[0-9a-hjkmnp-tv-z]{26}$",
   example: "was_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppSuppressionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One period during which an address is suppressed: when it started and, once it is over, what ended it. An address suppressed, ended and suppressed again has two of these on record rather than one current state. The list returns the periods in force; fetch one by ID to read one that has ended.\n",
+  required: ["id", "address", "reason", "origin", "applies_to", "created_at"],
+  properties: {
+    id: {
+      readOnly: true,
+      description: "Unique identifier for the suppression record.",
+      $ref: "#/components/schemas/WhatsAppSuppressionID",
+    },
+    address: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The suppressed WhatsApp address. For a phone number this is canonical E.164 with a leading plus sign, such as `+5511977670804`.\n",
+      example: "+5511977670804",
+    },
+    waba: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "The WhatsApp Business Account the suppression is limited to, identified by its WhatsApp-issued account ID, or null when it covers the whole workspace.\n",
+      example: null,
+    },
+    reason: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": ["manual"],
+      description:
+        "Why the address is suppressed. `manual` means it was added directly rather than created automatically from a delivery outcome. This list grows over time, so treat an unknown value as informational rather than rejecting the record.\n",
+    },
+    origin: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": ["api_key", "user"],
+      description:
+        "How the suppression came to exist: `api_key` (added through the API with an API key) or `user` (added by a user in the dashboard). This list grows over time, so treat an unknown value as informational rather than rejecting the record.\n",
+    },
+    applies_to: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": ["all"],
+      description:
+        "Blocking policy. `all` blocks every message category. Treat an unrecognized value as blocking.\n",
+    },
+    source_whatsapp_id: {
+      description:
+        "ID of the WhatsApp message that caused this address to be suppressed, when the suppression was created automatically. Omitted for addresses added manually.",
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMessageID",
+        },
+      ],
+    },
+    ended_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this stopped applying. Null while it is still stopping messages, which is the case for every record in the list.\n",
+    },
+    ended_reason: {
+      type: ["string", "null"],
+      "x-extensible-enum": ["api_key", "user"],
+      readOnly: true,
+      description:
+        "What ended it: `api_key` (deleted through the API with an API key) or `user` (deleted by a user in the dashboard). Null while it is still stopping messages. This list grows over time, so treat an unknown value as informational rather than rejecting the record.\n",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the suppression was created.",
+    },
+  },
+} as const;
+
+export const WhatsAppSuppressionListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/WhatsAppSuppression",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppSuppressionCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["address"],
+  properties: {
+    address: {
+      type: "string",
+      minLength: 1,
+      description:
+        "WhatsApp address to suppress. For a phone number, supply canonical E.164 with a leading plus sign, such as `+5511977670804`. A value that is not a valid phone number returns a `422`.\n",
+      example: "+5511977670804",
+    },
+    waba: {
+      type: "string",
+      minLength: 1,
+      maxLength: 64,
+      description:
+        "Limit the suppression to messages sent from this WhatsApp Business Account, identified by its WhatsApp-issued account ID. Omit it to block the address for the whole workspace, whichever account sends.\n",
+      example: "102290129340398",
+    },
+  },
 } as const;
 
 export const WhatsAppKeywordOperationSchema = {
@@ -22586,7 +23667,7 @@ export const EmailTemplateCreateSchema = {
       type: "boolean",
       default: false,
       description:
-        "Whether a send has to name a language. Set it to true to reject a send that names none instead of serving the default language. Pair it with `on_missing_language: fail` when every send must pick a language deliberately: on its own, `fail` is bypassed by naming no language at all. A template with this set cannot be used for a broadcast, which has no way to name one. Defaults to false.\n",
+        "Whether a send has to name a language. Set it to true to reject a send that names none instead of serving the default language. Pair it with `on_missing_language: fail` when every send must pick a language deliberately: on its own, `fail` is bypassed by naming no language at all. A broadcast must select a template language when this is set. Defaults to false.\n",
     },
   },
 } as const;
@@ -22789,7 +23870,7 @@ export const EmailTemplateSchema = {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether a send has to name a language. When true, a send that names none is rejected instead of being served the default language, and the template cannot be used for a broadcast, which has no way to name one.\n",
+        "Whether a send has to name a language. When true, a send that names none is rejected instead of being served the default language. A broadcast must select a template language when this is set.\n",
     },
     last_submitted_at: {
       type: ["string", "null"],
@@ -22862,7 +23943,7 @@ export const EmailTemplateUpdateSchema = {
     language_source_required: {
       type: "boolean",
       description:
-        "Whether a send has to name a language. Turning it on rejects a send that names none instead of serving the default language, and makes the template unusable for a broadcast, which has no way to name one.\n",
+        "Whether a send has to name a language. Turning it on rejects a send that names none instead of serving the default language. A broadcast must select a template language when this is set.\n",
     },
   },
 } as const;
@@ -30718,7 +31799,7 @@ export const VoiceCallRouteTypeSchema = {
   example: "reject",
 } as const;
 
-export const VoiceCallRejectionReasonSchema = {
+export const VoiceLegRejectionReasonSchema = {
   type: "string",
   minLength: 1,
   enum: [
@@ -30750,11 +31831,11 @@ export const VoiceCallRejectionReasonSchema = {
     "VoiceCallRejectionReasonNumberOwnershipNotVerified",
   ],
   description:
-    "Why we rejected the call. Use `rejection_reason` to identify the cause;\n`sip_response_code` alone cannot distinguish these reasons.\n\nYou can resolve these issues:\n\n- `source_not_allowed`: The call came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it or use a verified caller ID.\n- `number_ownership_not_verified`: The ownership documents for this purchased\n  number have not yet been accepted under its country's requirements. We\n  block outgoing and incoming calls on the number until verification is\n  complete. Blocked incoming calls never reach your PBX, and their route type\n  is `reject` regardless of the number's configuration. Open the number\n  under **Numbers** and complete its ownership requirements, then retry\n  the call.\n- `destination_not_enabled`: Calling to this destination country is disabled.\n  Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet balance was too low for the call.\n  Top up or enable automatic top-ups.\n- `daily_spend_exceeded`: The call would exceed your organization's daily\n  voice spend limit. Retry after the limit resets at the start of the next\n  UTC day.\n- `concurrent_calls_exceeded`: You already have as many calls in progress as\n  your account allows. Wait for one to end or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed calls faster than your account\n  allows. Reduce your dialing rate and retry.\n\nFor all other reasons, contact support and provide the call `id`:\n\n- `routing_not_configured`: This trunk has no dial plan, which can happen on\n  a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The call could not be priced for your account.\n",
+    "Why we rejected the leg. Use `rejection_reason` to identify the cause;\n`sip_response_code` alone cannot distinguish these reasons.\n\nYou can resolve these issues:\n\n- `source_not_allowed`: The leg came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it or use a verified caller ID.\n- `number_ownership_not_verified`: The ownership documents for this purchased\n  number have not yet been accepted under its country's requirements. We\n  block outgoing and incoming legs on the number until verification is\n  complete. Blocked incoming legs never reach your PBX, and their route type\n  is `reject` regardless of the number's configuration. Open the number\n  under **Numbers** and complete its ownership requirements, then retry\n  the leg.\n- `destination_not_enabled`: Calling to this destination country is disabled.\n  Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet balance was too low for the leg.\n  Top up or enable automatic top-ups.\n- `daily_spend_exceeded`: The leg would exceed your organization's daily\n  voice spend limit. Retry after the limit resets at the start of the next\n  UTC day.\n- `concurrent_calls_exceeded`: You already have as many legs in progress as\n  your account allows. Wait for one to end or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed legs faster than your account\n  allows. Reduce your dialing rate and retry.\n\nFor all other reasons, contact support and provide the leg `id`:\n\n- `routing_not_configured`: This trunk has no dial plan, which can happen on\n  a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The leg could not be priced for your account.\n",
   example: "destination_not_enabled",
 } as const;
 
-export const VoiceCallInboundRouteRejectSchema = {
+export const VoiceLegInboundRouteRejectSchema = {
   type: "object",
   additionalProperties: false,
   required: ["type"],
@@ -30766,12 +31847,12 @@ export const VoiceCallInboundRouteRejectSchema = {
         },
       ],
       description:
-        "The number turned the call away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.\n",
+        "The number turned the leg away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.\n",
     },
   },
 } as const;
 
-export const VoiceCallInboundRouteTrunkSchema = {
+export const VoiceLegInboundRouteTrunkSchema = {
   type: "object",
   additionalProperties: false,
   required: ["type", "trunk_id"],
@@ -30782,7 +31863,7 @@ export const VoiceCallInboundRouteTrunkSchema = {
           $ref: "#/components/schemas/VoiceCallRouteType",
         },
       ],
-      description: "The call was delivered to one of your SIP trunks.",
+      description: "The leg was delivered to one of your SIP trunks.",
     },
     trunk_id: {
       allOf: [
@@ -30791,12 +31872,12 @@ export const VoiceCallInboundRouteTrunkSchema = {
         },
       ],
       description:
-        "The SIP trunk the call was delivered to. Recorded as it was at the time, so it may name a trunk you have since changed or deleted.\n",
+        "The SIP trunk the leg was delivered to. Recorded as it was at the time, so it may name a trunk you have since changed or deleted.\n",
     },
   },
 } as const;
 
-export const VoiceCallInboundRouteForwardSchema = {
+export const VoiceLegInboundRouteForwardSchema = {
   type: "object",
   additionalProperties: false,
   required: ["type", "forward_to", "forward_as"],
@@ -30807,13 +31888,13 @@ export const VoiceCallInboundRouteForwardSchema = {
           $ref: "#/components/schemas/VoiceCallRouteType",
         },
       ],
-      description: "The call was forwarded to another of your numbers.",
+      description: "The leg was forwarded to another of your numbers.",
     },
     forward_to: {
       type: "string",
       minLength: 1,
       description:
-        "The number the call was forwarded to, in E.164 format. Recorded as it was at the time, so it may name a number you have since stopped verifying.\n",
+        "The number the leg was forwarded to, in E.164 format. Recorded as it was at the time, so it may name a number you have since stopped verifying.\n",
       example: "+14155551234",
     },
     forward_as: {
@@ -30823,31 +31904,31 @@ export const VoiceCallInboundRouteForwardSchema = {
         },
       ],
       description:
-        "Which of the call's two numbers the forwarded leg presented as its caller. The value that went on the wire, not the one the number is set to now.\n",
+        "Which of the leg's two numbers the forwarded leg presented as its caller. The value that went on the wire, not the one the number is set to now.\n",
     },
   },
 } as const;
 
-export const VoiceCallInboundRouteSchema = {
+export const VoiceLegInboundRouteSchema = {
   description:
-    "The routing choice recorded for an incoming call. A recorded route does not\nguarantee that the call connected. Check `status` for the outcome and\n`rejection_reason` for the cause when present.\n",
+    "The routing choice recorded for an incoming leg. A recorded route does not\nguarantee that the leg connected. Check `status` for the outcome and\n`rejection_reason` for the cause when present.\n",
   oneOf: [
     {
-      $ref: "#/components/schemas/VoiceCallInboundRouteReject",
+      $ref: "#/components/schemas/VoiceLegInboundRouteReject",
     },
     {
-      $ref: "#/components/schemas/VoiceCallInboundRouteTrunk",
+      $ref: "#/components/schemas/VoiceLegInboundRouteTrunk",
     },
     {
-      $ref: "#/components/schemas/VoiceCallInboundRouteForward",
+      $ref: "#/components/schemas/VoiceLegInboundRouteForward",
     },
   ],
   discriminator: {
     propertyName: "type",
     mapping: {
-      reject: "#/components/schemas/VoiceCallInboundRouteReject",
-      trunk: "#/components/schemas/VoiceCallInboundRouteTrunk",
-      forward: "#/components/schemas/VoiceCallInboundRouteForward",
+      reject: "#/components/schemas/VoiceLegInboundRouteReject",
+      trunk: "#/components/schemas/VoiceLegInboundRouteTrunk",
+      forward: "#/components/schemas/VoiceLegInboundRouteForward",
     },
   },
 } as const;
@@ -30893,7 +31974,7 @@ export const VoiceMediaQualitySchema = {
   },
 } as const;
 
-export const VoiceCallCostSchema = {
+export const VoiceLegCostSchema = {
   type: "object",
   additionalProperties: false,
   required: [
@@ -30906,7 +31987,7 @@ export const VoiceCallCostSchema = {
     "transcription_amount",
   ],
   description:
-    "What was charged for a call, split into the components that make it up.\n",
+    "What was charged for a leg, split into the components that make it up.\n",
   properties: {
     amount: {
       type: "string",
@@ -30927,14 +32008,14 @@ export const VoiceCallCostSchema = {
       type: ["string", "null"],
       readOnly: true,
       description:
-        "What we charged to carry the call to the destination network, as a decimal string. `null` until this component is priced.\n",
+        "What we charged to carry the leg to the destination network, as a decimal string. `null` until this component is priced.\n",
       example: "0.013000",
     },
     inbound_amount: {
       type: ["string", "null"],
       readOnly: true,
       description:
-        "What we charged to receive the call from the originating network, as a decimal string. Only a call that arrived at your number can carry it. `null` until this component is priced.\n",
+        "What we charged to receive the leg from the originating network, as a decimal string. Only a leg that arrived at your number can carry it. `null` until this component is priced.\n",
       example: null,
     },
     call_handling_amount: {
@@ -30948,20 +32029,20 @@ export const VoiceCallCostSchema = {
       type: ["string", "null"],
       readOnly: true,
       description:
-        "What we charged to record the call, as a decimal string, billed per second over the same billable time as the rest of the call. `null` until this component is priced.\n",
+        "What we charged to record the leg, as a decimal string, billed per second over the same billable time as the rest of the leg. `null` until this component is priced.\n",
       example: null,
     },
     transcription_amount: {
       type: ["string", "null"],
       readOnly: true,
       description:
-        "What we charged to transcribe the call's audio, as a decimal string, billed per second of recorded audio rather than for the length of the call. A transcript is produced after the call ends, so this can appear after the rest of the cost. `null` until this component is priced.\n",
+        "What we charged to transcribe the leg's audio, as a decimal string, billed per second of recorded audio rather than for the length of the leg. A transcript is produced after the leg ends, so this can appear after the rest of the cost. `null` until this component is priced.\n",
       example: null,
     },
   },
 } as const;
 
-export const VoiceCallSchema = {
+export const VoiceLegSchema = {
   type: "object",
   additionalProperties: false,
   required: [
@@ -30977,9 +32058,9 @@ export const VoiceCallSchema = {
     id: {
       readOnly: true,
       $ref: "#/components/schemas/VoiceCallID",
-      description: "Unique identifier for this call record.",
+      description: "Unique identifier for this leg record.",
     },
-    session_id: {
+    call_id: {
       readOnly: true,
       oneOf: [
         {
@@ -30990,7 +32071,7 @@ export const VoiceCallSchema = {
         },
       ],
       description:
-        "Session identifier shared across all legs of a multi-party or transferred call. Use this to correlate related call records. `null` when session correlation is not available for the call.",
+        "Call identifier shared across all legs of a multi-party or transferred call. Use this to correlate related leg records. `null` when call correlation is not available for the leg.",
     },
     workspace_id: {
       readOnly: true,
@@ -31026,7 +32107,7 @@ export const VoiceCallSchema = {
         },
       ],
       description:
-        "Who placed the call: the API key whose credentials it used, the integration acting for the workspace, or the user who placed it from a browser or the CLI. Absent when the call was admitted only by its source IP address, or when no actor was recorded.",
+        "Who placed the leg: the API key whose credentials it used, the integration acting for the workspace, or the user who placed it from a browser or the CLI. Absent when the leg was admitted only by its source IP address, or when no actor was recorded.",
     },
     sip_trunk_id: {
       readOnly: true,
@@ -31039,7 +32120,7 @@ export const VoiceCallSchema = {
         },
       ],
       description:
-        "Identifier of the SIP trunk that originated this call. `null` when no trunk is associated.",
+        "Identifier of the SIP trunk that originated this leg. `null` when no trunk is associated.",
     },
     status: {
       readOnly: true,
@@ -31061,21 +32142,21 @@ export const VoiceCallSchema = {
       readOnly: true,
       allOf: [
         {
-          $ref: "#/components/schemas/VoiceCallRejectionReason",
+          $ref: "#/components/schemas/VoiceLegRejectionReason",
         },
       ],
       description:
-        "Why we rejected the call. Absent on connected calls and calls rejected\nby the carrier or recipient. For carrier or recipient rejections, see\n`sip_response_code`; a `6xx` decline gives the call a `rejected` status.\n\nRead alongside `route` when present. A refusal caused by the number's\nconfiguration has no rejection reason; the route records that\nconfiguration.\n",
+        "Why we rejected the leg. Absent on connected legs and legs rejected\nby the carrier or recipient. For carrier or recipient rejections, see\n`sip_response_code`; a `6xx` decline gives the leg a `rejected` status.\n\nRead alongside `route` when present. A refusal caused by the number's\nconfiguration has no rejection reason; the route records that\nconfiguration.\n",
     },
     route: {
       readOnly: true,
       allOf: [
         {
-          $ref: "#/components/schemas/VoiceCallInboundRoute",
+          $ref: "#/components/schemas/VoiceLegInboundRoute",
         },
       ],
       description:
-        "Which answer your number gave an incoming call: a SIP trunk, a forward, or a refusal. Recorded when the call was handled, so changing the number's setup afterwards does not change what its past calls say. Absent on outbound calls, and on calls recorded before this field existed.",
+        "Which answer your number gave an incoming leg: a SIP trunk, a forward, or a refusal. Recorded when the leg was handled, so changing the number's setup afterwards does not change what its past legs say. Absent on outbound legs, and on legs recorded before this field existed.",
     },
     tags: {
       type: "array",
@@ -31085,35 +32166,35 @@ export const VoiceCallSchema = {
         $ref: "#/components/schemas/Tag",
       },
       description:
-        "Your own `{name, value}` labels for this call, taken from the `X-Bird-Call-Tag` headers on the INVITE that placed it. Set them to organise calls by a dimension of your own (campaign, queue, agent, cost centre), then filter this list by them with `tag`. Read-only here: a call is labelled when it is placed, and never afterwards. What is here may be less than what was sent, and the call still goes through either way: a tag whose name or value breaks the rules below is dropped, anything past the first five is ignored, and a name sent more than once keeps its first value. Absent when the call carried none, and on calls recorded before this field existed.",
+        "Your own `{name, value}` labels for this leg, taken from the `X-Bird-Call-Tag` headers on the INVITE that placed it. Set them to organise legs by a dimension of your own (campaign, queue, agent, cost centre), then filter this list by them with `tag`. Read-only here: a leg is labelled when it is placed, and never afterwards. What is here may be less than what was sent, and the leg still goes through either way: a tag whose name or value breaks the rules below is dropped, anything past the first five is ignored, and a name sent more than once keeps its first value. Absent when the leg carried none, and on legs recorded before this field existed.",
     },
     started_at: {
       type: "string",
       format: "date-time",
       minLength: 1,
       readOnly: true,
-      description: "When the call was initiated.",
+      description: "When the leg was initiated.",
     },
     answered_at: {
       type: ["string", "null"],
       format: "date-time",
       readOnly: true,
       description:
-        "When the call was answered (`200` OK received). `null` for unanswered calls.",
+        "When the leg was answered (`200` OK received). `null` for unanswered legs.",
     },
     ended_at: {
       type: ["string", "null"],
       format: "date-time",
       readOnly: true,
       description:
-        "When the call ended (BYE or final non-2xx response). `null` for calls that ended abnormally without a recorded end event.",
+        "When the leg ended (BYE or final non-2xx response). `null` for legs that ended abnormally without a recorded end event.",
     },
     duration_ms: {
       type: ["integer", "null"],
       minimum: 0,
       readOnly: true,
       description:
-        "Total call duration in milliseconds, measured from the first INVITE to the BYE or final response. `null` while the call is still in progress and has no final duration yet.",
+        "Total leg duration in milliseconds, measured from the first INVITE to the BYE or final response. `null` while the leg is still in progress and has no final duration yet.",
       example: 65000,
     },
     pdd_ms: {
@@ -31121,7 +32202,7 @@ export const VoiceCallSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Post-dial delay in milliseconds: how long the caller heard nothing between dialing and the phone starting to ring at the other end. High values are what callers experience as the call `not going through`. Absent when the call never rang, either because it failed first or because the carrier answered it immediately.\n",
+        "Post-dial delay in milliseconds: how long the caller heard nothing between dialing and the phone starting to ring at the other end. High values are what callers experience as the leg `not going through`. Absent when the leg never rang, either because it failed first or because the carrier answered it immediately.\n",
       example: 850,
     },
     billable_ms: {
@@ -31129,23 +32210,25 @@ export const VoiceCallSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Billable duration in milliseconds, measured from answer to call end. Zero for unanswered calls, and `null` while the call is still in progress.",
+        "Billable duration in milliseconds, measured from answer to leg end. Zero for unanswered legs, and `null` while the leg is still in progress.",
       example: 60000,
     },
     media_quality: {
       $ref: "#/components/schemas/VoiceMediaQuality",
+      readOnly: true,
       description:
-        "How the audio sounded, as opposed to whether the call connected. Absent when the call carried no audio, or when the far end reported nothing to measure from.",
+        "How the audio sounded, as opposed to whether the leg connected. Absent when the leg carried no audio, or when the far end reported nothing to measure from.",
     },
     cost: {
-      $ref: "#/components/schemas/VoiceCallCost",
+      $ref: "#/components/schemas/VoiceLegCost",
+      readOnly: true,
       description:
-        "What the call cost, net of tax, at full precision, split into the components that make it up. Absent until the call has been rated; unanswered or unpriced calls have no cost.",
+        "What the leg cost, net of tax, at full precision, split into the components that make it up. Absent until the leg has been rated; unanswered or unpriced legs have no cost.",
     },
   },
 } as const;
 
-export const VoiceCallListSchema = {
+export const VoiceLegListSchema = {
   allOf: [
     {
       type: "object",
@@ -31154,7 +32237,7 @@ export const VoiceCallListSchema = {
         data: {
           type: "array",
           items: {
-            $ref: "#/components/schemas/VoiceCall",
+            $ref: "#/components/schemas/VoiceLeg",
           },
         },
       },
@@ -31947,12 +33030,24 @@ export const EmailBroadcastTemplateWritableSchema = {
   additionalProperties: false,
   required: ["id"],
   description:
-    "The template a broadcast sends, and the exact version of it the broadcast is fixed to. The template cannot be one that requires every send to name a language, because a broadcast never names one, so a template that insists on it has nothing to work with.\n",
+    "The template a broadcast sends, the exact version of it the broadcast is fixed to, and which of that version's languages goes out.\n",
   properties: {
     id: {
       $ref: "#/components/schemas/EmailTemplateID",
       description:
         "Which template the broadcast sends. Which version of it the send is fixed to is `version_id`.\n",
+    },
+    language: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The BCP-47 language tag selected for the whole audience, such as `en` or `pt-BR`. `null` means no language is selected, so the broadcast uses the published version's default language, unless the template has `language_source_required` set. Send `template.language` in an update to change or clear the selection.\n",
     },
   },
 } as const;
@@ -31982,7 +33077,7 @@ export const EmailBroadcastWritableSchema = {
         },
       ],
       description:
-        "The template this broadcast sends. A broadcast sends the template's published version, and the exact version is fixed when the broadcast is prepared for sending, so publishing a new version afterwards does not change what this broadcast sends. Null on a draft that has not chosen a template yet.",
+        "The template this broadcast sends, and the language it sends in. A broadcast sends the template's published version, and the exact version is fixed when the broadcast is prepared for sending, so publishing a new version afterwards does not change what this broadcast sends. Null on a draft that has not chosen a template yet.",
     },
     category: {
       type: "string",
@@ -32060,209 +33155,6 @@ export const EmailBroadcastListWritableSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
-} as const;
-
-export const EmailBroadcastCreateRequestWritableSchema = {
-  type: "object",
-  additionalProperties: false,
-  description:
-    "A broadcast sends one email to a whole audience. Every field here is optional, so you can create an empty draft and fill it in later. To actually send, a broadcast needs three things: a `from` address on a verified domain, an `audience_id`, and a `template`.\n\nLeave `send` false, which is the default, and you get a draft. Update it as often as you like, then send it when you are ready. Set `send` to true and the broadcast goes out as soon as it is created, or at `scheduled_at` if you set one.\n",
-  properties: {
-    from: {
-      $ref: "#/components/schemas/EmailAddressInput",
-      description:
-        "The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.",
-    },
-    audience_id: {
-      $ref: "#/components/schemas/AudienceID",
-      description:
-        "The audience this broadcast sends to. We take the audience's contacts as they stand when the send starts and drop any suppressed addresses, and what is left is who gets the email.",
-    },
-    template: {
-      $ref: "#/components/schemas/EmailBroadcastTemplateWritable",
-      description:
-        "The template the broadcast sends. You can leave it out on a draft, but a broadcast cannot send without one. The template's published version is fixed when the broadcast is prepared for sending, and each recipient's contact properties are filled into the content as the email goes out.",
-    },
-    reply_to: {
-      type: "array",
-      items: {
-        $ref: "#/components/schemas/EmailAddressInput",
-      },
-      minItems: 1,
-      maxItems: 25,
-      description:
-        "Where replies to this broadcast should go. Give each address as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. You can list more than one.",
-    },
-    headers: {
-      type: "object",
-      maxProperties: 25,
-      additionalProperties: {
-        type: "string",
-        maxLength: 998,
-      },
-      description:
-        "Custom email headers to set on the broadcast, as name and value pairs. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.\n",
-    },
-    tags: {
-      type: "array",
-      items: {
-        $ref: "#/components/schemas/Tag",
-      },
-      maxItems: 20,
-      description:
-        "Labels on this broadcast, each one a `name` and a `value`, up to 20 of them. You can filter the broadcast list by a tag, break your stats down by one, and read them back off webhook payloads. Use tags for anything you want to find broadcasts by later, and `metadata` for data you only want handed back to you.",
-    },
-    metadata: {
-      type: "object",
-      description:
-        "Any JSON you want to keep on the broadcast. We store it, hand it back when you read the broadcast, and include it in webhook payloads, and you can break stats down by a path inside it such as `metadata.order_id`. It can be up to 2 KB once serialized.",
-      additionalProperties: true,
-    },
-    track_opens: {
-      type: "boolean",
-      default: true,
-      description: "Whether to track opens for this broadcast.",
-    },
-    track_clicks: {
-      type: "boolean",
-      default: true,
-      description: "Whether to track link clicks for this broadcast.",
-    },
-    ip_pool_id: {
-      type: "string",
-      pattern: "^ipp_([0-9a-hjkmnp-tv-z]{26}|shared)$",
-      description:
-        "The IP pool to send this broadcast from. Pass a pool ID, or `ipp_shared` to send through the shared pool on purpose. Leave it out and the broadcast uses your organization's default pool. A pool we do not recognize, or one with no IPs available to send from, is refused with a `422`.",
-    },
-    category: {
-      type: "string",
-      enum: ["marketing", "transactional"],
-      default: "marketing",
-      description:
-        "What kind of email this is. A broadcast sets this itself rather than taking it from its template, and it decides two things: which suppressions apply, and whether we add an unsubscribe header.\n\n`marketing`, the default, is held back from every suppressed address and has the one-click unsubscribe headers. `transactional` still goes to addresses suppressed for a complaint or an unsubscribe, and has no unsubscribe header. Only use `transactional` for genuine operational mail such as a terms-of-service update or a service outage notice. Marketing content sent this way still reaches people who have already unsubscribed from you.\n",
-    },
-    send: {
-      type: "boolean",
-      default: false,
-      description:
-        "Whether to send the broadcast as soon as it is created. Set it to true and the broadcast goes out immediately, or at `scheduled_at` if you set one. Leave it false, which is the default, and you get a draft you can update and send later.",
-    },
-    scheduled_at: {
-      type: "string",
-      format: "date-time",
-      description:
-        "When to send the broadcast. It has to be at least 30 seconds and at most 365 days from now. It requires `send` to be true, so a `scheduled_at` on its own is refused rather than saved on the draft.\n",
-    },
-  },
-  example: {
-    from: "newsletter@acme.com",
-    audience_id: "adn_01krdgeqcxet5s7t44vh8rt9mg",
-    template: {
-      id: "emt_01krdgeqcxet5s7t44vh8rt9mg",
-    },
-    category: "marketing",
-    tags: [
-      {
-        name: "campaign",
-        value: "spring_launch",
-      },
-    ],
-    metadata: {
-      campaign_id: "12345",
-    },
-  },
-} as const;
-
-export const EmailBroadcastUpdateRequestWritableSchema = {
-  type: "object",
-  additionalProperties: false,
-  description:
-    "Changes a broadcast that is still a draft or is scheduled. Whatever you send here is applied, and anything you leave out keeps the value it already had. Once a broadcast has started sending it can no longer be edited.\n",
-  properties: {
-    from: {
-      $ref: "#/components/schemas/EmailAddressInput",
-      description:
-        "The address the broadcast sends from. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. The domain has to be one this workspace has verified.",
-    },
-    audience_id: {
-      $ref: "#/components/schemas/AudienceID",
-      description:
-        "The audience this broadcast sends to. We take the audience's contacts as they stand when the send starts and drop any suppressed addresses, and what is left is who gets the email.",
-    },
-    template: {
-      oneOf: [
-        {
-          $ref: "#/components/schemas/EmailBroadcastTemplateWritable",
-        },
-        {
-          type: "null",
-        },
-      ],
-      description:
-        "The template the broadcast sends. Its published version is fixed when the broadcast is prepared for sending. Set this to null to take the template off a draft, or leave it out to keep the one already set.",
-    },
-    reply_to: {
-      type: ["array", "null"],
-      items: {
-        $ref: "#/components/schemas/EmailAddressInput",
-      },
-      minItems: 1,
-      maxItems: 25,
-      description:
-        "Where replies to this broadcast should go. Set this to null to remove the addresses already set.",
-    },
-    headers: {
-      type: "object",
-      maxProperties: 25,
-      additionalProperties: {
-        type: "string",
-        maxLength: 998,
-      },
-      description:
-        "Custom email headers to set on the broadcast, as name and value pairs. What you send replaces the headers the draft already had rather than adding to them. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.\n",
-    },
-    tags: {
-      type: "array",
-      items: {
-        $ref: "#/components/schemas/Tag",
-      },
-      maxItems: 20,
-      description:
-        "Labels on this broadcast, each one a `name` and a `value`, that you can filter and search broadcasts by. What you send replaces the tags the draft already had rather than adding to them.",
-    },
-    metadata: {
-      type: "object",
-      description:
-        "Any JSON you want to keep on the broadcast, up to 2 KB once serialized. What you send replaces the metadata the draft already had rather than merging into it.",
-      additionalProperties: true,
-    },
-    track_opens: {
-      type: "boolean",
-      description: "Whether to track opens for this broadcast.",
-    },
-    track_clicks: {
-      type: "boolean",
-      description: "Whether to track link clicks for this broadcast.",
-    },
-    ip_pool_id: {
-      type: ["string", "null"],
-      pattern: "^ipp_([0-9a-hjkmnp-tv-z]{26}|shared)$",
-      description:
-        "The IP pool to send this broadcast from. Pass a pool ID, or `ipp_shared` to send through the shared pool on purpose. Set it to null to fall back to your organization's default pool.",
-    },
-    category: {
-      type: "string",
-      enum: ["marketing", "transactional"],
-      description:
-        "What kind of email this is. It decides two things: which suppressions apply, and whether we add an unsubscribe header.\n\n`marketing` is held back from every suppressed address and has the one-click unsubscribe headers. `transactional` still goes to addresses suppressed for a complaint or an unsubscribe, and has no unsubscribe header. Only use `transactional` for genuine operational mail such as a terms-of-service update or a service outage notice. Marketing content sent this way reaches people who have already unsubscribed from you.\n",
-    },
-  },
-  example: {
-    category: "marketing",
-    template: {
-      id: "emt_01krdgeqcxet5s7t44vh8rt9mg",
-    },
-  },
 } as const;
 
 export const EmailBroadcastCountsWritableSchema = {
@@ -33359,6 +34251,75 @@ export const WhatsAppReactionEventListWritableSchema = {
   ],
 } as const;
 
+export const WhatsAppGroupWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      description:
+        "A WhatsApp group your business created and administers. People join by opening its invite link, not by being added.\n",
+      required: ["subject"],
+      properties: {
+        subject: {
+          type: "string",
+          minLength: 1,
+          maxLength: 128,
+          description:
+            "The group's name, shown to participants and to anyone who opens the invite link.",
+          example: "New Purchase Inquiry",
+        },
+        description: {
+          type: ["string", "null"],
+          maxLength: 2048,
+          description:
+            "The group's description, shown alongside the subject. Null when the group has none.",
+          example:
+            "Jim would like to learn about new car purchase options for current year models.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const WhatsAppGroupListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "The groups your workspace created, newest first.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppGroupWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppGroupJoinRequestListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "The join requests still waiting for a decision, oldest first.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
 export const WhatsAppTemplateRejectionWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -34005,6 +34966,73 @@ export const WhatsAppBusinessAccountListWritableSchema = {
           type: "array",
           description:
             "The WhatsApp Business Accounts your workspace has connected.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppSuppressionWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One period during which an address is suppressed: when it started and, once it is over, what ended it. An address suppressed, ended and suppressed again has two of these on record rather than one current state. The list returns the periods in force; fetch one by ID to read one that has ended.\n",
+  required: ["address", "reason", "origin", "applies_to"],
+  properties: {
+    address: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The suppressed WhatsApp address. For a phone number this is canonical E.164 with a leading plus sign, such as `+5511977670804`.\n",
+      example: "+5511977670804",
+    },
+    reason: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": ["manual"],
+      description:
+        "Why the address is suppressed. `manual` means it was added directly rather than created automatically from a delivery outcome. This list grows over time, so treat an unknown value as informational rather than rejecting the record.\n",
+    },
+    origin: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": ["api_key", "user"],
+      description:
+        "How the suppression came to exist: `api_key` (added through the API with an API key) or `user` (added by a user in the dashboard). This list grows over time, so treat an unknown value as informational rather than rejecting the record.\n",
+    },
+    applies_to: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": ["all"],
+      description:
+        "Blocking policy. `all` blocks every message category. Treat an unrecognized value as blocking.\n",
+    },
+    source_whatsapp_id: {
+      description:
+        "ID of the WhatsApp message that caused this address to be suppressed, when the suppression was created automatically. Omitted for addresses added manually.",
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMessageID",
+        },
+      ],
+    },
+  },
+} as const;
+
+export const WhatsAppSuppressionListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/WhatsAppSuppressionWritable",
+          },
         },
       },
     },
@@ -36693,12 +37721,12 @@ export const NumbersOrderListWritableSchema = {
   ],
 } as const;
 
-export const VoiceCallWritableSchema = {
+export const VoiceLegWritableSchema = {
   type: "object",
   additionalProperties: false,
 } as const;
 
-export const VoiceCallListWritableSchema = {
+export const VoiceLegListWritableSchema = {
   allOf: [
     {
       type: "object",
@@ -36707,7 +37735,7 @@ export const VoiceCallListWritableSchema = {
         data: {
           type: "array",
           items: {
-            $ref: "#/components/schemas/VoiceCallWritable",
+            $ref: "#/components/schemas/VoiceLegWritable",
           },
         },
       },

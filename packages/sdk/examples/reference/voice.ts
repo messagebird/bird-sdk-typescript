@@ -11,13 +11,13 @@ import { BirdClient } from "@messagebird/sdk";
 const bird = new BirdClient({ apiKey: process.env.BIRD_API_KEY! });
 
 export async function voiceGet() {
-  const call = await bird.voice.get("vcl_01k0p3v9wera3v6q6xw3e9y2mh");
+  const call = await bird.voice.legs.get("vcl_01k0p3v9wera3v6q6xw3e9y2mh");
   // A call still ringing or connected carries no economics yet.
   call.status; // "answered" | "no_answer" | "ringing" | …
 }
 
 export async function voiceList() {
-  for await (const call of bird.voice.list({ status: ["ringing", "in_progress"] })) {
-    console.log(call.id, call.status);
+  for await (const leg of bird.voice.legs.list()) {
+    console.log(leg.id, leg.status);
   }
 }
