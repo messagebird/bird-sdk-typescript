@@ -210,6 +210,7 @@ export type EmailLookupFlagValue = (typeof EmailLookupFlag)[keyof typeof EmailLo
  * these with a `default` branch rather than treating the set as closed.
  */
 export const EmailLookupReason = {
+  DisposableDomain: "disposable_domain",
   InvalidDomain: "invalid_domain",
   InvalidRecipient: "invalid_recipient",
   InvalidSyntax: "invalid_syntax",

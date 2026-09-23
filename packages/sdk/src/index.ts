@@ -157,6 +157,8 @@ export type {
   EmailLookup,
   LookupPhoneNumberParams,
   LookupEmailParams,
+  LookupEmailBatchParams,
+  EmailLookupBatchResponse,
 } from "./resources/lookup.gen.js";
 export type { WhatsappSendParams } from "./resources/whatsapp.js";
 export type { WhatsappMedia } from "./resources/whatsappMessages.js";

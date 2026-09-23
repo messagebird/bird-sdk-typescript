@@ -24,3 +24,10 @@ export async function lookupPhoneNumber() {
   // Only a block whose status is ok carries a value, and only that one is billed.
   if (answer.score?.status === "ok") console.log(answer.score.value);
 }
+
+export async function lookupEmailBatch() {
+  const answer = await bird.lookup.emailBatch({
+    emails: ["aisha.khan@example.com", "not-an-email"],
+  });
+  for (const item of answer.data) console.log(item.email, item.result);
+}

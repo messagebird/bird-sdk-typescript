@@ -235,6 +235,7 @@ export type ErrorBody = {
     | "auth_error"
     | "bad_request_error"
     | "billing_error"
+    | "client_closed_request_error"
     | "conflict_error"
     | "gone_error"
     | "internal_error"
@@ -2559,7 +2560,7 @@ export type ContactProperty = {
    */
   fallback_value?: unknown;
   /**
-   * Whether the property is archived. An archived property is rejected in new contact writes and stops rendering in templates, but every value already stored on contacts is preserved. Reactivate it with unarchive.
+   * Whether the property is archived. Archived keys are rejected in new contact writes and when publishing a new template version. Stored contact values are preserved, and previously published versions keep rendering them. Unarchive the property to use its key in new writes and template versions.
    */
   readonly archived?: boolean;
 } & Timestamps;
@@ -5024,12 +5025,14 @@ export type EmailLookupFlag =
   "role" | "disposable" | "free_provider" | (string & {});
 
 /**
- * Why an address cannot receive mail.
+ * An explanation for the assessment, when available.
  *
  * - `invalid_syntax`: the address is malformed.
  * - `invalid_domain`: the domain does not accept mail.
  * - `invalid_recipient`: the domain accepts mail but this mailbox does
  * not exist.
+ *
+ * - `disposable_domain`: the domain belongs to a disposable-address provider.
  *
  * Open enum: further reasons may be added over time, so treat an unrecognized
  * value as a future one rather than an error. `result` is what to branch on; this
@@ -5037,7 +5040,11 @@ export type EmailLookupFlag =
  *
  */
 export type EmailLookupReason =
-  "invalid_syntax" | "invalid_domain" | "invalid_recipient" | (string & {});
+  | "invalid_syntax"
+  | "invalid_domain"
+  | "invalid_recipient"
+  | "disposable_domain"
+  | (string & {});
 
 /**
  * Assessment of whether an email address accepts mail, the confidence and reason for that
@@ -5057,7 +5064,7 @@ export type EmailLookup = {
    */
   readonly email: string;
   /**
-   * Whether the address is well-formed and its domain is set up to receive mail at all. It says nothing about the mailbox itself, so a `valid` domain with no such mailbox is `true` here and `undeliverable` in `result`.
+   * The provider's validity assessment for the address. Read it with `result` and `delivery_confidence` when deciding whether to send; it does not guarantee delivery.
    */
   readonly valid: boolean;
   readonly result: EmailLookupResult;
@@ -5070,13 +5077,67 @@ export type EmailLookup = {
    */
   readonly flags: Array<EmailLookupFlag>;
   /**
-   * Why the address cannot receive mail. Absent unless `result` is `undeliverable`.
+   * An explanation for the assessment. Can accompany an undeliverable, risky, or typo result; omitted when no recognized reason is available.
    */
   readonly reason?: EmailLookupReason;
   /**
    * The address this one looks like a misspelling of. Absent unless a correction was found, which in practice means `result` is `typo`. Offer it to whoever typed the original rather than sending to it unasked, because it is a guess and the address they meant may be neither one.
    */
   readonly did_you_mean?: string;
+};
+
+export type EmailLookupBatchRequest = {
+  /**
+   * Addresses to assess in submission order. Surrounding whitespace is trimmed and case is preserved. Malformed addresses receive individual assessments. Duplicates are assessed and billed at each position. The request must also fit within the 128 KiB request-body limit.
+   */
+  emails: Array<string>;
+};
+
+/**
+ * Assessment of whether an email address accepts mail, the confidence and reason for that
+ * assessment, and a suggested correction when the address appears misspelled.
+ *
+ * `result` is the field to decide on; `delivery_confidence` grades it, and
+ * `flags` describes the address itself rather than its deliverability, so a
+ * perfectly valid address can still have `role` or `disposable`.
+ *
+ * Fields without resolved values are omitted rather than sent as null. Every
+ * field present in the response was resolved.
+ *
+ */
+export type EmailLookupBatchItem = {
+  /**
+   * The submitted value after trimming surrounding whitespace. May be empty or malformed.
+   */
+  readonly email: string;
+  /**
+   * The provider's validity assessment for the address. Read it with `result` and `delivery_confidence` when deciding whether to send; it does not guarantee delivery.
+   */
+  readonly valid: boolean;
+  readonly result: EmailLookupResult;
+  /**
+   * How likely mail to this address is to be delivered, from 0 (certain not to be) to 100 (certain to be). Read it alongside `result` rather than instead of it, because the same score can sit under `neutral` or `risky` for different reasons.
+   */
+  readonly delivery_confidence: number;
+  /**
+   * Notable characteristics of the address. Empty when none apply.
+   */
+  readonly flags: Array<EmailLookupFlag>;
+  /**
+   * An explanation for the assessment. Can accompany an undeliverable, risky, or typo result; omitted when no recognized reason is available.
+   */
+  readonly reason?: EmailLookupReason;
+  /**
+   * The address this one looks like a misspelling of. Absent unless a correction was found, which in practice means `result` is `typo`. Offer it to whoever typed the original rather than sending to it unasked, because it is a guess and the address they meant may be neither one.
+   */
+  readonly did_you_mean?: string;
+};
+
+export type EmailLookupBatchResponse = {
+  /**
+   * One assessment per submitted address, in submission order, including duplicates.
+   */
+  readonly data: Array<EmailLookupBatchItem>;
 };
 
 /**
@@ -9602,7 +9663,8 @@ export type EmailInboxInsightsEnvelopeBase = {
    */
   readonly measurement?: EmailInboxInsightsMeasurement;
   /**
-   * When the measurement service computed these figures.
+   * When these figures were computed. The measurement service's own stamp where it publishes one; on the resources Bird derives from daily rates it has none to publish, and this is when Bird computed them.
+   *
    */
   readonly generated_at: string;
   readonly freshness: EmailInboxInsightsFreshness;
@@ -15593,9 +15655,10 @@ export type WebhookEndpoint = {
    * - `paused`: All delivery is stopped, either because an update set `status` to
    * `paused` or automatically after sustained delivery failures. A paused endpoint
    * never resumes on its own: re-enable it with
-   * [Update a webhook endpoint](/docs/api/reference/update-webhook), then recover
-   * the missed events with
-   * [Replay missed events](/docs/api/reference/create-webhook-replay).
+   * [Update a webhook endpoint](/docs/api/reference/update-webhook), then
+   * [Replay failed deliveries](/docs/api/reference/create-webhook-replay) to
+   * recover the deliveries that failed before the pause. Events that arrived
+   * while it was paused were never attempted, so a replay does not reach them.
    *
    */
   readonly status: "active" | "degraded" | "paused";
@@ -15645,7 +15708,7 @@ export type WebhookEndpointUpdate = {
    */
   events?: Array<WebhookEventType>;
   /**
-   * `paused` stops all deliveries; `active` re-enables a paused endpoint. Omit to leave the status unchanged. Events that fire while paused are not delivered; after re-enabling, recover them with [Replay missed events](/docs/api/reference/create-webhook-replay). A `degraded` endpoint cannot be reset through this field: it returns to `active` automatically once deliveries succeed again.
+   * `paused` stops all deliveries; `active` re-enables a paused endpoint. Omit to leave the status unchanged. Events that fire while paused are not delivered and a replay cannot recover them, because they were never attempted; after re-enabling, [Replay failed deliveries](/docs/api/reference/create-webhook-replay) reaches only the deliveries that failed before the pause. A `degraded` endpoint cannot be reset through this field: it returns to `active` automatically once deliveries succeed again.
    *
    */
   status?: "active" | "paused";
@@ -17787,12 +17850,12 @@ export type WebhookTestResponse = {
 
 export type WebhookReplayRequest = {
   /**
-   * Replay events that occurred at or after this timestamp. Defaults to 24 hours before the request when omitted.
+   * Replay events whose delivery attempt failed at or after this timestamp. The bound is inclusive and applies to attempt time, not to when the event occurred, so a retry that trailed its event by a day falls in the window by the hour it was attempted. Defaults to 24 hours before the request when omitted. Attempts are retained for three days, so that is the oldest history a replay reaches: an earlier `since` widens the window without recovering anything older.
    *
    */
   since?: string;
   /**
-   * Replay events that occurred before or at this timestamp. Omit to bound the window only by `since`.
+   * Replay events whose delivery attempt failed at or before this timestamp, on the same attempt-time bound as `since`. Omitted, it resolves to the time of the request.
    *
    */
   until?: string;
@@ -17816,9 +17879,10 @@ export type WebhookAttempt = {
    *
    * - `delivered`: your endpoint accepted it with a `2xx` response.
    * - `pending`: the attempt is still in flight.
-   * - `failed`: it returned a non-`2xx` response or no response at all. A `failed`
-   * attempt is not final for the event: automatic retries appear as further
-   * attempts with the same `event_id`.
+   * - `failed`: it returned a non-`2xx` response or no response at all. Automatic
+   * retries appear as further attempts with the same `event_id`, so a `failed`
+   * attempt is final for the event only once the retry schedule is spent. A
+   * replayed delivery takes a single attempt and is never retried.
    *
    */
   status: "delivered" | "pending" | "failed";
@@ -18309,7 +18373,7 @@ export type VoiceLeg = {
    */
   readonly rejection_reason?: VoiceLegRejectionReason;
   /**
-   * Which answer your number gave an incoming leg: a SIP trunk, a forward, or a refusal. Recorded when the leg was handled, so changing the number's setup afterwards does not change what its past legs say. Absent on outbound legs, and on legs recorded before this field existed.
+   * Which answer your number gave an incoming leg. Its `type` selects the shape, and each answer carries its own fields; the variants below are the full set you can receive. Recorded when the leg was handled, so changing the number's setup afterwards does not change what its past legs say. Absent on outbound legs, and on legs recorded before this field existed.
    */
   readonly route?: VoiceLegInboundRoute;
   /**
@@ -18346,7 +18410,7 @@ export type VoiceLeg = {
    */
   readonly media_quality?: VoiceMediaQuality;
   /**
-   * What the leg cost, net of tax, at full precision, split into the components that make it up. Absent until the leg has been rated; unanswered or unpriced legs have no cost.
+   * What the leg cost, net of tax, at full precision, split into the components that make it up. Absent until the leg has been rated; unanswered or unpriced legs have no cost, and neither does a verification call Bird places and answers on your behalf, which is exempt from rating.
    */
   readonly cost?: VoiceLegCost;
 };
@@ -21647,9 +21711,10 @@ export type WebhookAttemptWritable = {
    *
    * - `delivered`: your endpoint accepted it with a `2xx` response.
    * - `pending`: the attempt is still in flight.
-   * - `failed`: it returned a non-`2xx` response or no response at all. A `failed`
-   * attempt is not final for the event: automatic retries appear as further
-   * attempts with the same `event_id`.
+   * - `failed`: it returned a non-`2xx` response or no response at all. Automatic
+   * retries appear as further attempts with the same `event_id`, so a `failed`
+   * attempt is final for the event only once the retry schedule is spent. A
+   * replayed delivery takes a single attempt and is never retried.
    *
    */
   status: "delivered" | "pending" | "failed";
@@ -28697,6 +28762,101 @@ export type CreateEmailLookupResponses = {
 
 export type CreateEmailLookupResponse =
   CreateEmailLookupResponses[keyof CreateEmailLookupResponses];
+
+export type CreateEmailLookupBatchData = {
+  body: EmailLookupBatchRequest;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/lookup/email/batch";
+};
+
+export type CreateEmailLookupBatchErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Request body or message size exceeds the allowed limit
+   */
+  413: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateEmailLookupBatchError =
+  CreateEmailLookupBatchErrors[keyof CreateEmailLookupBatchErrors];
+
+export type CreateEmailLookupBatchResponses = {
+  /**
+   * Completed assessments in submission order.
+   */
+  200: EmailLookupBatchResponse;
+};
+
+export type CreateEmailLookupBatchResponse =
+  CreateEmailLookupBatchResponses[keyof CreateEmailLookupBatchResponses];
 
 export type CreateVerificationData = {
   body: VerificationCreateRequest;

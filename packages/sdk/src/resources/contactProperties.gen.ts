@@ -60,7 +60,7 @@ export class ContactPropertiesResource extends Resource {
   }
 
   /**
-   * Archive a contact property: the key is rejected in new contact writes and stops rendering in templates, while stored values remain readable. The key stays reserved and counts toward the 200-property limit; reverse with `contact_properties.unarchive`.
+   * Archive a contact property: the key is rejected in new contact writes and can no longer be used in a template version you publish, while stored values remain readable and versions published before the archive keep sending. Succeeds whatever else reads the key; only an already-archived property is refused. The key stays reserved and counts toward the 200-property limit; reverse with `contact_properties.unarchive`.
    *
    * @example Archive a property, retiring the field without deleting its data
    * const prop = await bird.contactProperties.archive("cp_01krdgeqcxet5s7t44vh8rt9mg");
@@ -72,7 +72,7 @@ export class ContactPropertiesResource extends Resource {
   }
 
   /**
-   * Reactivate an archived contact property so its key is accepted in contact writes and renders in templates again. Fails with a conflict if the property is not archived.
+   * Reactivate an archived contact property so its key is accepted in contact writes and new template versions. Stored values are unchanged. Fails with a conflict if the property is not archived.
    *
    * @example Restore an archived property
    * await bird.contactProperties.unarchive("cp_01krdgeqcxet5s7t44vh8rt9mg");

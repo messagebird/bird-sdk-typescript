@@ -45,6 +45,9 @@ import type {
   CreateEmailCompetitiveWatchlistBrandData,
   CreateEmailCompetitiveWatchlistBrandErrors,
   CreateEmailCompetitiveWatchlistBrandResponses,
+  CreateEmailLookupBatchData,
+  CreateEmailLookupBatchErrors,
+  CreateEmailLookupBatchResponses,
   CreateEmailLookupData,
   CreateEmailLookupErrors,
   CreateEmailLookupResponses,
@@ -2136,7 +2139,9 @@ export const updateContactProperty = <ThrowOnError extends boolean = false>(
 /**
  * Archive a contact property
  *
- * Archives a contact property. The key stops being accepted in contact writes and stops rendering in templates, but every value already stored on your contacts is preserved and still returned when you read a contact.
+ * Archives a contact property. The key stops being accepted in contact writes, but every value already stored on your contacts is preserved and still returned when you read a contact.
+ *
+ * Archiving a live property succeeds whatever else reads the key. From then on the property behaves as though it does not exist for new work: it is gone from the property pickers, and publishing a template version whose content reads `bird.contact.<key>` is refused, naming the property. Template versions published before you archived it are untouched and keep sending, filling the key from the values your contacts already carry.
  *
  * The key stays reserved and still counts toward the workspace's 200-property limit, so it cannot be re-created with a different type. Archiving an already-archived property returns a conflict error; reverse it with [Unarchive a contact property](/docs/api/reference/unarchive-contact-property).
  *
@@ -2168,7 +2173,7 @@ export const archiveContactProperty = <ThrowOnError extends boolean = false>(
 /**
  * Unarchive a contact property
  *
- * Reactivates an archived contact property. The key is accepted in contact writes and renders in templates again; stored values were never removed, so they are unchanged. Unarchiving a property that is not archived returns a conflict error.
+ * Reactivates an archived contact property. The key is accepted in contact writes and new template versions. Stored values are unchanged. Unarchiving a property that is not archived returns a conflict error.
  *
  */
 export const unarchiveContactProperty = <ThrowOnError extends boolean = false>(
@@ -3722,7 +3727,7 @@ export const createPhoneNumberLookup = <ThrowOnError extends boolean = false>(
 /**
  * Create an email address lookup
  *
- * Returns a deliverability `result`, a `delivery_confidence` score, address characteristics, an undeliverable `reason`, and a suggested correction when available. `result` and `reason` are open vocabularies. Handle unknown values and use `delivery_confidence` as the stable fallback. Each completed lookup incurs the same charge regardless of its result.
+ * Returns a deliverability `result`, a `delivery_confidence` score, address characteristics, an assessment `reason`, and a suggested correction when available. `result` and `reason` are open vocabularies. Handle unknown values and use `delivery_confidence` as the stable fallback. Each completed lookup incurs the same charge regardless of its result.
  *
  * This form keeps the address out of the URL. The [URL form](/docs/api/reference/get-email-lookup) performs the same lookup but cannot use an idempotency key. With this form, reuse an `Idempotency-Key` to return the stored result without another lookup or charge.
  *
@@ -3748,6 +3753,51 @@ export const createEmailLookup = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/lookup/email",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Create a batch of email address lookups
+ *
+ * Assesses up to 1,000 email addresses synchronously and returns one result per
+ * input in submission order. Malformed addresses receive individual assessments.
+ * Duplicate addresses remain separate entries and each answered entry is billed
+ * at the email lookup rate. Use [Create an email address lookup](/docs/api/reference/create-email-lookup)
+ * for a single address. A batch consumes one request allowance under the shared
+ * lookup rate limit, regardless of its number of addresses.
+ *
+ * Requests must fit within 128 KiB. Split larger lists into separate requests.
+ * Reuse an `Idempotency-Key` for retries of the same batch. Successful responses
+ * up to 256 KiB can be retained for replay; larger responses are returned but
+ * are not retained, so retrying can perform and charge for another batch.
+ * An unavailable lookup returns `503` without charging for the batch.
+ *
+ */
+export const createEmailLookupBatch = <ThrowOnError extends boolean = false>(
+  options: Options<CreateEmailLookupBatchData, ThrowOnError>,
+): RequestResult<
+  CreateEmailLookupBatchResponses,
+  CreateEmailLookupBatchErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateEmailLookupBatchResponses,
+    CreateEmailLookupBatchErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/lookup/email/batch",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -9824,7 +9874,7 @@ export const listVoiceLegs = <ThrowOnError extends boolean = false>(
 /**
  * Get a leg
  *
- * Returns a single leg at any point in its lifecycle. A leg that is still ringing or connected answers with its in-flight `status` and no economics: `duration_ms`, `billable_ms`, `ended_at`, and `cost` fill in once it ends, at this same URL. Returns a 404 `not_found_error` if the leg does not exist in the workspace.
+ * Returns a single leg at any point in its lifecycle. A leg that is still ringing or connected answers with its in-flight `status` and no economics: `duration_ms`, `billable_ms`, and `ended_at` fill in once it ends, at this same URL, and `cost` does too unless the leg was never rated, as with a verification call Bird places and answers on your behalf. Returns a 404 `not_found_error` if the leg does not exist in the workspace.
  *
  */
 export const getVoiceLeg = <ThrowOnError extends boolean = false>(

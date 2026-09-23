@@ -318,6 +318,7 @@ export const ErrorBodySchema = {
         "auth_error",
         "bad_request_error",
         "billing_error",
+        "client_closed_request_error",
         "conflict_error",
         "gone_error",
         "internal_error",
@@ -4459,7 +4460,7 @@ export const ContactPropertySchema = {
           type: "boolean",
           readOnly: true,
           description:
-            "Whether the property is archived. An archived property is rejected in new contact writes and stops rendering in templates, but every value already stored on contacts is preserved. Reactivate it with unarchive.",
+            "Whether the property is archived. Archived keys are rejected in new contact writes and when publishing a new template version. Stored contact values are preserved, and previously published versions keep rendering them. Unarchive the property to use its key in new writes and template versions.",
         },
       },
     },
@@ -8942,9 +8943,10 @@ export const EmailLookupReasonSchema = {
     "invalid_syntax",
     "invalid_domain",
     "invalid_recipient",
+    "disposable_domain",
   ],
   description:
-    "Why an address cannot receive mail.\n\n- `invalid_syntax`: the address is malformed.\n- `invalid_domain`: the domain does not accept mail.\n- `invalid_recipient`: the domain accepts mail but this mailbox does\n  not exist.\n\nOpen enum: further reasons may be added over time, so treat an unrecognized\nvalue as a future one rather than an error. `result` is what to branch on; this\nfield explains it.\n",
+    "An explanation for the assessment, when available.\n\n- `invalid_syntax`: the address is malformed.\n- `invalid_domain`: the domain does not accept mail.\n- `invalid_recipient`: the domain accepts mail but this mailbox does\n  not exist.\n\n- `disposable_domain`: the domain belongs to a disposable-address provider.\n\nOpen enum: further reasons may be added over time, so treat an unrecognized\nvalue as a future one rather than an error. `result` is what to branch on; this\nfield explains it.\n",
   example: "invalid_recipient",
 } as const;
 
@@ -8966,7 +8968,7 @@ export const EmailLookupSchema = {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether the address is well-formed and its domain is set up to receive mail at all. It says nothing about the mailbox itself, so a `valid` domain with no such mailbox is `true` here and `undeliverable` in `result`.",
+        "The provider's validity assessment for the address. Read it with `result` and `delivery_confidence` when deciding whether to send; it does not guarantee delivery.",
     },
     result: {
       allOf: [
@@ -9001,7 +9003,7 @@ export const EmailLookupSchema = {
       ],
       readOnly: true,
       description:
-        "Why the address cannot receive mail. Absent unless `result` is `undeliverable`.",
+        "An explanation for the assessment. Can accompany an undeliverable, risky, or typo result; omitted when no recognized reason is available.",
     },
     did_you_mean: {
       type: "string",
@@ -9018,6 +9020,122 @@ export const EmailLookupSchema = {
     result: "risky",
     delivery_confidence: 42,
     flags: ["role", "free_provider"],
+  },
+} as const;
+
+export const EmailLookupBatchRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["emails"],
+  properties: {
+    emails: {
+      type: "array",
+      minItems: 1,
+      maxItems: 1000,
+      description:
+        "Addresses to assess in submission order. Surrounding whitespace is trimmed and case is preserved. Malformed addresses receive individual assessments. Duplicates are assessed and billed at each position. The request must also fit within the 128 KiB request-body limit.",
+      items: {
+        type: "string",
+        minLength: 0,
+        maxLength: 254,
+      },
+    },
+  },
+  example: {
+    emails: ["aisha.khan@example.com", "not-an-email"],
+  },
+} as const;
+
+export const EmailLookupBatchItemSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Assessment of whether an email address accepts mail, the confidence and reason for that\nassessment, and a suggested correction when the address appears misspelled.\n\n`result` is the field to decide on; `delivery_confidence` grades it, and\n`flags` describes the address itself rather than its deliverability, so a\nperfectly valid address can still have `role` or `disposable`.\n\nFields without resolved values are omitted rather than sent as null. Every\nfield present in the response was resolved.\n",
+  required: ["email", "valid", "result", "delivery_confidence", "flags"],
+  properties: {
+    email: {
+      type: "string",
+      minLength: 0,
+      maxLength: 254,
+      readOnly: true,
+      description:
+        "The submitted value after trimming surrounding whitespace. May be empty or malformed.",
+    },
+    valid: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "The provider's validity assessment for the address. Read it with `result` and `delivery_confidence` when deciding whether to send; it does not guarantee delivery.",
+    },
+    result: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailLookupResult",
+        },
+      ],
+      readOnly: true,
+    },
+    delivery_confidence: {
+      type: "integer",
+      minimum: 0,
+      maximum: 100,
+      readOnly: true,
+      description:
+        "How likely mail to this address is to be delivered, from 0 (certain not to be) to 100 (certain to be). Read it alongside `result` rather than instead of it, because the same score can sit under `neutral` or `risky` for different reasons.",
+    },
+    flags: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Notable characteristics of the address. Empty when none apply.",
+      items: {
+        $ref: "#/components/schemas/EmailLookupFlag",
+      },
+    },
+    reason: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/EmailLookupReason",
+        },
+      ],
+      readOnly: true,
+      description:
+        "An explanation for the assessment. Can accompany an undeliverable, risky, or typo result; omitted when no recognized reason is available.",
+    },
+    did_you_mean: {
+      type: "string",
+      minLength: 3,
+      maxLength: 254,
+      readOnly: true,
+      description:
+        "The address this one looks like a misspelling of. Absent unless a correction was found, which in practice means `result` is `typo`. Offer it to whoever typed the original rather than sending to it unasked, because it is a guess and the address they meant may be neither one.",
+    },
+  },
+  example: {
+    email: "aisha.khan@example.com",
+    valid: true,
+    result: "risky",
+    delivery_confidence: 42,
+    flags: ["role", "free_provider"],
+  },
+} as const;
+
+export const EmailLookupBatchResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      minItems: 1,
+      maxItems: 1000,
+      readOnly: true,
+      description:
+        "One assessment per submitted address, in submission order, including duplicates.",
+      items: {
+        $ref: "#/components/schemas/EmailLookupBatchItem",
+      },
+    },
   },
 } as const;
 
@@ -17222,7 +17340,8 @@ export const EmailInboxInsightsEnvelopeBaseSchema = {
       format: "date-time",
       minLength: 1,
       readOnly: true,
-      description: "When the measurement service computed these figures.",
+      description:
+        "When these figures were computed. The measurement service's own stamp where it publishes one; on the resources Bird derives from daily rates it has none to publish, and this is when Bird computed them.\n",
       example: "2026-08-18T09:34:00Z",
     },
     freshness: {
@@ -27377,7 +27496,7 @@ export const WebhookEndpointSchema = {
           readOnly: true,
           minLength: 1,
           description:
-            "Delivery state of the endpoint.\n\n- `active`: The initial state; events are being delivered normally.\n- `degraded`: Recent deliveries are failing. We keep delivering and retrying,\n  and the endpoint returns to `active` automatically once deliveries succeed\n  again.\n- `paused`: All delivery is stopped, either because an update set `status` to\n  `paused` or automatically after sustained delivery failures. A paused endpoint\n  never resumes on its own: re-enable it with\n  [Update a webhook endpoint](/docs/api/reference/update-webhook), then recover\n  the missed events with\n  [Replay missed events](/docs/api/reference/create-webhook-replay).\n",
+            "Delivery state of the endpoint.\n\n- `active`: The initial state; events are being delivered normally.\n- `degraded`: Recent deliveries are failing. We keep delivering and retrying,\n  and the endpoint returns to `active` automatically once deliveries succeed\n  again.\n- `paused`: All delivery is stopped, either because an update set `status` to\n  `paused` or automatically after sustained delivery failures. A paused endpoint\n  never resumes on its own: re-enable it with\n  [Update a webhook endpoint](/docs/api/reference/update-webhook), then\n  [Replay failed deliveries](/docs/api/reference/create-webhook-replay) to\n  recover the deliveries that failed before the pause. Events that arrived\n  while it was paused were never attempted, so a replay does not reach them.\n",
           enum: ["active", "degraded", "paused"],
         },
       },
@@ -27502,7 +27621,7 @@ export const WebhookEndpointUpdateSchema = {
       type: "string",
       enum: ["active", "paused"],
       description:
-        "`paused` stops all deliveries; `active` re-enables a paused endpoint. Omit to leave the status unchanged. Events that fire while paused are not delivered; after re-enabling, recover them with [Replay missed events](/docs/api/reference/create-webhook-replay). A `degraded` endpoint cannot be reset through this field: it returns to `active` automatically once deliveries succeed again.\n",
+        "`paused` stops all deliveries; `active` re-enables a paused endpoint. Omit to leave the status unchanged. Events that fire while paused are not delivered and a replay cannot recover them, because they were never attempted; after re-enabling, [Replay failed deliveries](/docs/api/reference/create-webhook-replay) reaches only the deliveries that failed before the pause. A `degraded` endpoint cannot be reset through this field: it returns to `active` automatically once deliveries succeed again.\n",
     },
   },
 } as const;
@@ -31240,7 +31359,7 @@ export const WebhookReplayRequestSchema = {
       format: "date-time",
       minLength: 1,
       description:
-        "Replay events that occurred at or after this timestamp. Defaults to 24 hours before the request when omitted.\n",
+        "Replay events whose delivery attempt failed at or after this timestamp. The bound is inclusive and applies to attempt time, not to when the event occurred, so a retry that trailed its event by a day falls in the window by the hour it was attempted. Defaults to 24 hours before the request when omitted. Attempts are retained for three days, so that is the oldest history a replay reaches: an earlier `since` widens the window without recovering anything older.\n",
       example: "2026-05-07T00:00:00Z",
     },
     until: {
@@ -31248,7 +31367,7 @@ export const WebhookReplayRequestSchema = {
       format: "date-time",
       minLength: 1,
       description:
-        "Replay events that occurred before or at this timestamp. Omit to bound the window only by `since`.\n",
+        "Replay events whose delivery attempt failed at or before this timestamp, on the same attempt-time bound as `since`. Omitted, it resolves to the time of the request.\n",
       example: "2026-05-07T23:59:59Z",
     },
   },
@@ -31302,7 +31421,7 @@ export const WebhookAttemptSchema = {
       minLength: 1,
       enum: ["delivered", "pending", "failed"],
       description:
-        "Outcome of this attempt.\n\n- `delivered`: your endpoint accepted it with a `2xx` response.\n- `pending`: the attempt is still in flight.\n- `failed`: it returned a non-`2xx` response or no response at all. A `failed`\n  attempt is not final for the event: automatic retries appear as further\n  attempts with the same `event_id`.\n",
+        "Outcome of this attempt.\n\n- `delivered`: your endpoint accepted it with a `2xx` response.\n- `pending`: the attempt is still in flight.\n- `failed`: it returned a non-`2xx` response or no response at all. Automatic\n  retries appear as further attempts with the same `event_id`, so a `failed`\n  attempt is final for the event only once the retry schedule is spent. A\n  replayed delivery takes a single attempt and is never retried.\n",
     },
     url: {
       type: "string",
@@ -32156,7 +32275,7 @@ export const VoiceLegSchema = {
         },
       ],
       description:
-        "Which answer your number gave an incoming leg: a SIP trunk, a forward, or a refusal. Recorded when the leg was handled, so changing the number's setup afterwards does not change what its past legs say. Absent on outbound legs, and on legs recorded before this field existed.",
+        "Which answer your number gave an incoming leg. Its `type` selects the shape, and each answer carries its own fields; the variants below are the full set you can receive. Recorded when the leg was handled, so changing the number's setup afterwards does not change what its past legs say. Absent on outbound legs, and on legs recorded before this field existed.",
     },
     tags: {
       type: "array",
@@ -32223,7 +32342,7 @@ export const VoiceLegSchema = {
       $ref: "#/components/schemas/VoiceLegCost",
       readOnly: true,
       description:
-        "What the leg cost, net of tax, at full precision, split into the components that make it up. Absent until the leg has been rated; unanswered or unpriced legs have no cost.",
+        "What the leg cost, net of tax, at full precision, split into the components that make it up. Absent until the leg has been rated; unanswered or unpriced legs have no cost, and neither does a verification call Bird places and answers on your behalf, which is exempt from rating.",
     },
   },
 } as const;
@@ -37540,7 +37659,7 @@ export const WebhookAttemptWritableSchema = {
       minLength: 1,
       enum: ["delivered", "pending", "failed"],
       description:
-        "Outcome of this attempt.\n\n- `delivered`: your endpoint accepted it with a `2xx` response.\n- `pending`: the attempt is still in flight.\n- `failed`: it returned a non-`2xx` response or no response at all. A `failed`\n  attempt is not final for the event: automatic retries appear as further\n  attempts with the same `event_id`.\n",
+        "Outcome of this attempt.\n\n- `delivered`: your endpoint accepted it with a `2xx` response.\n- `pending`: the attempt is still in flight.\n- `failed`: it returned a non-`2xx` response or no response at all. Automatic\n  retries appear as further attempts with the same `event_id`, so a `failed`\n  attempt is final for the event only once the retry schedule is spent. A\n  replayed delivery takes a single attempt and is never retried.\n",
     },
     url: {
       type: "string",
