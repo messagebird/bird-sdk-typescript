@@ -87,17 +87,17 @@ export interface CursorPage<T> {
  * List return (R1): `await` resolves the first page; `for await` walks every
  * item across all pages, fetching subsequent pages lazily.
  */
-export interface PaginatedPromise<T> extends Promise<CursorPage<T>>, AsyncIterable<T> {
-  withResponse(): Promise<{ data: CursorPage<T>; response: BirdResponse }>;
+export interface PaginatedPromise<T, P extends CursorPage<T> = CursorPage<T>> extends Promise<P>, AsyncIterable<T> {
+  withResponse(): Promise<{ data: P; response: BirdResponse }>;
   /** Resolve the first page as `{ data, error }` instead of throwing. */
-  safe(): Promise<SafeResult<CursorPage<T>>>;
+  safe(): Promise<SafeResult<P>>;
 }
 
-export function paginate<T>(
-  fetchPage: (cursor?: string) => Promise<{ data: CursorPage<T>; response: BirdResponse }>,
-): PaginatedPromise<T> {
+export function paginate<T, P extends CursorPage<T> = CursorPage<T>>(
+  fetchPage: (cursor?: string) => Promise<{ data: P; response: BirdResponse }>,
+): PaginatedPromise<T, P> {
   const first = fetchPage();
-  const promise = basePromise<CursorPage<T>, PaginatedPromise<T>>(first);
+  const promise = basePromise<P, PaginatedPromise<T, P>>(first);
   promise[Symbol.asyncIterator] = async function* () {
     let result = await first;
     for (;;) {

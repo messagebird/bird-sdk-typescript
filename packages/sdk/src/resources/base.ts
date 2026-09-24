@@ -48,19 +48,26 @@ export abstract class Resource {
   }
 
   /** Run a cursor-paginated list through the lifecycle (each page retried independently). */
-  protected paginated<T>(
+  protected paginated<T, P extends CursorPage<T> = CursorPage<T>>(
     method: string,
     options: RequestOptions | undefined,
-    invoke: (ctx: CallContext, cursor: string | undefined) => Promise<FetchOutcome<CursorPage<T>>>,
+    invoke: (ctx: CallContext, cursor: string | undefined) => Promise<FetchOutcome<P>>,
     schemes?: string[],
-  ): PaginatedPromise<T> {
+  ): PaginatedPromise<T, P> {
     const credentials = this.core.credentialHeaders(schemes, options?.credentials);
-    return paginate<T>((cursor) =>
-      this.core.request<CursorPage<T>>(
-        (ctx) => invoke(callContext(ctx, options, credentials), cursor),
-        lifecycle(method, options),
-      ),
-    );
+    return paginate<T, P>((cursor) => {
+      const pageOptions = method === "POST" && cursor !== undefined
+        ? {
+          ...options,
+          idempotencyKey: undefined,
+          headers: Object.fromEntries(Object.entries(options?.headers ?? {}).filter(([key]) => key.toLowerCase() !== "idempotency-key")),
+        }
+        : options;
+      return this.core.request<P>(
+        (ctx) => invoke(callContext(ctx, pageOptions, credentials), cursor),
+        lifecycle(method, pageOptions),
+      );
+    });
   }
 }
 

@@ -149,6 +149,12 @@ export const WebhookEventSchema = {
       $ref: "#/components/schemas/EventWhatsAppFailed",
     },
     {
+      $ref: "#/components/schemas/EventWhatsAppGroupJoinRequestCreated",
+    },
+    {
+      $ref: "#/components/schemas/EventWhatsAppGroupJoinRequestRevoked",
+    },
+    {
       $ref: "#/components/schemas/EventWhatsAppReacted",
     },
     {
@@ -233,6 +239,10 @@ export const WebhookEventSchema = {
       "whatsapp.accepted": "#/components/schemas/EventWhatsAppAccepted",
       "whatsapp.delivered": "#/components/schemas/EventWhatsAppDelivered",
       "whatsapp.failed": "#/components/schemas/EventWhatsAppFailed",
+      "whatsapp.group.join_request_created":
+        "#/components/schemas/EventWhatsAppGroupJoinRequestCreated",
+      "whatsapp.group.join_request_revoked":
+        "#/components/schemas/EventWhatsAppGroupJoinRequestRevoked",
       "whatsapp.reacted": "#/components/schemas/EventWhatsAppReacted",
       "whatsapp.read": "#/components/schemas/EventWhatsAppRead",
       "whatsapp.received": "#/components/schemas/EventWhatsAppReceived",
@@ -655,6 +665,29 @@ export const CurrencyCodeSchema = {
   pattern: "^[A-Z]{3}$",
   description: "ISO 4217 three-letter currency code.",
   example: "EUR",
+} as const;
+
+export const DestinationRegionSchema = {
+  type: ["string", "null"],
+  minLength: 1,
+  "x-extensible-enum": [
+    "western_europe",
+    "nordics_baltics",
+    "southern_europe",
+    "central_eastern_europe",
+    "north_america",
+    "latin_america_caribbean",
+    "middle_east_north_africa",
+    "sub_saharan_africa",
+    "central_asia_caucasus",
+    "south_asia",
+    "south_east_asia",
+    "east_asia",
+    "oceania",
+  ],
+  example: "western_europe",
+  description:
+    "The commercial region this country belongs to, for grouping a destination list the way it is bought rather than alphabetically. `null` for a country we have not assigned yet. Bird defines these regions independently of ISO and UN M49. A country can move between them, so treat the set as open.\n",
 } as const;
 
 export const CountryCodeSchema = {
@@ -8328,6 +8361,37 @@ export const SMSInboundStatsByNumberResponseSchema = {
   },
 } as const;
 
+export const DestinationSuperRegionSchema = {
+  type: ["string", "null"],
+  minLength: 1,
+  "x-extensible-enum": [
+    "europe",
+    "americas",
+    "middle_east_africa",
+    "asia_pacific",
+  ],
+  example: "europe",
+  description:
+    "The continent-scale group the region rolls up into. Derived from `region`, and `null` whenever that is. Treat the set as open.\n",
+} as const;
+
+export const DestinationSettingSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["country_code", "enabled"],
+  properties: {
+    country_code: {
+      $ref: "#/components/schemas/CountryCode",
+    },
+    enabled: {
+      type: "boolean",
+      description:
+        "Whether to enable (`true`) or disable (`false`) this destination country.",
+      example: true,
+    },
+  },
+} as const;
+
 export const AllocatedNumberIDSchema = {
   type: "string",
   minLength: 1,
@@ -9460,6 +9524,20 @@ export const DomainIDSchema = {
   minLength: 1,
   pattern: "^dom_[0-9a-hjkmnp-tv-z]{26}$",
   example: "dom_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppNumberIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^wan_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "wan_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppTemplateIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^wat_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "wat_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const WhatsAppMessageStatusSchema = {
@@ -10961,13 +11039,6 @@ export const WhatsAppMessageListSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
-} as const;
-
-export const WhatsAppTemplateIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^wat_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "wat_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const WhatsAppTemplateSendSchema = {
@@ -12786,13 +12857,6 @@ export const WhatsAppGroupStatusSchema = {
   example: "active",
 } as const;
 
-export const WhatsAppNumberIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^wan_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "wan_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
 export const WhatsAppGroupJoinApprovalModeSchema = {
   type: "string",
   minLength: 1,
@@ -12961,7 +13025,7 @@ export const WhatsAppGroupParticipantSchema = {
       readOnly: true,
       description:
         "Business-scoped user ID, Meta's identifier for this person against your business. The one identifier every participant has: WhatsApp always sends it, and it is stable for as long as they are in the group.\n",
-      example: "BR.1566655121691972",
+      example: "US.1566655121691972",
     },
     phone_number: {
       type: "string",
@@ -12977,7 +13041,7 @@ export const WhatsAppGroupParticipantSchema = {
       readOnly: true,
       description:
         "The WhatsApp username this person chose. Absent when they have none, and not an identifier to address them by: it is theirs to change, so it names them in a list rather than keying anything.\n",
-      example: "jim.almeida",
+      example: "john.doe",
     },
     last_operation: {
       $ref: "#/components/schemas/WhatsAppGroupOperation",
@@ -13335,7 +13399,7 @@ export const WhatsAppGroupJoinRequestSchema = {
       readOnly: true,
       description:
         "Business-scoped user ID, Meta's identifier for this person against your business. The one identifier every request has, and the one that carries over to `participants` if you approve it.\n",
-      example: "BR.1566655121691972",
+      example: "US.1566655121691972",
     },
     phone_number: {
       type: "string",
@@ -13351,7 +13415,7 @@ export const WhatsAppGroupJoinRequestSchema = {
       readOnly: true,
       description:
         "The WhatsApp username this person chose. Absent when they have none, and theirs to change, so it names them in a list rather than keying anything.\n",
-      example: "jim.almeida",
+      example: "john.doe",
     },
     created_at: {
       type: "string",
@@ -19619,8 +19683,15 @@ export const EmailStatsTagsResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-tag breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).",
-  required: ["period", "data", "total"],
+    "Per-tag breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: [
+    "period",
+    "data",
+    "total",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
   properties: {
     period: {
       $ref: "#/components/schemas/EmailStatsPeriod",
@@ -19641,10 +19712,934 @@ export const EmailStatsTagsResponseSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Total number of distinct tags (name and value pairs) with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.\n",
+        "Total number of distinct tags (name and value pairs) with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
       example: 173,
     },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
   },
+} as const;
+
+export const EmailStatsQueryMetricSchema = {
+  type: "string",
+  description:
+    "Metric selected for period totals, time buckets, or group ranking. Counts estimate distinct identities; rates are ratios. Latency metrics measure milliseconds from Bird acceptance to processing or delivery.",
+  enum: [
+    "sends_accepted",
+    "accepted",
+    "processed",
+    "delivered",
+    "bounced",
+    "hard_bounced",
+    "soft_bounced",
+    "admin_bounced",
+    "block_bounced",
+    "undetermined_bounced",
+    "complained",
+    "deferred",
+    "rejected",
+    "oob_bounces",
+    "opens",
+    "opens_non_prefetched",
+    "clicks",
+    "unsubscribes",
+    "unique_opens",
+    "unique_opens_non_prefetched",
+    "unique_clicks",
+    "confirmed_unique_opens",
+    "confirmed_unique_opens_non_prefetched",
+    "effective_delivered",
+    "all_bounces",
+    "delivery_rate",
+    "bounce_rate",
+    "complaint_rate",
+    "deferral_rate",
+    "open_rate",
+    "click_rate",
+    "unsubscribe_rate",
+    "oob_rate",
+    "processing_p50_ms",
+    "processing_p95_ms",
+    "processing_p99_ms",
+    "total_p50_ms",
+    "total_p95_ms",
+    "total_p99_ms",
+  ],
+} as const;
+
+export const EmailStatsQueryDimensionSchema = {
+  type: "string",
+  description:
+    "Recorded event context used to group results. Grouping by `tag` requires `filters.tag.name`.\nMissing values form a null group when the metric supports that dimension.\n\nEvery selected metric must support the grouping dimension and every filter dimension.\nUnsupported combinations return validation error `E04074`, even when the workspace has no events.\n\n- `sending_domain`, `category`, `template_id`, `tag`: all metrics.\n- `recipient_domain`, `ip_pool_id`, `broadcast_id`: all metrics except `sends_accepted`.\n- `mailbox_provider`, `mailbox_provider_region`: all metrics except `sends_accepted`, `accepted`, and `rejected`.\n- `sending_ip`: `delivered`, `bounced`, `hard_bounced`, `soft_bounced`, `admin_bounced`, `block_bounced`,\n  `undetermined_bounced`, `deferred`, `oob_bounces`, `effective_delivered`, `all_bounces`, `delivery_rate`,\n  `bounce_rate`, `deferral_rate`, `oob_rate`, `total_p50_ms`, `total_p95_ms`, and `total_p99_ms`.\n- `country`, `region`, `city`, `agent_family`, `os_family`, `device_family`: `opens`, `opens_non_prefetched`,\n  `clicks`, `unique_opens`, `unique_opens_non_prefetched`, `unique_clicks`, `confirmed_unique_opens`,\n  and `confirmed_unique_opens_non_prefetched`.\n- `smtp_error_code`: `bounced`, `hard_bounced`, `soft_bounced`, `admin_bounced`, `block_bounced`, and `undetermined_bounced`.\n- `feedback_type`: `complained`.\n",
+  enum: [
+    "sending_domain",
+    "category",
+    "template_id",
+    "tag",
+    "recipient_domain",
+    "mailbox_provider",
+    "mailbox_provider_region",
+    "sending_ip",
+    "ip_pool_id",
+    "broadcast_id",
+    "country",
+    "region",
+    "city",
+    "agent_family",
+    "os_family",
+    "device_family",
+    "smtp_error_code",
+    "feedback_type",
+  ],
+} as const;
+
+export const EmailStatsQueryGrainSchema = {
+  type: "string",
+  description:
+    "Time buckets in the requested timezone. Weeks start on Monday; months start on the first day. Half days start at midnight and noon. Edge buckets count events inside the normalized period.",
+  enum: ["quarter_hour", "hour", "half_day", "day", "week", "month"],
+} as const;
+
+export const EmailStatsQueryStringFilterSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Match recorded values using include or exclude. Include values combine with OR; exclusions remove matches. Missing values survive exclude-only predicates. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.",
+  properties: {
+    include: {
+      type: "array",
+      items: {
+        type: "string",
+      },
+    },
+    exclude: {
+      type: "array",
+      items: {
+        type: "string",
+      },
+    },
+  },
+  minProperties: 1,
+  not: {
+    properties: {
+      include: {
+        maxItems: 0,
+      },
+      exclude: {
+        maxItems: 0,
+      },
+    },
+  },
+} as const;
+
+export const EmailStatsQueryCategoryFilterSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Match recorded values using include or exclude. Include values combine with OR; exclusions remove matches. Missing values survive exclude-only predicates. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.",
+  properties: {
+    include: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailMessageCategory",
+      },
+    },
+    exclude: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailMessageCategory",
+      },
+    },
+  },
+  minProperties: 1,
+} as const;
+
+export const EmailStatsQueryTemplateFilterSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Match recorded values using include or exclude. Include values combine with OR; exclusions remove matches. Missing values survive exclude-only predicates. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.",
+  properties: {
+    include: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailTemplateID",
+      },
+    },
+    exclude: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailTemplateID",
+      },
+    },
+  },
+  minProperties: 1,
+} as const;
+
+export const EmailStatsQueryTagFilterSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Select one case-sensitive tag name. A name without values requires that tag to exist. Exclude-only predicates retain events without that tag. Include and exclude together accept at most 20 distinct normalized values with no overlap.",
+  required: ["name"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      example: "campaign",
+    },
+    include: {
+      type: "array",
+      items: {
+        type: "string",
+      },
+    },
+    exclude: {
+      type: "array",
+      items: {
+        type: "string",
+      },
+    },
+  },
+} as const;
+
+export const IPPoolIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^ipp_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "ipp_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EmailStatsQueryIPPoolFilterSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Match recorded values using include or exclude. Include values combine with OR; exclusions remove matches. Missing values survive exclude-only predicates. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.",
+  properties: {
+    include: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/IPPoolID",
+      },
+    },
+    exclude: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/IPPoolID",
+      },
+    },
+  },
+  minProperties: 1,
+} as const;
+
+export const EmailStatsQueryBroadcastFilterSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Match recorded values using include or exclude. Include values combine with OR; exclusions remove matches. Missing values survive exclude-only predicates. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.",
+  properties: {
+    include: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailBroadcastID",
+      },
+    },
+    exclude: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailBroadcastID",
+      },
+    },
+  },
+  minProperties: 1,
+} as const;
+
+export const EmailStatsQueryFiltersSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Predicates on the context recorded for each event. Dimensions combine with AND. Unsupported metric and dimension combinations return 422, including for an empty workspace.",
+  properties: {
+    sending_domain: {
+      $ref: "#/components/schemas/EmailStatsQueryStringFilter",
+    },
+    category: {
+      $ref: "#/components/schemas/EmailStatsQueryCategoryFilter",
+    },
+    template_id: {
+      $ref: "#/components/schemas/EmailStatsQueryTemplateFilter",
+    },
+    tag: {
+      $ref: "#/components/schemas/EmailStatsQueryTagFilter",
+    },
+    recipient_domain: {
+      $ref: "#/components/schemas/EmailStatsQueryStringFilter",
+    },
+    mailbox_provider: {
+      $ref: "#/components/schemas/EmailStatsQueryStringFilter",
+    },
+    mailbox_provider_region: {
+      $ref: "#/components/schemas/EmailStatsQueryStringFilter",
+    },
+    sending_ip: {
+      $ref: "#/components/schemas/EmailStatsQueryStringFilter",
+    },
+    ip_pool_id: {
+      $ref: "#/components/schemas/EmailStatsQueryIPPoolFilter",
+    },
+    broadcast_id: {
+      $ref: "#/components/schemas/EmailStatsQueryBroadcastFilter",
+    },
+    country: {
+      $ref: "#/components/schemas/EmailStatsQueryStringFilter",
+    },
+    region: {
+      $ref: "#/components/schemas/EmailStatsQueryStringFilter",
+    },
+    city: {
+      $ref: "#/components/schemas/EmailStatsQueryStringFilter",
+    },
+    agent_family: {
+      $ref: "#/components/schemas/EmailStatsQueryStringFilter",
+    },
+    os_family: {
+      $ref: "#/components/schemas/EmailStatsQueryStringFilter",
+    },
+    device_family: {
+      $ref: "#/components/schemas/EmailStatsQueryStringFilter",
+    },
+    smtp_error_code: {
+      $ref: "#/components/schemas/EmailStatsQueryStringFilter",
+    },
+    feedback_type: {
+      $ref: "#/components/schemas/EmailStatsQueryStringFilter",
+    },
+  },
+} as const;
+
+export const EmailStatsQueryRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Select email metrics for one workspace and one time window. Group-only fields require group_by; defaults apply after grouping is selected. Queries are limited to 20,000 series points, 1,000,000 selected metric cells including period rows, and a 4 MiB JSON response. Unsupported combinations or unavailable history return 422.",
+  required: ["from", "to", "metrics"],
+  properties: {
+    from: {
+      type: "string",
+      minLength: 1,
+      pattern:
+        "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2}))?$",
+      description:
+        "Inclusive start, as a calendar date or RFC 3339 instant. Use the same form for from and to. Instants round down to a local quarter-hour; use Z when timezone is supplied.",
+      example: "2026-08-03",
+    },
+    to: {
+      type: "string",
+      minLength: 1,
+      pattern:
+        "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2}))?$",
+      description:
+        "Inclusive end. Dates include the whole local day; instants round down to a local quarter-hour and include that quarter-hour. Dates allow up to 365 local days; instants allow up to 720 hours, subject to available history. Preserve this original bound when following cursors.",
+      example: "2026-08-16",
+    },
+    timezone: {
+      type: "string",
+      minLength: 1,
+      description:
+        "IANA timezone for dates and bucket boundaries. Defaults to UTC.",
+      example: "Europe/Amsterdam",
+    },
+    metrics: {
+      type: "array",
+      minItems: 1,
+      maxItems: 39,
+      uniqueItems: true,
+      items: {
+        $ref: "#/components/schemas/EmailStatsQueryMetric",
+      },
+      description: "Distinct metrics to return. Unselected metrics are absent.",
+    },
+    group_by: {
+      $ref: "#/components/schemas/EmailStatsQueryDimension",
+      description:
+        "Group by this dimension. Omit for a single ungrouped summary with optional series.",
+    },
+    grain: {
+      $ref: "#/components/schemas/EmailStatsQueryGrain",
+    },
+    filters: {
+      $ref: "#/components/schemas/EmailStatsQueryFilters",
+    },
+    sort: {
+      $ref: "#/components/schemas/EmailStatsQueryMetric",
+      description:
+        "Grouped requests only. Rank groups by this selected metric; defaults to the first metrics entry. Undefined values sort last in either direction. Ties use the dimension value ascending, with null last.",
+    },
+    order: {
+      $ref: "#/components/schemas/SortOrder",
+      description: "Grouped requests only. Defaults to desc.",
+    },
+    limit: {
+      type: "integer",
+      minimum: 1,
+      maximum: 100,
+      description:
+        "Grouped requests only. Maximum groups per page; defaults to 25. Each group retains its complete series.",
+    },
+    starting_after: {
+      type: "string",
+      maxLength: 2048,
+      description:
+        "Grouped requests only. Opaque next_cursor from the previous response. Mutually exclusive with ending_before.",
+    },
+    ending_before: {
+      type: "string",
+      maxLength: 2048,
+      description:
+        "Grouped requests only. Opaque prev_cursor for backward navigation, or refresh_cursor to read groups before the anchor in the current sort order. Mutually exclusive with starting_after.",
+    },
+  },
+} as const;
+
+export const EmailStatsQueryDimensionsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Contains the requested group_by property, including a null value when context is missing. Ungrouped results use an empty object.",
+  properties: {
+    sending_domain: {
+      type: ["string", "null"],
+      description:
+        "Recorded sending domain value. Null represents missing context and differs from an empty string.",
+    },
+    category: {
+      type: ["string", "null"],
+      description:
+        "Recorded category value. Null represents missing context and differs from an empty string.",
+    },
+    template_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Recorded template id value. Null represents missing context and differs from an empty string.",
+    },
+    tag: {
+      type: ["string", "null"],
+      description:
+        "Recorded tag value. Null represents missing context and differs from an empty string.",
+    },
+    recipient_domain: {
+      type: ["string", "null"],
+      description:
+        "Recorded recipient domain value. Null represents missing context and differs from an empty string.",
+    },
+    mailbox_provider: {
+      type: ["string", "null"],
+      description:
+        "Recorded mailbox provider value. Null represents missing context and differs from an empty string.",
+    },
+    mailbox_provider_region: {
+      type: ["string", "null"],
+      description:
+        "Recorded mailbox provider region value. Null represents missing context and differs from an empty string.",
+    },
+    sending_ip: {
+      type: ["string", "null"],
+      description:
+        "Recorded sending ip value. Null represents missing context and differs from an empty string.",
+    },
+    ip_pool_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/IPPoolID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Recorded ip pool id value. Null represents missing context and differs from an empty string.",
+    },
+    broadcast_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Recorded broadcast id value. Null represents missing context and differs from an empty string.",
+    },
+    country: {
+      type: ["string", "null"],
+      description:
+        "Recorded country value. Null represents missing context and differs from an empty string.",
+    },
+    region: {
+      type: ["string", "null"],
+      description:
+        "Recorded region value. Null represents missing context and differs from an empty string.",
+    },
+    city: {
+      type: ["string", "null"],
+      description:
+        "Recorded city value. Null represents missing context and differs from an empty string.",
+    },
+    agent_family: {
+      type: ["string", "null"],
+      description:
+        "Recorded agent family value. Null represents missing context and differs from an empty string.",
+    },
+    os_family: {
+      type: ["string", "null"],
+      description:
+        "Recorded os family value. Null represents missing context and differs from an empty string.",
+    },
+    device_family: {
+      type: ["string", "null"],
+      description:
+        "Recorded device family value. Null represents missing context and differs from an empty string.",
+    },
+    smtp_error_code: {
+      type: ["string", "null"],
+      description:
+        "Recorded smtp error code value. Null represents missing context and differs from an empty string.",
+    },
+    feedback_type: {
+      type: ["string", "null"],
+      description:
+        "Recorded feedback type value. Null represents missing context and differs from an empty string.",
+    },
+  },
+  maxProperties: 1,
+  readOnly: true,
+} as const;
+
+export const EmailStatsQueryMetricsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Selected metric values. Counts are nonnegative approximate distinct counts. Period uniques and rates are computed independently of buckets; summing bucket or group values does not reconstruct period totals. Zero means a supported empty population; undefined rates and empty latency samples are null.",
+  properties: {
+    sends_accepted: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Distinct sends accepted by Bird, counted by email identity.",
+    },
+    accepted: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct message recipients accepted by Bird.",
+    },
+    processed: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct message recipients processed for delivery.",
+    },
+    delivered: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct message recipients with a delivery event.",
+    },
+    bounced: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct message recipients with bounced events.",
+    },
+    hard_bounced: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct message recipients with hard bounced events.",
+    },
+    soft_bounced: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct message recipients with soft bounced events.",
+    },
+    admin_bounced: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct message recipients with admin bounced events.",
+    },
+    block_bounced: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct message recipients with block bounced events.",
+    },
+    undetermined_bounced: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Distinct message recipients with undetermined bounced events.",
+    },
+    complained: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct message recipients with complained events.",
+    },
+    deferred: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct message recipients with a deferral event.",
+    },
+    rejected: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Distinct message recipients rejected before provider delivery.",
+    },
+    oob_bounces: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct out-of-band bounce events.",
+    },
+    opens: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct open events, including prefetched opens.",
+    },
+    opens_non_prefetched: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Distinct open events excluding prefetched opens. An absent prefetch flag counts as false.",
+    },
+    clicks: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct click events.",
+    },
+    unsubscribes: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct unsubscribe events.",
+    },
+    unique_opens: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct message recipients with an open event.",
+    },
+    unique_opens_non_prefetched: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Distinct message recipients with a non-prefetched open event.",
+    },
+    unique_clicks: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Distinct message recipients with a click event.",
+    },
+    confirmed_unique_opens: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Distinct message recipients with an open or click event, deduplicated across both.",
+    },
+    confirmed_unique_opens_non_prefetched: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Distinct message recipients with a non-prefetched open or click event, deduplicated across both.",
+    },
+    effective_delivered: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Delivered recipients less out-of-band bounce events, calculated as `max(delivered - oob_bounces, 0)`.",
+    },
+    all_bounces: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "In-band bounced recipients plus out-of-band bounce events, calculated as `bounced + oob_bounces`.",
+    },
+    delivery_rate: {
+      type: ["number", "null"],
+      format: "double",
+      minimum: 0,
+      maximum: 1,
+      description:
+        "Ratio of `effective_delivered / (delivered + bounced)`, from 0 to 1. Null when `delivered + bounced` is zero.",
+    },
+    bounce_rate: {
+      type: ["number", "null"],
+      format: "double",
+      minimum: 0,
+      maximum: 1,
+      description:
+        "Ratio of `all_bounces / (delivered + bounced)`, capped at 1. Null when `delivered + bounced` is zero.",
+    },
+    complaint_rate: {
+      type: ["number", "null"],
+      format: "double",
+      minimum: 0,
+      description:
+        "Ratio of `complained / effective_delivered`. Uncapped and can exceed 1 when complaints and deliveries fall in different windows. Null when `effective_delivered` is zero.",
+    },
+    deferral_rate: {
+      type: ["number", "null"],
+      format: "double",
+      minimum: 0,
+      maximum: 1,
+      description:
+        "Ratio of `deferred / (delivered + bounced)`, capped at 1. Null when `delivered + bounced` is zero.",
+    },
+    open_rate: {
+      type: ["number", "null"],
+      format: "double",
+      minimum: 0,
+      description:
+        "Ratio of `unique_opens_non_prefetched / effective_delivered`. Uncapped and can exceed 1 when opens and deliveries fall in different windows. Null when `effective_delivered` is zero.",
+    },
+    click_rate: {
+      type: ["number", "null"],
+      format: "double",
+      minimum: 0,
+      description:
+        "Ratio of `unique_clicks / effective_delivered`. Uncapped and can exceed 1 when clicks and deliveries fall in different windows. Null when `effective_delivered` is zero.",
+    },
+    unsubscribe_rate: {
+      type: ["number", "null"],
+      format: "double",
+      minimum: 0,
+      description:
+        "Ratio of `unsubscribes / effective_delivered`, using distinct unsubscribe events as the numerator. Uncapped and can exceed 1. Null when `effective_delivered` is zero.",
+    },
+    oob_rate: {
+      type: ["number", "null"],
+      format: "double",
+      minimum: 0,
+      description:
+        "Ratio of `oob_bounces / (delivered + bounced)`, using distinct out-of-band bounce events as the numerator. Uncapped and can exceed 1. Null when `delivered + bounced` is zero.",
+    },
+    processing_p50_ms: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "Processing latency at the 50th percentile, in integer milliseconds from Bird acceptance. One sample per logical event; null when no eligible sample exists.",
+    },
+    processing_p95_ms: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "Processing latency at the 95th percentile, in integer milliseconds from Bird acceptance. One sample per logical event; null when no eligible sample exists.",
+    },
+    processing_p99_ms: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "Processing latency at the 99th percentile, in integer milliseconds from Bird acceptance. One sample per logical event; null when no eligible sample exists.",
+    },
+    total_p50_ms: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "Delivery latency at the 50th percentile, in integer milliseconds from Bird acceptance. One sample per logical event; null when no eligible sample exists.",
+    },
+    total_p95_ms: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "Delivery latency at the 95th percentile, in integer milliseconds from Bird acceptance. One sample per logical event; null when no eligible sample exists.",
+    },
+    total_p99_ms: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "Delivery latency at the 99th percentile, in integer milliseconds from Bird acceptance. One sample per logical event; null when no eligible sample exists.",
+    },
+  },
+  readOnly: true,
+} as const;
+
+export const EmailStatsQueryPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One time bucket with the selected metrics. Bucket timestamps label nominal boundaries; edge buckets count events inside the normalized period.",
+  required: ["bucket", "metrics"],
+  properties: {
+    bucket: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Nominal bucket start as a UTC RFC 3339 instant.",
+    },
+    metrics: {
+      $ref: "#/components/schemas/EmailStatsQueryMetrics",
+    },
+  },
+  readOnly: true,
+} as const;
+
+export const EmailStatsQueryGroupSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One group ranked over the whole requested period. Its optional series contains complete chronological buckets, including zero counts and null undefined values for empty buckets.",
+  required: ["dimensions", "metrics"],
+  properties: {
+    dimensions: {
+      $ref: "#/components/schemas/EmailStatsQueryDimensions",
+    },
+    metrics: {
+      $ref: "#/components/schemas/EmailStatsQueryMetrics",
+    },
+    series: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailStatsQueryPoint",
+      },
+      description: "Present when grain is requested; absent otherwise.",
+    },
+  },
+  readOnly: true,
+} as const;
+
+export const EmailStatsQueryPeriodSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Normalized half-open period. The response end is exclusive; replay the original inclusive request bounds when following cursors.",
+  required: ["from", "to", "timezone", "grain"],
+  properties: {
+    from: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Inclusive normalized start as a UTC instant.",
+    },
+    to: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Exclusive normalized end as a UTC instant.",
+    },
+    timezone: {
+      type: "string",
+      minLength: 1,
+      description: "Timezone used to normalize bounds and buckets.",
+    },
+    grain: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailStatsQueryGrain",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description: "Requested grain, or null when no series was requested.",
+    },
+  },
+  readOnly: true,
+} as const;
+
+export const EmailStatsQueryResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Selected email metrics with normalized bounds. Ungrouped requests return one group and null cursors, including empty windows. Grouped requests without observed groups return an empty data array. Live page reads can reflect new events or changed ranking.",
+  required: [
+    "data",
+    "period",
+    "data_as_of",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailStatsQueryGroup",
+      },
+    },
+    period: {
+      $ref: "#/components/schemas/EmailStatsQueryPeriod",
+    },
+    data_as_of: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "Always null for this endpoint. It does not report a refresh boundary, claim completeness, or record request time.",
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Pass as starting_after for the next grouped page. Null when no next page exists or the request is ungrouped.",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Pass as ending_before for the previous grouped page. Null when no previous page exists or the request is ungrouped.",
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Anchor for the first group. Pass as ending_before to read groups sorting before it. Null for empty or ungrouped results. Ranking can change between reads; refresh by repeating the original query.",
+    },
+  },
+  readOnly: true,
 } as const;
 
 export const EmailStatsSummaryPeriodSchema = {
@@ -19907,13 +20902,6 @@ export const EmailStatsSummarySchema = {
   },
 } as const;
 
-export const IPPoolIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^ipp_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "ipp_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
 export const EmailSendingIpDeliveryStatsSchema = {
   type: "object",
   additionalProperties: false,
@@ -20114,8 +21102,15 @@ export const EmailStatsBySendingIpResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-sending-IP breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, max 200).",
-  required: ["period", "data", "total"],
+    "Per-sending-IP breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: [
+    "period",
+    "data",
+    "total",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
   properties: {
     period: {
       $ref: "#/components/schemas/EmailStatsPeriod",
@@ -20136,8 +21131,28 @@ export const EmailStatsBySendingIpResponseSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Total number of distinct sending IP addresses with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.\n",
+        "Total number of distinct sending IP addresses with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
       example: 6,
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -20197,8 +21212,15 @@ export const EmailStatsBySendingDomainResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-sending-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).",
-  required: ["period", "data", "total"],
+    "Per-sending-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: [
+    "period",
+    "data",
+    "total",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
   properties: {
     period: {
       $ref: "#/components/schemas/EmailStatsPeriod",
@@ -20219,8 +21241,28 @@ export const EmailStatsBySendingDomainResponseSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Total number of distinct sending domains with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.\n",
+        "Total number of distinct sending domains with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
       example: 12,
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -20280,8 +21322,15 @@ export const EmailStatsByCategoryResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-category breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).",
-  required: ["period", "data", "total"],
+    "Per-category breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: [
+    "period",
+    "data",
+    "total",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
   properties: {
     period: {
       $ref: "#/components/schemas/EmailStatsPeriod",
@@ -20302,8 +21351,28 @@ export const EmailStatsByCategoryResponseSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Total number of distinct categories with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.\n",
+        "Total number of distinct categories with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
       example: 2,
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -20485,8 +21554,15 @@ export const EmailStatsByMailboxProviderResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-mailbox-provider breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, max 200).",
-  required: ["period", "data", "total"],
+    "Per-mailbox-provider breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: [
+    "period",
+    "data",
+    "total",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
   properties: {
     period: {
       $ref: "#/components/schemas/EmailStatsPeriod",
@@ -20507,8 +21583,28 @@ export const EmailStatsByMailboxProviderResponseSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Total number of distinct mailbox providers with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.\n",
+        "Total number of distinct mailbox providers with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
       example: 14,
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -20582,8 +21678,15 @@ export const EmailStatsByMailboxProviderRegionResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-(mailbox provider, provider region) breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, max 200).",
-  required: ["period", "data", "total"],
+    "Per-(mailbox provider, provider region) breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: [
+    "period",
+    "data",
+    "total",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
   properties: {
     period: {
       $ref: "#/components/schemas/EmailStatsPeriod",
@@ -20604,8 +21707,28 @@ export const EmailStatsByMailboxProviderRegionResponseSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Total number of distinct mailbox provider and region pairs with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.\n",
+        "Total number of distinct mailbox provider and region pairs with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
       example: 31,
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -20665,8 +21788,15 @@ export const EmailStatsByRecipientDomainResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-recipient-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).",
-  required: ["period", "data", "total"],
+    "Per-recipient-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: [
+    "period",
+    "data",
+    "total",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
   properties: {
     period: {
       $ref: "#/components/schemas/EmailStatsPeriod",
@@ -20687,8 +21817,28 @@ export const EmailStatsByRecipientDomainResponseSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Total number of distinct recipient domains with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.\n",
+        "Total number of distinct recipient domains with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
       example: 412,
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -20750,8 +21900,15 @@ export const EmailStatsByTemplateResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-template breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).",
-  required: ["period", "data", "total"],
+    "Per-template breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: [
+    "period",
+    "data",
+    "total",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
   properties: {
     period: {
       $ref: "#/components/schemas/EmailStatsPeriod",
@@ -20772,8 +21929,28 @@ export const EmailStatsByTemplateResponseSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Total number of distinct templates with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.\n",
+        "Total number of distinct templates with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
       example: 42,
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -20902,8 +22079,15 @@ export const EmailStatsByLocationResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-location engagement breakdown for the requested period, grouped at the requested `group_by` granularity, ranked by the `sort` metric (default `unique_opens`) descending and capped at the requested `limit` (default 50, max 200).",
-  required: ["period", "data", "total"],
+    "Per-location engagement breakdown for the requested period, grouped at the requested `group_by` granularity, ranked by the `sort` metric (default `unique_opens`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: [
+    "period",
+    "data",
+    "total",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
   properties: {
     period: {
       $ref: "#/components/schemas/EmailStatsPeriod",
@@ -20924,8 +22108,28 @@ export const EmailStatsByLocationResponseSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Total number of distinct locations at the requested `group_by` level with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.\n",
+        "Total number of distinct locations at the requested `group_by` level with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
       example: 86,
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -20973,8 +22177,15 @@ export const EmailStatsByClientResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-client engagement breakdown for the requested period, grouped by the requested `group_by` facet, ranked by the `sort` metric (default `unique_opens`) descending and capped at the requested `limit` (default 50, max 200).",
-  required: ["period", "data", "total"],
+    "Per-client engagement breakdown for the requested period, grouped by the requested `group_by` facet, ranked by the `sort` metric (default `unique_opens`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: [
+    "period",
+    "data",
+    "total",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
   properties: {
     period: {
       $ref: "#/components/schemas/EmailStatsPeriod",
@@ -20995,8 +22206,28 @@ export const EmailStatsByClientResponseSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Total number of distinct values of the requested `group_by` facet with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.\n",
+        "Total number of distinct values of the requested `group_by` facet with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
       example: 9,
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -21090,8 +22321,15 @@ export const EmailStatsByBounceCodeResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-SMTP-code bounce breakdown for the requested period, ranked by the `sort` metric (default `bounced`) descending and capped at the requested `limit` (default 50, max 200).",
-  required: ["period", "data", "total"],
+    "Per-SMTP-code bounce breakdown for the requested period, ranked by the `sort` metric (default `bounced`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: [
+    "period",
+    "data",
+    "total",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
   properties: {
     period: {
       $ref: "#/components/schemas/EmailStatsPeriod",
@@ -21112,8 +22350,28 @@ export const EmailStatsByBounceCodeResponseSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Total number of distinct SMTP error codes with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.\n",
+        "Total number of distinct SMTP error codes with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
       example: 17,
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -21148,8 +22406,15 @@ export const EmailStatsByComplaintTypeResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-complaint-type breakdown for the requested period, ranked by `complained` descending and capped at the requested `limit` (default 50, max 200).",
-  required: ["period", "data", "total"],
+    "Per-complaint-type breakdown for the requested period, ranked by `complained` descending and paginated with the requested `limit` (default 50, max 200).",
+  required: [
+    "period",
+    "data",
+    "total",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
   properties: {
     period: {
       $ref: "#/components/schemas/EmailStatsPeriod",
@@ -21170,8 +22435,28 @@ export const EmailStatsByComplaintTypeResponseSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Total number of distinct feedback types with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.\n",
+        "Total number of distinct feedback types with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
       example: 4,
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -21223,8 +22508,15 @@ export const EmailStatsByBroadcastResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-broadcast breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).",
-  required: ["period", "data", "total"],
+    "Per-broadcast breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: [
+    "period",
+    "data",
+    "total",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
   properties: {
     period: {
       $ref: "#/components/schemas/EmailStatsPeriod",
@@ -21245,8 +22537,28 @@ export const EmailStatsByBroadcastResponseSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Total number of distinct broadcasts with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.\n",
+        "Total number of distinct broadcasts with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.\n",
       example: 57,
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -27447,6 +28759,8 @@ export const WebhookEventTypeSchema = {
     "whatsapp.accepted",
     "whatsapp.delivered",
     "whatsapp.failed",
+    "whatsapp.group.join_request_created",
+    "whatsapp.group.join_request_revoked",
     "whatsapp.reacted",
     "whatsapp.read",
     "whatsapp.received",
@@ -31030,6 +32344,149 @@ export const EventWhatsAppFailedSchema = {
   },
 } as const;
 
+export const WhatsAppGroupJoinRequestCreatedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["whatsapp.group.join_request_created"],
+  description: "Always `whatsapp.group.join_request_created` for this event.",
+  example: "whatsapp.group.join_request_created",
+} as const;
+
+export const WhatsAppGroupJoinRequestSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Someone who asked to be let into a group, as named by a join-request webhook event.",
+  required: ["id", "bsuid", "phone_number", "username"],
+  properties: {
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppGroupJoinRequestID",
+        },
+      ],
+      description:
+        "Unique identifier for the join request. Pass it to the batch-approve and batch-reject operations.",
+    },
+    bsuid: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Business-scoped user ID, Meta's identifier for this person against your business. The one identifier every request has, and the one that carries over to `participants` if you approve it.\n",
+      example: "US.1566655121691972",
+    },
+    phone_number: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Phone number in E.164 format. Null when WhatsApp withholds it, which it does for anyone who has not shared their number with your business.\n",
+      example: "+16505551234",
+    },
+    username: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "The WhatsApp username this person chose. Null when they have none, and theirs to change, so it names them in a list rather than keying anything.\n",
+      example: "john.doe",
+    },
+  },
+} as const;
+
+export const EventWhatsAppGroupJoinRequestDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Payload shared by the whatsapp.group.join_request_created and whatsapp.group.join_request_revoked events. Everything about the person who asked is nested under `join_request`; the sibling identifiers name the business side.\n",
+  required: ["group_id", "whatsapp_number_id", "workspace_id", "join_request"],
+  properties: {
+    group_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppGroupID",
+        },
+      ],
+      description: "The group the person asked to join.",
+      example: "wag_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    whatsapp_number_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberID",
+        },
+      ],
+      description:
+        "The business number that created the group and administers it.",
+      example: "wan_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    workspace_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WorkspaceID",
+        },
+      ],
+      description: "The workspace that owns the group.",
+      example: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    join_request: {
+      $ref: "#/components/schemas/WhatsAppGroupJoinRequestSummary",
+      description: "The request itself, and who made it.",
+    },
+  },
+} as const;
+
+export const EventWhatsAppGroupJoinRequestCreatedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Someone asked to join a group that requires approval.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/WhatsAppGroupJoinRequestCreatedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "When the person asked to join.",
+      example: "2026-09-22T10:07:57Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventWhatsAppGroupJoinRequestData",
+    },
+  },
+} as const;
+
+export const WhatsAppGroupJoinRequestRevokedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["whatsapp.group.join_request_revoked"],
+  description: "Always `whatsapp.group.join_request_revoked` for this event.",
+  example: "whatsapp.group.join_request_revoked",
+} as const;
+
+export const EventWhatsAppGroupJoinRequestRevokedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Someone withdrew their request to join a group before it was decided.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/WhatsAppGroupJoinRequestRevokedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "When the person withdrew their request.",
+      example: "2026-09-22T11:12:03Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventWhatsAppGroupJoinRequestData",
+    },
+  },
+} as const;
+
 export const WhatsAppReactedEventTypeSchema = {
   type: "string",
   minLength: 1,
@@ -31476,11 +32933,36 @@ export const WebhookAttemptListSchema = {
   },
 } as const;
 
-export const SIPTrunkIDSchema = {
+export const VoicePartyEndpointTypeSchema = {
   type: "string",
   minLength: 1,
-  pattern: "^spt_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "spt_01krdgeqcxet5s7t44vh8rt9mg",
+  "x-extensible-enum": [
+    "pstn",
+    "sip",
+    "voicemail",
+    "bridge_pstn",
+    "bridge_sip",
+    "webhook",
+  ],
+  description:
+    "The technical participant observed on one side of a call. Additional endpoint types may appear in retained observations.",
+  example: "pstn",
+} as const;
+
+export const VoicePartySIPEndpointSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["contact"],
+  properties: {
+    contact: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The address the user agent registered, as a `sip:` or `sips:` URI. It is where the endpoint asked to be reached, which is not always the address that was dialled.",
+      example: "sip:ua@203.0.113.7:5060",
+    },
+  },
 } as const;
 
 export const VoiceInboundForwardAsSchema = {
@@ -31488,8 +32970,120 @@ export const VoiceInboundForwardAsSchema = {
   minLength: 1,
   enum: ["dialed_number", "calling_number"],
   description:
-    'Which of a forwarded call\'s two numbers it shows as the caller.\n\n"dialed_number" is the number the caller dialled, which is one of yours.\nCarriers treat it as fully yours, so it is the least likely to be altered or\nscreened. Whoever answers sees which of your numbers was called, not who called\nit. It needs your workspace approved to place calls from numbers you bought from\nus; where it is not, this value is refused and the call shows the calling\nnumber.\n\n"calling_number" is the caller\'s own number, so the phone rings as though they\nhad dialled it directly and the call can be returned from the call log. Because\nthe number is not one you own, some carriers (most often in the US and parts of\nEurope) mark such calls as unverified, replace the number, or screen them.\n',
+    "Which of a forwarded call's two numbers it shows as the caller.\n\n`dialed_number` presents the Bird number the caller dialed. Whoever answers\nsees which of your numbers was called. Older configurations without a stored\nchoice use this value. Carrier screening can still affect delivery.\n\n`calling_number` presents the caller's own number, so the phone rings as though\nthey had dialed it directly and the call can be returned from the call log. Because\nthe number is not one you own, some carriers (most often in the US and parts of\nEurope) mark such calls as unverified, replace the number, or screen them.\n",
   example: "dialed_number",
+} as const;
+
+export const VoicePartyBridgePSTNEndpointSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["forward_to", "forward_as"],
+  properties: {
+    forward_to: {
+      type: "string",
+      minLength: 3,
+      maxLength: 16,
+      pattern: "^\\+[1-9][0-9]{1,14}$",
+      description:
+        "The number the platform placed the leg onward to, in E.164. The party's own `address` is the number that was dialled, so the two together are one hop of the call.",
+      example: "+31612345678",
+    },
+    forward_as: {
+      $ref: "#/components/schemas/VoiceInboundForwardAs",
+      description: "Which number the forwarded leg presented to the far end.",
+    },
+  },
+} as const;
+
+export const SIPTrunkIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^spt_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "spt_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoicePartyBridgeSIPEndpointSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["trunk_id"],
+  properties: {
+    trunk_id: {
+      $ref: "#/components/schemas/SIPTrunkID",
+      description:
+        "The workspace trunk the leg was delivered onward to. It is distinct from the party's own `trunk_id`, which is the trunk this side itself sat behind.",
+    },
+  },
+} as const;
+
+export const VoicePartyEndpointSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoicePartyEndpointType",
+      description:
+        "What kind of participant sat on this side of a leg. It selects which payload below is present, and most kinds carry none because the party's `address` is already their coordinate.",
+    },
+    sip: {
+      $ref: "#/components/schemas/VoicePartySIPEndpoint",
+      description:
+        "The registered contact of a `sip` endpoint. Absent when the observation recorded none, and on every other kind of endpoint.",
+    },
+    bridge_pstn: {
+      $ref: "#/components/schemas/VoicePartyBridgePSTNEndpoint",
+      description:
+        "Where the platform placed the leg onward, on a `bridge_pstn` endpoint. Absent on every other kind of endpoint.",
+    },
+    bridge_sip: {
+      $ref: "#/components/schemas/VoicePartyBridgeSIPEndpoint",
+      description:
+        "The trunk the platform delivered the leg onward to, on a `bridge_sip` endpoint. Absent on every other kind of endpoint.",
+    },
+  },
+} as const;
+
+export const VoicePartySchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    endpoint: {
+      readOnly: true,
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoicePartyEndpoint",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "What kind of participant sat on this side of a leg, and the coordinate that kind carries: a telephone endpoint off the platform, a SIP or WebRTC endpoint, Bird answering, or the platform placing a leg onward. It does not name a person.\n`null` on an observation this API could not read. The entry stays, because the session counted it when it deduplicated, and dropping it here would report fewer participants than were observed.",
+    },
+    address: {
+      readOnly: true,
+      type: ["string", "null"],
+      description:
+        "This side's own address, in E.164 or as a `sip:` URI. `null` when the observation carried none, which does not say whether one was withheld, missing, or nonexistent.",
+      example: "+14155551234",
+    },
+    trunk_id: {
+      readOnly: true,
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SIPTrunkID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The workspace trunk on this side of the leg. `null` when this side sat behind no trunk.",
+    },
+  },
 } as const;
 
 export const NumberTypeSchema = {
@@ -31909,13 +33503,1142 @@ export const NumbersOrderCreateSchema = {
   },
 } as const;
 
+export const VoiceTrunkSortFieldSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Field used to sort the list.",
+} as const;
+
+export const SIPTrunkACLIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^sta_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "sta_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoiceTrunkIPACLSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "trunk_id", "cidr", "created_at"],
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/SIPTrunkACLID",
+      description: "Unique identifier for this IP ACL entry.",
+    },
+    trunk_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/SIPTrunkID",
+    },
+    cidr: {
+      type: "string",
+      minLength: 7,
+      readOnly: true,
+      description:
+        "IPv4 or IPv6 CIDR block that is allowed to send SIP traffic to this trunk.",
+      example: "203.0.113.0/24",
+    },
+    description: {
+      type: ["string", "null"],
+      minLength: 1,
+      description: "Optional human-readable label for this ACL entry.",
+      example: "Office network",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const VoiceSIPDigestAlgorithmSchema = {
+  type: "string",
+  enum: ["SHA-256", "MD5"],
+  description:
+    "A hash algorithm for SIP Digest authentication, spelled as it appears in the `algorithm=` parameter on the wire. `SHA-256` is the stronger option and is offered first; `MD5` is the algorithm most PBX and ITSP equipment implements.\n",
+  example: "SHA-256",
+} as const;
+
+export const VoiceTrunkCoreSchema = {
+  type: "object",
+  description: "A SIP trunk's identity and access-control settings.",
+  required: [
+    "id",
+    "workspace_id",
+    "name",
+    "domain",
+    "outbound_enabled",
+    "inbound_enabled",
+    "media_bypass",
+    "ip_acls",
+    "allowed_api_key_ids",
+    "ineligible_api_key_ids",
+    "digest_algorithms",
+    "session_credentials_enabled",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/SIPTrunkID",
+      description: "Unique identifier for this SIP trunk.",
+    },
+    workspace_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/WorkspaceID",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      description:
+        "A human-readable label for this SIP trunk. Mutable, and distinct from the generated wire domain.",
+      example: "Production PBX trunk",
+    },
+    domain: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Full SIP address for this trunk, generated as `{trunk-id}.trunk.{region}.sip.bird.com`. This is the trunk's identity, so configure your PBX or SIP client to send calls to this address. It is derived from the trunk id and cannot be chosen or changed.\n",
+      example: "01kxp5bb9qf878642atrf0xy5r.trunk.eu1.sip.bird.com",
+    },
+    outbound_enabled: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this trunk may place calls: your PBX connects to us to dial out. Off on a new trunk. While it is off the trunk refuses every call attempt no matter what its allow lists say, and the connection and authentication settings below have no effect. Set `outbound_enabled` through the trunk update operation.\n",
+    },
+    inbound_enabled: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this trunk may receive calls: we dial the addresses you declared, for the numbers this trunk answers. Off on a new trunk. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. Set `inbound_enabled` through the trunk update operation.\n",
+    },
+    media_bypass: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether we take ourselves out of the audio path for calls we forward to this trunk: your equipment and the originating carrier exchange audio directly, and only the call signalling passes through us. Off by default. It applies to inbound calls alone (calls this trunk places are always carried through us, whatever this says). While it is on we cannot record those calls, report their audio quality, or end one because its audio stopped. Your equipment must be reachable for audio from the public internet. Set `media_bypass` through the trunk update operation.\n",
+    },
+    ip_acls: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The trunk's IP allow list. IP filtering is active whenever this has at least one entry: calls admitted through the allow lists must come from those CIDR ranges. This restriction does not apply to session credentials when `session_credentials_enabled` is true. An empty list means no IP restriction. Replace the whole `ip_acls` list through the trunk update operation.\n",
+      items: {
+        $ref: "#/components/schemas/VoiceTrunkIPACL",
+      },
+    },
+    allowed_api_key_ids: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The API keys allowed to authenticate this trunk over SIP Digest. A key must hold `voice` at write level and be neither revoked nor expired to authenticate. `ineligible_api_key_ids` names the entries that currently cannot. A nonempty list enables API-key authentication, limited to its eligible keys. An empty list means no API-key authentication. A trunk with empty `ip_acls` and `allowed_api_key_ids` lists accepts nothing when `session_credentials_enabled` is false. Replace the whole `allowed_api_key_ids` list through the trunk update operation.\n",
+      items: {
+        $ref: "#/components/schemas/APIKeyID",
+      },
+    },
+    ineligible_api_key_ids: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The entries in `allowed_api_key_ids` that cannot authenticate this trunk right now because the key lacks `voice` at write level, has expired, or was revoked. The bindings remain until you remove them from the trunk. Restoring `voice` at write level makes a key eligible again if it is still unexpired and unrevoked, without changing its secret or trunk binding. Empty when every allowed key can authenticate.\n",
+      items: {
+        $ref: "#/components/schemas/APIKeyID",
+      },
+    },
+    digest_algorithms: {
+      type: "array",
+      readOnly: true,
+      minItems: 1,
+      description:
+        'The Digest hash algorithms this trunk offers, in the order they are offered. We send one challenge line per algorithm and your PBX answers with the first it supports, so the order decides what most equipment picks. Always populated: a trunk with no explicit setting reports the default, `["SHA-256", "MD5"]`. A trunk answering with an algorithm that is not on this list is rejected, so narrowing the list also narrows what the trunk accepts. Replace `digest_algorithms` through the trunk update operation.\n',
+      items: {
+        $ref: "#/components/schemas/VoiceSIPDigestAlgorithm",
+      },
+      example: ["SHA-256", "MD5"],
+    },
+    session_credentials_enabled: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP, alongside whatever the allow lists admit. Off by default. It grants nothing on its own: a call still has to present a credential issued to this workspace, and each one expires within minutes. Set `session_credentials_enabled` through the trunk update operation.\n",
+    },
+  },
+} as const;
+
+export const VoiceTrunkSchema = {
+  allOf: [
+    {
+      $ref: "#/components/schemas/VoiceTrunkCore",
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+} as const;
+
+export const VoiceTrunkListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/VoiceTrunk",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const VoiceTrunkCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      description:
+        "A human-readable label for this SIP trunk. Mutable, and distinct from the generated wire domain.",
+      example: "Production PBX trunk",
+    },
+    outbound_enabled: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether the new trunk may place calls. Omit it to create a trunk that does neither direction yet, and enable the ones you want once you know what the trunk is for. The settings below configure outbound, so send this as `true` alongside them.\n",
+      example: true,
+    },
+    inbound_enabled: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether the new trunk may receive calls. Omit it to create a trunk that does neither direction yet. A trunk receives no calls until it also has at least one gateway and at least one number, both added after create.\n",
+      example: true,
+    },
+    media_bypass: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether we take ourselves out of the audio path for calls we forward to this trunk. Omit it to create the trunk with this off, which is what suits equipment behind NAT and any account that wants call recording. It is an inbound setting, so `true` is accepted only alongside `inbound_enabled: true`; `false` is always accepted. It can be changed later.\n",
+      example: true,
+    },
+    digest_algorithms: {
+      type: "array",
+      minItems: 1,
+      description:
+        'The Digest hash algorithms to offer, in the order they should be offered. Omit this to use the default of `["SHA-256", "MD5"]`, which suits most equipment. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. This can be changed later without re-issuing credentials.\n',
+      items: {
+        $ref: "#/components/schemas/VoiceSIPDigestAlgorithm",
+      },
+      example: ["MD5"],
+    },
+    session_credentials_enabled: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP. Omit it to create the trunk with this off, which is what a trunk reached only by a PBX wants. It can be changed later.\n",
+      example: true,
+    },
+  },
+} as const;
+
+export const VoiceTrunkIPACLCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["cidr"],
+  properties: {
+    cidr: {
+      type: "string",
+      minLength: 7,
+      description:
+        "IPv4 or IPv6 CIDR block to allow. Use /32 for a single IPv4 address or /128 for a single IPv6 address.",
+      example: "203.0.113.0/24",
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      description: "Optional human-readable label for this ACL entry.",
+      example: "Office network",
+    },
+  },
+} as const;
+
+export const VoiceTrunkUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  description:
+    "A change to the trunk's directions, name, access control, and Digest algorithm\noffer. Every field is optional. An omitted field is left unchanged. The\n`ip_acls`, `allowed_api_key_ids`, and `digest_algorithms` fields each replace\ntheir whole list when present. Send an empty array to clear one. This lets you\ncommit the trunk's entire access configuration in one update.\n\nA direction has to be enabled before its settings can be set, but one update\ncan do both: enable a direction and send its configuration together.\n",
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      description:
+        "A human-readable label for this SIP trunk. Mutable, and distinct from the generated wire domain.",
+      example: "Production PBX trunk",
+    },
+    outbound_enabled: {
+      type: "boolean",
+      description:
+        "Whether this trunk may place calls. Turning it off stops the trunk admitting call attempts at the next call setup and leaves its connection and authentication settings stored, so turning it back on restores a working trunk. Omit the field to leave it unchanged.\n",
+      example: true,
+    },
+    inbound_enabled: {
+      type: "boolean",
+      description:
+        "Whether this trunk may receive calls. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. The gateways remain configured. Omit the field to leave it unchanged.\n",
+      example: true,
+    },
+    media_bypass: {
+      type: "boolean",
+      description:
+        "Whether we take ourselves out of the audio path for calls we forward to this trunk. Turning it on takes effect at the next call setup and leaves calls already up untouched. It is an inbound setting, so the trunk must have `inbound_enabled` on; one update can do both. While it is on we cannot record those calls, report their audio quality, or end one because its audio stopped, and your equipment must be reachable for audio from the public internet. Turning it off puts us back in the path at the next call setup. Omit the field to leave it unchanged.\n",
+      example: true,
+    },
+    ip_acls: {
+      type: "array",
+      description:
+        "Replaces the trunk's entire IP allow list. When present, the allow list is set to exactly these CIDR blocks: ranges not listed are removed and new ones are added. Send an empty array to clear the list, turning IP filtering off. Omit the field to leave the allow list unchanged.\n",
+      items: {
+        $ref: "#/components/schemas/VoiceTrunkIPACLCreate",
+      },
+    },
+    allowed_api_key_ids: {
+      type: "array",
+      description:
+        "Replaces the trunk's entire set of allowed API keys. When present, exactly these keys may authenticate the trunk over SIP Digest. Each key you ADD must belong to this workspace and hold `voice` at write level; a key that does not is refused and the whole update is rolled back. A key already on the list that has since lost the permission or expired does not block the update, so you can keep editing the trunk while you put its permission back. A non-empty list turns API-key authentication on; send an empty array to turn it off. Omit the field to leave the allowed keys unchanged.\n",
+      items: {
+        $ref: "#/components/schemas/APIKeyID",
+      },
+    },
+    digest_algorithms: {
+      type: "array",
+      description:
+        'Replaces the Digest hash algorithms this trunk offers, in the order they should be offered. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. Send an empty array to return to the default of `["SHA-256", "MD5"]`. The offer is never empty, because a trunk that offered nothing could not be authenticated at all. Narrowing the list also narrows what the trunk accepts: an answer using an algorithm no longer offered is rejected. Takes effect on the next call setup; no credential is re-issued. Omit the field to leave the offer unchanged.\n',
+      items: {
+        $ref: "#/components/schemas/VoiceSIPDigestAlgorithm",
+      },
+      example: ["MD5"],
+    },
+    session_credentials_enabled: {
+      type: "boolean",
+      description:
+        "Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP. Off by default; turning it on does not change what the allow lists admit, and turning it off stops those connections at the next call setup without re-issuing anything. Omit the field to leave it unchanged.\n",
+      example: true,
+    },
+  },
+} as const;
+
+export const VoiceSessionCredentialSchema = {
+  type: "object",
+  description:
+    "A short-lived SIP digest credential for a calling client. The `password` is returned once and cannot be recovered. Create a new credential if you lose it.\n",
+  additionalProperties: false,
+  required: ["username", "password", "realm", "expires_at"],
+  properties: {
+    username: {
+      type: "string",
+      minLength: 1,
+      maxLength: 64,
+      description:
+        "SIP digest username. Always `bird`. The credential identifies the workspace through `realm`. The username does not identify the workspace.\n",
+      example: "bird",
+    },
+    password: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+      "x-sensitive": true,
+      description:
+        "SIP digest password, returned once. Treat it as a bearer secret: until it expires it can place calls billed to this workspace.\n",
+      example: "8Kx2mQ7pR4tYvB9nL3sW6dF1gH5jC0aZ",
+    },
+    realm: {
+      type: "string",
+      minLength: 1,
+      maxLength: 253,
+      description:
+        "SIP digest realm to authenticate against. Workspace-scoped, so a credential minted for one workspace cannot authenticate against another.\n",
+      example: "01ARZ3NDEKTSV4RRFFQ69G5FAV.sip.bird.com",
+    },
+    expires_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description:
+        "When the credential stops authenticating, five minutes after creation. Existing calls may continue; use a fresh credential for later authentication.",
+      example: "2026-07-30T12:05:00Z",
+    },
+    handshake_token: {
+      type: "string",
+      minLength: 1,
+      maxLength: 4096,
+      "x-sensitive": true,
+      description:
+        "Short-lived token required when upgrading the WebSocket connection. The token authorizes the connection only; each call still authenticates with `password`.\n",
+      example:
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODU0NDMwMzV9.fp1xWxROEmgCafwiJ-ZHbZg9cIdYC-wLGcH-5gIVbco",
+    },
+  },
+} as const;
+
+export const VoiceTrunkGatewayIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^vtg_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vtg_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoiceTrunkGatewaySchema = {
+  description:
+    "One address an inbound call to this trunk is forwarded to, and how that peer wants the call's two numbers spelled. A trunk can have several, tried in priority order until one answers.\n",
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "id",
+        "trunk_id",
+        "sip_uri",
+        "priority",
+        "origination_format",
+        "destination_format",
+      ],
+      properties: {
+        id: {
+          readOnly: true,
+          $ref: "#/components/schemas/VoiceTrunkGatewayID",
+          description: "Unique identifier for this gateway.",
+        },
+        trunk_id: {
+          readOnly: true,
+          $ref: "#/components/schemas/SIPTrunkID",
+        },
+        sip_uri: {
+          type: "string",
+          minLength: 1,
+          maxLength: 512,
+          description:
+            "SIP URI an inbound call to this trunk is forwarded to. The host only: which number is dialed at that host comes from `destination_format`, because it changes with every call.\n",
+          example: "sip:pbx.example.com:5060",
+        },
+        priority: {
+          type: "integer",
+          minimum: 0,
+          description:
+            "The order gateways are tried in, lowest first. Gateways sharing a priority take an equal share of calls, and any of them may be tried first on a given call.\n",
+          example: 0,
+        },
+        origination_format: {
+          type: "string",
+          minLength: 1,
+          maxLength: 64,
+          description:
+            "How the calling number is spelled to this gateway, as a template whose\n`{number}` stands for the number without its leading `+`. It is stated\nin the `P-Asserted-Identity` header of the delivered call.\n\nA gateway that has not asked for anything else reports `+{number}`,\nwhich is E.164. A format with no `{number}` states that same identity on\nevery call, whoever called.\n",
+          example: "+{number}",
+        },
+        destination_format: {
+          type: "string",
+          minLength: 1,
+          maxLength: 64,
+          description:
+            "How this gateway formats the dialed number. In the template,\n`{number}` represents the number without its leading `+`. The result\nis placed before the `sip_uri` host. For example, `1234#{number}`\nformats `+31201234567` as\n`sip:1234#31201234567@pbx.example.com:5060`.\n\nA gateway that has not asked for anything else reports `+{number}`,\nwhich is E.164. A format with no `{number}` is dialed as it stands, so\nevery number the trunk answers reaches that one number.\n",
+          example: "+{number}",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+} as const;
+
+export const VoiceTrunkGatewayListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  description:
+    "The trunk's gateways. Not paginated: a trunk holds a small, hand-managed set of dial targets, and the order across the whole set is what decides hunt order, so a partial page would misrepresent it.",
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/VoiceTrunkGateway",
+      },
+      description: "The trunk's gateways, in priority order.",
+    },
+  },
+} as const;
+
+export const VoiceTrunkGatewayCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["sip_uri", "priority"],
+  properties: {
+    sip_uri: {
+      type: "string",
+      minLength: 1,
+      maxLength: 512,
+      description:
+        "SIP URI an inbound call to this trunk should be forwarded to. Give the host only, with an optional port: which number is dialed there comes from `destination_format`, so a URI carrying a user part is rejected.\n",
+      example: "sip:pbx.example.com:5060",
+    },
+    priority: {
+      type: "integer",
+      minimum: 0,
+      maximum: 2147483647,
+      description:
+        "The order gateways are tried in, lowest first. Give two gateways the same priority to share calls between them evenly.\n",
+      example: 0,
+    },
+    origination_format: {
+      type: "string",
+      maxLength: 64,
+      description:
+        "How this gateway wants the calling number spelled. Write a template whose\n`{number}` stands for the number without its leading `+`; the result is\nstated in the `P-Asserted-Identity` header of the delivered call.\n\nOmit it for E.164, which is `+{number}`. The template may add digits,\nletters and the characters `-_.!~*'()&=+$,;?/%#` around `{number}`, which\nmay appear at most once, and anything else in braces is rejected so a\nmisspelled placeholder cannot reach a call.\n\nA format with no `{number}` at all states the same identity on every call,\nwhich is what a peer that only accepts one authorized number wants. The\ncall then carries nothing about who really called.\n",
+      example: "+{number}",
+    },
+    destination_format: {
+      type: "string",
+      maxLength: 64,
+      description:
+        "How this gateway formats the dialed number. In the template, `{number}`\nrepresents the number without its leading `+`. The result is placed before\nthe `sip_uri` host. For example, `1234#{number}` formats `+31201234567` as\n`sip:1234#31201234567@pbx.example.com:5060`.\n\nOmit it for E.164, which is `+{number}`. A format with no `{number}` at all\nsends every number this trunk answers to one fixed number, so\n`777000447973` reaches `sip:777000447973@pbx.example.com:5060` whatever was\ndialed. The same rules as `origination_format` apply to what the template\nmay contain.\n",
+      example: "1234#{number}",
+    },
+  },
+} as const;
+
+export const VoiceTrunkGatewayUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  description:
+    "A change to the gateway's address, its place in the order, or how it wants numbers spelled. Every field is optional; an omitted field is left unchanged.\n",
+  properties: {
+    sip_uri: {
+      type: "string",
+      minLength: 1,
+      maxLength: 512,
+      description:
+        "SIP URI an inbound call to this trunk should be forwarded to. Give the host only, with an optional port: which number is dialed there comes from `destination_format`, so a URI carrying a user part is rejected.\n",
+      example: "sip:pbx.example.com:5060",
+    },
+    priority: {
+      type: "integer",
+      minimum: 0,
+      maximum: 2147483647,
+      description:
+        "The order gateways are tried in, lowest first. Give two gateways the same priority to share calls between them evenly.\n",
+      example: 0,
+    },
+    origination_format: {
+      type: "string",
+      maxLength: 64,
+      description:
+        "How this gateway wants the calling number spelled, as a template whose\n`{number}` stands for the number without its leading `+`. The result is\nstated in the `P-Asserted-Identity` header of the delivered call.\n\nSend an empty string to go back to E.164, which is `+{number}`. The template\nmay add digits, letters and the characters `-_.!~*'()&=+$,;?/%#` around\n`{number}`, which may appear at most once, and anything else in braces is\nrejected so a misspelled placeholder cannot reach a call.\n\nA format with no `{number}` at all states the same identity on every call,\nwhich is what a peer that only accepts one authorized number wants. The\ncall then carries nothing about who really called.\n",
+      example: "+{number}",
+    },
+    destination_format: {
+      type: "string",
+      maxLength: 64,
+      description:
+        "How this gateway formats the dialed number. In the template, `{number}`\nrepresents the number without its leading `+`. The result is placed before\nthe `sip_uri` host. For example, `1234#{number}` formats `+31201234567` as\n`sip:1234#31201234567@pbx.example.com:5060`.\n\nSend an empty string to go back to E.164, which is `+{number}`. A format\nwith no `{number}` at all sends every number this trunk answers to one fixed\nnumber, so `777000447973` reaches `sip:777000447973@pbx.example.com:5060`\nwhatever was dialed. The same rules as `origination_format` apply to what\nthe template may contain.\n",
+      example: "1234#{number}",
+    },
+  },
+} as const;
+
+export const VoiceNumberSortFieldSchema = {
+  type: "string",
+  enum: ["phone_number"],
+  default: "phone_number",
+  description: "Field used to sort the list.",
+} as const;
+
+export const VoiceNumberIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^vnu_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vnu_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoiceNumberProviderTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["allocation", "verified_number"],
+  description:
+    "Where a number came from. `allocation` is a number we allocated to your workspace, and the only kind whose calls reach us. `verified_number` is a number from another carrier that you registered and proved you control, so it can be presented on a call you place.\n",
+  example: "allocation",
+} as const;
+
+export const VoiceNumberProviderAllocationSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "number_id"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoiceNumberProviderType",
+      const: "allocation",
+      description: "A number we allocated to your workspace.",
+    },
+    number_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AllocatedNumberID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Identifier of this number's allocation, to pass to the numbers operations. Null when the allocation behind this number cannot be resolved.\n",
+    },
+  },
+} as const;
+
+export const VoiceCallerIDStatusSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["pending", "verified", "failed"],
+  description:
+    "Verification state of the caller ID.\n\n- `pending`: the number is registered but ownership has not yet been proven.\n- `verified`: the workspace completed the verification call, so the number can\n  be presented as the outbound caller ID.\n- `failed`: terminal because the verification challenge expired or the attempt\n  limit was exhausted. Use the dashboard to remove and register the caller ID\n  again to retry.\n",
+  example: "pending",
+} as const;
+
+export const VoiceNumberProviderVerifiedNumberSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "status", "verified_at"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoiceNumberProviderType",
+      const: "verified_number",
+      description:
+        "A number from another carrier that you registered here. That carrier decides where calls to it go; we only present it on calls you place.\n",
+    },
+    status: {
+      $ref: "#/components/schemas/VoiceCallerIDStatus",
+      readOnly: true,
+      description: "How far proving control of this number has got.",
+    },
+    verified_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When control of this number was last proven. Null until it is.",
+    },
+  },
+} as const;
+
+export const VoiceNumberProviderSchema = {
+  description:
+    "Where this number came from, and the facts that belong to that answer. The type selects the shape. `allocation` is a number we allocated to your workspace, and it carries that allocation's identifier. `verified_number` is a number from another carrier, and it carries how far proving control of it has got.\n",
+  oneOf: [
+    {
+      $ref: "#/components/schemas/VoiceNumberProviderAllocation",
+    },
+    {
+      $ref: "#/components/schemas/VoiceNumberProviderVerifiedNumber",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      allocation: "#/components/schemas/VoiceNumberProviderAllocation",
+      verified_number: "#/components/schemas/VoiceNumberProviderVerifiedNumber",
+    },
+  },
+} as const;
+
+export const VoiceNumberDirectionsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["inbound", "outbound"],
+  properties: {
+    inbound: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether calls to this number arrive here. False for a number from another carrier, whose calls that carrier routes, and for one allocated to you that cannot carry calls.\n",
+    },
+    outbound: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this number can be presented on a call you place. Buying a number does not grant this on its own: proving control of it does.\n",
+    },
+  },
+} as const;
+
+export const VoiceInboundConfigurationErrorSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["unsupported_route_type"],
+} as const;
+
 export const VoiceCallRouteTypeSchema = {
   type: "string",
   minLength: 1,
-  enum: ["reject", "trunk", "forward"],
+  enum: ["reject", "trunk", "forward", "sequence"],
   description:
-    "Which answer a number carries.\n\n- `reject`: refuses the call. This is where every number starts.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
+    "Which answer a number carries.\n\n- `reject`: refuses the call. This is where every number starts.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n- `sequence`: runs the configured sequence from its selected voice-call entry.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
   example: "reject",
+} as const;
+
+export const VoiceCallRouteRejectSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoiceCallRouteType",
+      const: "reject",
+      description:
+        "Refuses the call. Every number starts here, and setting it again is how you stop a number answering without giving it up.\n",
+    },
+  },
+} as const;
+
+export const VoiceCallRouteTrunkSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "trunk_id"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoiceCallRouteType",
+      const: "trunk",
+      description: "Delivers the call to one of your SIP trunks.",
+    },
+    trunk_id: {
+      $ref: "#/components/schemas/SIPTrunkID",
+      description:
+        'The SIP trunk that answers calls to this number. It must be one of yours and must have inbound calling enabled. Turning that trunk\'s inbound calling off, or deleting it, puts this number back on "reject".\n',
+    },
+  },
+} as const;
+
+export const VoiceCallRouteForwardSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "forward_to", "forward_as"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoiceCallRouteType",
+      const: "forward",
+      description:
+        "Places a call to another of your numbers and connects the two.",
+    },
+    forward_to: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The number calls are forwarded to, in E.164 format. It has to be one of your verified caller IDs. That is checked when you set it and again on every call it forwards, so a caller ID you later remove stops forwarding rather than carrying on.\n",
+      example: "+14155551234",
+    },
+    forward_as: {
+      $ref: "#/components/schemas/VoiceInboundForwardAs",
+      description:
+        "Which number the forwarded leg presents as its caller. Include the choice\non every write. Reads return the effective choice; older configurations\nwithout a stored choice return `dialed_number`.\n",
+    },
+  },
+} as const;
+
+export const VoiceSequenceIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^vsq_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vsq_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoiceSequenceNodeIDSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 64,
+  pattern: "^[a-z][a-z0-9_]{0,63}$",
+  not: {
+    enum: ["false", "in", "null", "true"],
+  },
+  description: "Stable identifier for a node within one sequence definition.",
+} as const;
+
+export const VoiceCallRouteSequenceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "sequence_id", "entry_node_id"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoiceCallRouteType",
+      const: "sequence",
+      description:
+        "Runs the named sequence's active publication from the selected voice-call entry.",
+    },
+    sequence_id: {
+      $ref: "#/components/schemas/VoiceSequenceID",
+      description: "Named sequence whose active publication handles the call.",
+    },
+    entry_node_id: {
+      $ref: "#/components/schemas/VoiceSequenceNodeID",
+      description: "Voice-call entry in the sequence's active publication.",
+    },
+  },
+} as const;
+
+export const VoiceCallRouteSchema = {
+  description:
+    'What happens to a call arriving for this number, as it is configured now. Its `type` selects the shape, and each answer carries its own fields. An unconfigured number answers with "reject". Setting a route is a separate shape, and it does not offer every variant reported here.\n',
+  oneOf: [
+    {
+      $ref: "#/components/schemas/VoiceCallRouteReject",
+    },
+    {
+      $ref: "#/components/schemas/VoiceCallRouteTrunk",
+    },
+    {
+      $ref: "#/components/schemas/VoiceCallRouteForward",
+    },
+    {
+      $ref: "#/components/schemas/VoiceCallRouteSequence",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      reject: "#/components/schemas/VoiceCallRouteReject",
+      trunk: "#/components/schemas/VoiceCallRouteTrunk",
+      forward: "#/components/schemas/VoiceCallRouteForward",
+      sequence: "#/components/schemas/VoiceCallRouteSequence",
+    },
+  },
+} as const;
+
+export const VoiceInboundConfigurationSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["route"],
+  properties: {
+    route: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceCallRoute",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Null when the stored route type is unsupported; inspect configuration_error before changing it.",
+    },
+    configuration_error: {
+      $ref: "#/components/schemas/VoiceInboundConfigurationError",
+      readOnly: true,
+    },
+    forward_as_options: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/VoiceInboundForwardAs",
+      },
+      description:
+        "Caller identities available when configuring a forward. Use these values to populate the choice in your editor. The current choices are `dialed_number` and `calling_number`.\n",
+      example: ["dialed_number", "calling_number"],
+    },
+  },
+  if: {
+    properties: {
+      route: {
+        type: "null",
+      },
+    },
+    required: ["route"],
+  },
+  then: {
+    properties: {
+      configuration_error: {
+        $ref: "#/components/schemas/VoiceInboundConfigurationError",
+      },
+    },
+    required: ["configuration_error"],
+  },
+  else: {
+    properties: {
+      configuration_error: {
+        not: {},
+      },
+    },
+  },
+} as const;
+
+export const VoiceNumberSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "phone_number",
+    "country_code",
+    "name",
+    "provider",
+    "directions",
+    "inbound_configuration",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/VoiceNumberID",
+      readOnly: true,
+      description:
+        "Identifier of this number, to pass to the operations that read and change it. A number you registered as a caller ID carries the same identifier there, with the caller-ID prefix.\n",
+    },
+    phone_number: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The phone number in E.164 format.",
+      example: "+14155551234",
+    },
+    country_code: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/CountryCode",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Country the number belongs to. Null when the number is not geographic or its country cannot be determined.\n",
+    },
+    name: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 100,
+      readOnly: true,
+      description:
+        "Your own label for this number, to tell several apart. Null when it has none. Only you see it, so it never affects what a caller sees.\n",
+      example: "Support line",
+    },
+    provider: {
+      $ref: "#/components/schemas/VoiceNumberProvider",
+      readOnly: true,
+    },
+    directions: {
+      $ref: "#/components/schemas/VoiceNumberDirections",
+      readOnly: true,
+      description:
+        "Which directions this number can carry. Both follow from the number itself, so neither is yours to change. On a SIP trunk each direction is a setting you turn on; here it is a fact about the number.\n",
+    },
+    inbound_configuration: {
+      $ref: "#/components/schemas/VoiceInboundConfiguration",
+      readOnly: true,
+      description: "What happens to a call arriving for this number.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When this number became usable for voice: when it was allocated to you, or when you first registered it, whichever this number is.\n",
+    },
+  },
+} as const;
+
+export const VoiceNumberListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/VoiceNumber",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const VoiceCallRouteWritableSchema = {
+  description:
+    'What happens to a call arriving for this number. Its `type` selects the shape, and each answer carries its own fields; the variants below are the full set you can set. An unconfigured number uses "reject".\n',
+  oneOf: [
+    {
+      $ref: "#/components/schemas/VoiceCallRouteReject",
+    },
+    {
+      $ref: "#/components/schemas/VoiceCallRouteTrunk",
+    },
+    {
+      $ref: "#/components/schemas/VoiceCallRouteForward",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      reject: "#/components/schemas/VoiceCallRouteReject",
+      trunk: "#/components/schemas/VoiceCallRouteTrunk",
+      forward: "#/components/schemas/VoiceCallRouteForward",
+    },
+  },
+} as const;
+
+export const VoiceInboundConfigurationPutSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["route"],
+  properties: {
+    route: {
+      $ref: "#/components/schemas/VoiceCallRouteWritable",
+    },
+  },
+} as const;
+
+export const VoiceNumberUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  properties: {
+    name: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "Your own label for this number. Send null to remove the one it has. Omit the field to leave it alone.\n",
+      example: "Support line",
+    },
+    inbound_configuration: {
+      $ref: "#/components/schemas/VoiceInboundConfigurationPut",
+      description:
+        'What should happen to calls arriving for this number. The route replaces\nwhatever was set before, because a number has exactly one answer at a time,\nand type "reject" is how you stop it answering. Omit the field to leave the\nanswer alone.\n\nOnly a number that can receive calls carries a route, so it is refused on\none whose directions do not include inbound.\n',
+    },
+  },
+} as const;
+
+export const VoiceCallerIDSortFieldSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Field used to sort the list.",
+} as const;
+
+export const VoiceCallerIDIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^vci_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vci_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoiceCallerIDSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "id",
+        "workspace_id",
+        "phone_number",
+        "name",
+        "status",
+        "verified_at",
+      ],
+      properties: {
+        id: {
+          readOnly: true,
+          $ref: "#/components/schemas/VoiceCallerIDID",
+          description: "Unique identifier for this caller ID.",
+        },
+        workspace_id: {
+          readOnly: true,
+          $ref: "#/components/schemas/WorkspaceID",
+        },
+        phone_number: {
+          type: "string",
+          minLength: 1,
+          readOnly: true,
+          description:
+            "The phone number in E.164 format registered as a caller ID.",
+          example: "+14155551234",
+        },
+        name: {
+          type: ["string", "null"],
+          minLength: 1,
+          maxLength: 100,
+          readOnly: true,
+          description:
+            "Your label for this caller ID, to tell several registered numbers apart. `null` when the caller ID has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the caller ID update operation.\n",
+          example: "Support line",
+        },
+        status: {
+          readOnly: true,
+          $ref: "#/components/schemas/VoiceCallerIDStatus",
+        },
+        verified_at: {
+          type: ["string", "null"],
+          format: "date-time",
+          readOnly: true,
+          description:
+            "When the caller ID was verified. `null` when its status is `pending` or `failed`.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+} as const;
+
+export const VoiceCallerIDListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/VoiceCallerID",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const VoiceCallerIDVerifyRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["code"],
+  properties: {
+    code: {
+      type: "string",
+      pattern: "^\\d{6}$",
+      minLength: 6,
+      maxLength: 6,
+      "x-sensitive": true,
+      description:
+        "The 6-digit verification code read out by the verification call.",
+      example: "123456",
+    },
+  },
 } as const;
 
 export const VoiceLegRejectionReasonSchema = {
@@ -31954,6 +34677,15 @@ export const VoiceLegRejectionReasonSchema = {
   example: "destination_not_enabled",
 } as const;
 
+export const VoiceLegInboundRouteTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["reject", "trunk", "forward", "sequence"],
+  description:
+    "Which answer handled this incoming leg.\n\n- `reject`: the call was refused.\n- `trunk`: the call was delivered to one of your SIP trunks.\n- `forward`: the call was forwarded to one of your verified caller IDs.\n- `sequence`: the call was handled by one of your sequences.\n",
+  example: "trunk",
+} as const;
+
 export const VoiceLegInboundRouteRejectSchema = {
   type: "object",
   additionalProperties: false,
@@ -31962,9 +34694,10 @@ export const VoiceLegInboundRouteRejectSchema = {
     type: {
       allOf: [
         {
-          $ref: "#/components/schemas/VoiceCallRouteType",
+          $ref: "#/components/schemas/VoiceLegInboundRouteType",
         },
       ],
+      const: "reject",
       description:
         "The number turned the leg away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.\n",
     },
@@ -31979,9 +34712,10 @@ export const VoiceLegInboundRouteTrunkSchema = {
     type: {
       allOf: [
         {
-          $ref: "#/components/schemas/VoiceCallRouteType",
+          $ref: "#/components/schemas/VoiceLegInboundRouteType",
         },
       ],
+      const: "trunk",
       description: "The leg was delivered to one of your SIP trunks.",
     },
     trunk_id: {
@@ -32004,9 +34738,10 @@ export const VoiceLegInboundRouteForwardSchema = {
     type: {
       allOf: [
         {
-          $ref: "#/components/schemas/VoiceCallRouteType",
+          $ref: "#/components/schemas/VoiceLegInboundRouteType",
         },
       ],
+      const: "forward",
       description: "The leg was forwarded to another of your numbers.",
     },
     forward_to: {
@@ -32028,6 +34763,37 @@ export const VoiceLegInboundRouteForwardSchema = {
   },
 } as const;
 
+export const VoiceLegInboundRouteSequenceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "sequence_id", "entry_node_id"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoiceLegInboundRouteType",
+      const: "sequence",
+      description: "The leg was handled by one of your sequences.",
+    },
+    sequence_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceSequenceID",
+        },
+      ],
+      description:
+        "The sequence that handled the leg. Recorded as it was at the time, so it may name a sequence you have since changed or deleted.\n",
+    },
+    entry_node_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceSequenceNodeID",
+        },
+      ],
+      description:
+        "The entry the leg started from in the publication that handled it. Recorded as it was at the time, so it may name an entry the sequence no longer has.\n",
+    },
+  },
+} as const;
+
 export const VoiceLegInboundRouteSchema = {
   description:
     "The routing choice recorded for an incoming leg. A recorded route does not\nguarantee that the leg connected. Check `status` for the outcome and\n`rejection_reason` for the cause when present.\n",
@@ -32041,6 +34807,9 @@ export const VoiceLegInboundRouteSchema = {
     {
       $ref: "#/components/schemas/VoiceLegInboundRouteForward",
     },
+    {
+      $ref: "#/components/schemas/VoiceLegInboundRouteSequence",
+    },
   ],
   discriminator: {
     propertyName: "type",
@@ -32048,6 +34817,7 @@ export const VoiceLegInboundRouteSchema = {
       reject: "#/components/schemas/VoiceLegInboundRouteReject",
       trunk: "#/components/schemas/VoiceLegInboundRouteTrunk",
       forward: "#/components/schemas/VoiceLegInboundRouteForward",
+      sequence: "#/components/schemas/VoiceLegInboundRouteSequence",
     },
   },
 } as const;
@@ -32367,6 +35137,303 @@ export const VoiceLegListSchema = {
   ],
 } as const;
 
+export const VoiceSequencePhoneNumberSchema = {
+  type: "string",
+  minLength: 5,
+  maxLength: 16,
+  pattern: "^\\+[1-9][0-9]{3,14}$",
+  description:
+    "Canonical E.164 phone number, with a leading plus sign and four to fifteen digits.",
+} as const;
+
+export const VoiceSequenceRunIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^vsr_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vsr_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoiceCallSequenceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "run_id"],
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/VoiceSequenceID",
+      description: "Voice sequence selected for this call.",
+    },
+    run_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/VoiceSequenceRunID",
+      description: "Run created from the sequence's frozen publication.",
+    },
+  },
+} as const;
+
+export const VoiceCallSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A call summary. Call reads report observed state. Call creation returns an immutable acceptance snapshot: `started_at` and `ended_at` are `null`, the boolean observation fields are `false`, and `parties` is empty. Replays return that same snapshot after the call progresses.",
+  required: [
+    "id",
+    "workspace_id",
+    "initial_leg_id",
+    "direction",
+    "started_at",
+    "live",
+    "has_recording",
+    "has_transcript",
+    "parties",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/VoiceSessionID",
+      description:
+        "Unique identifier for this call, shared by every leg that belongs to it.",
+    },
+    workspace_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/WorkspaceID",
+    },
+    initial_leg_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/VoiceCallID",
+      description:
+        "The initial leg identity. For an accepted outbound call, this identity is reserved before the leg starts.",
+    },
+    direction: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceCallDirection",
+        },
+      ],
+      description: "Direction of the initial leg.",
+    },
+    started_at: {
+      readOnly: true,
+      type: ["string", "null"],
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When the initial leg started. `null` in the acceptance snapshot returned by call creation.",
+    },
+    ended_at: {
+      readOnly: true,
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When the call's last leg ended. `null` while any leg is still in progress. Recordings and transcripts can still arrive after this instant, so it does not mean the call is finished being written.",
+    },
+    live: {
+      readOnly: true,
+      type: "boolean",
+      description:
+        "Whether any leg in the call currently holds a lease. `false` covers the interval between a leg ending and its settlement being confirmed, and says nothing about whether transcription has finished.",
+    },
+    has_recording: {
+      readOnly: true,
+      type: "boolean",
+      description:
+        "Whether the call ever produced a recording. It stays `true` for the life of the call, so it records that a recording was made rather than promising one can still be fetched.",
+    },
+    has_transcript: {
+      readOnly: true,
+      type: "boolean",
+      description:
+        "Whether the call ever produced a transcript. A failed transcription attempt does not set it, and a later failure does not clear it.",
+    },
+    parties: {
+      readOnly: true,
+      type: "array",
+      description:
+        "The distinct participant observations the call's legs recorded, for display beside the call. The length is not a count of people and not a reconstruction of the leg graph.",
+      items: {
+        $ref: "#/components/schemas/VoiceParty",
+      },
+    },
+    sequence: {
+      readOnly: true,
+      $ref: "#/components/schemas/VoiceCallSequence",
+      description:
+        "Sequence and run accepted for this outbound call. Present in the immutable acceptance snapshot returned by call creation. Current call detail and list reads omit this property, including for calls created from a sequence.",
+    },
+  },
+} as const;
+
+export const CreateVoiceCallSequenceRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "entry_node_id", "trigger_data"],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/VoiceSequenceID",
+      description:
+        "Published voice sequence to run after the recipient answers.",
+    },
+    entry_node_id: {
+      $ref: "#/components/schemas/VoiceSequenceNodeID",
+      description: "Voice call entry node to start.",
+    },
+    trigger_data: {
+      type: "object",
+      additionalProperties: true,
+      description:
+        "Data matching the selected entry's configured schema, limited to 16 KiB before and after normalization. Use an empty object when the entry needs no data. Fields remain application data and cannot provide trusted call identity or routing authority.",
+    },
+  },
+} as const;
+
+export const CreateVoiceCallRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  "x-sensitive": true,
+  required: ["from", "to", "sequence"],
+  properties: {
+    from: {
+      $ref: "#/components/schemas/VoiceSequencePhoneNumber",
+      description:
+        "Calling number that this workspace is permitted to present.",
+    },
+    to: {
+      $ref: "#/components/schemas/VoiceSequencePhoneNumber",
+      description: "Recipient number in canonical E.164 form.",
+    },
+    ringing_timeout_seconds: {
+      type: "integer",
+      minimum: 5,
+      maximum: 120,
+      default: 30,
+      description:
+        "Maximum ringing time for the original dialing attempt, shared across routing candidates.",
+    },
+    sequence: {
+      $ref: "#/components/schemas/CreateVoiceCallSequenceRequest",
+    },
+  },
+} as const;
+
+export const VoiceDestinationSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "country_code",
+    "country_name",
+    "enabled",
+    "status",
+    "high_risk_destination",
+  ],
+  properties: {
+    country_code: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/CountryCode",
+        },
+      ],
+      readOnly: true,
+    },
+    country_name: {
+      type: "string",
+      minLength: 1,
+      description: "Full English country name.",
+      example: "Netherlands",
+      readOnly: true,
+    },
+    dial_code: {
+      type: "string",
+      description:
+        "International dialling prefix, without the leading plus. Absent for countries that have none.",
+      example: "31",
+      readOnly: true,
+    },
+    region: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/DestinationRegion",
+        },
+      ],
+      readOnly: true,
+    },
+    super_region: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/DestinationSuperRegion",
+        },
+      ],
+      readOnly: true,
+    },
+    enabled: {
+      type: "boolean",
+      description:
+        "Whether your workspace has enabled calling to this country.",
+    },
+    status: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": ["available", "not_supported"],
+      description:
+        "This country's Voice callability at the destination level, independent of your enabled setting. `available` means we place calls there; `not_supported` means we do not.\n",
+      readOnly: true,
+    },
+    high_risk_destination: {
+      type: "boolean",
+      description:
+        "Whether we treat this country as a high-risk calling destination.",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const VoiceDestinationListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data", "total"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/VoiceDestination",
+      },
+      description:
+        "The Voice destination countries, each annotated with your workspace's enabled setting.",
+    },
+    total: {
+      type: "integer",
+      format: "int64",
+      description: "Total number of destination countries.",
+    },
+  },
+} as const;
+
+export const VoiceDestinationsUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["destinations"],
+  properties: {
+    destinations: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/DestinationSetting",
+      },
+      description:
+        "The destination countries to enable or disable. Only the countries listed here change; any country you do not list keeps its current setting.\n",
+      example: [
+        {
+          country_code: "NL",
+          enabled: true,
+        },
+        {
+          country_code: "GB",
+          enabled: false,
+        },
+      ],
+    },
+  },
+} as const;
+
 export const WebhookEventWritableSchema = {
   description:
     "Webhook delivery body. `type` identifies the event variant, `timestamp` is when the event occurred, and `data` contains the event-specific payload. See the [webhooks guide](/docs/guides/webhooks) for signature verification.\n",
@@ -32516,6 +35583,12 @@ export const WebhookEventWritableSchema = {
       $ref: "#/components/schemas/EventWhatsAppFailedWritable",
     },
     {
+      $ref: "#/components/schemas/EventWhatsAppGroupJoinRequestCreated",
+    },
+    {
+      $ref: "#/components/schemas/EventWhatsAppGroupJoinRequestRevoked",
+    },
+    {
       $ref: "#/components/schemas/EventWhatsAppReacted",
     },
     {
@@ -32600,6 +35673,10 @@ export const WebhookEventWritableSchema = {
       "whatsapp.accepted": "#/components/schemas/EventWhatsAppAccepted",
       "whatsapp.delivered": "#/components/schemas/EventWhatsAppDelivered",
       "whatsapp.failed": "#/components/schemas/EventWhatsAppFailedWritable",
+      "whatsapp.group.join_request_created":
+        "#/components/schemas/EventWhatsAppGroupJoinRequestCreated",
+      "whatsapp.group.join_request_revoked":
+        "#/components/schemas/EventWhatsAppGroupJoinRequestRevoked",
       "whatsapp.reacted": "#/components/schemas/EventWhatsAppReacted",
       "whatsapp.read": "#/components/schemas/EventWhatsAppRead",
       "whatsapp.received": "#/components/schemas/EventWhatsAppReceivedWritable",
@@ -35355,7 +38432,283 @@ export const EmailStatsTagsResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-tag breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-tag breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
+} as const;
+
+export const EmailStatsQueryDimensionsWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Contains the requested group_by property, including a null value when context is missing. Ungrouped results use an empty object.",
+  properties: {
+    sending_domain: {
+      type: ["string", "null"],
+      description:
+        "Recorded sending domain value. Null represents missing context and differs from an empty string.",
+    },
+    category: {
+      type: ["string", "null"],
+      description:
+        "Recorded category value. Null represents missing context and differs from an empty string.",
+    },
+    template_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailTemplateID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Recorded template id value. Null represents missing context and differs from an empty string.",
+    },
+    tag: {
+      type: ["string", "null"],
+      description:
+        "Recorded tag value. Null represents missing context and differs from an empty string.",
+    },
+    recipient_domain: {
+      type: ["string", "null"],
+      description:
+        "Recorded recipient domain value. Null represents missing context and differs from an empty string.",
+    },
+    mailbox_provider: {
+      type: ["string", "null"],
+      description:
+        "Recorded mailbox provider value. Null represents missing context and differs from an empty string.",
+    },
+    mailbox_provider_region: {
+      type: ["string", "null"],
+      description:
+        "Recorded mailbox provider region value. Null represents missing context and differs from an empty string.",
+    },
+    sending_ip: {
+      type: ["string", "null"],
+      description:
+        "Recorded sending ip value. Null represents missing context and differs from an empty string.",
+    },
+    ip_pool_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/IPPoolID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Recorded ip pool id value. Null represents missing context and differs from an empty string.",
+    },
+    broadcast_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Recorded broadcast id value. Null represents missing context and differs from an empty string.",
+    },
+    country: {
+      type: ["string", "null"],
+      description:
+        "Recorded country value. Null represents missing context and differs from an empty string.",
+    },
+    region: {
+      type: ["string", "null"],
+      description:
+        "Recorded region value. Null represents missing context and differs from an empty string.",
+    },
+    city: {
+      type: ["string", "null"],
+      description:
+        "Recorded city value. Null represents missing context and differs from an empty string.",
+    },
+    agent_family: {
+      type: ["string", "null"],
+      description:
+        "Recorded agent family value. Null represents missing context and differs from an empty string.",
+    },
+    os_family: {
+      type: ["string", "null"],
+      description:
+        "Recorded os family value. Null represents missing context and differs from an empty string.",
+    },
+    device_family: {
+      type: ["string", "null"],
+      description:
+        "Recorded device family value. Null represents missing context and differs from an empty string.",
+    },
+    smtp_error_code: {
+      type: ["string", "null"],
+      description:
+        "Recorded smtp error code value. Null represents missing context and differs from an empty string.",
+    },
+    feedback_type: {
+      type: ["string", "null"],
+      description:
+        "Recorded feedback type value. Null represents missing context and differs from an empty string.",
+    },
+  },
+  maxProperties: 1,
+  readOnly: true,
+} as const;
+
+export const EmailStatsQueryPointWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One time bucket with the selected metrics. Bucket timestamps label nominal boundaries; edge buckets count events inside the normalized period.",
+  required: ["bucket", "metrics"],
+  properties: {
+    bucket: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Nominal bucket start as a UTC RFC 3339 instant.",
+    },
+    metrics: {
+      $ref: "#/components/schemas/EmailStatsQueryMetrics",
+    },
+  },
+  readOnly: true,
+} as const;
+
+export const EmailStatsQueryGroupWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One group ranked over the whole requested period. Its optional series contains complete chronological buckets, including zero counts and null undefined values for empty buckets.",
+  required: ["dimensions", "metrics"],
+  properties: {
+    dimensions: {
+      $ref: "#/components/schemas/EmailStatsQueryDimensionsWritable",
+    },
+    metrics: {
+      $ref: "#/components/schemas/EmailStatsQueryMetrics",
+    },
+    series: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailStatsQueryPointWritable",
+      },
+      description: "Present when grain is requested; absent otherwise.",
+    },
+  },
+  readOnly: true,
+} as const;
+
+export const EmailStatsQueryPeriodWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Normalized half-open period. The response end is exclusive; replay the original inclusive request bounds when following cursors.",
+  required: ["from", "to", "timezone", "grain"],
+  properties: {
+    from: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Inclusive normalized start as a UTC instant.",
+    },
+    to: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Exclusive normalized end as a UTC instant.",
+    },
+    timezone: {
+      type: "string",
+      minLength: 1,
+      description: "Timezone used to normalize bounds and buckets.",
+    },
+    grain: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailStatsQueryGrain",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description: "Requested grain, or null when no series was requested.",
+    },
+  },
+  readOnly: true,
+} as const;
+
+export const EmailStatsQueryResponseWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Selected email metrics with normalized bounds. Ungrouped requests return one group and null cursors, including empty windows. Grouped requests without observed groups return an empty data array. Live page reads can reflect new events or changed ranking.",
+  required: [
+    "data",
+    "period",
+    "data_as_of",
+    "next_cursor",
+    "prev_cursor",
+    "refresh_cursor",
+  ],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailStatsQueryGroupWritable",
+      },
+    },
+    period: {
+      $ref: "#/components/schemas/EmailStatsQueryPeriodWritable",
+    },
+    data_as_of: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "Always null for this endpoint. It does not report a refresh boundary, claim completeness, or record request time.",
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Pass as starting_after for the next grouped page. Null when no next page exists or the request is ungrouped.",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Pass as ending_before for the previous grouped page. Null when no previous page exists or the request is ungrouped.",
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Anchor for the first group. Pass as ending_before to read groups sorting before it. Null for empty or ungrouped results. Ranking can change between reads; refresh by repeating the original query.",
+    },
+  },
+  readOnly: true,
 } as const;
 
 export const EmailStatsComparisonWritableSchema = {
@@ -35392,7 +38745,30 @@ export const EmailStatsBySendingIpResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-sending-IP breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-sending-IP breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
 } as const;
 
 export const EmailSendingDomainStatsPointWritableSchema = {
@@ -35406,7 +38782,30 @@ export const EmailStatsBySendingDomainResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-sending-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-sending-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
 } as const;
 
 export const EmailCategoryStatsPointWritableSchema = {
@@ -35420,7 +38819,30 @@ export const EmailStatsByCategoryResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-category breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-category breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
 } as const;
 
 export const EmailMailboxProviderStatsPointWritableSchema = {
@@ -35434,7 +38856,30 @@ export const EmailStatsByMailboxProviderResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-mailbox-provider breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-mailbox-provider breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
 } as const;
 
 export const EmailMailboxProviderRegionStatsPointWritableSchema = {
@@ -35448,7 +38893,30 @@ export const EmailStatsByMailboxProviderRegionResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-(mailbox provider, provider region) breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-(mailbox provider, provider region) breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
 } as const;
 
 export const EmailRecipientDomainStatsPointWritableSchema = {
@@ -35462,7 +38930,30 @@ export const EmailStatsByRecipientDomainResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-recipient-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-recipient-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
 } as const;
 
 export const EmailTemplateStatsPointWritableSchema = {
@@ -35476,35 +38967,150 @@ export const EmailStatsByTemplateResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-template breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-template breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
 } as const;
 
 export const EmailStatsByLocationResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-location engagement breakdown for the requested period, grouped at the requested `group_by` granularity, ranked by the `sort` metric (default `unique_opens`) descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-location engagement breakdown for the requested period, grouped at the requested `group_by` granularity, ranked by the `sort` metric (default `unique_opens`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
 } as const;
 
 export const EmailStatsByClientResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-client engagement breakdown for the requested period, grouped by the requested `group_by` facet, ranked by the `sort` metric (default `unique_opens`) descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-client engagement breakdown for the requested period, grouped by the requested `group_by` facet, ranked by the `sort` metric (default `unique_opens`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
 } as const;
 
 export const EmailStatsByBounceCodeResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-SMTP-code bounce breakdown for the requested period, ranked by the `sort` metric (default `bounced`) descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-SMTP-code bounce breakdown for the requested period, ranked by the `sort` metric (default `bounced`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
 } as const;
 
 export const EmailStatsByComplaintTypeResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-complaint-type breakdown for the requested period, ranked by `complained` descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-complaint-type breakdown for the requested period, ranked by `complained` descending and paginated with the requested `limit` (default 50, max 200).",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
 } as const;
 
 export const EmailBroadcastStatsPointWritableSchema = {
@@ -35518,7 +39124,30 @@ export const EmailStatsByBroadcastResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-broadcast breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-broadcast breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
 } as const;
 
 export const EmailHealthWritableSchema = {
@@ -37705,6 +41334,76 @@ export const WebhookAttemptListWritableSchema = {
   },
 } as const;
 
+export const VoicePartyBridgePSTNEndpointWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["forward_to", "forward_as"],
+  properties: {
+    forward_to: {
+      type: "string",
+      minLength: 3,
+      maxLength: 16,
+      pattern: "^\\+[1-9][0-9]{1,14}$",
+      description:
+        "The number the platform placed the leg onward to, in E.164. The party's own `address` is the number that was dialled, so the two together are one hop of the call.",
+      example: "+31612345678",
+    },
+    forward_as: {
+      $ref: "#/components/schemas/VoiceInboundForwardAs",
+      description: "Which number the forwarded leg presented to the far end.",
+    },
+  },
+} as const;
+
+export const VoicePartyBridgeSIPEndpointWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["trunk_id"],
+  properties: {
+    trunk_id: {
+      $ref: "#/components/schemas/SIPTrunkID",
+      description:
+        "The workspace trunk the leg was delivered onward to. It is distinct from the party's own `trunk_id`, which is the trunk this side itself sat behind.",
+    },
+  },
+} as const;
+
+export const VoicePartyEndpointWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoicePartyEndpointType",
+      description:
+        "What kind of participant sat on this side of a leg. It selects which payload below is present, and most kinds carry none because the party's `address` is already their coordinate.",
+    },
+    sip: {
+      $ref: "#/components/schemas/VoicePartySIPEndpoint",
+      description:
+        "The registered contact of a `sip` endpoint. Absent when the observation recorded none, and on every other kind of endpoint.",
+    },
+    bridge_pstn: {
+      $ref: "#/components/schemas/VoicePartyBridgePSTNEndpointWritable",
+      description:
+        "Where the platform placed the leg onward, on a `bridge_pstn` endpoint. Absent on every other kind of endpoint.",
+    },
+    bridge_sip: {
+      $ref: "#/components/schemas/VoicePartyBridgeSIPEndpointWritable",
+      description:
+        "The trunk the platform delivered the leg onward to, on a `bridge_sip` endpoint. Absent on every other kind of endpoint.",
+    },
+  },
+} as const;
+
+export const VoicePartyWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
 export const NumberOwnershipWritableSchema = {
   type: "object",
   readOnly: true,
@@ -37840,6 +41539,261 @@ export const NumbersOrderListWritableSchema = {
   ],
 } as const;
 
+export const VoiceTrunkIPACLWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    description: {
+      type: ["string", "null"],
+      minLength: 1,
+      description: "Optional human-readable label for this ACL entry.",
+      example: "Office network",
+    },
+  },
+} as const;
+
+export const VoiceTrunkCoreWritableSchema = {
+  type: "object",
+  description: "A SIP trunk's identity and access-control settings.",
+  required: ["name"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      description:
+        "A human-readable label for this SIP trunk. Mutable, and distinct from the generated wire domain.",
+      example: "Production PBX trunk",
+    },
+  },
+} as const;
+
+export const VoiceTrunkWritableSchema = {
+  allOf: [
+    {
+      $ref: "#/components/schemas/VoiceTrunkCoreWritable",
+    },
+  ],
+} as const;
+
+export const VoiceTrunkListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/VoiceTrunkWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const VoiceTrunkGatewayWritableSchema = {
+  description:
+    "One address an inbound call to this trunk is forwarded to, and how that peer wants the call's two numbers spelled. A trunk can have several, tried in priority order until one answers.\n",
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "sip_uri",
+        "priority",
+        "origination_format",
+        "destination_format",
+      ],
+      properties: {
+        sip_uri: {
+          type: "string",
+          minLength: 1,
+          maxLength: 512,
+          description:
+            "SIP URI an inbound call to this trunk is forwarded to. The host only: which number is dialed at that host comes from `destination_format`, because it changes with every call.\n",
+          example: "sip:pbx.example.com:5060",
+        },
+        priority: {
+          type: "integer",
+          minimum: 0,
+          description:
+            "The order gateways are tried in, lowest first. Gateways sharing a priority take an equal share of calls, and any of them may be tried first on a given call.\n",
+          example: 0,
+        },
+        origination_format: {
+          type: "string",
+          minLength: 1,
+          maxLength: 64,
+          description:
+            "How the calling number is spelled to this gateway, as a template whose\n`{number}` stands for the number without its leading `+`. It is stated\nin the `P-Asserted-Identity` header of the delivered call.\n\nA gateway that has not asked for anything else reports `+{number}`,\nwhich is E.164. A format with no `{number}` states that same identity on\nevery call, whoever called.\n",
+          example: "+{number}",
+        },
+        destination_format: {
+          type: "string",
+          minLength: 1,
+          maxLength: 64,
+          description:
+            "How this gateway formats the dialed number. In the template,\n`{number}` represents the number without its leading `+`. The result\nis placed before the `sip_uri` host. For example, `1234#{number}`\nformats `+31201234567` as\n`sip:1234#31201234567@pbx.example.com:5060`.\n\nA gateway that has not asked for anything else reports `+{number}`,\nwhich is E.164. A format with no `{number}` is dialed as it stands, so\nevery number the trunk answers reaches that one number.\n",
+          example: "+{number}",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const VoiceTrunkGatewayListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  description:
+    "The trunk's gateways. Not paginated: a trunk holds a small, hand-managed set of dial targets, and the order across the whole set is what decides hunt order, so a partial page would misrepresent it.",
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/VoiceTrunkGatewayWritable",
+      },
+      description: "The trunk's gateways, in priority order.",
+    },
+  },
+} as const;
+
+export const VoiceNumberProviderAllocationWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoiceNumberProviderType",
+      const: "allocation",
+      description: "A number we allocated to your workspace.",
+    },
+  },
+} as const;
+
+export const VoiceNumberProviderVerifiedNumberWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoiceNumberProviderType",
+      const: "verified_number",
+      description:
+        "A number from another carrier that you registered here. That carrier decides where calls to it go; we only present it on calls you place.\n",
+    },
+  },
+} as const;
+
+export const VoiceNumberProviderWritableSchema = {
+  description:
+    "Where this number came from, and the facts that belong to that answer. The type selects the shape. `allocation` is a number we allocated to your workspace, and it carries that allocation's identifier. `verified_number` is a number from another carrier, and it carries how far proving control of it has got.\n",
+  oneOf: [
+    {
+      $ref: "#/components/schemas/VoiceNumberProviderAllocationWritable",
+    },
+    {
+      $ref: "#/components/schemas/VoiceNumberProviderVerifiedNumberWritable",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      allocation: "#/components/schemas/VoiceNumberProviderAllocationWritable",
+      verified_number:
+        "#/components/schemas/VoiceNumberProviderVerifiedNumberWritable",
+    },
+  },
+} as const;
+
+export const VoiceInboundConfigurationWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["route"],
+  properties: {
+    route: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceCallRoute",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Null when the stored route type is unsupported; inspect configuration_error before changing it.",
+    },
+  },
+  if: {
+    properties: {
+      route: {
+        type: "null",
+      },
+    },
+    required: ["route"],
+  },
+  then: {
+    properties: {
+      configuration_error: {
+        $ref: "#/components/schemas/VoiceInboundConfigurationError",
+      },
+    },
+    required: ["configuration_error"],
+  },
+  else: {
+    properties: {
+      configuration_error: {
+        not: {},
+      },
+    },
+  },
+} as const;
+
+export const VoiceNumberWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
+export const VoiceNumberListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/VoiceNumberWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const VoiceCallerIDListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
 export const VoiceLegWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -37863,4 +41817,45 @@ export const VoiceLegListWritableSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
+} as const;
+
+export const VoiceCallWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A call summary. Call reads report observed state. Call creation returns an immutable acceptance snapshot: `started_at` and `ended_at` are `null`, the boolean observation fields are `false`, and `parties` is empty. Replays return that same snapshot after the call progresses.",
+} as const;
+
+export const VoiceDestinationWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["enabled"],
+  properties: {
+    enabled: {
+      type: "boolean",
+      description:
+        "Whether your workspace has enabled calling to this country.",
+    },
+  },
+} as const;
+
+export const VoiceDestinationListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data", "total"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/VoiceDestinationWritable",
+      },
+      description:
+        "The Voice destination countries, each annotated with your workspace's enabled setting.",
+    },
+    total: {
+      type: "integer",
+      format: "int64",
+      description: "Total number of destination countries.",
+    },
+  },
 } as const;

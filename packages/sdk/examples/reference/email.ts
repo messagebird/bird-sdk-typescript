@@ -467,3 +467,16 @@ export async function insights_email_inboxInsights_benchmarks_industry() {
   const report = await bird.email.inboxInsights.benchmarks.industry({ sending_domain: sendingDomain });
   console.log(report);
 }
+
+export async function emailStatsQuery() {
+  for await (const group of bird.email.stats.query({
+    from: "2026-08-03",
+    to: "2026-08-16",
+    metrics: ["delivered", "bounce_rate"],
+    group_by: "recipient_domain",
+    grain: "week",
+    limit: 25,
+  })) {
+    console.log(group.dimensions, group.metrics, group.series);
+  }
+}

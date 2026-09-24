@@ -54,6 +54,8 @@ export const WebhookEventType = {
   WhatsappAccepted: "whatsapp.accepted",
   WhatsappDelivered: "whatsapp.delivered",
   WhatsappFailed: "whatsapp.failed",
+  WhatsappGroupJoinRequestCreated: "whatsapp.group.join_request_created",
+  WhatsappGroupJoinRequestRevoked: "whatsapp.group.join_request_revoked",
   WhatsappReacted: "whatsapp.reacted",
   WhatsappRead: "whatsapp.read",
   WhatsappReceived: "whatsapp.received",

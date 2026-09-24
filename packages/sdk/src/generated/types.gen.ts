@@ -158,6 +158,12 @@ export type WebhookEvent =
       type: "whatsapp.failed";
     } & EventWhatsAppFailed)
   | ({
+      type: "whatsapp.group.join_request_created";
+    } & EventWhatsAppGroupJoinRequestCreated)
+  | ({
+      type: "whatsapp.group.join_request_revoked";
+    } & EventWhatsAppGroupJoinRequestRevoked)
+  | ({
       type: "whatsapp.reacted";
     } & EventWhatsAppReacted)
   | ({
@@ -421,6 +427,12 @@ export type DocsPage = {
  * ISO 4217 three-letter currency code.
  */
 export type CurrencyCode = string;
+
+/**
+ * The commercial region this country belongs to, for grouping a destination list the way it is bought rather than alphabetically. `null` for a country we have not assigned yet. Bird defines these regions independently of ISO and UN M49. A country can move between them, so treat the set as open.
+ *
+ */
+export type DestinationRegion = string | null;
 
 /**
  * ISO 3166-1 alpha-2 country code.
@@ -4620,6 +4632,20 @@ export type SmsInboundStatsByNumberResponse = {
 };
 
 /**
+ * The continent-scale group the region rolls up into. Derived from `region`, and `null` whenever that is. Treat the set as open.
+ *
+ */
+export type DestinationSuperRegion = string | null;
+
+export type DestinationSetting = {
+  country_code: CountryCode;
+  /**
+   * Whether to enable (`true`) or disable (`false`) this destination country.
+   */
+  enabled: boolean;
+};
+
+/**
  * Identifier of a number allocated to your workspace, as returned in the id field of `GET /v1/numbers`.
  */
 export type AllocatedNumberId = string;
@@ -5336,6 +5362,10 @@ export type VerificationNextChannelRequest = {
 };
 
 export type DomainId = string;
+
+export type WhatsAppNumberId = string;
+
+export type WhatsAppTemplateId = string;
 
 /**
  * Delivery status:
@@ -6294,8 +6324,6 @@ export type WhatsAppMessageList = {
   data: Array<WhatsAppMessage>;
 } & ListEnvelope;
 
-export type WhatsAppTemplateId = string;
-
 export type WhatsAppTemplateSend = unknown & {
   /**
    * The template to send, by its id.
@@ -7121,8 +7149,6 @@ export type WhatsAppGroupSortField = "created_at";
  */
 export type WhatsAppGroupStatus =
   "pending" | "active" | "suspended" | "deleted" | "failed";
-
-export type WhatsAppNumberId = string;
 
 /**
  * How someone opening the invite link gets in:
@@ -11019,7 +11045,7 @@ export type EmailTagStatsPoint = {
 };
 
 /**
- * Per-tag breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-tag breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsTagsResponse = {
   /**
@@ -11031,10 +11057,544 @@ export type EmailStatsTagsResponse = {
    */
   readonly data: Array<EmailTagStatsPoint>;
   /**
-   * Total number of distinct tags (name and value pairs) with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct tags (name and value pairs) with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
+/**
+ * Metric selected for period totals, time buckets, or group ranking. Counts estimate distinct identities; rates are ratios. Latency metrics measure milliseconds from Bird acceptance to processing or delivery.
+ */
+export type EmailStatsQueryMetric =
+  | "sends_accepted"
+  | "accepted"
+  | "processed"
+  | "delivered"
+  | "bounced"
+  | "hard_bounced"
+  | "soft_bounced"
+  | "admin_bounced"
+  | "block_bounced"
+  | "undetermined_bounced"
+  | "complained"
+  | "deferred"
+  | "rejected"
+  | "oob_bounces"
+  | "opens"
+  | "opens_non_prefetched"
+  | "clicks"
+  | "unsubscribes"
+  | "unique_opens"
+  | "unique_opens_non_prefetched"
+  | "unique_clicks"
+  | "confirmed_unique_opens"
+  | "confirmed_unique_opens_non_prefetched"
+  | "effective_delivered"
+  | "all_bounces"
+  | "delivery_rate"
+  | "bounce_rate"
+  | "complaint_rate"
+  | "deferral_rate"
+  | "open_rate"
+  | "click_rate"
+  | "unsubscribe_rate"
+  | "oob_rate"
+  | "processing_p50_ms"
+  | "processing_p95_ms"
+  | "processing_p99_ms"
+  | "total_p50_ms"
+  | "total_p95_ms"
+  | "total_p99_ms";
+
+/**
+ * Recorded event context used to group results. Grouping by `tag` requires `filters.tag.name`.
+ * Missing values form a null group when the metric supports that dimension.
+ *
+ * Every selected metric must support the grouping dimension and every filter dimension.
+ * Unsupported combinations return validation error `E04074`, even when the workspace has no events.
+ *
+ * - `sending_domain`, `category`, `template_id`, `tag`: all metrics.
+ * - `recipient_domain`, `ip_pool_id`, `broadcast_id`: all metrics except `sends_accepted`.
+ * - `mailbox_provider`, `mailbox_provider_region`: all metrics except `sends_accepted`, `accepted`, and `rejected`.
+ * - `sending_ip`: `delivered`, `bounced`, `hard_bounced`, `soft_bounced`, `admin_bounced`, `block_bounced`,
+ * `undetermined_bounced`, `deferred`, `oob_bounces`, `effective_delivered`, `all_bounces`, `delivery_rate`,
+ * `bounce_rate`, `deferral_rate`, `oob_rate`, `total_p50_ms`, `total_p95_ms`, and `total_p99_ms`.
+ * - `country`, `region`, `city`, `agent_family`, `os_family`, `device_family`: `opens`, `opens_non_prefetched`,
+ * `clicks`, `unique_opens`, `unique_opens_non_prefetched`, `unique_clicks`, `confirmed_unique_opens`,
+ * and `confirmed_unique_opens_non_prefetched`.
+ * - `smtp_error_code`: `bounced`, `hard_bounced`, `soft_bounced`, `admin_bounced`, `block_bounced`, and `undetermined_bounced`.
+ * - `feedback_type`: `complained`.
+ *
+ */
+export type EmailStatsQueryDimension =
+  | "sending_domain"
+  | "category"
+  | "template_id"
+  | "tag"
+  | "recipient_domain"
+  | "mailbox_provider"
+  | "mailbox_provider_region"
+  | "sending_ip"
+  | "ip_pool_id"
+  | "broadcast_id"
+  | "country"
+  | "region"
+  | "city"
+  | "agent_family"
+  | "os_family"
+  | "device_family"
+  | "smtp_error_code"
+  | "feedback_type";
+
+/**
+ * Time buckets in the requested timezone. Weeks start on Monday; months start on the first day. Half days start at midnight and noon. Edge buckets count events inside the normalized period.
+ */
+export type EmailStatsQueryGrain =
+  "quarter_hour" | "hour" | "half_day" | "day" | "week" | "month";
+
+/**
+ * Match recorded values using include or exclude. Include values combine with OR; exclusions remove matches. Missing values survive exclude-only predicates. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.
+ */
+export type EmailStatsQueryStringFilter = {
+  include?: Array<string>;
+  exclude?: Array<string>;
+};
+
+/**
+ * Match recorded values using include or exclude. Include values combine with OR; exclusions remove matches. Missing values survive exclude-only predicates. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.
+ */
+export type EmailStatsQueryCategoryFilter = {
+  include?: Array<EmailMessageCategory>;
+  exclude?: Array<EmailMessageCategory>;
+};
+
+/**
+ * Match recorded values using include or exclude. Include values combine with OR; exclusions remove matches. Missing values survive exclude-only predicates. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.
+ */
+export type EmailStatsQueryTemplateFilter = {
+  include?: Array<EmailTemplateId>;
+  exclude?: Array<EmailTemplateId>;
+};
+
+/**
+ * Select one case-sensitive tag name. A name without values requires that tag to exist. Exclude-only predicates retain events without that tag. Include and exclude together accept at most 20 distinct normalized values with no overlap.
+ */
+export type EmailStatsQueryTagFilter = {
+  name: string;
+  include?: Array<string>;
+  exclude?: Array<string>;
+};
+
+export type IpPoolId = string;
+
+/**
+ * Match recorded values using include or exclude. Include values combine with OR; exclusions remove matches. Missing values survive exclude-only predicates. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.
+ */
+export type EmailStatsQueryIpPoolFilter = {
+  include?: Array<IpPoolId>;
+  exclude?: Array<IpPoolId>;
+};
+
+/**
+ * Match recorded values using include or exclude. Include values combine with OR; exclusions remove matches. Missing values survive exclude-only predicates. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.
+ */
+export type EmailStatsQueryBroadcastFilter = {
+  include?: Array<EmailBroadcastId>;
+  exclude?: Array<EmailBroadcastId>;
+};
+
+/**
+ * Predicates on the context recorded for each event. Dimensions combine with AND. Unsupported metric and dimension combinations return 422, including for an empty workspace.
+ */
+export type EmailStatsQueryFilters = {
+  sending_domain?: EmailStatsQueryStringFilter;
+  category?: EmailStatsQueryCategoryFilter;
+  template_id?: EmailStatsQueryTemplateFilter;
+  tag?: EmailStatsQueryTagFilter;
+  recipient_domain?: EmailStatsQueryStringFilter;
+  mailbox_provider?: EmailStatsQueryStringFilter;
+  mailbox_provider_region?: EmailStatsQueryStringFilter;
+  sending_ip?: EmailStatsQueryStringFilter;
+  ip_pool_id?: EmailStatsQueryIpPoolFilter;
+  broadcast_id?: EmailStatsQueryBroadcastFilter;
+  country?: EmailStatsQueryStringFilter;
+  region?: EmailStatsQueryStringFilter;
+  city?: EmailStatsQueryStringFilter;
+  agent_family?: EmailStatsQueryStringFilter;
+  os_family?: EmailStatsQueryStringFilter;
+  device_family?: EmailStatsQueryStringFilter;
+  smtp_error_code?: EmailStatsQueryStringFilter;
+  feedback_type?: EmailStatsQueryStringFilter;
+};
+
+/**
+ * Select email metrics for one workspace and one time window. Group-only fields require group_by; defaults apply after grouping is selected. Queries are limited to 20,000 series points, 1,000,000 selected metric cells including period rows, and a 4 MiB JSON response. Unsupported combinations or unavailable history return 422.
+ */
+export type EmailStatsQueryRequest = {
+  /**
+   * Inclusive start, as a calendar date or RFC 3339 instant. Use the same form for from and to. Instants round down to a local quarter-hour; use Z when timezone is supplied.
+   */
+  from: string;
+  /**
+   * Inclusive end. Dates include the whole local day; instants round down to a local quarter-hour and include that quarter-hour. Dates allow up to 365 local days; instants allow up to 720 hours, subject to available history. Preserve this original bound when following cursors.
+   */
+  to: string;
+  /**
+   * IANA timezone for dates and bucket boundaries. Defaults to UTC.
+   */
+  timezone?: string;
+  /**
+   * Distinct metrics to return. Unselected metrics are absent.
+   */
+  metrics: Array<EmailStatsQueryMetric>;
+  /**
+   * Group by this dimension. Omit for a single ungrouped summary with optional series.
+   */
+  group_by?: EmailStatsQueryDimension;
+  grain?: EmailStatsQueryGrain;
+  filters?: EmailStatsQueryFilters;
+  /**
+   * Grouped requests only. Rank groups by this selected metric; defaults to the first metrics entry. Undefined values sort last in either direction. Ties use the dimension value ascending, with null last.
+   */
+  sort?: EmailStatsQueryMetric;
+  /**
+   * Grouped requests only. Defaults to desc.
+   */
+  order?: SortOrder;
+  /**
+   * Grouped requests only. Maximum groups per page; defaults to 25. Each group retains its complete series.
+   */
+  limit?: number;
+  /**
+   * Grouped requests only. Opaque next_cursor from the previous response. Mutually exclusive with ending_before.
+   */
+  starting_after?: string;
+  /**
+   * Grouped requests only. Opaque prev_cursor for backward navigation, or refresh_cursor to read groups before the anchor in the current sort order. Mutually exclusive with starting_after.
+   */
+  ending_before?: string;
+};
+
+/**
+ * Contains the requested group_by property, including a null value when context is missing. Ungrouped results use an empty object.
+ */
+export type EmailStatsQueryDimensions = {
+  /**
+   * Recorded sending domain value. Null represents missing context and differs from an empty string.
+   */
+  sending_domain?: string | null;
+  /**
+   * Recorded category value. Null represents missing context and differs from an empty string.
+   */
+  category?: string | null;
+  /**
+   * Recorded template id value. Null represents missing context and differs from an empty string.
+   */
+  template_id?: EmailTemplateId | null;
+  /**
+   * Recorded tag value. Null represents missing context and differs from an empty string.
+   */
+  tag?: string | null;
+  /**
+   * Recorded recipient domain value. Null represents missing context and differs from an empty string.
+   */
+  recipient_domain?: string | null;
+  /**
+   * Recorded mailbox provider value. Null represents missing context and differs from an empty string.
+   */
+  mailbox_provider?: string | null;
+  /**
+   * Recorded mailbox provider region value. Null represents missing context and differs from an empty string.
+   */
+  mailbox_provider_region?: string | null;
+  /**
+   * Recorded sending ip value. Null represents missing context and differs from an empty string.
+   */
+  sending_ip?: string | null;
+  /**
+   * Recorded ip pool id value. Null represents missing context and differs from an empty string.
+   */
+  ip_pool_id?: IpPoolId | null;
+  /**
+   * Recorded broadcast id value. Null represents missing context and differs from an empty string.
+   */
+  broadcast_id?: EmailBroadcastId | null;
+  /**
+   * Recorded country value. Null represents missing context and differs from an empty string.
+   */
+  country?: string | null;
+  /**
+   * Recorded region value. Null represents missing context and differs from an empty string.
+   */
+  region?: string | null;
+  /**
+   * Recorded city value. Null represents missing context and differs from an empty string.
+   */
+  city?: string | null;
+  /**
+   * Recorded agent family value. Null represents missing context and differs from an empty string.
+   */
+  agent_family?: string | null;
+  /**
+   * Recorded os family value. Null represents missing context and differs from an empty string.
+   */
+  os_family?: string | null;
+  /**
+   * Recorded device family value. Null represents missing context and differs from an empty string.
+   */
+  device_family?: string | null;
+  /**
+   * Recorded smtp error code value. Null represents missing context and differs from an empty string.
+   */
+  smtp_error_code?: string | null;
+  /**
+   * Recorded feedback type value. Null represents missing context and differs from an empty string.
+   */
+  feedback_type?: string | null;
+};
+
+/**
+ * Selected metric values. Counts are nonnegative approximate distinct counts. Period uniques and rates are computed independently of buckets; summing bucket or group values does not reconstruct period totals. Zero means a supported empty population; undefined rates and empty latency samples are null.
+ */
+export type EmailStatsQueryMetrics = {
+  /**
+   * Distinct sends accepted by Bird, counted by email identity.
+   */
+  sends_accepted?: number;
+  /**
+   * Distinct message recipients accepted by Bird.
+   */
+  accepted?: number;
+  /**
+   * Distinct message recipients processed for delivery.
+   */
+  processed?: number;
+  /**
+   * Distinct message recipients with a delivery event.
+   */
+  delivered?: number;
+  /**
+   * Distinct message recipients with bounced events.
+   */
+  bounced?: number;
+  /**
+   * Distinct message recipients with hard bounced events.
+   */
+  hard_bounced?: number;
+  /**
+   * Distinct message recipients with soft bounced events.
+   */
+  soft_bounced?: number;
+  /**
+   * Distinct message recipients with admin bounced events.
+   */
+  admin_bounced?: number;
+  /**
+   * Distinct message recipients with block bounced events.
+   */
+  block_bounced?: number;
+  /**
+   * Distinct message recipients with undetermined bounced events.
+   */
+  undetermined_bounced?: number;
+  /**
+   * Distinct message recipients with complained events.
+   */
+  complained?: number;
+  /**
+   * Distinct message recipients with a deferral event.
+   */
+  deferred?: number;
+  /**
+   * Distinct message recipients rejected before provider delivery.
+   */
+  rejected?: number;
+  /**
+   * Distinct out-of-band bounce events.
+   */
+  oob_bounces?: number;
+  /**
+   * Distinct open events, including prefetched opens.
+   */
+  opens?: number;
+  /**
+   * Distinct open events excluding prefetched opens. An absent prefetch flag counts as false.
+   */
+  opens_non_prefetched?: number;
+  /**
+   * Distinct click events.
+   */
+  clicks?: number;
+  /**
+   * Distinct unsubscribe events.
+   */
+  unsubscribes?: number;
+  /**
+   * Distinct message recipients with an open event.
+   */
+  unique_opens?: number;
+  /**
+   * Distinct message recipients with a non-prefetched open event.
+   */
+  unique_opens_non_prefetched?: number;
+  /**
+   * Distinct message recipients with a click event.
+   */
+  unique_clicks?: number;
+  /**
+   * Distinct message recipients with an open or click event, deduplicated across both.
+   */
+  confirmed_unique_opens?: number;
+  /**
+   * Distinct message recipients with a non-prefetched open or click event, deduplicated across both.
+   */
+  confirmed_unique_opens_non_prefetched?: number;
+  /**
+   * Delivered recipients less out-of-band bounce events, calculated as `max(delivered - oob_bounces, 0)`.
+   */
+  effective_delivered?: number;
+  /**
+   * In-band bounced recipients plus out-of-band bounce events, calculated as `bounced + oob_bounces`.
+   */
+  all_bounces?: number;
+  /**
+   * Ratio of `effective_delivered / (delivered + bounced)`, from 0 to 1. Null when `delivered + bounced` is zero.
+   */
+  delivery_rate?: number | null;
+  /**
+   * Ratio of `all_bounces / (delivered + bounced)`, capped at 1. Null when `delivered + bounced` is zero.
+   */
+  bounce_rate?: number | null;
+  /**
+   * Ratio of `complained / effective_delivered`. Uncapped and can exceed 1 when complaints and deliveries fall in different windows. Null when `effective_delivered` is zero.
+   */
+  complaint_rate?: number | null;
+  /**
+   * Ratio of `deferred / (delivered + bounced)`, capped at 1. Null when `delivered + bounced` is zero.
+   */
+  deferral_rate?: number | null;
+  /**
+   * Ratio of `unique_opens_non_prefetched / effective_delivered`. Uncapped and can exceed 1 when opens and deliveries fall in different windows. Null when `effective_delivered` is zero.
+   */
+  open_rate?: number | null;
+  /**
+   * Ratio of `unique_clicks / effective_delivered`. Uncapped and can exceed 1 when clicks and deliveries fall in different windows. Null when `effective_delivered` is zero.
+   */
+  click_rate?: number | null;
+  /**
+   * Ratio of `unsubscribes / effective_delivered`, using distinct unsubscribe events as the numerator. Uncapped and can exceed 1. Null when `effective_delivered` is zero.
+   */
+  unsubscribe_rate?: number | null;
+  /**
+   * Ratio of `oob_bounces / (delivered + bounced)`, using distinct out-of-band bounce events as the numerator. Uncapped and can exceed 1. Null when `delivered + bounced` is zero.
+   */
+  oob_rate?: number | null;
+  /**
+   * Processing latency at the 50th percentile, in integer milliseconds from Bird acceptance. One sample per logical event; null when no eligible sample exists.
+   */
+  processing_p50_ms?: number | null;
+  /**
+   * Processing latency at the 95th percentile, in integer milliseconds from Bird acceptance. One sample per logical event; null when no eligible sample exists.
+   */
+  processing_p95_ms?: number | null;
+  /**
+   * Processing latency at the 99th percentile, in integer milliseconds from Bird acceptance. One sample per logical event; null when no eligible sample exists.
+   */
+  processing_p99_ms?: number | null;
+  /**
+   * Delivery latency at the 50th percentile, in integer milliseconds from Bird acceptance. One sample per logical event; null when no eligible sample exists.
+   */
+  total_p50_ms?: number | null;
+  /**
+   * Delivery latency at the 95th percentile, in integer milliseconds from Bird acceptance. One sample per logical event; null when no eligible sample exists.
+   */
+  total_p95_ms?: number | null;
+  /**
+   * Delivery latency at the 99th percentile, in integer milliseconds from Bird acceptance. One sample per logical event; null when no eligible sample exists.
+   */
+  total_p99_ms?: number | null;
+};
+
+/**
+ * One time bucket with the selected metrics. Bucket timestamps label nominal boundaries; edge buckets count events inside the normalized period.
+ */
+export type EmailStatsQueryPoint = {
+  /**
+   * Nominal bucket start as a UTC RFC 3339 instant.
+   */
+  bucket: string;
+  metrics: EmailStatsQueryMetrics;
+};
+
+/**
+ * One group ranked over the whole requested period. Its optional series contains complete chronological buckets, including zero counts and null undefined values for empty buckets.
+ */
+export type EmailStatsQueryGroup = {
+  dimensions: EmailStatsQueryDimensions;
+  metrics: EmailStatsQueryMetrics;
+  /**
+   * Present when grain is requested; absent otherwise.
+   */
+  series?: Array<EmailStatsQueryPoint>;
+};
+
+/**
+ * Normalized half-open period. The response end is exclusive; replay the original inclusive request bounds when following cursors.
+ */
+export type EmailStatsQueryPeriod = {
+  /**
+   * Inclusive normalized start as a UTC instant.
+   */
+  from: string;
+  /**
+   * Exclusive normalized end as a UTC instant.
+   */
+  to: string;
+  /**
+   * Timezone used to normalize bounds and buckets.
+   */
+  timezone: string;
+  /**
+   * Requested grain, or null when no series was requested.
+   */
+  grain: EmailStatsQueryGrain | null;
+};
+
+/**
+ * Selected email metrics with normalized bounds. Ungrouped requests return one group and null cursors, including empty windows. Grouped requests without observed groups return an empty data array. Live page reads can reflect new events or changed ranking.
+ */
+export type EmailStatsQueryResponse = {
+  data: Array<EmailStatsQueryGroup>;
+  period: EmailStatsQueryPeriod;
+  /**
+   * Always null for this endpoint. It does not report a refresh boundary, claim completeness, or record request time.
+   */
+  data_as_of: string | null;
+  /**
+   * Pass as starting_after for the next grouped page. Null when no next page exists or the request is ungrouped.
+   */
+  next_cursor: string | null;
+  /**
+   * Pass as ending_before for the previous grouped page. Null when no previous page exists or the request is ungrouped.
+   */
+  prev_cursor: string | null;
+  /**
+   * Anchor for the first group. Pass as ending_before to read groups sorting before it. Null for empty or ungrouped results. Ranking can change between reads; refresh by repeating the original query.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -11160,8 +11720,6 @@ export type EmailStatsSummary = {
   readonly comparison?: EmailStatsComparison;
 };
 
-export type IpPoolId = string;
-
 /**
  * Delivery counts and rates for messages attributed to a single sending IP. Per-IP results omit `accepted` and `processed` counts. The sending IP becomes known only after a message is delivered, bounced, deferred, or bounced late. Those earlier lifecycle states cannot be attributed to a specific IP. Spam complaints and out-of-band bounce notifications also lack per-IP attribution on this breakdown. The `complained` and `oob_bounces` fields therefore read 0. Their rates read 0 when the denominator is non-zero and null when it is zero. The `effective_delivered` field equals `delivered`, and `all_bounces` equals `bounced`.
  *
@@ -11255,7 +11813,7 @@ export type EmailSendingIpStatsPoint = {
 };
 
 /**
- * Per-sending-IP breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-sending-IP breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsBySendingIpResponse = {
   /**
@@ -11267,10 +11825,22 @@ export type EmailStatsBySendingIpResponse = {
    */
   readonly data: Array<EmailSendingIpStatsPoint>;
   /**
-   * Total number of distinct sending IP addresses with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct sending IP addresses with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -11291,7 +11861,7 @@ export type EmailSendingDomainStatsPoint = {
 };
 
 /**
- * Per-sending-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-sending-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsBySendingDomainResponse = {
   /**
@@ -11303,10 +11873,22 @@ export type EmailStatsBySendingDomainResponse = {
    */
   readonly data: Array<EmailSendingDomainStatsPoint>;
   /**
-   * Total number of distinct sending domains with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct sending domains with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -11327,7 +11909,7 @@ export type EmailCategoryStatsPoint = {
 };
 
 /**
- * Per-category breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-category breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByCategoryResponse = {
   /**
@@ -11339,10 +11921,22 @@ export type EmailStatsByCategoryResponse = {
    */
   readonly data: Array<EmailCategoryStatsPoint>;
   /**
-   * Total number of distinct categories with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct categories with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -11436,7 +12030,7 @@ export type EmailMailboxProviderStatsPoint = {
 };
 
 /**
- * Per-mailbox-provider breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-mailbox-provider breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByMailboxProviderResponse = {
   /**
@@ -11448,10 +12042,22 @@ export type EmailStatsByMailboxProviderResponse = {
    */
   readonly data: Array<EmailMailboxProviderStatsPoint>;
   /**
-   * Total number of distinct mailbox providers with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct mailbox providers with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -11477,7 +12083,7 @@ export type EmailMailboxProviderRegionStatsPoint = {
 };
 
 /**
- * Per-(mailbox provider, provider region) breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-(mailbox provider, provider region) breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByMailboxProviderRegionResponse = {
   /**
@@ -11489,10 +12095,22 @@ export type EmailStatsByMailboxProviderRegionResponse = {
    */
   readonly data: Array<EmailMailboxProviderRegionStatsPoint>;
   /**
-   * Total number of distinct mailbox provider and region pairs with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct mailbox provider and region pairs with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -11513,7 +12131,7 @@ export type EmailRecipientDomainStatsPoint = {
 };
 
 /**
- * Per-recipient-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-recipient-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByRecipientDomainResponse = {
   /**
@@ -11525,10 +12143,22 @@ export type EmailStatsByRecipientDomainResponse = {
    */
   readonly data: Array<EmailRecipientDomainStatsPoint>;
   /**
-   * Total number of distinct recipient domains with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct recipient domains with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -11551,7 +12181,7 @@ export type EmailTemplateStatsPoint = {
 };
 
 /**
- * Per-template breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-template breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByTemplateResponse = {
   /**
@@ -11563,10 +12193,22 @@ export type EmailStatsByTemplateResponse = {
    */
   readonly data: Array<EmailTemplateStatsPoint>;
   /**
-   * Total number of distinct templates with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct templates with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -11635,7 +12277,7 @@ export type EmailLocationStatsPoint = {
 };
 
 /**
- * Per-location engagement breakdown for the requested period, grouped at the requested `group_by` granularity, ranked by the `sort` metric (default `unique_opens`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-location engagement breakdown for the requested period, grouped at the requested `group_by` granularity, ranked by the `sort` metric (default `unique_opens`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByLocationResponse = {
   /**
@@ -11647,10 +12289,22 @@ export type EmailStatsByLocationResponse = {
    */
   readonly data: Array<EmailLocationStatsPoint>;
   /**
-   * Total number of distinct locations at the requested `group_by` level with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct locations at the requested `group_by` level with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -11674,7 +12328,7 @@ export type EmailClientStatsPoint = {
 };
 
 /**
- * Per-client engagement breakdown for the requested period, grouped by the requested `group_by` facet, ranked by the `sort` metric (default `unique_opens`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-client engagement breakdown for the requested period, grouped by the requested `group_by` facet, ranked by the `sort` metric (default `unique_opens`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByClientResponse = {
   /**
@@ -11686,10 +12340,22 @@ export type EmailStatsByClientResponse = {
    */
   readonly data: Array<EmailClientStatsPoint>;
   /**
-   * Total number of distinct values of the requested `group_by` facet with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct values of the requested `group_by` facet with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -11741,7 +12407,7 @@ export type EmailBounceCodeStatsPoint = {
 };
 
 /**
- * Per-SMTP-code bounce breakdown for the requested period, ranked by the `sort` metric (default `bounced`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-SMTP-code bounce breakdown for the requested period, ranked by the `sort` metric (default `bounced`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByBounceCodeResponse = {
   /**
@@ -11753,10 +12419,22 @@ export type EmailStatsByBounceCodeResponse = {
    */
   readonly data: Array<EmailBounceCodeStatsPoint>;
   /**
-   * Total number of distinct SMTP error codes with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct SMTP error codes with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -11775,7 +12453,7 @@ export type EmailComplaintTypeStatsPoint = {
 };
 
 /**
- * Per-complaint-type breakdown for the requested period, ranked by `complained` descending and capped at the requested `limit` (default 50, max 200).
+ * Per-complaint-type breakdown for the requested period, ranked by `complained` descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByComplaintTypeResponse = {
   /**
@@ -11787,10 +12465,22 @@ export type EmailStatsByComplaintTypeResponse = {
    */
   readonly data: Array<EmailComplaintTypeStatsPoint>;
   /**
-   * Total number of distinct feedback types with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct feedback types with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -11807,7 +12497,7 @@ export type EmailBroadcastStatsPoint = {
 };
 
 /**
- * Per-broadcast breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-broadcast breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByBroadcastResponse = {
   /**
@@ -11819,10 +12509,22 @@ export type EmailStatsByBroadcastResponse = {
    */
   readonly data: Array<EmailBroadcastStatsPoint>;
   /**
-   * Total number of distinct broadcasts with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped. Raise `limit` (up to 200) or narrow the window to see more.
+   * Total number of distinct broadcasts with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -15618,6 +16320,8 @@ export type WebhookEventType =
   | "whatsapp.accepted"
   | "whatsapp.delivered"
   | "whatsapp.failed"
+  | "whatsapp.group.join_request_created"
+  | "whatsapp.group.join_request_revoked"
   | "whatsapp.reacted"
   | "whatsapp.read"
   | "whatsapp.received"
@@ -17656,6 +18360,90 @@ export type EventWhatsAppFailed = {
 };
 
 /**
+ * Always `whatsapp.group.join_request_created` for this event.
+ */
+export type WhatsAppGroupJoinRequestCreatedEventType =
+  "whatsapp.group.join_request_created";
+
+/**
+ * Someone who asked to be let into a group, as named by a join-request webhook event.
+ */
+export type WhatsAppGroupJoinRequestSummary = {
+  /**
+   * Unique identifier for the join request. Pass it to the batch-approve and batch-reject operations.
+   */
+  id: WhatsAppGroupJoinRequestId;
+  /**
+   * Business-scoped user ID, Meta's identifier for this person against your business. The one identifier every request has, and the one that carries over to `participants` if you approve it.
+   *
+   */
+  bsuid: string;
+  /**
+   * Phone number in E.164 format. Null when WhatsApp withholds it, which it does for anyone who has not shared their number with your business.
+   *
+   */
+  phone_number: string | null;
+  /**
+   * The WhatsApp username this person chose. Null when they have none, and theirs to change, so it names them in a list rather than keying anything.
+   *
+   */
+  username: string | null;
+};
+
+/**
+ * Payload shared by the whatsapp.group.join_request_created and whatsapp.group.join_request_revoked events. Everything about the person who asked is nested under `join_request`; the sibling identifiers name the business side.
+ *
+ */
+export type EventWhatsAppGroupJoinRequestData = {
+  /**
+   * The group the person asked to join.
+   */
+  group_id: WhatsAppGroupId;
+  /**
+   * The business number that created the group and administers it.
+   */
+  whatsapp_number_id: WhatsAppNumberId;
+  /**
+   * The workspace that owns the group.
+   */
+  workspace_id: WorkspaceId;
+  /**
+   * The request itself, and who made it.
+   */
+  join_request: WhatsAppGroupJoinRequestSummary;
+};
+
+/**
+ * Someone asked to join a group that requires approval.
+ */
+export type EventWhatsAppGroupJoinRequestCreated = {
+  type: WhatsAppGroupJoinRequestCreatedEventType;
+  /**
+   * When the person asked to join.
+   */
+  timestamp: string;
+  data: EventWhatsAppGroupJoinRequestData;
+};
+
+/**
+ * Always `whatsapp.group.join_request_revoked` for this event.
+ */
+export type WhatsAppGroupJoinRequestRevokedEventType =
+  "whatsapp.group.join_request_revoked";
+
+/**
+ * Someone withdrew their request to join a group before it was decided.
+ */
+export type EventWhatsAppGroupJoinRequestRevoked = {
+  type: WhatsAppGroupJoinRequestRevokedEventType;
+  /**
+   * When the person withdrew their request.
+   */
+  timestamp: string;
+  data: EventWhatsAppGroupJoinRequestData;
+};
+
+/**
  * Always `whatsapp.reacted` for this event.
  */
 export type WhatsAppReactedEventType = "whatsapp.reacted";
@@ -17918,25 +18706,94 @@ export type WebhookAttemptList = {
   data: Array<WebhookAttempt>;
 };
 
-export type SipTrunkId = string;
+/**
+ * The technical participant observed on one side of a call. Additional endpoint types may appear in retained observations.
+ */
+export type VoicePartyEndpointType =
+  | "pstn"
+  | "sip"
+  | "voicemail"
+  | "bridge_pstn"
+  | "bridge_sip"
+  | "webhook"
+  | (string & {});
+
+export type VoicePartySipEndpoint = {
+  /**
+   * The address the user agent registered, as a `sip:` or `sips:` URI. It is where the endpoint asked to be reached, which is not always the address that was dialled.
+   */
+  contact: string;
+};
 
 /**
  * Which of a forwarded call's two numbers it shows as the caller.
  *
- * "dialed_number" is the number the caller dialled, which is one of yours.
- * Carriers treat it as fully yours, so it is the least likely to be altered or
- * screened. Whoever answers sees which of your numbers was called, not who called
- * it. It needs your workspace approved to place calls from numbers you bought from
- * us; where it is not, this value is refused and the call shows the calling
- * number.
+ * `dialed_number` presents the Bird number the caller dialed. Whoever answers
+ * sees which of your numbers was called. Older configurations without a stored
+ * choice use this value. Carrier screening can still affect delivery.
  *
- * "calling_number" is the caller's own number, so the phone rings as though they
- * had dialled it directly and the call can be returned from the call log. Because
+ * `calling_number` presents the caller's own number, so the phone rings as though
+ * they had dialed it directly and the call can be returned from the call log. Because
  * the number is not one you own, some carriers (most often in the US and parts of
  * Europe) mark such calls as unverified, replace the number, or screen them.
  *
  */
 export type VoiceInboundForwardAs = "dialed_number" | "calling_number";
+
+export type VoicePartyBridgePstnEndpoint = {
+  /**
+   * The number the platform placed the leg onward to, in E.164. The party's own `address` is the number that was dialled, so the two together are one hop of the call.
+   */
+  forward_to: string;
+  /**
+   * Which number the forwarded leg presented to the far end.
+   */
+  forward_as: VoiceInboundForwardAs;
+};
+
+export type SipTrunkId = string;
+
+export type VoicePartyBridgeSipEndpoint = {
+  /**
+   * The workspace trunk the leg was delivered onward to. It is distinct from the party's own `trunk_id`, which is the trunk this side itself sat behind.
+   */
+  trunk_id: SipTrunkId;
+};
+
+export type VoicePartyEndpoint = {
+  /**
+   * What kind of participant sat on this side of a leg. It selects which payload below is present, and most kinds carry none because the party's `address` is already their coordinate.
+   */
+  type: VoicePartyEndpointType;
+  /**
+   * The registered contact of a `sip` endpoint. Absent when the observation recorded none, and on every other kind of endpoint.
+   */
+  sip?: VoicePartySipEndpoint;
+  /**
+   * Where the platform placed the leg onward, on a `bridge_pstn` endpoint. Absent on every other kind of endpoint.
+   */
+  bridge_pstn?: VoicePartyBridgePstnEndpoint;
+  /**
+   * The trunk the platform delivered the leg onward to, on a `bridge_sip` endpoint. Absent on every other kind of endpoint.
+   */
+  bridge_sip?: VoicePartyBridgeSipEndpoint;
+};
+
+export type VoiceParty = {
+  /**
+   * What kind of participant sat on this side of a leg, and the coordinate that kind carries: a telephone endpoint off the platform, a SIP or WebRTC endpoint, Bird answering, or the platform placing a leg onward. It does not name a person.
+   * `null` on an observation this API could not read. The entry stays, because the session counted it when it deduplicated, and dropping it here would report fewer participants than were observed.
+   */
+  readonly endpoint?: VoicePartyEndpoint | null;
+  /**
+   * This side's own address, in E.164 or as a `sip:` URI. `null` when the observation carried none, which does not say whether one was withheld, missing, or nonexistent.
+   */
+  readonly address?: string | null;
+  /**
+   * The workspace trunk on this side of the leg. `null` when this side sat behind no trunk.
+   */
+  readonly trunk_id?: SipTrunkId | null;
+};
 
 /**
  * Physical type of a phone number. New number types may be added over time, so treat unrecognized values as supported types rather than errors.
@@ -18148,17 +19005,682 @@ export type NumbersOrderCreate = {
 };
 
 /**
+ * Field used to sort the list.
+ */
+export type VoiceTrunkSortField = "created_at";
+
+export type SipTrunkAclid = string;
+
+export type VoiceTrunkIpacl = {
+  /**
+   * Unique identifier for this IP ACL entry.
+   */
+  readonly id: SipTrunkAclid;
+  readonly trunk_id: SipTrunkId;
+  /**
+   * IPv4 or IPv6 CIDR block that is allowed to send SIP traffic to this trunk.
+   */
+  readonly cidr: string;
+  /**
+   * Optional human-readable label for this ACL entry.
+   */
+  description?: string | null;
+  readonly created_at: string;
+};
+
+/**
+ * A hash algorithm for SIP Digest authentication, spelled as it appears in the `algorithm=` parameter on the wire. `SHA-256` is the stronger option and is offered first; `MD5` is the algorithm most PBX and ITSP equipment implements.
+ *
+ */
+export type VoiceSipDigestAlgorithm = "SHA-256" | "MD5";
+
+/**
+ * A SIP trunk's identity and access-control settings.
+ */
+export type VoiceTrunkCore = {
+  /**
+   * Unique identifier for this SIP trunk.
+   */
+  readonly id: SipTrunkId;
+  readonly workspace_id: WorkspaceId;
+  /**
+   * A human-readable label for this SIP trunk. Mutable, and distinct from the generated wire domain.
+   */
+  name: string;
+  /**
+   * Full SIP address for this trunk, generated as `{trunk-id}.trunk.{region}.sip.bird.com`. This is the trunk's identity, so configure your PBX or SIP client to send calls to this address. It is derived from the trunk id and cannot be chosen or changed.
+   *
+   */
+  readonly domain: string;
+  /**
+   * Whether this trunk may place calls: your PBX connects to us to dial out. Off on a new trunk. While it is off the trunk refuses every call attempt no matter what its allow lists say, and the connection and authentication settings below have no effect. Set `outbound_enabled` through the trunk update operation.
+   *
+   */
+  readonly outbound_enabled: boolean;
+  /**
+   * Whether this trunk may receive calls: we dial the addresses you declared, for the numbers this trunk answers. Off on a new trunk. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. Set `inbound_enabled` through the trunk update operation.
+   *
+   */
+  readonly inbound_enabled: boolean;
+  /**
+   * Whether we take ourselves out of the audio path for calls we forward to this trunk: your equipment and the originating carrier exchange audio directly, and only the call signalling passes through us. Off by default. It applies to inbound calls alone (calls this trunk places are always carried through us, whatever this says). While it is on we cannot record those calls, report their audio quality, or end one because its audio stopped. Your equipment must be reachable for audio from the public internet. Set `media_bypass` through the trunk update operation.
+   *
+   */
+  readonly media_bypass: boolean;
+  /**
+   * The trunk's IP allow list. IP filtering is active whenever this has at least one entry: calls admitted through the allow lists must come from those CIDR ranges. This restriction does not apply to session credentials when `session_credentials_enabled` is true. An empty list means no IP restriction. Replace the whole `ip_acls` list through the trunk update operation.
+   *
+   */
+  readonly ip_acls: Array<VoiceTrunkIpacl>;
+  /**
+   * The API keys allowed to authenticate this trunk over SIP Digest. A key must hold `voice` at write level and be neither revoked nor expired to authenticate. `ineligible_api_key_ids` names the entries that currently cannot. A nonempty list enables API-key authentication, limited to its eligible keys. An empty list means no API-key authentication. A trunk with empty `ip_acls` and `allowed_api_key_ids` lists accepts nothing when `session_credentials_enabled` is false. Replace the whole `allowed_api_key_ids` list through the trunk update operation.
+   *
+   */
+  readonly allowed_api_key_ids: Array<ApiKeyId>;
+  /**
+   * The entries in `allowed_api_key_ids` that cannot authenticate this trunk right now because the key lacks `voice` at write level, has expired, or was revoked. The bindings remain until you remove them from the trunk. Restoring `voice` at write level makes a key eligible again if it is still unexpired and unrevoked, without changing its secret or trunk binding. Empty when every allowed key can authenticate.
+   *
+   */
+  readonly ineligible_api_key_ids: Array<ApiKeyId>;
+  /**
+   * The Digest hash algorithms this trunk offers, in the order they are offered. We send one challenge line per algorithm and your PBX answers with the first it supports, so the order decides what most equipment picks. Always populated: a trunk with no explicit setting reports the default, `["SHA-256", "MD5"]`. A trunk answering with an algorithm that is not on this list is rejected, so narrowing the list also narrows what the trunk accepts. Replace `digest_algorithms` through the trunk update operation.
+   *
+   */
+  readonly digest_algorithms: Array<VoiceSipDigestAlgorithm>;
+  /**
+   * Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP, alongside whatever the allow lists admit. Off by default. It grants nothing on its own: a call still has to present a credential issued to this workspace, and each one expires within minutes. Set `session_credentials_enabled` through the trunk update operation.
+   *
+   */
+  readonly session_credentials_enabled: boolean;
+};
+
+export type VoiceTrunk = VoiceTrunkCore & Timestamps;
+
+export type VoiceTrunkList = {
+  data: Array<VoiceTrunk>;
+} & ListEnvelope;
+
+export type VoiceTrunkCreate = {
+  /**
+   * A human-readable label for this SIP trunk. Mutable, and distinct from the generated wire domain.
+   */
+  name: string;
+  /**
+   * Whether the new trunk may place calls. Omit it to create a trunk that does neither direction yet, and enable the ones you want once you know what the trunk is for. The settings below configure outbound, so send this as `true` alongside them.
+   *
+   */
+  outbound_enabled?: boolean;
+  /**
+   * Whether the new trunk may receive calls. Omit it to create a trunk that does neither direction yet. A trunk receives no calls until it also has at least one gateway and at least one number, both added after create.
+   *
+   */
+  inbound_enabled?: boolean;
+  /**
+   * Whether we take ourselves out of the audio path for calls we forward to this trunk. Omit it to create the trunk with this off, which is what suits equipment behind NAT and any account that wants call recording. It is an inbound setting, so `true` is accepted only alongside `inbound_enabled: true`; `false` is always accepted. It can be changed later.
+   *
+   */
+  media_bypass?: boolean;
+  /**
+   * The Digest hash algorithms to offer, in the order they should be offered. Omit this to use the default of `["SHA-256", "MD5"]`, which suits most equipment. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. This can be changed later without re-issuing credentials.
+   *
+   */
+  digest_algorithms?: Array<VoiceSipDigestAlgorithm>;
+  /**
+   * Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP. Omit it to create the trunk with this off, which is what a trunk reached only by a PBX wants. It can be changed later.
+   *
+   */
+  session_credentials_enabled?: boolean;
+};
+
+export type VoiceTrunkIpaclCreate = {
+  /**
+   * IPv4 or IPv6 CIDR block to allow. Use /32 for a single IPv4 address or /128 for a single IPv6 address.
+   */
+  cidr: string;
+  /**
+   * Optional human-readable label for this ACL entry.
+   */
+  description?: string;
+};
+
+/**
+ * A change to the trunk's directions, name, access control, and Digest algorithm
+ * offer. Every field is optional. An omitted field is left unchanged. The
+ * `ip_acls`, `allowed_api_key_ids`, and `digest_algorithms` fields each replace
+ * their whole list when present. Send an empty array to clear one. This lets you
+ * commit the trunk's entire access configuration in one update.
+ *
+ * A direction has to be enabled before its settings can be set, but one update
+ * can do both: enable a direction and send its configuration together.
+ *
+ */
+export type VoiceTrunkUpdate = {
+  /**
+   * A human-readable label for this SIP trunk. Mutable, and distinct from the generated wire domain.
+   */
+  name?: string;
+  /**
+   * Whether this trunk may place calls. Turning it off stops the trunk admitting call attempts at the next call setup and leaves its connection and authentication settings stored, so turning it back on restores a working trunk. Omit the field to leave it unchanged.
+   *
+   */
+  outbound_enabled?: boolean;
+  /**
+   * Whether this trunk may receive calls. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. The gateways remain configured. Omit the field to leave it unchanged.
+   *
+   */
+  inbound_enabled?: boolean;
+  /**
+   * Whether we take ourselves out of the audio path for calls we forward to this trunk. Turning it on takes effect at the next call setup and leaves calls already up untouched. It is an inbound setting, so the trunk must have `inbound_enabled` on; one update can do both. While it is on we cannot record those calls, report their audio quality, or end one because its audio stopped, and your equipment must be reachable for audio from the public internet. Turning it off puts us back in the path at the next call setup. Omit the field to leave it unchanged.
+   *
+   */
+  media_bypass?: boolean;
+  /**
+   * Replaces the trunk's entire IP allow list. When present, the allow list is set to exactly these CIDR blocks: ranges not listed are removed and new ones are added. Send an empty array to clear the list, turning IP filtering off. Omit the field to leave the allow list unchanged.
+   *
+   */
+  ip_acls?: Array<VoiceTrunkIpaclCreate>;
+  /**
+   * Replaces the trunk's entire set of allowed API keys. When present, exactly these keys may authenticate the trunk over SIP Digest. Each key you ADD must belong to this workspace and hold `voice` at write level; a key that does not is refused and the whole update is rolled back. A key already on the list that has since lost the permission or expired does not block the update, so you can keep editing the trunk while you put its permission back. A non-empty list turns API-key authentication on; send an empty array to turn it off. Omit the field to leave the allowed keys unchanged.
+   *
+   */
+  allowed_api_key_ids?: Array<ApiKeyId>;
+  /**
+   * Replaces the Digest hash algorithms this trunk offers, in the order they should be offered. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. Send an empty array to return to the default of `["SHA-256", "MD5"]`. The offer is never empty, because a trunk that offered nothing could not be authenticated at all. Narrowing the list also narrows what the trunk accepts: an answer using an algorithm no longer offered is rejected. Takes effect on the next call setup; no credential is re-issued. Omit the field to leave the offer unchanged.
+   *
+   */
+  digest_algorithms?: Array<VoiceSipDigestAlgorithm>;
+  /**
+   * Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP. Off by default; turning it on does not change what the allow lists admit, and turning it off stops those connections at the next call setup without re-issuing anything. Omit the field to leave it unchanged.
+   *
+   */
+  session_credentials_enabled?: boolean;
+};
+
+/**
+ * A short-lived SIP digest credential for a calling client. The `password` is returned once and cannot be recovered. Create a new credential if you lose it.
+ *
+ */
+export type VoiceSessionCredential = {
+  /**
+   * SIP digest username. Always `bird`. The credential identifies the workspace through `realm`. The username does not identify the workspace.
+   *
+   */
+  username: string;
+  /**
+   * SIP digest password, returned once. Treat it as a bearer secret: until it expires it can place calls billed to this workspace.
+   *
+   */
+  password: string;
+  /**
+   * SIP digest realm to authenticate against. Workspace-scoped, so a credential minted for one workspace cannot authenticate against another.
+   *
+   */
+  realm: string;
+  /**
+   * When the credential stops authenticating, five minutes after creation. Existing calls may continue; use a fresh credential for later authentication.
+   */
+  expires_at: string;
+  /**
+   * Short-lived token required when upgrading the WebSocket connection. The token authorizes the connection only; each call still authenticates with `password`.
+   *
+   */
+  handshake_token?: string;
+};
+
+export type VoiceTrunkGatewayId = string;
+
+/**
+ * One address an inbound call to this trunk is forwarded to, and how that peer wants the call's two numbers spelled. A trunk can have several, tried in priority order until one answers.
+ *
+ */
+export type VoiceTrunkGateway = {
+  /**
+   * Unique identifier for this gateway.
+   */
+  readonly id: VoiceTrunkGatewayId;
+  readonly trunk_id: SipTrunkId;
+  /**
+   * SIP URI an inbound call to this trunk is forwarded to. The host only: which number is dialed at that host comes from `destination_format`, because it changes with every call.
+   *
+   */
+  sip_uri: string;
+  /**
+   * The order gateways are tried in, lowest first. Gateways sharing a priority take an equal share of calls, and any of them may be tried first on a given call.
+   *
+   */
+  priority: number;
+  /**
+   * How the calling number is spelled to this gateway, as a template whose
+   * `{number}` stands for the number without its leading `+`. It is stated
+   * in the `P-Asserted-Identity` header of the delivered call.
+   *
+   * A gateway that has not asked for anything else reports `+{number}`,
+   * which is E.164. A format with no `{number}` states that same identity on
+   * every call, whoever called.
+   *
+   */
+  origination_format: string;
+  /**
+   * How this gateway formats the dialed number. In the template,
+   * `{number}` represents the number without its leading `+`. The result
+   * is placed before the `sip_uri` host. For example, `1234#{number}`
+   * formats `+31201234567` as
+   * `sip:1234#31201234567@pbx.example.com:5060`.
+   *
+   * A gateway that has not asked for anything else reports `+{number}`,
+   * which is E.164. A format with no `{number}` is dialed as it stands, so
+   * every number the trunk answers reaches that one number.
+   *
+   */
+  destination_format: string;
+} & Timestamps;
+
+/**
+ * The trunk's gateways. Not paginated: a trunk holds a small, hand-managed set of dial targets, and the order across the whole set is what decides hunt order, so a partial page would misrepresent it.
+ */
+export type VoiceTrunkGatewayList = {
+  /**
+   * The trunk's gateways, in priority order.
+   */
+  data: Array<VoiceTrunkGateway>;
+};
+
+export type VoiceTrunkGatewayCreate = {
+  /**
+   * SIP URI an inbound call to this trunk should be forwarded to. Give the host only, with an optional port: which number is dialed there comes from `destination_format`, so a URI carrying a user part is rejected.
+   *
+   */
+  sip_uri: string;
+  /**
+   * The order gateways are tried in, lowest first. Give two gateways the same priority to share calls between them evenly.
+   *
+   */
+  priority: number;
+  /**
+   * How this gateway wants the calling number spelled. Write a template whose
+   * `{number}` stands for the number without its leading `+`; the result is
+   * stated in the `P-Asserted-Identity` header of the delivered call.
+   *
+   * Omit it for E.164, which is `+{number}`. The template may add digits,
+   * letters and the characters `-_.!~*'()&=+$,;?/%#` around `{number}`, which
+   * may appear at most once, and anything else in braces is rejected so a
+   * misspelled placeholder cannot reach a call.
+   *
+   * A format with no `{number}` at all states the same identity on every call,
+   * which is what a peer that only accepts one authorized number wants. The
+   * call then carries nothing about who really called.
+   *
+   */
+  origination_format?: string;
+  /**
+   * How this gateway formats the dialed number. In the template, `{number}`
+   * represents the number without its leading `+`. The result is placed before
+   * the `sip_uri` host. For example, `1234#{number}` formats `+31201234567` as
+   * `sip:1234#31201234567@pbx.example.com:5060`.
+   *
+   * Omit it for E.164, which is `+{number}`. A format with no `{number}` at all
+   * sends every number this trunk answers to one fixed number, so
+   * `777000447973` reaches `sip:777000447973@pbx.example.com:5060` whatever was
+   * dialed. The same rules as `origination_format` apply to what the template
+   * may contain.
+   *
+   */
+  destination_format?: string;
+};
+
+/**
+ * A change to the gateway's address, its place in the order, or how it wants numbers spelled. Every field is optional; an omitted field is left unchanged.
+ *
+ */
+export type VoiceTrunkGatewayUpdate = {
+  /**
+   * SIP URI an inbound call to this trunk should be forwarded to. Give the host only, with an optional port: which number is dialed there comes from `destination_format`, so a URI carrying a user part is rejected.
+   *
+   */
+  sip_uri?: string;
+  /**
+   * The order gateways are tried in, lowest first. Give two gateways the same priority to share calls between them evenly.
+   *
+   */
+  priority?: number;
+  /**
+   * How this gateway wants the calling number spelled, as a template whose
+   * `{number}` stands for the number without its leading `+`. The result is
+   * stated in the `P-Asserted-Identity` header of the delivered call.
+   *
+   * Send an empty string to go back to E.164, which is `+{number}`. The template
+   * may add digits, letters and the characters `-_.!~*'()&=+$,;?/%#` around
+   * `{number}`, which may appear at most once, and anything else in braces is
+   * rejected so a misspelled placeholder cannot reach a call.
+   *
+   * A format with no `{number}` at all states the same identity on every call,
+   * which is what a peer that only accepts one authorized number wants. The
+   * call then carries nothing about who really called.
+   *
+   */
+  origination_format?: string;
+  /**
+   * How this gateway formats the dialed number. In the template, `{number}`
+   * represents the number without its leading `+`. The result is placed before
+   * the `sip_uri` host. For example, `1234#{number}` formats `+31201234567` as
+   * `sip:1234#31201234567@pbx.example.com:5060`.
+   *
+   * Send an empty string to go back to E.164, which is `+{number}`. A format
+   * with no `{number}` at all sends every number this trunk answers to one fixed
+   * number, so `777000447973` reaches `sip:777000447973@pbx.example.com:5060`
+   * whatever was dialed. The same rules as `origination_format` apply to what
+   * the template may contain.
+   *
+   */
+  destination_format?: string;
+};
+
+/**
+ * Field used to sort the list.
+ */
+export type VoiceNumberSortField = "phone_number";
+
+export type VoiceNumberId = string;
+
+/**
+ * Where a number came from. `allocation` is a number we allocated to your workspace, and the only kind whose calls reach us. `verified_number` is a number from another carrier that you registered and proved you control, so it can be presented on a call you place.
+ *
+ */
+export type VoiceNumberProviderType = "allocation" | "verified_number";
+
+export type VoiceNumberProviderAllocation = {
+  /**
+   * A number we allocated to your workspace.
+   */
+  type: VoiceNumberProviderType;
+  /**
+   * Identifier of this number's allocation, to pass to the numbers operations. Null when the allocation behind this number cannot be resolved.
+   *
+   */
+  readonly number_id: AllocatedNumberId | null;
+};
+
+/**
+ * Verification state of the caller ID.
+ *
+ * - `pending`: the number is registered but ownership has not yet been proven.
+ * - `verified`: the workspace completed the verification call, so the number can
+ * be presented as the outbound caller ID.
+ * - `failed`: terminal because the verification challenge expired or the attempt
+ * limit was exhausted. Use the dashboard to remove and register the caller ID
+ * again to retry.
+ *
+ */
+export type VoiceCallerIdStatus =
+  "pending" | "verified" | "failed" | (string & {});
+
+export type VoiceNumberProviderVerifiedNumber = {
+  /**
+   * A number from another carrier that you registered here. That carrier decides where calls to it go; we only present it on calls you place.
+   *
+   */
+  type: VoiceNumberProviderType;
+  /**
+   * How far proving control of this number has got.
+   */
+  readonly status: VoiceCallerIdStatus;
+  /**
+   * When control of this number was last proven. Null until it is.
+   */
+  readonly verified_at: string | null;
+};
+
+/**
+ * Where this number came from, and the facts that belong to that answer. The type selects the shape. `allocation` is a number we allocated to your workspace, and it carries that allocation's identifier. `verified_number` is a number from another carrier, and it carries how far proving control of it has got.
+ *
+ */
+export type VoiceNumberProvider =
+  | ({
+      type: "allocation";
+    } & VoiceNumberProviderAllocation)
+  | ({
+      type: "verified_number";
+    } & VoiceNumberProviderVerifiedNumber);
+
+export type VoiceNumberDirections = {
+  /**
+   * Whether calls to this number arrive here. False for a number from another carrier, whose calls that carrier routes, and for one allocated to you that cannot carry calls.
+   *
+   */
+  readonly inbound: boolean;
+  /**
+   * Whether this number can be presented on a call you place. Buying a number does not grant this on its own: proving control of it does.
+   *
+   */
+  readonly outbound: boolean;
+};
+
+export type VoiceInboundConfigurationError = "unsupported_route_type";
+
+/**
  * Which answer a number carries.
  *
  * - `reject`: refuses the call. This is where every number starts.
  * - `trunk`: delivers the call to one of your SIP trunks.
  * - `forward`: places a call to one of your verified caller IDs and connects the two.
+ * - `sequence`: runs the configured sequence from its selected voice-call entry.
  *
  * It selects the answer's own shape, so a new way to answer a call arrives as a
  * new value alongside a new set of fields.
  *
  */
-export type VoiceCallRouteType = "reject" | "trunk" | "forward";
+export type VoiceCallRouteType = "reject" | "trunk" | "forward" | "sequence";
+
+export type VoiceCallRouteReject = {
+  /**
+   * Refuses the call. Every number starts here, and setting it again is how you stop a number answering without giving it up.
+   *
+   */
+  type: VoiceCallRouteType;
+};
+
+export type VoiceCallRouteTrunk = {
+  /**
+   * Delivers the call to one of your SIP trunks.
+   */
+  type: VoiceCallRouteType;
+  /**
+   * The SIP trunk that answers calls to this number. It must be one of yours and must have inbound calling enabled. Turning that trunk's inbound calling off, or deleting it, puts this number back on "reject".
+   *
+   */
+  trunk_id: SipTrunkId;
+};
+
+export type VoiceCallRouteForward = {
+  /**
+   * Places a call to another of your numbers and connects the two.
+   */
+  type: VoiceCallRouteType;
+  /**
+   * The number calls are forwarded to, in E.164 format. It has to be one of your verified caller IDs. That is checked when you set it and again on every call it forwards, so a caller ID you later remove stops forwarding rather than carrying on.
+   *
+   */
+  forward_to: string;
+  /**
+   * Which number the forwarded leg presents as its caller. Include the choice
+   * on every write. Reads return the effective choice; older configurations
+   * without a stored choice return `dialed_number`.
+   *
+   */
+  forward_as: VoiceInboundForwardAs;
+};
+
+export type VoiceSequenceId = string;
+
+/**
+ * Stable identifier for a node within one sequence definition.
+ */
+export type VoiceSequenceNodeId = string;
+
+export type VoiceCallRouteSequence = {
+  /**
+   * Runs the named sequence's active publication from the selected voice-call entry.
+   */
+  type: VoiceCallRouteType;
+  /**
+   * Named sequence whose active publication handles the call.
+   */
+  sequence_id: VoiceSequenceId;
+  /**
+   * Voice-call entry in the sequence's active publication.
+   */
+  entry_node_id: VoiceSequenceNodeId;
+};
+
+/**
+ * What happens to a call arriving for this number, as it is configured now. Its `type` selects the shape, and each answer carries its own fields. An unconfigured number answers with "reject". Setting a route is a separate shape, and it does not offer every variant reported here.
+ *
+ */
+export type VoiceCallRoute =
+  | ({
+      type: "reject";
+    } & VoiceCallRouteReject)
+  | ({
+      type: "trunk";
+    } & VoiceCallRouteTrunk)
+  | ({
+      type: "forward";
+    } & VoiceCallRouteForward)
+  | ({
+      type: "sequence";
+    } & VoiceCallRouteSequence);
+
+export type VoiceInboundConfiguration = {
+  /**
+   * Null when the stored route type is unsupported; inspect configuration_error before changing it.
+   */
+  route: VoiceCallRoute | null;
+  readonly configuration_error?: VoiceInboundConfigurationError;
+  /**
+   * Caller identities available when configuring a forward. Use these values to populate the choice in your editor. The current choices are `dialed_number` and `calling_number`.
+   *
+   */
+  readonly forward_as_options?: Array<VoiceInboundForwardAs>;
+};
+
+export type VoiceNumber = {
+  /**
+   * Identifier of this number, to pass to the operations that read and change it. A number you registered as a caller ID carries the same identifier there, with the caller-ID prefix.
+   *
+   */
+  readonly id: VoiceNumberId;
+  /**
+   * The phone number in E.164 format.
+   */
+  readonly phone_number: string;
+  /**
+   * Country the number belongs to. Null when the number is not geographic or its country cannot be determined.
+   *
+   */
+  readonly country_code: CountryCode | null;
+  /**
+   * Your own label for this number, to tell several apart. Null when it has none. Only you see it, so it never affects what a caller sees.
+   *
+   */
+  readonly name: string | null;
+  readonly provider: VoiceNumberProvider;
+  /**
+   * Which directions this number can carry. Both follow from the number itself, so neither is yours to change. On a SIP trunk each direction is a setting you turn on; here it is a fact about the number.
+   *
+   */
+  readonly directions: VoiceNumberDirections;
+  /**
+   * What happens to a call arriving for this number.
+   */
+  readonly inbound_configuration: VoiceInboundConfiguration;
+  /**
+   * When this number became usable for voice: when it was allocated to you, or when you first registered it, whichever this number is.
+   *
+   */
+  readonly created_at: string;
+};
+
+export type VoiceNumberList = {
+  data: Array<VoiceNumber>;
+} & ListEnvelope;
+
+/**
+ * What happens to a call arriving for this number. Its `type` selects the shape, and each answer carries its own fields; the variants below are the full set you can set. An unconfigured number uses "reject".
+ *
+ */
+export type VoiceCallRouteWritable =
+  | ({
+      type: "reject";
+    } & VoiceCallRouteReject)
+  | ({
+      type: "trunk";
+    } & VoiceCallRouteTrunk)
+  | ({
+      type: "forward";
+    } & VoiceCallRouteForward);
+
+export type VoiceInboundConfigurationPut = {
+  route: VoiceCallRouteWritable;
+};
+
+export type VoiceNumberUpdate = {
+  /**
+   * Your own label for this number. Send null to remove the one it has. Omit the field to leave it alone.
+   *
+   */
+  name?: string | null;
+  /**
+   * What should happen to calls arriving for this number. The route replaces
+   * whatever was set before, because a number has exactly one answer at a time,
+   * and type "reject" is how you stop it answering. Omit the field to leave the
+   * answer alone.
+   *
+   * Only a number that can receive calls carries a route, so it is refused on
+   * one whose directions do not include inbound.
+   *
+   */
+  inbound_configuration?: VoiceInboundConfigurationPut;
+};
+
+/**
+ * Field used to sort the list.
+ */
+export type VoiceCallerIdSortField = "created_at";
+
+export type VoiceCallerIdid = string;
+
+export type VoiceCallerId = {
+  /**
+   * Unique identifier for this caller ID.
+   */
+  readonly id: VoiceCallerIdid;
+  readonly workspace_id: WorkspaceId;
+  /**
+   * The phone number in E.164 format registered as a caller ID.
+   */
+  readonly phone_number: string;
+  /**
+   * Your label for this caller ID, to tell several registered numbers apart. `null` when the caller ID has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the caller ID update operation.
+   *
+   */
+  readonly name: string | null;
+  readonly status: VoiceCallerIdStatus;
+  /**
+   * When the caller ID was verified. `null` when its status is `pending` or `failed`.
+   */
+  readonly verified_at: string | null;
+} & Timestamps;
+
+export type VoiceCallerIdList = {
+  data: Array<VoiceCallerId>;
+} & ListEnvelope;
+
+export type VoiceCallerIdVerifyRequest = {
+  /**
+   * The 6-digit verification code read out by the verification call.
+   */
+  code: string;
+};
 
 /**
  * Why we rejected the leg. Use `rejection_reason` to identify the cause;
@@ -18214,19 +19736,31 @@ export type VoiceLegRejectionReason =
   | "call_not_permitted"
   | "number_ownership_not_verified";
 
+/**
+ * Which answer handled this incoming leg.
+ *
+ * - `reject`: the call was refused.
+ * - `trunk`: the call was delivered to one of your SIP trunks.
+ * - `forward`: the call was forwarded to one of your verified caller IDs.
+ * - `sequence`: the call was handled by one of your sequences.
+ *
+ */
+export type VoiceLegInboundRouteType =
+  "reject" | "trunk" | "forward" | "sequence";
+
 export type VoiceLegInboundRouteReject = {
   /**
    * The number turned the leg away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.
    *
    */
-  type: VoiceCallRouteType;
+  type: VoiceLegInboundRouteType;
 };
 
 export type VoiceLegInboundRouteTrunk = {
   /**
    * The leg was delivered to one of your SIP trunks.
    */
-  type: VoiceCallRouteType;
+  type: VoiceLegInboundRouteType;
   /**
    * The SIP trunk the leg was delivered to. Recorded as it was at the time, so it may name a trunk you have since changed or deleted.
    *
@@ -18238,7 +19772,7 @@ export type VoiceLegInboundRouteForward = {
   /**
    * The leg was forwarded to another of your numbers.
    */
-  type: VoiceCallRouteType;
+  type: VoiceLegInboundRouteType;
   /**
    * The number the leg was forwarded to, in E.164 format. Recorded as it was at the time, so it may name a number you have since stopped verifying.
    *
@@ -18249,6 +19783,23 @@ export type VoiceLegInboundRouteForward = {
    *
    */
   forward_as: VoiceInboundForwardAs;
+};
+
+export type VoiceLegInboundRouteSequence = {
+  /**
+   * The leg was handled by one of your sequences.
+   */
+  type: VoiceLegInboundRouteType;
+  /**
+   * The sequence that handled the leg. Recorded as it was at the time, so it may name a sequence you have since changed or deleted.
+   *
+   */
+  sequence_id: VoiceSequenceId;
+  /**
+   * The entry the leg started from in the publication that handled it. Recorded as it was at the time, so it may name an entry the sequence no longer has.
+   *
+   */
+  entry_node_id: VoiceSequenceNodeId;
 };
 
 /**
@@ -18266,7 +19817,10 @@ export type VoiceLegInboundRoute =
     } & VoiceLegInboundRouteTrunk)
   | ({
       type: "forward";
-    } & VoiceLegInboundRouteForward);
+    } & VoiceLegInboundRouteForward)
+  | ({
+      type: "sequence";
+    } & VoiceLegInboundRouteSequence);
 
 export type VoiceMediaQuality = {
   /**
@@ -18420,6 +19974,150 @@ export type VoiceLegList = {
 } & ListEnvelope;
 
 /**
+ * Canonical E.164 phone number, with a leading plus sign and four to fifteen digits.
+ */
+export type VoiceSequencePhoneNumber = string;
+
+export type VoiceSequenceRunId = string;
+
+export type VoiceCallSequence = {
+  /**
+   * Voice sequence selected for this call.
+   */
+  readonly id: VoiceSequenceId;
+  /**
+   * Run created from the sequence's frozen publication.
+   */
+  readonly run_id: VoiceSequenceRunId;
+};
+
+/**
+ * A call summary. Call reads report observed state. Call creation returns an immutable acceptance snapshot: `started_at` and `ended_at` are `null`, the boolean observation fields are `false`, and `parties` is empty. Replays return that same snapshot after the call progresses.
+ */
+export type VoiceCall = {
+  /**
+   * Unique identifier for this call, shared by every leg that belongs to it.
+   */
+  readonly id: VoiceSessionId;
+  readonly workspace_id: WorkspaceId;
+  /**
+   * The initial leg identity. For an accepted outbound call, this identity is reserved before the leg starts.
+   */
+  readonly initial_leg_id: VoiceCallId;
+  /**
+   * Direction of the initial leg.
+   */
+  readonly direction: VoiceCallDirection;
+  /**
+   * When the initial leg started. `null` in the acceptance snapshot returned by call creation.
+   */
+  readonly started_at: string | null;
+  /**
+   * When the call's last leg ended. `null` while any leg is still in progress. Recordings and transcripts can still arrive after this instant, so it does not mean the call is finished being written.
+   */
+  readonly ended_at?: string | null;
+  /**
+   * Whether any leg in the call currently holds a lease. `false` covers the interval between a leg ending and its settlement being confirmed, and says nothing about whether transcription has finished.
+   */
+  readonly live: boolean;
+  /**
+   * Whether the call ever produced a recording. It stays `true` for the life of the call, so it records that a recording was made rather than promising one can still be fetched.
+   */
+  readonly has_recording: boolean;
+  /**
+   * Whether the call ever produced a transcript. A failed transcription attempt does not set it, and a later failure does not clear it.
+   */
+  readonly has_transcript: boolean;
+  /**
+   * The distinct participant observations the call's legs recorded, for display beside the call. The length is not a count of people and not a reconstruction of the leg graph.
+   */
+  readonly parties: Array<VoiceParty>;
+  /**
+   * Sequence and run accepted for this outbound call. Present in the immutable acceptance snapshot returned by call creation. Current call detail and list reads omit this property, including for calls created from a sequence.
+   */
+  readonly sequence?: VoiceCallSequence;
+};
+
+export type CreateVoiceCallSequenceRequest = {
+  /**
+   * Published voice sequence to run after the recipient answers.
+   */
+  id: VoiceSequenceId;
+  /**
+   * Voice call entry node to start.
+   */
+  entry_node_id: VoiceSequenceNodeId;
+  /**
+   * Data matching the selected entry's configured schema, limited to 16 KiB before and after normalization. Use an empty object when the entry needs no data. Fields remain application data and cannot provide trusted call identity or routing authority.
+   */
+  trigger_data: {
+    [key: string]: unknown;
+  };
+};
+
+export type CreateVoiceCallRequest = {
+  /**
+   * Calling number that this workspace is permitted to present.
+   */
+  from: VoiceSequencePhoneNumber;
+  /**
+   * Recipient number in canonical E.164 form.
+   */
+  to: VoiceSequencePhoneNumber;
+  /**
+   * Maximum ringing time for the original dialing attempt, shared across routing candidates.
+   */
+  ringing_timeout_seconds?: number;
+  sequence: CreateVoiceCallSequenceRequest;
+};
+
+export type VoiceDestination = {
+  readonly country_code: CountryCode;
+  /**
+   * Full English country name.
+   */
+  readonly country_name: string;
+  /**
+   * International dialling prefix, without the leading plus. Absent for countries that have none.
+   */
+  readonly dial_code?: string;
+  readonly region?: DestinationRegion;
+  readonly super_region?: DestinationSuperRegion;
+  /**
+   * Whether your workspace has enabled calling to this country.
+   */
+  enabled: boolean;
+  /**
+   * This country's Voice callability at the destination level, independent of your enabled setting. `available` means we place calls there; `not_supported` means we do not.
+   *
+   */
+  readonly status: string;
+  /**
+   * Whether we treat this country as a high-risk calling destination.
+   */
+  readonly high_risk_destination: boolean;
+};
+
+export type VoiceDestinationList = {
+  /**
+   * The Voice destination countries, each annotated with your workspace's enabled setting.
+   */
+  data: Array<VoiceDestination>;
+  /**
+   * Total number of destination countries.
+   */
+  total: number;
+};
+
+export type VoiceDestinationsUpdate = {
+  /**
+   * The destination countries to enable or disable. Only the countries listed here change; any country you do not list keeps its current setting.
+   *
+   */
+  destinations: Array<DestinationSetting>;
+};
+
+/**
  * Webhook delivery body. `type` identifies the event variant, `timestamp` is when the event occurred, and `data` contains the event-specific payload. See the [webhooks guide](/docs/guides/webhooks) for signature verification.
  *
  */
@@ -18568,6 +20266,12 @@ export type WebhookEventWritable =
   | ({
       type: "whatsapp.failed";
     } & EventWhatsAppFailedWritable)
+  | ({
+      type: "whatsapp.group.join_request_created";
+    } & EventWhatsAppGroupJoinRequestCreated)
+  | ({
+      type: "whatsapp.group.join_request_revoked";
+    } & EventWhatsAppGroupJoinRequestRevoked)
   | ({
       type: "whatsapp.reacted";
     } & EventWhatsAppReacted)
@@ -20317,10 +22021,168 @@ export type EmailTagStatsPointWritable = {
 };
 
 /**
- * Per-tag breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-tag breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsTagsResponseWritable = {
-  [key: string]: never;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
+/**
+ * Contains the requested group_by property, including a null value when context is missing. Ungrouped results use an empty object.
+ */
+export type EmailStatsQueryDimensionsWritable = {
+  /**
+   * Recorded sending domain value. Null represents missing context and differs from an empty string.
+   */
+  sending_domain?: string | null;
+  /**
+   * Recorded category value. Null represents missing context and differs from an empty string.
+   */
+  category?: string | null;
+  /**
+   * Recorded template id value. Null represents missing context and differs from an empty string.
+   */
+  template_id?: EmailTemplateId | null;
+  /**
+   * Recorded tag value. Null represents missing context and differs from an empty string.
+   */
+  tag?: string | null;
+  /**
+   * Recorded recipient domain value. Null represents missing context and differs from an empty string.
+   */
+  recipient_domain?: string | null;
+  /**
+   * Recorded mailbox provider value. Null represents missing context and differs from an empty string.
+   */
+  mailbox_provider?: string | null;
+  /**
+   * Recorded mailbox provider region value. Null represents missing context and differs from an empty string.
+   */
+  mailbox_provider_region?: string | null;
+  /**
+   * Recorded sending ip value. Null represents missing context and differs from an empty string.
+   */
+  sending_ip?: string | null;
+  /**
+   * Recorded ip pool id value. Null represents missing context and differs from an empty string.
+   */
+  ip_pool_id?: IpPoolId | null;
+  /**
+   * Recorded broadcast id value. Null represents missing context and differs from an empty string.
+   */
+  broadcast_id?: EmailBroadcastId | null;
+  /**
+   * Recorded country value. Null represents missing context and differs from an empty string.
+   */
+  country?: string | null;
+  /**
+   * Recorded region value. Null represents missing context and differs from an empty string.
+   */
+  region?: string | null;
+  /**
+   * Recorded city value. Null represents missing context and differs from an empty string.
+   */
+  city?: string | null;
+  /**
+   * Recorded agent family value. Null represents missing context and differs from an empty string.
+   */
+  agent_family?: string | null;
+  /**
+   * Recorded os family value. Null represents missing context and differs from an empty string.
+   */
+  os_family?: string | null;
+  /**
+   * Recorded device family value. Null represents missing context and differs from an empty string.
+   */
+  device_family?: string | null;
+  /**
+   * Recorded smtp error code value. Null represents missing context and differs from an empty string.
+   */
+  smtp_error_code?: string | null;
+  /**
+   * Recorded feedback type value. Null represents missing context and differs from an empty string.
+   */
+  feedback_type?: string | null;
+};
+
+/**
+ * One time bucket with the selected metrics. Bucket timestamps label nominal boundaries; edge buckets count events inside the normalized period.
+ */
+export type EmailStatsQueryPointWritable = {
+  /**
+   * Nominal bucket start as a UTC RFC 3339 instant.
+   */
+  bucket: string;
+  metrics: EmailStatsQueryMetrics;
+};
+
+/**
+ * One group ranked over the whole requested period. Its optional series contains complete chronological buckets, including zero counts and null undefined values for empty buckets.
+ */
+export type EmailStatsQueryGroupWritable = {
+  dimensions: EmailStatsQueryDimensionsWritable;
+  metrics: EmailStatsQueryMetrics;
+  /**
+   * Present when grain is requested; absent otherwise.
+   */
+  series?: Array<EmailStatsQueryPointWritable>;
+};
+
+/**
+ * Normalized half-open period. The response end is exclusive; replay the original inclusive request bounds when following cursors.
+ */
+export type EmailStatsQueryPeriodWritable = {
+  /**
+   * Inclusive normalized start as a UTC instant.
+   */
+  from: string;
+  /**
+   * Exclusive normalized end as a UTC instant.
+   */
+  to: string;
+  /**
+   * Timezone used to normalize bounds and buckets.
+   */
+  timezone: string;
+  /**
+   * Requested grain, or null when no series was requested.
+   */
+  grain: EmailStatsQueryGrain | null;
+};
+
+/**
+ * Selected email metrics with normalized bounds. Ungrouped requests return one group and null cursors, including empty windows. Grouped requests without observed groups return an empty data array. Live page reads can reflect new events or changed ranking.
+ */
+export type EmailStatsQueryResponseWritable = {
+  data: Array<EmailStatsQueryGroupWritable>;
+  period: EmailStatsQueryPeriodWritable;
+  /**
+   * Always null for this endpoint. It does not report a refresh boundary, claim completeness, or record request time.
+   */
+  data_as_of: string | null;
+  /**
+   * Pass as starting_after for the next grouped page. Null when no next page exists or the request is ungrouped.
+   */
+  next_cursor: string | null;
+  /**
+   * Pass as ending_before for the previous grouped page. Null when no previous page exists or the request is ungrouped.
+   */
+  prev_cursor: string | null;
+  /**
+   * Anchor for the first group. Pass as ending_before to read groups sorting before it. Null for empty or ungrouped results. Ranking can change between reads; refresh by repeating the original query.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -20375,10 +22237,21 @@ export type EmailSendingIpStatsPointWritable = {
 };
 
 /**
- * Per-sending-IP breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-sending-IP breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsBySendingIpResponseWritable = {
-  [key: string]: never;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -20389,10 +22262,21 @@ export type EmailSendingDomainStatsPointWritable = {
 };
 
 /**
- * Per-sending-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-sending-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsBySendingDomainResponseWritable = {
-  [key: string]: never;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -20403,10 +22287,21 @@ export type EmailCategoryStatsPointWritable = {
 };
 
 /**
- * Per-category breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-category breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByCategoryResponseWritable = {
-  [key: string]: never;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -20418,10 +22313,21 @@ export type EmailMailboxProviderStatsPointWritable = {
 };
 
 /**
- * Per-mailbox-provider breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-mailbox-provider breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByMailboxProviderResponseWritable = {
-  [key: string]: never;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -20433,10 +22339,21 @@ export type EmailMailboxProviderRegionStatsPointWritable = {
 };
 
 /**
- * Per-(mailbox provider, provider region) breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-(mailbox provider, provider region) breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByMailboxProviderRegionResponseWritable = {
-  [key: string]: never;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -20447,10 +22364,21 @@ export type EmailRecipientDomainStatsPointWritable = {
 };
 
 /**
- * Per-recipient-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-recipient-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByRecipientDomainResponseWritable = {
-  [key: string]: never;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -20461,38 +22389,93 @@ export type EmailTemplateStatsPointWritable = {
 };
 
 /**
- * Per-template breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-template breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByTemplateResponseWritable = {
-  [key: string]: never;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
- * Per-location engagement breakdown for the requested period, grouped at the requested `group_by` granularity, ranked by the `sort` metric (default `unique_opens`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-location engagement breakdown for the requested period, grouped at the requested `group_by` granularity, ranked by the `sort` metric (default `unique_opens`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByLocationResponseWritable = {
-  [key: string]: never;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
- * Per-client engagement breakdown for the requested period, grouped by the requested `group_by` facet, ranked by the `sort` metric (default `unique_opens`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-client engagement breakdown for the requested period, grouped by the requested `group_by` facet, ranked by the `sort` metric (default `unique_opens`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByClientResponseWritable = {
-  [key: string]: never;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
- * Per-SMTP-code bounce breakdown for the requested period, ranked by the `sort` metric (default `bounced`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-SMTP-code bounce breakdown for the requested period, ranked by the `sort` metric (default `bounced`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByBounceCodeResponseWritable = {
-  [key: string]: never;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
- * Per-complaint-type breakdown for the requested period, ranked by `complained` descending and capped at the requested `limit` (default 50, max 200).
+ * Per-complaint-type breakdown for the requested period, ranked by `complained` descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByComplaintTypeResponseWritable = {
-  [key: string]: never;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -20503,10 +22486,21 @@ export type EmailBroadcastStatsPointWritable = {
 };
 
 /**
- * Per-broadcast breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, max 200).
+ * Per-broadcast breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByBroadcastResponseWritable = {
-  [key: string]: never;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -21745,6 +23739,47 @@ export type WebhookAttemptListWritable = {
   data: Array<WebhookAttemptWritable>;
 };
 
+export type VoicePartyBridgePstnEndpointWritable = {
+  /**
+   * The number the platform placed the leg onward to, in E.164. The party's own `address` is the number that was dialled, so the two together are one hop of the call.
+   */
+  forward_to: string;
+  /**
+   * Which number the forwarded leg presented to the far end.
+   */
+  forward_as: VoiceInboundForwardAs;
+};
+
+export type VoicePartyBridgeSipEndpointWritable = {
+  /**
+   * The workspace trunk the leg was delivered onward to. It is distinct from the party's own `trunk_id`, which is the trunk this side itself sat behind.
+   */
+  trunk_id: SipTrunkId;
+};
+
+export type VoicePartyEndpointWritable = {
+  /**
+   * What kind of participant sat on this side of a leg. It selects which payload below is present, and most kinds carry none because the party's `address` is already their coordinate.
+   */
+  type: VoicePartyEndpointType;
+  /**
+   * The registered contact of a `sip` endpoint. Absent when the observation recorded none, and on every other kind of endpoint.
+   */
+  sip?: VoicePartySipEndpoint;
+  /**
+   * Where the platform placed the leg onward, on a `bridge_pstn` endpoint. Absent on every other kind of endpoint.
+   */
+  bridge_pstn?: VoicePartyBridgePstnEndpointWritable;
+  /**
+   * The trunk the platform delivered the leg onward to, on a `bridge_sip` endpoint. Absent on every other kind of endpoint.
+   */
+  bridge_sip?: VoicePartyBridgeSipEndpointWritable;
+};
+
+export type VoicePartyWritable = {
+  [key: string]: never;
+};
+
 /**
  * Ownership paperwork and registration approval progress for this number. Reported when ownership requirements or a recorded ownership block or decision apply. If requirements or progress cannot be read, a recorded block or decision preserves this object; without either, the object is absent. Other sending requirements can apply even when ownership is approved.
  *
@@ -21803,6 +23838,126 @@ export type NumbersOrderListWritable = {
   data: Array<unknown>;
 } & ListEnvelope;
 
+export type VoiceTrunkIpaclWritable = {
+  /**
+   * Optional human-readable label for this ACL entry.
+   */
+  description?: string | null;
+};
+
+/**
+ * A SIP trunk's identity and access-control settings.
+ */
+export type VoiceTrunkCoreWritable = {
+  /**
+   * A human-readable label for this SIP trunk. Mutable, and distinct from the generated wire domain.
+   */
+  name: string;
+};
+
+export type VoiceTrunkWritable = VoiceTrunkCoreWritable;
+
+export type VoiceTrunkListWritable = {
+  data: Array<VoiceTrunkWritable>;
+} & ListEnvelope;
+
+/**
+ * One address an inbound call to this trunk is forwarded to, and how that peer wants the call's two numbers spelled. A trunk can have several, tried in priority order until one answers.
+ *
+ */
+export type VoiceTrunkGatewayWritable = {
+  /**
+   * SIP URI an inbound call to this trunk is forwarded to. The host only: which number is dialed at that host comes from `destination_format`, because it changes with every call.
+   *
+   */
+  sip_uri: string;
+  /**
+   * The order gateways are tried in, lowest first. Gateways sharing a priority take an equal share of calls, and any of them may be tried first on a given call.
+   *
+   */
+  priority: number;
+  /**
+   * How the calling number is spelled to this gateway, as a template whose
+   * `{number}` stands for the number without its leading `+`. It is stated
+   * in the `P-Asserted-Identity` header of the delivered call.
+   *
+   * A gateway that has not asked for anything else reports `+{number}`,
+   * which is E.164. A format with no `{number}` states that same identity on
+   * every call, whoever called.
+   *
+   */
+  origination_format: string;
+  /**
+   * How this gateway formats the dialed number. In the template,
+   * `{number}` represents the number without its leading `+`. The result
+   * is placed before the `sip_uri` host. For example, `1234#{number}`
+   * formats `+31201234567` as
+   * `sip:1234#31201234567@pbx.example.com:5060`.
+   *
+   * A gateway that has not asked for anything else reports `+{number}`,
+   * which is E.164. A format with no `{number}` is dialed as it stands, so
+   * every number the trunk answers reaches that one number.
+   *
+   */
+  destination_format: string;
+};
+
+/**
+ * The trunk's gateways. Not paginated: a trunk holds a small, hand-managed set of dial targets, and the order across the whole set is what decides hunt order, so a partial page would misrepresent it.
+ */
+export type VoiceTrunkGatewayListWritable = {
+  /**
+   * The trunk's gateways, in priority order.
+   */
+  data: Array<VoiceTrunkGatewayWritable>;
+};
+
+export type VoiceNumberProviderAllocationWritable = {
+  /**
+   * A number we allocated to your workspace.
+   */
+  type: VoiceNumberProviderType;
+};
+
+export type VoiceNumberProviderVerifiedNumberWritable = {
+  /**
+   * A number from another carrier that you registered here. That carrier decides where calls to it go; we only present it on calls you place.
+   *
+   */
+  type: VoiceNumberProviderType;
+};
+
+/**
+ * Where this number came from, and the facts that belong to that answer. The type selects the shape. `allocation` is a number we allocated to your workspace, and it carries that allocation's identifier. `verified_number` is a number from another carrier, and it carries how far proving control of it has got.
+ *
+ */
+export type VoiceNumberProviderWritable =
+  | ({
+      type: "allocation";
+    } & VoiceNumberProviderAllocationWritable)
+  | ({
+      type: "verified_number";
+    } & VoiceNumberProviderVerifiedNumberWritable);
+
+export type VoiceInboundConfigurationWritable = {
+  /**
+   * Null when the stored route type is unsupported; inspect configuration_error before changing it.
+   */
+  route: VoiceCallRoute | null;
+};
+
+export type VoiceNumberWritable = {
+  [key: string]: never;
+};
+
+export type VoiceNumberListWritable = {
+  data: Array<VoiceNumberWritable>;
+} & ListEnvelope;
+
+export type VoiceCallerIdListWritable = {
+  data: Array<unknown>;
+} & ListEnvelope;
+
 export type VoiceLegWritable = {
   [key: string]: never;
 };
@@ -21810,6 +23965,31 @@ export type VoiceLegWritable = {
 export type VoiceLegListWritable = {
   data: Array<VoiceLegWritable>;
 } & ListEnvelope;
+
+/**
+ * A call summary. Call reads report observed state. Call creation returns an immutable acceptance snapshot: `started_at` and `ended_at` are `null`, the boolean observation fields are `false`, and `parties` is empty. Replays return that same snapshot after the call progresses.
+ */
+export type VoiceCallWritable = {
+  [key: string]: never;
+};
+
+export type VoiceDestinationWritable = {
+  /**
+   * Whether your workspace has enabled calling to this country.
+   */
+  enabled: boolean;
+};
+
+export type VoiceDestinationListWritable = {
+  /**
+   * The Voice destination countries, each annotated with your workspace's enabled setting.
+   */
+  data: Array<VoiceDestinationWritable>;
+  /**
+   * Total number of destination countries.
+   */
+  total: number;
+};
 
 /**
  * Client-supplied key. On operations supporting request deduplication, a retained
@@ -21925,7 +24105,7 @@ export type StatsTimezone = string;
 export type WhatsAppStatsTemplateFilter = string;
 
 /**
- * Restricts the statistics to one template, identified by its ID (`emt_…`) or name. This parameter is mutually exclusive with other dimension filters.
+ * Restricts the statistics to a template or a comma-separated union of templates, identified by ID (`emt_…`) or name. This parameter is mutually exclusive with other dimension filters.
  *
  */
 export type EmailStatsTemplateFilter = string;
@@ -34119,31 +36299,31 @@ export type GetEmailStatsDailyData = {
      */
     timezone?: string;
     /**
-     * Restrict the statistics to a single category: `transactional` or `marketing`. Mutually exclusive with the other dimension filters; only one may be set per request.
+     * Restrict the statistics to a category or a comma-separated union of categories: `transactional` or `marketing`. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     category?: string;
     /**
-     * Restrict the statistics to a single sending domain (the part of the From address after @). Mutually exclusive with the other dimension filters; only one may be set per request.
+     * Restrict the statistics to a sending domain or a comma-separated union of sending domains (the part of the From address after @). Mutually exclusive with the other dimension filters; only one may be set per request.
      */
     sending_domain?: string;
     /**
-     * Restrict the statistics to a single tag. Use `name` to match any value of a tag, or `name:value` for a specific pair (for example `campaign:spring_launch`). Mutually exclusive with the other dimension filters; only one may be set per request.
+     * Restrict the statistics to a tag. Use `name` to match any value of a tag, or `name:value` for a specific pair (for example `campaign:spring_launch`). To combine values of one tag name, separate complete pairs with commas, such as `campaign:spring,campaign:summer`. Different tag names cannot be combined. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     tag?: string;
     /**
-     * Restrict the statistics to a single sending IP. Mutually exclusive with the other dimension filters; only one may be set per request. A sending IP is assigned only after a message reaches delivery, so this filter reports delivery-side metrics only. Accepted, processed, rejected, complaint, and engagement counts are `0`, and processing latency is `null`. Complaint, open, and click rates are `0` when deliveries exist and `null` otherwise.
+     * Restrict the statistics to a sending IP or a comma-separated union of IPs. Mutually exclusive with the other dimension filters; only one may be set per request. A sending IP is assigned only after a message reaches delivery, so this filter reports delivery-side metrics only. Accepted, processed, rejected, complaint, and engagement counts are `0`, and processing latency is `null`. Complaint, open, and click rates are `0` when deliveries exist and `null` otherwise.
      *
      */
     sending_ip?: string;
     /**
-     * Restrict the statistics to a single recipient mailbox domain (the part of the recipient address after the `@`, for example `gmail.com`). Mutually exclusive with the other dimension filters; only one may be set per request.
+     * Restrict the statistics to a recipient mailbox domain or a comma-separated union of domains (the part of the recipient address after the `@`, for example `gmail.com`). Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     recipient_domain?: string;
     /**
-     * Restricts the statistics to one template, identified by its ID (`emt_…`) or name. This parameter is mutually exclusive with other dimension filters.
+     * Restricts the statistics to a template or a comma-separated union of templates, identified by ID (`emt_…`) or name. This parameter is mutually exclusive with other dimension filters.
      *
      */
     template?: string;
@@ -34215,31 +36395,31 @@ export type GetEmailStatsHourlyData = {
      */
     timezone?: string;
     /**
-     * Restrict the statistics to a single category: `transactional` or `marketing`. Mutually exclusive with the other dimension filters; only one may be set per request.
+     * Restrict the statistics to a category or a comma-separated union of categories: `transactional` or `marketing`. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     category?: string;
     /**
-     * Restrict the statistics to a single sending domain (the part of the From address after @). Mutually exclusive with the other dimension filters; only one may be set per request.
+     * Restrict the statistics to a sending domain or a comma-separated union of sending domains (the part of the From address after @). Mutually exclusive with the other dimension filters; only one may be set per request.
      */
     sending_domain?: string;
     /**
-     * Restrict the statistics to a single tag. Use `name` to match any value of a tag, or `name:value` for a specific pair (for example `campaign:spring_launch`). Mutually exclusive with the other dimension filters; only one may be set per request.
+     * Restrict the statistics to a tag. Use `name` to match any value of a tag, or `name:value` for a specific pair (for example `campaign:spring_launch`). To combine values of one tag name, separate complete pairs with commas, such as `campaign:spring,campaign:summer`. Different tag names cannot be combined. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     tag?: string;
     /**
-     * Restrict the statistics to a single sending IP. Mutually exclusive with the other dimension filters; only one may be set per request. A sending IP is assigned only after a message reaches delivery, so this filter reports delivery-side metrics only. Accepted, processed, rejected, complaint, and engagement counts are `0`, and processing latency is `null`. Complaint, open, and click rates are `0` when deliveries exist and `null` otherwise.
+     * Restrict the statistics to a sending IP or a comma-separated union of IPs. Mutually exclusive with the other dimension filters; only one may be set per request. A sending IP is assigned only after a message reaches delivery, so this filter reports delivery-side metrics only. Accepted, processed, rejected, complaint, and engagement counts are `0`, and processing latency is `null`. Complaint, open, and click rates are `0` when deliveries exist and `null` otherwise.
      *
      */
     sending_ip?: string;
     /**
-     * Restrict the statistics to a single recipient mailbox domain (the part of the recipient address after the `@`, for example `gmail.com`). Mutually exclusive with the other dimension filters; only one may be set per request.
+     * Restrict the statistics to a recipient mailbox domain or a comma-separated union of domains (the part of the recipient address after the `@`, for example `gmail.com`). Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     recipient_domain?: string;
     /**
-     * Restricts the statistics to one template, identified by its ID (`emt_…`) or name. This parameter is mutually exclusive with other dimension filters.
+     * Restricts the statistics to a template or a comma-separated union of templates, identified by ID (`emt_…`) or name. This parameter is mutually exclusive with other dimension filters.
      *
      */
     template?: string;
@@ -34297,6 +36477,18 @@ export type GetEmailStatsByTagData = {
   body?: never;
   path?: never;
   query?: {
+    /**
+     * Restrict the breakdown to this tag name. Names match case-sensitively.
+     */
+    name?: string;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
     /**
      * Start date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
@@ -34382,6 +36574,89 @@ export type GetEmailStatsByTagResponses = {
 export type GetEmailStatsByTagResponse =
   GetEmailStatsByTagResponses[keyof GetEmailStatsByTagResponses];
 
+export type GetEmailStatsQueryData = {
+  body: EmailStatsQueryRequest;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/email/stats/query";
+};
+
+export type GetEmailStatsQueryErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailStatsQueryError =
+  GetEmailStatsQueryErrors[keyof GetEmailStatsQueryErrors];
+
+export type GetEmailStatsQueryResponses = {
+  /**
+   * Selected metrics, normalized bounds, and grouped navigation cursors.
+   */
+  200: EmailStatsQueryResponse;
+};
+
+export type GetEmailStatsQueryResponse =
+  GetEmailStatsQueryResponses[keyof GetEmailStatsQueryResponses];
+
 export type GetEmailStatsSummaryData = {
   body?: never;
   path?: never;
@@ -34402,31 +36677,31 @@ export type GetEmailStatsSummaryData = {
      */
     timezone?: string;
     /**
-     * Restrict the statistics to a single category: `transactional` or `marketing`. Mutually exclusive with the other dimension filters; only one may be set per request.
+     * Restrict the statistics to a category or a comma-separated union of categories: `transactional` or `marketing`. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     category?: string;
     /**
-     * Restrict the statistics to a single sending domain (the part of the From address after @). Mutually exclusive with the other dimension filters; only one may be set per request.
+     * Restrict the statistics to a sending domain or a comma-separated union of sending domains (the part of the From address after @). Mutually exclusive with the other dimension filters; only one may be set per request.
      */
     sending_domain?: string;
     /**
-     * Restrict the statistics to a single tag. Use `name` to match any value of a tag, or `name:value` for a specific pair (for example `campaign:spring_launch`). Mutually exclusive with the other dimension filters; only one may be set per request.
+     * Restrict the statistics to a tag. Use `name` to match any value of a tag, or `name:value` for a specific pair (for example `campaign:spring_launch`). To combine values of one tag name, separate complete pairs with commas, such as `campaign:spring,campaign:summer`. Different tag names cannot be combined. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     tag?: string;
     /**
-     * Restrict the statistics to a single sending IP. Mutually exclusive with the other dimension filters; only one may be set per request. A sending IP is assigned only after a message reaches delivery, so this filter reports delivery-side metrics only. Accepted, processed, rejected, complaint, and engagement counts are `0`, and processing latency is `null`. Complaint, open, and click rates are `0` when deliveries exist and `null` otherwise.
+     * Restrict the statistics to a sending IP or a comma-separated union of IPs. Mutually exclusive with the other dimension filters; only one may be set per request. A sending IP is assigned only after a message reaches delivery, so this filter reports delivery-side metrics only. Accepted, processed, rejected, complaint, and engagement counts are `0`, and processing latency is `null`. Complaint, open, and click rates are `0` when deliveries exist and `null` otherwise.
      *
      */
     sending_ip?: string;
     /**
-     * Restrict the statistics to a single recipient mailbox domain (the part of the recipient address after the `@`, for example `gmail.com`). Mutually exclusive with the other dimension filters; only one may be set per request.
+     * Restrict the statistics to a recipient mailbox domain or a comma-separated union of domains (the part of the recipient address after the `@`, for example `gmail.com`). Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     recipient_domain?: string;
     /**
-     * Restricts the statistics to one template, identified by its ID (`emt_…`) or name. This parameter is mutually exclusive with other dimension filters.
+     * Restricts the statistics to a template or a comma-separated union of templates, identified by ID (`emt_…`) or name. This parameter is mutually exclusive with other dimension filters.
      *
      */
     template?: string;
@@ -34489,6 +36764,14 @@ export type GetEmailStatsBySendingIpData = {
   body?: never;
   path?: never;
   query?: {
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
     /**
      * Start date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
@@ -34596,6 +36879,14 @@ export type GetEmailStatsBySendingDomainData = {
   path?: never;
   query?: {
     /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
      * Start date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
     from?: string;
@@ -34685,6 +36976,14 @@ export type GetEmailStatsByCategoryData = {
   path?: never;
   query?: {
     /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
      * Start date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
     from?: string;
@@ -34769,6 +37068,14 @@ export type GetEmailStatsByMailboxProviderData = {
   body?: never;
   path?: never;
   query?: {
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
     /**
      * Start date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
@@ -34859,6 +37166,14 @@ export type GetEmailStatsByMailboxProviderRegionData = {
   path?: never;
   query?: {
     /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
      * Start date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
     from?: string;
@@ -34947,6 +37262,14 @@ export type GetEmailStatsByRecipientDomainData = {
   body?: never;
   path?: never;
   query?: {
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
     /**
      * Start date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). It defaults to 30 days before `to` when you leave it out. When `include_trend=true` and `trend_grain=hourly`, that default tightens to 29 days before `to` instead, so the defaulted window still fits inside the 720-hour trend cap.
      */
@@ -35037,6 +37360,14 @@ export type GetEmailStatsByTemplateData = {
   path?: never;
   query?: {
     /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
      * Start date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to 29 days before `to`, keeping the defaulted window within the 720-hour trend cap.
      */
     from?: string;
@@ -35126,6 +37457,14 @@ export type GetEmailStatsByLocationData = {
   path?: never;
   query?: {
     /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
      * Start date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted.
      */
     from?: string;
@@ -35211,6 +37550,14 @@ export type GetEmailStatsByClientData = {
   path?: never;
   query?: {
     /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
      * Start date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted.
      */
     from?: string;
@@ -35295,6 +37642,14 @@ export type GetEmailStatsByBounceCodeData = {
   body?: never;
   path?: never;
   query?: {
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
     /**
      * Start date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted.
      */
@@ -35382,6 +37737,14 @@ export type GetEmailStatsByComplaintTypeData = {
   path?: never;
   query?: {
     /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
      * Start date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted.
      */
     from?: string;
@@ -35461,6 +37824,14 @@ export type GetEmailStatsByBroadcastData = {
   body?: never;
   path?: never;
   query?: {
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
     /**
      * Start date (inclusive) in `YYYY-MM-DD`, UTC. Defaults to 30 days before `to` when omitted.
      */
@@ -41486,6 +43857,1362 @@ export type GetWorkspaceNumberResponses = {
 export type GetWorkspaceNumberResponse =
   GetWorkspaceNumberResponses[keyof GetWorkspaceNumberResponses];
 
+export type ListVoiceTrunksData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by.
+     */
+    sort?: VoiceTrunkSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/voice/trunks";
+};
+
+export type ListVoiceTrunksErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListVoiceTrunksError =
+  ListVoiceTrunksErrors[keyof ListVoiceTrunksErrors];
+
+export type ListVoiceTrunksResponses = {
+  /**
+   * Paginated list of SIP trunks.
+   */
+  200: VoiceTrunkList;
+};
+
+export type ListVoiceTrunksResponse =
+  ListVoiceTrunksResponses[keyof ListVoiceTrunksResponses];
+
+export type CreateVoiceTrunkData = {
+  body: VoiceTrunkCreate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/voice/trunks";
+};
+
+export type CreateVoiceTrunkErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateVoiceTrunkError =
+  CreateVoiceTrunkErrors[keyof CreateVoiceTrunkErrors];
+
+export type CreateVoiceTrunkResponses = {
+  /**
+   * SIP trunk created.
+   */
+  201: VoiceTrunk;
+};
+
+export type CreateVoiceTrunkResponse =
+  CreateVoiceTrunkResponses[keyof CreateVoiceTrunkResponses];
+
+export type DeleteVoiceTrunkData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    trunk_id: SipTrunkId;
+  };
+  query?: never;
+  url: "/v1/voice/trunks/{trunk_id}";
+};
+
+export type DeleteVoiceTrunkErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteVoiceTrunkError =
+  DeleteVoiceTrunkErrors[keyof DeleteVoiceTrunkErrors];
+
+export type DeleteVoiceTrunkResponses = {
+  /**
+   * SIP trunk deleted.
+   */
+  204: void;
+};
+
+export type DeleteVoiceTrunkResponse =
+  DeleteVoiceTrunkResponses[keyof DeleteVoiceTrunkResponses];
+
+export type GetVoiceTrunkData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path: {
+    trunk_id: SipTrunkId;
+  };
+  query?: never;
+  url: "/v1/voice/trunks/{trunk_id}";
+};
+
+export type GetVoiceTrunkErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetVoiceTrunkError = GetVoiceTrunkErrors[keyof GetVoiceTrunkErrors];
+
+export type GetVoiceTrunkResponses = {
+  /**
+   * SIP trunk with its current configuration and status.
+   */
+  200: VoiceTrunk;
+};
+
+export type GetVoiceTrunkResponse =
+  GetVoiceTrunkResponses[keyof GetVoiceTrunkResponses];
+
+export type UpdateVoiceTrunkData = {
+  body: VoiceTrunkUpdate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    trunk_id: SipTrunkId;
+  };
+  query?: never;
+  url: "/v1/voice/trunks/{trunk_id}";
+};
+
+export type UpdateVoiceTrunkErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateVoiceTrunkError =
+  UpdateVoiceTrunkErrors[keyof UpdateVoiceTrunkErrors];
+
+export type UpdateVoiceTrunkResponses = {
+  /**
+   * Updated SIP trunk.
+   */
+  200: VoiceTrunk;
+};
+
+export type UpdateVoiceTrunkResponse =
+  UpdateVoiceTrunkResponses[keyof UpdateVoiceTrunkResponses];
+
+export type CreateVoiceSessionCredentialData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Does not deduplicate this operation. Every successful attempt creates a fresh credential.
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/voice/session-credentials";
+};
+
+export type CreateVoiceSessionCredentialErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateVoiceSessionCredentialError =
+  CreateVoiceSessionCredentialErrors[keyof CreateVoiceSessionCredentialErrors];
+
+export type CreateVoiceSessionCredentialResponses = {
+  /**
+   * Credential minted. The password appears only in this response.
+   *
+   */
+  201: VoiceSessionCredential;
+};
+
+export type CreateVoiceSessionCredentialResponse =
+  CreateVoiceSessionCredentialResponses[keyof CreateVoiceSessionCredentialResponses];
+
+export type ListVoiceTrunkGatewaysData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path: {
+    trunk_id: SipTrunkId;
+  };
+  query?: never;
+  url: "/v1/voice/trunks/{trunk_id}/gateways";
+};
+
+export type ListVoiceTrunkGatewaysErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListVoiceTrunkGatewaysError =
+  ListVoiceTrunkGatewaysErrors[keyof ListVoiceTrunkGatewaysErrors];
+
+export type ListVoiceTrunkGatewaysResponses = {
+  /**
+   * The complete gateway list, ordered by priority and then creation time.
+   */
+  200: VoiceTrunkGatewayList;
+};
+
+export type ListVoiceTrunkGatewaysResponse =
+  ListVoiceTrunkGatewaysResponses[keyof ListVoiceTrunkGatewaysResponses];
+
+export type CreateVoiceTrunkGatewayData = {
+  body: VoiceTrunkGatewayCreate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    trunk_id: SipTrunkId;
+  };
+  query?: never;
+  url: "/v1/voice/trunks/{trunk_id}/gateways";
+};
+
+export type CreateVoiceTrunkGatewayErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateVoiceTrunkGatewayError =
+  CreateVoiceTrunkGatewayErrors[keyof CreateVoiceTrunkGatewayErrors];
+
+export type CreateVoiceTrunkGatewayResponses = {
+  /**
+   * Gateway created.
+   */
+  201: VoiceTrunkGateway;
+};
+
+export type CreateVoiceTrunkGatewayResponse =
+  CreateVoiceTrunkGatewayResponses[keyof CreateVoiceTrunkGatewayResponses];
+
+export type DeleteVoiceTrunkGatewayData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    trunk_id: SipTrunkId;
+    gateway_id: VoiceTrunkGatewayId;
+  };
+  query?: never;
+  url: "/v1/voice/trunks/{trunk_id}/gateways/{gateway_id}";
+};
+
+export type DeleteVoiceTrunkGatewayErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteVoiceTrunkGatewayError =
+  DeleteVoiceTrunkGatewayErrors[keyof DeleteVoiceTrunkGatewayErrors];
+
+export type DeleteVoiceTrunkGatewayResponses = {
+  /**
+   * Gateway deleted.
+   */
+  204: void;
+};
+
+export type DeleteVoiceTrunkGatewayResponse =
+  DeleteVoiceTrunkGatewayResponses[keyof DeleteVoiceTrunkGatewayResponses];
+
+export type GetVoiceTrunkGatewayData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path: {
+    trunk_id: SipTrunkId;
+    gateway_id: VoiceTrunkGatewayId;
+  };
+  query?: never;
+  url: "/v1/voice/trunks/{trunk_id}/gateways/{gateway_id}";
+};
+
+export type GetVoiceTrunkGatewayErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetVoiceTrunkGatewayError =
+  GetVoiceTrunkGatewayErrors[keyof GetVoiceTrunkGatewayErrors];
+
+export type GetVoiceTrunkGatewayResponses = {
+  /**
+   * Gateway with its current routing and connection settings.
+   */
+  200: VoiceTrunkGateway;
+};
+
+export type GetVoiceTrunkGatewayResponse =
+  GetVoiceTrunkGatewayResponses[keyof GetVoiceTrunkGatewayResponses];
+
+export type UpdateVoiceTrunkGatewayData = {
+  body: VoiceTrunkGatewayUpdate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    trunk_id: SipTrunkId;
+    gateway_id: VoiceTrunkGatewayId;
+  };
+  query?: never;
+  url: "/v1/voice/trunks/{trunk_id}/gateways/{gateway_id}";
+};
+
+export type UpdateVoiceTrunkGatewayErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateVoiceTrunkGatewayError =
+  UpdateVoiceTrunkGatewayErrors[keyof UpdateVoiceTrunkGatewayErrors];
+
+export type UpdateVoiceTrunkGatewayResponses = {
+  /**
+   * Updated gateway.
+   */
+  200: VoiceTrunkGateway;
+};
+
+export type UpdateVoiceTrunkGatewayResponse =
+  UpdateVoiceTrunkGatewayResponses[keyof UpdateVoiceTrunkGatewayResponses];
+
+export type ListVoiceNumbersData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by.
+     */
+    sort?: VoiceNumberSortField;
+    /**
+     * Sort direction. Defaults to `asc`, which sorts alphabetically or from oldest to newest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/voice/numbers";
+};
+
+export type ListVoiceNumbersErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListVoiceNumbersError =
+  ListVoiceNumbersErrors[keyof ListVoiceNumbersErrors];
+
+export type ListVoiceNumbersResponses = {
+  /**
+   * Paginated list of the numbers the workspace can use for voice.
+   */
+  200: VoiceNumberList;
+};
+
+export type ListVoiceNumbersResponse =
+  ListVoiceNumbersResponses[keyof ListVoiceNumbersResponses];
+
+export type GetVoiceNumberData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path: {
+    number_id: VoiceNumberId;
+  };
+  query?: never;
+  url: "/v1/voice/numbers/{number_id}";
+};
+
+export type GetVoiceNumberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetVoiceNumberError =
+  GetVoiceNumberErrors[keyof GetVoiceNumberErrors];
+
+export type GetVoiceNumberResponses = {
+  /**
+   * The number.
+   */
+  200: VoiceNumber;
+};
+
+export type GetVoiceNumberResponse =
+  GetVoiceNumberResponses[keyof GetVoiceNumberResponses];
+
+export type UpdateVoiceNumberData = {
+  body: VoiceNumberUpdate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    number_id: VoiceNumberId;
+  };
+  query?: never;
+  url: "/v1/voice/numbers/{number_id}";
+};
+
+export type UpdateVoiceNumberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateVoiceNumberError =
+  UpdateVoiceNumberErrors[keyof UpdateVoiceNumberErrors];
+
+export type UpdateVoiceNumberResponses = {
+  /**
+   * The number as it now stands.
+   */
+  200: VoiceNumber;
+};
+
+export type UpdateVoiceNumberResponse =
+  UpdateVoiceNumberResponses[keyof UpdateVoiceNumberResponses];
+
+export type ListVoiceCallerIdsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by.
+     */
+    sort?: VoiceCallerIdSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/voice/caller-ids";
+};
+
+export type ListVoiceCallerIdsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListVoiceCallerIdsError =
+  ListVoiceCallerIdsErrors[keyof ListVoiceCallerIdsErrors];
+
+export type ListVoiceCallerIdsResponses = {
+  /**
+   * Paginated list of caller IDs.
+   */
+  200: VoiceCallerIdList;
+};
+
+export type ListVoiceCallerIdsResponse =
+  ListVoiceCallerIdsResponses[keyof ListVoiceCallerIdsResponses];
+
+export type GetVoiceCallerIdData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path: {
+    caller_id: VoiceCallerIdid;
+  };
+  query?: never;
+  url: "/v1/voice/caller-ids/{caller_id}";
+};
+
+export type GetVoiceCallerIdErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetVoiceCallerIdError =
+  GetVoiceCallerIdErrors[keyof GetVoiceCallerIdErrors];
+
+export type GetVoiceCallerIdResponses = {
+  /**
+   * Caller ID with its current verification status.
+   */
+  200: VoiceCallerId;
+};
+
+export type GetVoiceCallerIdResponse =
+  GetVoiceCallerIdResponses[keyof GetVoiceCallerIdResponses];
+
+export type VerifyVoiceCallerIdData = {
+  body: VoiceCallerIdVerifyRequest;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    caller_id: VoiceCallerIdid;
+  };
+  query?: never;
+  url: "/v1/voice/caller-ids/{caller_id}/verify";
+};
+
+export type VerifyVoiceCallerIdErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type VerifyVoiceCallerIdError =
+  VerifyVoiceCallerIdErrors[keyof VerifyVoiceCallerIdErrors];
+
+export type VerifyVoiceCallerIdResponses = {
+  /**
+   * Caller ID verified.
+   */
+  200: VoiceCallerId;
+};
+
+export type VerifyVoiceCallerIdResponse =
+  VerifyVoiceCallerIdResponses[keyof VerifyVoiceCallerIdResponses];
+
 export type ListVoiceLegsData = {
   body?: never;
   path?: never;
@@ -41635,3 +45362,235 @@ export type GetVoiceLegResponses = {
 
 export type GetVoiceLegResponse =
   GetVoiceLegResponses[keyof GetVoiceLegResponses];
+
+export type CreateVoiceCallData = {
+  body: CreateVoiceCallRequest;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/voice/calls";
+};
+
+export type CreateVoiceCallErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateVoiceCallError =
+  CreateVoiceCallErrors[keyof CreateVoiceCallErrors];
+
+export type CreateVoiceCallResponses = {
+  /**
+   * Immutable acceptance snapshot for the call.
+   */
+  202: VoiceCall;
+};
+
+export type CreateVoiceCallResponse =
+  CreateVoiceCallResponses[keyof CreateVoiceCallResponses];
+
+export type ListVoiceDestinationsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/voice/destinations";
+};
+
+export type ListVoiceDestinationsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListVoiceDestinationsError =
+  ListVoiceDestinationsErrors[keyof ListVoiceDestinationsErrors];
+
+export type ListVoiceDestinationsResponses = {
+  /**
+   * The Voice destination countries with your workspace's enabled settings.
+   */
+  200: VoiceDestinationList;
+};
+
+export type ListVoiceDestinationsResponse =
+  ListVoiceDestinationsResponses[keyof ListVoiceDestinationsResponses];
+
+export type UpdateVoiceDestinationsData = {
+  body: VoiceDestinationsUpdate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/voice/destinations";
+};
+
+export type UpdateVoiceDestinationsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateVoiceDestinationsError =
+  UpdateVoiceDestinationsErrors[keyof UpdateVoiceDestinationsErrors];
+
+export type UpdateVoiceDestinationsResponses = {
+  /**
+   * The updated Voice destination countries with your workspace's enabled settings.
+   */
+  200: VoiceDestinationList;
+};
+
+export type UpdateVoiceDestinationsResponse =
+  UpdateVoiceDestinationsResponses[keyof UpdateVoiceDestinationsResponses];

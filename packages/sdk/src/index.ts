@@ -49,6 +49,9 @@ export type {
 export type {
   // response types
   EmailStatsSummary,
+  EmailStatsQueryParams,
+  EmailStatsQueryResponse,
+  EmailStatsQueryGroup,
   EmailStatsResponse,
   EmailStatsTagsResponse,
   EmailStatsByCategoryResponse,
@@ -87,7 +90,26 @@ export type {
   SmsSendBatchResult,
 } from "./resources/sms.js";
 export type { SmsMessage, SmsListQuery } from "./resources/sms.gen.js";
+export type { VoiceCall, VoiceCallsCreateParams } from "./resources/voiceCalls.gen.js";
 export type { VoiceLeg, VoiceLegsListQuery } from "./resources/voiceLegs.gen.js";
+export type {
+  VoiceTrunksListQuery,
+  VoiceTrunksCreateParams,
+  VoiceTrunksUpdateParams,
+} from "./resources/voiceTrunks.gen.js";
+export type {
+  VoiceNumbersListQuery,
+  VoiceNumbersUpdateParams,
+} from "./resources/voiceNumbers.gen.js";
+export type { VoiceCallerIdsListQuery } from "./resources/voiceCallerIds.gen.js";
+export type { VoiceDestinationsUpdateParams } from "./resources/voiceDestinations.gen.js";
+export type {
+  VoiceTrunk,
+  VoiceNumber,
+  VoiceCallerId,
+  VoiceDestinationList,
+  VoiceSessionCredential,
+} from "./generated/types.gen.js";
 export type {
   SmsTemplate,
   SmsTemplateSummary,
@@ -387,6 +409,8 @@ export type {
 export { WebhookEventType } from "./event-types.gen.js";
 export type { WebhookEventTypeValue } from "./event-types.gen.js";
 export {
+  DestinationRegion,
+  DestinationSuperRegion,
   EmailClientFamily,
   EmailClientPlatform,
   EmailCompatibilityRuleID,
@@ -416,9 +440,11 @@ export {
   SMSSuppressionOrigin,
   SMSSuppressionReason,
   TemplateLanguageStatus,
+  VoiceCallerIDStatus,
   VerificationAttemptFailureReason,
   VerificationChannel,
   VerificationTerminalReason,
+  VoicePartyEndpointType,
   WhatsAppBusinessAccountMarketingMessagesStatus,
   WhatsAppBusinessAccountReviewStatus,
   WhatsAppBusinessAccountStatus,
@@ -447,6 +473,8 @@ export {
   WhatsAppUsernameStatus,
 } from "./open-enums.gen.js";
 export type {
+  DestinationRegionValue,
+  DestinationSuperRegionValue,
   EmailClientFamilyValue,
   EmailClientPlatformValue,
   EmailCompatibilityRuleIDValue,
@@ -476,9 +504,11 @@ export type {
   SMSSuppressionOriginValue,
   SMSSuppressionReasonValue,
   TemplateLanguageStatusValue,
+  VoiceCallerIDStatusValue,
   VerificationAttemptFailureReasonValue,
   VerificationChannelValue,
   VerificationTerminalReasonValue,
+  VoicePartyEndpointTypeValue,
   WhatsAppBusinessAccountMarketingMessagesStatusValue,
   WhatsAppBusinessAccountReviewStatusValue,
   WhatsAppBusinessAccountStatusValue,
@@ -625,3 +655,11 @@ export type {
   EmailInboxInsightsDomainsListQuery,
   EmailInboxInsightsDomainsUpdateParams,
 } from "./resources/emailInboxInsightsDomains.gen.js";
+
+export type {
+  VoiceTrunkGateway,
+  VoiceTrunkGatewayList,
+  VoiceTrunksGatewaysCreateParams,
+  VoiceTrunksGatewaysUpdateParams,
+} from "./resources/voiceTrunksGateways.gen.js";
+export type { VoiceCallerIdsVerifyParams } from "./resources/voiceCallerIds.gen.js";

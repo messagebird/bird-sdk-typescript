@@ -102,6 +102,18 @@ import type {
   CreateVerificationNextChannelErrors,
   CreateVerificationNextChannelResponses,
   CreateVerificationResponses,
+  CreateVoiceCallData,
+  CreateVoiceCallErrors,
+  CreateVoiceCallResponses,
+  CreateVoiceSessionCredentialData,
+  CreateVoiceSessionCredentialErrors,
+  CreateVoiceSessionCredentialResponses,
+  CreateVoiceTrunkData,
+  CreateVoiceTrunkErrors,
+  CreateVoiceTrunkGatewayData,
+  CreateVoiceTrunkGatewayErrors,
+  CreateVoiceTrunkGatewayResponses,
+  CreateVoiceTrunkResponses,
   CreateWebhookData,
   CreateWebhookErrors,
   CreateWebhookResponses,
@@ -165,6 +177,12 @@ import type {
   DeleteSuppressionData,
   DeleteSuppressionErrors,
   DeleteSuppressionResponses,
+  DeleteVoiceTrunkData,
+  DeleteVoiceTrunkErrors,
+  DeleteVoiceTrunkGatewayData,
+  DeleteVoiceTrunkGatewayErrors,
+  DeleteVoiceTrunkGatewayResponses,
+  DeleteVoiceTrunkResponses,
   DeleteWebhookData,
   DeleteWebhookErrors,
   DeleteWebhookResponses,
@@ -312,6 +330,9 @@ import type {
   GetEmailStatsHourlyData,
   GetEmailStatsHourlyErrors,
   GetEmailStatsHourlyResponses,
+  GetEmailStatsQueryData,
+  GetEmailStatsQueryErrors,
+  GetEmailStatsQueryResponses,
   GetEmailStatsSummaryData,
   GetEmailStatsSummaryErrors,
   GetEmailStatsSummaryResponses,
@@ -420,9 +441,21 @@ import type {
   GetSuppressionData,
   GetSuppressionErrors,
   GetSuppressionResponses,
+  GetVoiceCallerIdData,
+  GetVoiceCallerIdErrors,
+  GetVoiceCallerIdResponses,
   GetVoiceLegData,
   GetVoiceLegErrors,
   GetVoiceLegResponses,
+  GetVoiceNumberData,
+  GetVoiceNumberErrors,
+  GetVoiceNumberResponses,
+  GetVoiceTrunkData,
+  GetVoiceTrunkErrors,
+  GetVoiceTrunkGatewayData,
+  GetVoiceTrunkGatewayErrors,
+  GetVoiceTrunkGatewayResponses,
+  GetVoiceTrunkResponses,
   GetWebhookData,
   GetWebhookErrors,
   GetWebhookResponses,
@@ -602,9 +635,24 @@ import type {
   ListSuppressionsData,
   ListSuppressionsErrors,
   ListSuppressionsResponses,
+  ListVoiceCallerIdsData,
+  ListVoiceCallerIdsErrors,
+  ListVoiceCallerIdsResponses,
+  ListVoiceDestinationsData,
+  ListVoiceDestinationsErrors,
+  ListVoiceDestinationsResponses,
   ListVoiceLegsData,
   ListVoiceLegsErrors,
   ListVoiceLegsResponses,
+  ListVoiceNumbersData,
+  ListVoiceNumbersErrors,
+  ListVoiceNumbersResponses,
+  ListVoiceTrunkGatewaysData,
+  ListVoiceTrunkGatewaysErrors,
+  ListVoiceTrunkGatewaysResponses,
+  ListVoiceTrunksData,
+  ListVoiceTrunksErrors,
+  ListVoiceTrunksResponses,
   ListWebhookAttemptsData,
   ListWebhookAttemptsErrors,
   ListWebhookAttemptsResponses,
@@ -743,6 +791,18 @@ import type {
   UpdateSmsKeywordRuleData,
   UpdateSmsKeywordRuleErrors,
   UpdateSmsKeywordRuleResponses,
+  UpdateVoiceDestinationsData,
+  UpdateVoiceDestinationsErrors,
+  UpdateVoiceDestinationsResponses,
+  UpdateVoiceNumberData,
+  UpdateVoiceNumberErrors,
+  UpdateVoiceNumberResponses,
+  UpdateVoiceTrunkData,
+  UpdateVoiceTrunkErrors,
+  UpdateVoiceTrunkGatewayData,
+  UpdateVoiceTrunkGatewayErrors,
+  UpdateVoiceTrunkGatewayResponses,
+  UpdateVoiceTrunkResponses,
   UpdateWebhookData,
   UpdateWebhookErrors,
   UpdateWebhookResponses,
@@ -764,6 +824,9 @@ import type {
   VerifyDomainData,
   VerifyDomainErrors,
   VerifyDomainResponses,
+  VerifyVoiceCallerIdData,
+  VerifyVoiceCallerIdErrors,
+  VerifyVoiceCallerIdResponses,
 } from "./types.gen";
 
 export type Options<
@@ -6681,7 +6744,7 @@ export const getEmailStatsHourly = <ThrowOnError extends boolean = false>(
 /**
  * Get statistics by tag
  *
- * Returns delivery and engagement counts for the requested period, grouped by tag. Use it to compare performance across the tags you set at send time. Rows are ranked by the `sort` metric, `processed` by default, and capped at the requested `limit` (50 by default, 200 at most).
+ * Returns delivery and engagement counts for the requested period, grouped by tag. Use it to compare performance across the tags you set at send time. Rows are ranked by the `sort` metric, `processed` by default, and paginated with the requested `limit` (50 by default, 200 at most).
  *
  * Rows are computed against event time rather than send time, so engagement received during the period counts even for messages that were sent earlier.
  *
@@ -6710,6 +6773,44 @@ export const getEmailStatsByTag = <ThrowOnError extends boolean = false>(
     ],
     url: "/v1/email/stats/tags",
     ...options,
+  });
+
+/**
+ * Get selected email metrics
+ *
+ * Returns selected delivery, engagement, and latency metrics for the workspace. Combine filters, one grouping dimension, and a time grain for reports such as weekly deliveries by recipient domain for a campaign. Events are selected and bucketed by when they occurred. An open in the window can belong to a message sent earlier; later outcomes outside the window are excluded. Ungrouped requests return one summary; grouped pages retain each group's complete series. Counts estimate distinct identities, and undefined rates or empty latency samples return null.
+ *
+ * Dates include whole local days. Instants include the quarter-hour containing the requested end. Responses echo normalized UTC bounds with an exclusive end. Follow cursors using the original body and replace the cursor fields. Requests can cover up to 365 local days or 720 hours for instant bounds, subject to available history. Unsupported combinations, unavailable history, or query-size limits return 422; a failed query returns no partial report.
+ *
+ * Idempotency is best-effort replay. Responses up to 256 KiB may be replayed while retained; larger valid responses up to 4 MiB are read again on retry. A key does not freeze an analytics snapshot. SDK iterators use your explicit key for the first page and a fresh automatic key per continuation page, reusing that page's key across retries. For a fresh read, omit the key or use a new one.
+ *
+ */
+export const getEmailStatsQuery = <ThrowOnError extends boolean = false>(
+  options: Options<GetEmailStatsQueryData, ThrowOnError>,
+): RequestResult<
+  GetEmailStatsQueryResponses,
+  GetEmailStatsQueryErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    GetEmailStatsQueryResponses,
+    GetEmailStatsQueryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/stats/query",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**
@@ -6753,7 +6854,7 @@ export const getEmailStatsSummary = <ThrowOnError extends boolean = false>(
  *
  * A sending IP is only known once the receiving mail server reports an outcome: a delivery, a bounce, a deferral, or a late bounce. So this breakdown starts from the delivery stage onward. Accepted, processed, and rejected counts aren't included at all, and neither are engagement counts or processing latency. Complaints and out-of-band bounces aren't attributed to a sending IP either, so `complained` and `oob_bounces` are included but always read `0` here. Bounced, deferred, delivery latency, and total latency are the ones that have real numbers. For workspace-wide figures, use `GET /v1/email/stats/daily`. Rows are computed against event time rather than send time.
  *
- * Rows are ranked by the `sort` field, `delivered` by default, and capped at the requested `limit` (50 by default, 200 at most). The window can span at most 365 days. Ask for more and you get a `422`.
+ * Rows are ranked by the `sort` field, `delivered` by default, and paginated with the requested `limit` (50 by default, 200 at most). The window can span at most 365 days. Ask for more and you get a `422`.
  *
  */
 export const getEmailStatsBySendingIp = <ThrowOnError extends boolean = false>(
@@ -6787,7 +6888,7 @@ export const getEmailStatsBySendingIp = <ThrowOnError extends boolean = false>(
  *
  * Rows are computed against event time rather than send time, so engagement and bounces received during the period count even for messages that were sent earlier.
  *
- * Rows are ranked by the `sort` metric, `processed` by default, and capped at the requested `limit` (50 by default, 200 at most). The window can span at most 365 days. Ask for more and you get a `422`.
+ * Rows are ranked by the `sort` metric, `processed` by default, and paginated with the requested `limit` (50 by default, 200 at most). The window can span at most 365 days. Ask for more and you get a `422`.
  *
  */
 export const getEmailStatsBySendingDomain = <
@@ -6819,7 +6920,7 @@ export const getEmailStatsBySendingDomain = <
 /**
  * Get statistics by category
  *
- * Returns delivery and engagement counts for the requested period, grouped by category, so you can compare deliverability and engagement between your transactional and marketing traffic. Rows are ranked by the `sort` metric, `processed` by default, and capped at the requested `limit` (50 by default, 200 at most).
+ * Returns delivery and engagement counts for the requested period, grouped by category, so you can compare deliverability and engagement between your transactional and marketing traffic. Rows are ranked by the `sort` metric, `processed` by default, and paginated with the requested `limit` (50 by default, 200 at most).
  *
  * Rows are computed against event time rather than send time, so engagement received during the period counts even for messages that were sent earlier.
  *
@@ -6857,7 +6958,7 @@ export const getEmailStatsByCategory = <ThrowOnError extends boolean = false>(
  *
  * A recipient's mailbox provider is only known once the receiving mail system reports an outcome, so this breakdown covers the delivery stage onward. Accepted, processed, and rejected counts and processing latency are not included. Rows are computed against event time rather than send time.
  *
- * Rows are ranked by the `sort` metric, `delivered` by default, and capped at the requested `limit` (50 by default, 200 at most). The window can span at most 365 days. Ask for more and you get a `422`.
+ * Rows are ranked by the `sort` metric, `delivered` by default, and paginated with the requested `limit` (50 by default, 200 at most). The window can span at most 365 days. Ask for more and you get a `422`.
  *
  */
 export const getEmailStatsByMailboxProvider = <
@@ -6893,7 +6994,7 @@ export const getEmailStatsByMailboxProvider = <
  *
  * A provider region is only known once the receiving mail system reports an outcome, so this breakdown covers the delivery stage onward. Accepted, processed, and rejected counts and processing latency are not included. Rows are computed against event time rather than send time.
  *
- * Rows are ranked by the `sort` metric, `delivered` by default, and capped at the requested `limit` (50 by default, 200 at most). The window can span at most 365 days. Ask for more and you get a `422`.
+ * Rows are ranked by the `sort` metric, `delivered` by default, and paginated with the requested `limit` (50 by default, 200 at most). The window can span at most 365 days. Ask for more and you get a `422`.
  *
  */
 export const getEmailStatsByMailboxProviderRegion = <
@@ -6927,7 +7028,7 @@ export const getEmailStatsByMailboxProviderRegion = <
  *
  * Returns delivery and engagement counts for the requested period, grouped by recipient mailbox domain: the part of each recipient address after the `@`, for example `gmail.com`, `yahoo.com`, or `outlook.com`. This is the finest-grained deliverability view. Where the mailbox-provider breakdown groups recipients into provider buckets such as `gmail` or `microsoft`, this keys on the exact destination domain. Use it to spot a delivery-rate dip or a complaint spike at a specific domain.
  *
- * Rows are ranked by the `sort` metric, `processed` by default, and capped at the requested `limit` (50 by default, 200 at most). Rows are computed against event time rather than send time, so engagement received during the period counts even for messages that were sent earlier.
+ * Rows are ranked by the `sort` metric, `processed` by default, and paginated with the requested `limit` (50 by default, 200 at most). Rows are computed against event time rather than send time, so engagement received during the period counts even for messages that were sent earlier.
  *
  * The window can span at most 365 days. Ask for more and you get a `422`.
  *
@@ -6963,7 +7064,7 @@ export const getEmailStatsByRecipientDomain = <
  *
  * Returns aggregate delivery and engagement counts grouped by the template each message was sent with, so a template's deliverability and engagement can be compared side by side. Attribution is by the template used at send time; only messages sent with a template appear here, so a workspace that has sent none returns an empty list rather than an error. Each row is keyed by the template ID (`emt_…`); a template deleted after sending still appears by its ID.
  *
- * Rows are ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, hard maximum 200). Rows are computed against event time (not send time), so engagement received during the period for messages sent earlier is included.
+ * Rows are ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, hard maximum 200). Rows are computed against event time (not send time), so engagement received during the period for messages sent earlier is included.
  *
  * The maximum window is 365 days; requesting a longer range returns `422`.
  *
@@ -6997,7 +7098,7 @@ export const getEmailStatsByTemplate = <ThrowOnError extends boolean = false>(
  *
  * Returns engagement counts (opens and clicks) for the requested period, grouped by the location they were recorded from. Use it to see where your audience engages, for example the top countries by unique opens. The reading location is only known from open and click events, so rows have engagement counts but no delivery counts or rates.
  *
- * Use `group_by` to choose the granularity: `country` (the default), `region`, or `city`. Each row has the location hierarchy down to the requested level, so a `city` grouping also reports that row's region and country. Rows are ranked by the `sort` metric, `unique_opens` by default, and capped at the requested `limit` (50 by default, 200 at most).
+ * Use `group_by` to choose the granularity: `country` (the default), `region`, or `city`. Each row has the location hierarchy down to the requested level, so a `city` grouping also reports that row's region and country. Rows are ranked by the `sort` metric, `unique_opens` by default, and paginated with the requested `limit` (50 by default, 200 at most).
  *
  * Rows are computed against event time rather than send time. The window can span at most 365 days. Ask for more and you get a `422`.
  *
@@ -7031,7 +7132,7 @@ export const getEmailStatsByLocation = <ThrowOnError extends boolean = false>(
  *
  * Returns engagement counts (opens and clicks) for the requested period, grouped by the email client, operating system, or device type they were recorded from. Use it for the classic view of opens by mail client, for example the share of opens from Apple Mail compared with Gmail and Outlook. The reading environment is only known from open and click events, so rows have engagement counts but no delivery counts or rates.
  *
- * Use `group_by` to choose the facet: `email_client` (the default), `os`, or `device_type`. Each row fills in the facet you chose and leaves the other two `null`. Rows are ranked by the `sort` metric, `unique_opens` by default, and capped at the requested `limit` (50 by default, 200 at most).
+ * Use `group_by` to choose the facet: `email_client` (the default), `os`, or `device_type`. Each row fills in the facet you chose and leaves the other two `null`. Rows are ranked by the `sort` metric, `unique_opens` by default, and paginated with the requested `limit` (50 by default, 200 at most).
  *
  * Rows are computed against event time rather than send time. The window can span at most 365 days. Ask for more and you get a `422`.
  *
@@ -7067,7 +7168,7 @@ export const getEmailStatsByClient = <ThrowOnError extends boolean = false>(
  *
  * This failure-only breakdown omits delivered, open, click, and rate fields because bounce codes occur only on bounce events.
  *
- * Rows are ranked by the `sort` metric, `bounced` by default, and capped at the requested `limit` (50 by default, 200 at most). They are computed against event time rather than send time. The window can span at most 365 days. Ask for more and you get a `422`.
+ * Rows are ranked by the `sort` metric, `bounced` by default, and paginated with the requested `limit` (50 by default, 200 at most). They are computed against event time rather than send time. The window can span at most 365 days. Ask for more and you get a `422`.
  *
  */
 export const getEmailStatsByBounceCode = <ThrowOnError extends boolean = false>(
@@ -7101,7 +7202,7 @@ export const getEmailStatsByBounceCode = <ThrowOnError extends boolean = false>(
  *
  * This breakdown only covers the complaint side. Each row has the complained count for one type and nothing else, because a complaint type is only ever recorded on a spam-complaint event.
  *
- * Rows are ranked by `complained` descending, and capped at the requested `limit` (default 50, hard maximum 200). They are computed against event time rather than send time. The window can span at most 365 days. Ask for more and you get a `422`.
+ * Rows are ranked by `complained` descending, and paginated with the requested `limit` (default 50, hard maximum 200). They are computed against event time rather than send time. The window can span at most 365 days. Ask for more and you get a `422`.
  *
  */
 export const getEmailStatsByComplaintType = <
@@ -7135,7 +7236,7 @@ export const getEmailStatsByComplaintType = <
  *
  * Returns aggregate delivery and engagement counts grouped by broadcast for the requested period, so each broadcast's deliverability and engagement can be compared side by side. Only messages sent as part of a broadcast appear here. One-off and transactional sends are not included, so a workspace that has not sent broadcasts returns an empty list rather than an error.
  *
- * Rows are ranked by the `sort` metric (default `processed`) descending and capped at the requested `limit` (default 50, hard maximum 200). Rows are computed against event time (not send time), so engagement received during the period for messages sent earlier is included.
+ * Rows are ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, hard maximum 200). Rows are computed against event time (not send time), so engagement received during the period for messages sent earlier is included.
  *
  * The maximum window is 365 days. Requesting a longer range returns a `422`. This breakdown is computed from per-message activity retained for 30 days, so it reflects roughly the last 30 days of activity even when the requested window reaches further back.
  *
@@ -9834,6 +9935,606 @@ export const getWorkspaceNumber = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * List SIP trunks
+ *
+ * Returns the workspace's SIP trunks as a paginated list, each with its assigned `domain` and access control lists. Create a trunk to provision a new one, or use `voice.trunks.get` to fetch an existing trunk by ID.
+ *
+ */
+export const listVoiceTrunks = <ThrowOnError extends boolean = false>(
+  options?: Options<ListVoiceTrunksData, ThrowOnError>,
+): RequestResult<
+  ListVoiceTrunksResponses,
+  ListVoiceTrunksErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListVoiceTrunksResponses,
+    ListVoiceTrunksErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/trunks",
+    ...options,
+  });
+
+/**
+ * Create a SIP trunk
+ *
+ * Provisions a new SIP trunk for the workspace. Bird assigns a unique domain for the trunk; use this domain as the SIP registrar or proxy address in your PBX or SIP client. Pass `digest_algorithms` when the PBX needs a specific Digest hash, such as MD5-only equipment. Otherwise the trunk offers Bird's default of SHA-256 then MD5.
+ *
+ */
+export const createVoiceTrunk = <ThrowOnError extends boolean = false>(
+  options: Options<CreateVoiceTrunkData, ThrowOnError>,
+): RequestResult<
+  CreateVoiceTrunkResponses,
+  CreateVoiceTrunkErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateVoiceTrunkResponses,
+    CreateVoiceTrunkErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/trunks",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a SIP trunk
+ *
+ * Removes the SIP trunk. Calls already in progress on this trunk are not affected. After deletion, new calls cannot use the trunk. Historical leg records retain the trunk reference. The generated domain is not reused.
+ *
+ */
+export const deleteVoiceTrunk = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteVoiceTrunkData, ThrowOnError>,
+): RequestResult<
+  DeleteVoiceTrunkResponses,
+  DeleteVoiceTrunkErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteVoiceTrunkResponses,
+    DeleteVoiceTrunkErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/trunks/{trunk_id}",
+    ...options,
+  });
+
+/**
+ * Get a SIP trunk
+ *
+ * Returns a single SIP trunk, including its Bird-assigned `domain`, its access control lists. Returns a 404 `not_found_error` if the trunk does not exist in the workspace.
+ *
+ */
+export const getVoiceTrunk = <ThrowOnError extends boolean = false>(
+  options: Options<GetVoiceTrunkData, ThrowOnError>,
+): RequestResult<GetVoiceTrunkResponses, GetVoiceTrunkErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetVoiceTrunkResponses,
+    GetVoiceTrunkErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/trunks/{trunk_id}",
+    ...options,
+  });
+
+/**
+ * Update a SIP trunk
+ *
+ * Updates a SIP trunk's `name`, access control (`ip_acls`, `allowed_api_key_ids`), and Digest algorithm offer (`digest_algorithms`). Omitted fields stay unchanged; each list, when present, replaces the previous list wholesale. An empty body or invalid list entry returns a 422 `validation_error`; a trunk outside the workspace returns a 404 `not_found_error`.
+ *
+ */
+export const updateVoiceTrunk = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateVoiceTrunkData, ThrowOnError>,
+): RequestResult<
+  UpdateVoiceTrunkResponses,
+  UpdateVoiceTrunkErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateVoiceTrunkResponses,
+    UpdateVoiceTrunkErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/trunks/{trunk_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Create a SIP session credential
+ *
+ * Issues a workspace-scoped SIP digest credential valid for five minutes. The password appears only in this response; create another credential if you lose it. Trunks must allow session credentials to accept it.
+ *
+ * The request has no body. Each successful request creates a fresh credential, including retries. Keep retries bounded: creating more than 20 live credentials for the same caller invalidates the oldest. Treat the password as a bearer secret until expires_at.
+ *
+ */
+export const createVoiceSessionCredential = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<CreateVoiceSessionCredentialData, ThrowOnError>,
+): RequestResult<
+  CreateVoiceSessionCredentialResponses,
+  CreateVoiceSessionCredentialErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).post<
+    CreateVoiceSessionCredentialResponses,
+    CreateVoiceSessionCredentialErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/session-credentials",
+    ...options,
+  });
+
+/**
+ * List a SIP trunk's gateways
+ *
+ * Returns the gateway addresses used to forward inbound calls to this trunk, ordered by priority. A trunk with no gateway refuses inbound calls. Returns a `404 Not Found` error if the trunk does not exist in the workspace.
+ *
+ * Returns the complete collection without pagination, including any pre-existing gateways above the current limit of 20. Reads are available when inbound calling is disabled.
+ *
+ */
+export const listVoiceTrunkGateways = <ThrowOnError extends boolean = false>(
+  options: Options<ListVoiceTrunkGatewaysData, ThrowOnError>,
+): RequestResult<
+  ListVoiceTrunkGatewaysResponses,
+  ListVoiceTrunkGatewaysErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListVoiceTrunkGatewaysResponses,
+    ListVoiceTrunkGatewaysErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/trunks/{trunk_id}/gateways",
+    ...options,
+  });
+
+/**
+ * Create a gateway on a SIP trunk
+ *
+ * Adds a gateway address for forwarding inbound calls to this trunk.
+ *
+ * Gateways are tried in `priority` order, lowest first, until one answers.
+ * Gateways with equal priority share calls evenly. `sip_uri` identifies the
+ * peer host, while `destination_format` and `origination_format` control the
+ * called and calling number formats. Both number formats default to E.164.
+ *
+ * A SIP URI already registered on this trunk returns `409 Conflict`. An
+ * invalid SIP URI, a SIP URI carrying a user part, or a malformed number
+ * format returns `422`. A trunk outside the workspace returns `404 Not Found`.
+ * A trunk without inbound calling enabled returns `412 Precondition Failed`.
+ *
+ * A trunk supports at most 20 gateways. Creating another returns 422; delete a gateway before adding its replacement. SIP ports must be between 1 and 65535.
+ *
+ */
+export const createVoiceTrunkGateway = <ThrowOnError extends boolean = false>(
+  options: Options<CreateVoiceTrunkGatewayData, ThrowOnError>,
+): RequestResult<
+  CreateVoiceTrunkGatewayResponses,
+  CreateVoiceTrunkGatewayErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateVoiceTrunkGatewayResponses,
+    CreateVoiceTrunkGatewayErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/trunks/{trunk_id}/gateways",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a SIP trunk gateway
+ *
+ * Removes the gateway. Calls already ringing this address are not affected. Removing the last gateway leaves inbound calling enabled but removes its delivery targets. New inbound calls to numbers routed to this trunk are refused until a gateway is added back. The trunk must have inbound calling enabled, otherwise this returns `412 Precondition Failed`.
+ *
+ */
+export const deleteVoiceTrunkGateway = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteVoiceTrunkGatewayData, ThrowOnError>,
+): RequestResult<
+  DeleteVoiceTrunkGatewayResponses,
+  DeleteVoiceTrunkGatewayErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteVoiceTrunkGatewayResponses,
+    DeleteVoiceTrunkGatewayErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/trunks/{trunk_id}/gateways/{gateway_id}",
+    ...options,
+  });
+
+/**
+ * Get a SIP trunk gateway
+ *
+ * Returns a single gateway by ID. Returns a 404 `not_found_error` if the trunk or the gateway does not exist in the workspace.
+ *
+ */
+export const getVoiceTrunkGateway = <ThrowOnError extends boolean = false>(
+  options: Options<GetVoiceTrunkGatewayData, ThrowOnError>,
+): RequestResult<
+  GetVoiceTrunkGatewayResponses,
+  GetVoiceTrunkGatewayErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetVoiceTrunkGatewayResponses,
+    GetVoiceTrunkGatewayErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/trunks/{trunk_id}/gateways/{gateway_id}",
+    ...options,
+  });
+
+/**
+ * Update a SIP trunk gateway
+ *
+ * Updates the gateway's `sip_uri`, its `priority`, either number format, or any
+ * combination. Omitted fields stay unchanged; sending an empty string for a
+ * number format returns it to E.164.
+ *
+ * An updated SIP URI that collides with another gateway on this trunk returns
+ * `409 Conflict`. An empty body or invalid field returns `422`. A trunk or
+ * gateway outside the workspace returns `404 Not Found`. A trunk without
+ * inbound calling enabled returns `412 Precondition Failed`.
+ *
+ */
+export const updateVoiceTrunkGateway = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateVoiceTrunkGatewayData, ThrowOnError>,
+): RequestResult<
+  UpdateVoiceTrunkGatewayResponses,
+  UpdateVoiceTrunkGatewayErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateVoiceTrunkGatewayResponses,
+    UpdateVoiceTrunkGatewayErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/trunks/{trunk_id}/gateways/{gateway_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List the numbers you can use for voice
+ *
+ * Lists the phone numbers your workspace can use for voice: the voice-capable
+ * numbers we allocated to you, and the numbers from other carriers you
+ * registered and verified. One list, ordered by number.
+ *
+ * Each entry is one phone number, and provider says which of the two it is.
+ *
+ * This is one cursor page, not the whole set. It returns 25 numbers unless you
+ * ask for more with limit, so follow the cursor until it stops rather than
+ * treating the first page as everything you have.
+ *
+ */
+export const listVoiceNumbers = <ThrowOnError extends boolean = false>(
+  options?: Options<ListVoiceNumbersData, ThrowOnError>,
+): RequestResult<
+  ListVoiceNumbersResponses,
+  ListVoiceNumbersErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListVoiceNumbersResponses,
+    ListVoiceNumbersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/numbers",
+    ...options,
+  });
+
+/**
+ * Get a voice number
+ *
+ * Returns one of the numbers your workspace can use for voice.
+ *
+ * A number nobody has configured reads back with its inbound route set to
+ * "reject", which is where every number starts rather than an absence.
+ *
+ */
+export const getVoiceNumber = <ThrowOnError extends boolean = false>(
+  options: Options<GetVoiceNumberData, ThrowOnError>,
+): RequestResult<GetVoiceNumberResponses, GetVoiceNumberErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetVoiceNumberResponses,
+    GetVoiceNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/numbers/{number_id}",
+    ...options,
+  });
+
+/**
+ * Update a voice number
+ *
+ * Changes what you have said about this number: the label you gave it, and what
+ * happens when a call arrives for it. Omit a field to leave it as it is.
+ *
+ * The route replaces whatever was set before, because a number has exactly one
+ * answer at a time. Type "reject" refuses calls and is where every number
+ * starts, so sending it clears a trunk or forward you set earlier.
+ * "trunk" needs a trunk_id: the trunk must be yours and must have inbound
+ * calling enabled. "forward" needs a forward_to, which has to be one of your
+ * verified caller IDs. That is checked when you set it, and again on every call
+ * it forwards, so a caller ID you later remove stops forwarding rather than
+ * carrying on.
+ *
+ * Sequence management remains in the dashboard. A `sequence` route needs
+ * `sequence_id` and `entry_node_id` from an existing active publication in your
+ * workspace. Binding a sequence with recording commands or managed recording
+ * transfers requires organization preview access. Sequence management endpoints
+ * are not available through the public API; see the
+ * [call sequences guide](https://bird.com/docs/guides/voice/call-sequences).
+ *
+ * Only a number whose calls arrive here can carry a route. A number from
+ * another carrier is somewhere calls can be sent to, and that carrier routes
+ * the calls made to it, so inbound_configuration is refused on it. The label
+ * can be set on either.
+ *
+ */
+export const updateVoiceNumber = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateVoiceNumberData, ThrowOnError>,
+): RequestResult<
+  UpdateVoiceNumberResponses,
+  UpdateVoiceNumberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateVoiceNumberResponses,
+    UpdateVoiceNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/numbers/{number_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List caller IDs
+ *
+ * Returns a paginated list of the workspace's caller IDs and their verification status.
+ */
+export const listVoiceCallerIds = <ThrowOnError extends boolean = false>(
+  options?: Options<ListVoiceCallerIdsData, ThrowOnError>,
+): RequestResult<
+  ListVoiceCallerIdsResponses,
+  ListVoiceCallerIdsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListVoiceCallerIdsResponses,
+    ListVoiceCallerIdsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/caller-ids",
+    ...options,
+  });
+
+/**
+ * Get a caller ID
+ *
+ * Returns the caller ID with the given ID, including its verification status.
+ */
+export const getVoiceCallerId = <ThrowOnError extends boolean = false>(
+  options: Options<GetVoiceCallerIdData, ThrowOnError>,
+): RequestResult<
+  GetVoiceCallerIdResponses,
+  GetVoiceCallerIdErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetVoiceCallerIdResponses,
+    GetVoiceCallerIdErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/caller-ids/{caller_id}",
+    ...options,
+  });
+
+/**
+ * Verify a caller ID
+ *
+ * Completes a caller-ID verification challenge started in the dashboard. Submit
+ * the code delivered by the verification call. Success marks the caller ID as
+ * `verified` so you can present it on outbound calls. While verification is
+ * pending, an incorrect code is rejected. Repeating the request for an already
+ * verified caller ID returns it without checking the code again.
+ *
+ * If the verification call could not be started previously, this request can
+ * retry it and place another call to the same number. Your organization must
+ * still meet the identity-verification requirements for registering caller IDs;
+ * otherwise the request returns `412`. For an expired or exhausted challenge,
+ * use **Get a new code** under **Voice** > **Numbers** in the dashboard to remove
+ * and register the caller ID again. List caller IDs again to obtain the new
+ * registration ID before submitting its code. Caller-ID creation and deletion
+ * are not available through the public API.
+ *
+ * Verification attempts to enable the number's country as a Voice destination.
+ * An unavailable country or a failed settings update can leave it disabled
+ * after the number is verified. Check **Voice** > **Destinations** before calling;
+ * see the [caller ID guide](https://bird.com/docs/guides/voice/caller-ids).
+ *
+ */
+export const verifyVoiceCallerId = <ThrowOnError extends boolean = false>(
+  options: Options<VerifyVoiceCallerIdData, ThrowOnError>,
+): RequestResult<
+  VerifyVoiceCallerIdResponses,
+  VerifyVoiceCallerIdErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    VerifyVoiceCallerIdResponses,
+    VerifyVoiceCallerIdErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/caller-ids/{caller_id}/verify",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * List legs
  *
  * Returns a paginated list of the workspace's legs, ordered by start time
@@ -9895,4 +10596,130 @@ export const getVoiceLeg = <ThrowOnError extends boolean = false>(
     ],
     url: "/v1/voice/legs/{leg_id}",
     ...options,
+  });
+
+/**
+ * Create a call
+ *
+ * Accepts a real outbound call using the active publication of a voice
+ * sequence. The sequence starts at the selected entry node after the
+ * recipient answers. Production availability rules and normal calling
+ * charges apply. Requires both voice management write and voice calling
+ * write permissions and a permitted calling number. Browser users and API
+ * keys are supported. Create and publish the sequence in the dashboard before
+ * calling this endpoint; inline definitions and draft/test selectors are not
+ * accepted. See the [Create Call guide](https://bird.com/docs/guides/voice/create-calls).
+ *
+ * Supply sequence trigger data as an explicit object matching the selected
+ * entry's configured data schema, or an empty object when no data is needed.
+ * The active publication, entry node, and trigger data are frozen when the
+ * call is accepted. The response contains reserved call and initial-leg IDs.
+ * Its `null` `started_at`, `false` `live`, and empty `parties` describe the
+ * acceptance snapshot. Acceptance does not guarantee that dialing starts or
+ * that call and leg reads become available. A call that fails or is canceled
+ * before registration might never appear in those reads. Read progress
+ * in the sequence's Runs tab in the dashboard. Once the initial leg is
+ * registered, use its `initial_leg_id` with `GET /v1/voice/legs/{leg_id}` to
+ * inspect the telephone outcome; that read requires voice read permission.
+ *
+ * Idempotency is optional. Without an `Idempotency-Key` header, each request
+ * accepts a new call attempt. To protect retries, supply a key on the first
+ * attempt and reuse it for the same intended call.
+ * Requests are limited to 20 KiB. The same idempotency key and exact request
+ * bytes replay the original acceptance snapshot for three hours. Changed
+ * requests return 409. Authorization and calling-number permission are
+ * checked on every request, including replays. Replays include the
+ * Idempotency-Replay header with value true.
+ *
+ */
+export const createVoiceCall = <ThrowOnError extends boolean = false>(
+  options: Options<CreateVoiceCallData, ThrowOnError>,
+): RequestResult<
+  CreateVoiceCallResponses,
+  CreateVoiceCallErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateVoiceCallResponses,
+    CreateVoiceCallErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/calls",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List Voice destination countries
+ *
+ * Returns every country the Voice service supports, each annotated with whether your workspace has enabled calling to it and whether the country is currently callable. Use this to render and manage your destination allowlist.
+ *
+ */
+export const listVoiceDestinations = <ThrowOnError extends boolean = false>(
+  options?: Options<ListVoiceDestinationsData, ThrowOnError>,
+): RequestResult<
+  ListVoiceDestinationsResponses,
+  ListVoiceDestinationsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListVoiceDestinationsResponses,
+    ListVoiceDestinationsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/destinations",
+    ...options,
+  });
+
+/**
+ * Update enabled Voice destination countries
+ *
+ * Enables or disables specific destination countries for your workspace. Only the countries listed in the request change; any country you do not list keeps its current setting. Each code must be a country the Voice service supports, or the request is rejected and nothing changes.
+ *
+ */
+export const updateVoiceDestinations = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateVoiceDestinationsData, ThrowOnError>,
+): RequestResult<
+  UpdateVoiceDestinationsResponses,
+  UpdateVoiceDestinationsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateVoiceDestinationsResponses,
+    UpdateVoiceDestinationsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/destinations",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });

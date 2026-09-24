@@ -5,7 +5,7 @@
 import type { BirdClient } from "./client.js";
 
 export type _Email = Pick<BirdClient["email"], "send" | "sendBatch" | "get" | "list" | "cancel" | "health">;
-export type _EmailStats = Pick<BirdClient["email"]["stats"], "summary" | "daily" | "hourly" | "byTag" | "byCategory" | "bySendingIp" | "bySendingDomain" | "byRecipientDomain" | "byMailboxProvider" | "byMailboxProviderRegion" | "byTemplate" | "byLocation" | "byClient" | "byBounceCode" | "byComplaintType" | "byBroadcast">;
+export type _EmailStats = Pick<BirdClient["email"]["stats"], "query" | "summary" | "daily" | "hourly" | "byTag" | "byCategory" | "bySendingIp" | "bySendingDomain" | "byRecipientDomain" | "byMailboxProvider" | "byMailboxProviderRegion" | "byTemplate" | "byLocation" | "byClient" | "byBounceCode" | "byComplaintType" | "byBroadcast">;
 export type _EmailCompetitiveBrands = Pick<BirdClient["email"]["competitive"]["brands"], "search">;
 export type _EmailCompetitiveWatchlist = Pick<BirdClient["email"]["competitive"]["watchlist"], "get" | "notable">;
 export type _EmailCompetitiveWatchlistBrands = Pick<BirdClient["email"]["competitive"]["watchlist"]["brands"], "create" | "delete" | "get" | "sendTime">;
@@ -46,7 +46,14 @@ export type _WhatsappKeywordRules = Pick<BirdClient["whatsapp"]["keywordRules"],
 export type _WhatsappSuppressions = Pick<BirdClient["whatsapp"]["suppressions"], "list" | "get" | "add" | "remove">;
 export type _WhatsappStats = Pick<BirdClient["whatsapp"]["stats"], "summary" | "daily" | "hourly" | "byErrorCode" | "byTemplate" | "byTemplateCategory" | "byTag" | "byPhoneNumber" | "byCountry">;
 export type _WhatsappStatsInbound = Pick<BirdClient["whatsapp"]["stats"]["inbound"], "summary" | "daily" | "hourly" | "byPhoneNumber">;
+export type _VoiceCalls = Pick<BirdClient["voice"]["calls"], "create">;
 export type _VoiceLegs = Pick<BirdClient["voice"]["legs"], "list" | "get">;
+export type _VoiceSessionCredentials = Pick<BirdClient["voice"]["sessionCredentials"], "create">;
+export type _VoiceTrunks = Pick<BirdClient["voice"]["trunks"], "list" | "get" | "create" | "update" | "delete">;
+export type _VoiceTrunksGateways = Pick<BirdClient["voice"]["trunks"]["gateways"], "list" | "get" | "create" | "update" | "delete">;
+export type _VoiceNumbers = Pick<BirdClient["voice"]["numbers"], "list" | "get" | "update">;
+export type _VoiceCallerIds = Pick<BirdClient["voice"]["callerIds"], "list" | "get" | "verify">;
+export type _VoiceDestinations = Pick<BirdClient["voice"]["destinations"], "list" | "update">;
 export type _VerifyVerifications = Pick<BirdClient["verify"]["verifications"], "create" | "check" | "nextChannel">;
 export type _Lookup = Pick<BirdClient["lookup"], "phoneNumber" | "email" | "emailBatch">;
 export type _Numbers = Pick<BirdClient["numbers"], "list" | "get" | "release">;

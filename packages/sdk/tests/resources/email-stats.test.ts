@@ -59,7 +59,7 @@ describe("bird.email.stats breakdowns", () => {
   });
 
   it("maps each method to its route", async () => {
-    const cases: Array<[keyof BirdClient["email"]["stats"], RegExp]> = [
+    const cases: Array<[Exclude<keyof BirdClient["email"]["stats"], "query">, RegExp]> = [
       ["daily", /\/stats\/daily$/],
       ["hourly", /\/stats\/hourly$/],
       ["byCategory", /\/stats\/categories$/],
