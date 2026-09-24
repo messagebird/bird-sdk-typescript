@@ -1826,7 +1826,7 @@ export const createContactBatch = <ThrowOnError extends boolean = false>(
 /**
  * Delete a contact
  *
- * Deletes a contact permanently and removes it from every audience it belongs to. Suppression records for the address are not affected: an unsubscribed or bounced address stays suppressed even after the contact is deleted.
+ * Deletes a contact permanently and removes it from every audience it belongs to. Suppression records for the address are not affected: an unsubscribed or bounced address stays suppressed even after the contact is deleted. Deletion is refused while any eSIM subscriber links to the contact, including subscribers without an active eSIM. Subscriber links cannot currently be deleted, detached, or anonymized; ending or releasing an eSIM does not restore Contact deletion.
  *
  */
 export const deleteContact = <ThrowOnError extends boolean = false>(

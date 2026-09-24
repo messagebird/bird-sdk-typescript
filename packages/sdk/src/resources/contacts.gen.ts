@@ -68,7 +68,7 @@ export class ContactsResourceBase extends Resource {
   }
 
   /**
-   * Delete a contact and remove it from every audience it belongs to. Suppression records for the address are unaffected.
+   * Delete a contact and remove it from every audience it belongs to. Refused when an eSIM subscriber links to the contact. Suppression records for the address are unaffected.
    *
    * @example Delete a contact by id
    * await bird.contacts.delete("con_01krdgeqcxet5s7t44vh8rt9mg");

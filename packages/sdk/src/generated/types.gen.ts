@@ -26340,6 +26340,10 @@ export type DeleteContactErrors = {
    */
   404: Error;
   /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
