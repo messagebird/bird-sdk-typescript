@@ -8184,6 +8184,8 @@ export const createEmailTemplate = <ThrowOnError extends boolean = false>(
  *
  * A template can't be deleted while a broadcast that has not started sending still uses it, because a `scheduled` or `accepted` broadcast has not pinned the content it will send yet. [List the broadcasts blocking a template delete](/docs/api/reference/list-email-template-broadcasts) to see which ones those are. A broadcast that has already started sending does not block the delete: it pinned its version when it started, so it keeps sending the content it froze.
  *
+ * A message scheduled with this template does not block the delete either. It keeps only a reference to the template version until it falls due, so once the template is deleted that message is rejected with `generation_failure` at its scheduled time and no email is sent.
+ *
  */
 export const deleteEmailTemplate = <ThrowOnError extends boolean = false>(
   options: Options<DeleteEmailTemplateData, ThrowOnError>,
