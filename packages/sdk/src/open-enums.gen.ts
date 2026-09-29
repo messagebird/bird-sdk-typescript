@@ -686,20 +686,6 @@ export const VerificationTerminalReason = {
 export type VerificationTerminalReasonValue = (typeof VerificationTerminalReason)[keyof typeof VerificationTerminalReason];
 
 /**
- * Values of VoiceCallerIDStatus known at this SDK version. The wire value is an open
- * string: a value added by a newer server deserializes unchanged, so switch on
- * these with a `default` branch rather than treating the set as closed.
- */
-export const VoiceCallerIDStatus = {
-  Failed: "failed",
-  Pending: "pending",
-  Verified: "verified",
-} as const;
-
-/** A known VoiceCallerIDStatus value. */
-export type VoiceCallerIDStatusValue = (typeof VoiceCallerIDStatus)[keyof typeof VoiceCallerIDStatus];
-
-/**
  * Values of VoicePartyEndpointType known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -715,6 +701,20 @@ export const VoicePartyEndpointType = {
 
 /** A known VoicePartyEndpointType value. */
 export type VoicePartyEndpointTypeValue = (typeof VoicePartyEndpointType)[keyof typeof VoicePartyEndpointType];
+
+/**
+ * Values of VoiceVerifiedNumberStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const VoiceVerifiedNumberStatus = {
+  Failed: "failed",
+  Pending: "pending",
+  Verified: "verified",
+} as const;
+
+/** A known VoiceVerifiedNumberStatus value. */
+export type VoiceVerifiedNumberStatusValue = (typeof VoiceVerifiedNumberStatus)[keyof typeof VoiceVerifiedNumberStatus];
 
 /**
  * Values of WhatsAppBusinessAccountMarketingMessagesStatus known at this SDK version. The wire value is an open

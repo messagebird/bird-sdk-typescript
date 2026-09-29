@@ -110,20 +110,20 @@ export async function voiceNumbersUpdate() {
   console.log(number.id, number.name);
 }
 
-export async function voiceCallerIdsList() {
-  for await (const callerId of bird.voice.callerIds.list()) {
-    console.log(callerId.id, callerId.phone_number, callerId.status);
+export async function voiceVerifiedNumbersList() {
+  for await (const verifiedNumber of bird.voice.verifiedNumbers.list()) {
+    console.log(verifiedNumber.id, verifiedNumber.phone_number, verifiedNumber.status);
   }
 }
 
-export async function voiceCallerIdsGet() {
-  const callerId = await bird.voice.callerIds.get("caller-id");
-  console.log(callerId.phone_number, callerId.status, callerId.verified_at);
+export async function voiceVerifiedNumbersGet() {
+  const verifiedNumber = await bird.voice.verifiedNumbers.get("vvn_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(verifiedNumber.phone_number, verifiedNumber.status, verifiedNumber.verified_at);
 }
 
-export async function voiceCallerIdsVerify() {
-  const callerId = await bird.voice.callerIds.verify("CALLER_ID", { code: "123456" });
-  console.log(callerId.id, callerId.status);
+export async function voiceVerifiedNumbersVerify() {
+  const verifiedNumber = await bird.voice.verifiedNumbers.verify("vvn_01krdgeqcxet5s7t44vh8rt9mg", { code: "123456" });
+  console.log(verifiedNumber.id, verifiedNumber.status);
 }
 
 export async function voiceDestinationsUpdate() {

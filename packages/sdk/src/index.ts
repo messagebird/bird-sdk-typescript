@@ -107,12 +107,12 @@ export type {
   VoiceNumbersListQuery,
   VoiceNumbersUpdateParams,
 } from "./resources/voiceNumbers.gen.js";
-export type { VoiceCallerIdsListQuery } from "./resources/voiceCallerIds.gen.js";
+export type { VoiceVerifiedNumbersListQuery } from "./resources/voiceVerifiedNumbers.gen.js";
 export type { VoiceDestinationsUpdateParams } from "./resources/voiceDestinations.gen.js";
 export type {
   VoiceTrunk,
   VoiceNumber,
-  VoiceCallerId,
+  VoiceVerifiedNumber,
   VoiceDestinationList,
   VoiceSessionCredential,
 } from "./generated/types.gen.js";
@@ -450,7 +450,7 @@ export {
   SMSSuppressionOrigin,
   SMSSuppressionReason,
   TemplateLanguageStatus,
-  VoiceCallerIDStatus,
+  VoiceVerifiedNumberStatus,
   VerificationAttemptFailureReason,
   VerificationChannel,
   VerificationTerminalReason,
@@ -520,7 +520,7 @@ export type {
   SMSSuppressionOriginValue,
   SMSSuppressionReasonValue,
   TemplateLanguageStatusValue,
-  VoiceCallerIDStatusValue,
+  VoiceVerifiedNumberStatusValue,
   VerificationAttemptFailureReasonValue,
   VerificationChannelValue,
   VerificationTerminalReasonValue,
@@ -676,7 +676,7 @@ export type {
   VoiceTrunksGatewaysCreateParams,
   VoiceTrunksGatewaysUpdateParams,
 } from "./resources/voiceTrunksGateways.gen.js";
-export type { VoiceCallerIdsVerifyParams } from "./resources/voiceCallerIds.gen.js";
+export type { VoiceVerifiedNumbersVerifyParams } from "./resources/voiceVerifiedNumbers.gen.js";
 
 export type {
   AmbListEventsQuery,

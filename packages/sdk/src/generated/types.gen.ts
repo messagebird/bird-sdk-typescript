@@ -22287,19 +22287,19 @@ export type VoiceNumberProviderAllocation = {
 };
 
 /**
- * Verification state of the caller ID.
+ * Verification state of the verified number.
  *
  * - `pending`: the number is registered but ownership has not yet been proven.
  * - `verified`: the workspace proved ownership of the number. Check the
  * resource's activation or direction fields for outbound availability.
  * - `failed`: terminal because the verification challenge expired or the attempt limit was exhausted.
- * Remove and register the caller ID again in the dashboard to retry.
+ * Remove and register the verified number again in the dashboard to retry.
  *
  * Open enum: additional states may be added over time, so treat an unrecognized
  * value as a future state rather than an error.
  *
  */
-export type VoiceCallerIdStatus =
+export type VoiceVerifiedNumberStatus =
   "pending" | "verified" | "failed" | (string & {});
 
 export type VoiceNumberProviderVerifiedNumber = {
@@ -22311,7 +22311,7 @@ export type VoiceNumberProviderVerifiedNumber = {
   /**
    * How far proving control of this number has got.
    */
-  readonly status: VoiceCallerIdStatus;
+  readonly status: VoiceVerifiedNumberStatus;
   /**
    * When control of this number was last proven. Null until it is.
    */
@@ -22519,41 +22519,41 @@ export type VoiceNumberUpdate = {
 /**
  * Field used to sort the list.
  */
-export type VoiceCallerIdSortField = "created_at";
+export type VoiceVerifiedNumberSortField = "created_at";
 
-export type VoiceCallerIdid = string;
+export type VoiceVerifiedNumberId = string;
 
-export type VoiceCallerId = {
+export type VoiceVerifiedNumber = {
   /**
-   * Unique identifier for this caller ID.
+   * Unique identifier for this verified number.
    */
-  id: VoiceCallerIdid;
+  id: VoiceVerifiedNumberId;
   workspace_id: WorkspaceId;
   /**
-   * The phone number in E.164 format registered as a caller ID.
+   * The phone number in E.164 format registered as an outbound caller ID.
    */
   phone_number: string;
   /**
-   * Your label for this caller ID, to tell several registered numbers apart. `null` when the caller ID has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the caller ID update operation.
+   * Your label for this verified number, to tell several registered numbers apart. `null` when the verified number has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the verified number update operation.
    *
    */
   name: string | null;
-  status: VoiceCallerIdStatus;
+  status: VoiceVerifiedNumberStatus;
   /**
    * Whether outbound caller ID activation has completed. A verified number can remain inactive until activation requirements are met. Outbound calls remain subject to routing and number ownership requirements.
    */
   outbound_enabled: boolean;
   /**
-   * When the caller ID was verified. `null` when its status is `pending` or `failed`.
+   * When the verified number was verified. `null` when its status is `pending` or `failed`.
    */
   verified_at: string | null;
 } & Timestamps;
 
-export type VoiceCallerIdList = {
-  data: Array<VoiceCallerId>;
+export type VoiceVerifiedNumberList = {
+  data: Array<VoiceVerifiedNumber>;
 } & ListEnvelope;
 
-export type VoiceCallerIdVerifyRequest = {
+export type VoiceVerifiedNumberVerifyRequest = {
   /**
    * The 6-digit verification code read out by the verification call. Required until ownership is verified. Omit it when retrying activation of an already verified number.
    */
@@ -27358,34 +27358,34 @@ export type VoiceNumberListWritable = {
   data: Array<VoiceNumberWritable>;
 } & ListEnvelope;
 
-export type VoiceCallerIdWritable = {
+export type VoiceVerifiedNumberWritable = {
   /**
-   * Unique identifier for this caller ID.
+   * Unique identifier for this verified number.
    */
-  id: VoiceCallerIdid;
+  id: VoiceVerifiedNumberId;
   workspace_id: WorkspaceId;
   /**
-   * The phone number in E.164 format registered as a caller ID.
+   * The phone number in E.164 format registered as an outbound caller ID.
    */
   phone_number: string;
   /**
-   * Your label for this caller ID, to tell several registered numbers apart. `null` when the caller ID has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the caller ID update operation.
+   * Your label for this verified number, to tell several registered numbers apart. `null` when the verified number has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the verified number update operation.
    *
    */
   name: string | null;
-  status: VoiceCallerIdStatus;
+  status: VoiceVerifiedNumberStatus;
   /**
    * Whether outbound caller ID activation has completed. A verified number can remain inactive until activation requirements are met. Outbound calls remain subject to routing and number ownership requirements.
    */
   outbound_enabled: boolean;
   /**
-   * When the caller ID was verified. `null` when its status is `pending` or `failed`.
+   * When the verified number was verified. `null` when its status is `pending` or `failed`.
    */
   verified_at: string | null;
 };
 
-export type VoiceCallerIdListWritable = {
-  data: Array<VoiceCallerIdWritable>;
+export type VoiceVerifiedNumberListWritable = {
+  data: Array<VoiceVerifiedNumberWritable>;
 } & ListEnvelope;
 
 export type VoiceLegWritable = {
@@ -50597,6 +50597,91 @@ export type TestWebhookResponses = {
 export type TestWebhookResponse =
   TestWebhookResponses[keyof TestWebhookResponses];
 
+export type CreateWebhookReplayData = {
+  body?: WebhookReplayRequest;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the webhook endpoint (`whk_` prefix), as returned when it was created.
+     */
+    webhook_id: WebhookEndpointId;
+  };
+  query?: never;
+  url: "/v1/webhooks/{webhook_id}/replay";
+};
+
+export type CreateWebhookReplayErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateWebhookReplayError =
+  CreateWebhookReplayErrors[keyof CreateWebhookReplayErrors];
+
+export type CreateWebhookReplayResponses = {
+  /**
+   * Replay queued. Events are redelivered asynchronously; no count or task ID is returned.
+   */
+  202: unknown;
+};
+
 export type ListWebhookAttemptsData = {
   body?: never;
   path: {
@@ -52403,7 +52488,7 @@ export type UpdateVoiceNumberResponses = {
 export type UpdateVoiceNumberResponse =
   UpdateVoiceNumberResponses[keyof UpdateVoiceNumberResponses];
 
-export type ListVoiceCallerIdsData = {
+export type ListVoiceVerifiedNumbersData = {
   body?: never;
   headers?: {
     /**
@@ -52416,7 +52501,7 @@ export type ListVoiceCallerIdsData = {
     /**
      * Field to sort by.
      */
-    sort?: VoiceCallerIdSortField;
+    sort?: VoiceVerifiedNumberSortField;
     /**
      * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
      *
@@ -52435,10 +52520,10 @@ export type ListVoiceCallerIdsData = {
      */
     ending_before?: string;
   };
-  url: "/v1/voice/caller-ids";
+  url: "/v1/voice/verified-numbers";
 };
 
-export type ListVoiceCallerIdsErrors = {
+export type ListVoiceVerifiedNumbersErrors = {
   /**
    * Bad request
    */
@@ -52466,20 +52551,20 @@ export type ListVoiceCallerIdsErrors = {
   500: Error;
 };
 
-export type ListVoiceCallerIdsError =
-  ListVoiceCallerIdsErrors[keyof ListVoiceCallerIdsErrors];
+export type ListVoiceVerifiedNumbersError =
+  ListVoiceVerifiedNumbersErrors[keyof ListVoiceVerifiedNumbersErrors];
 
-export type ListVoiceCallerIdsResponses = {
+export type ListVoiceVerifiedNumbersResponses = {
   /**
-   * Paginated list of caller IDs.
+   * Paginated list of verified numbers.
    */
-  200: VoiceCallerIdList;
+  200: VoiceVerifiedNumberList;
 };
 
-export type ListVoiceCallerIdsResponse =
-  ListVoiceCallerIdsResponses[keyof ListVoiceCallerIdsResponses];
+export type ListVoiceVerifiedNumbersResponse =
+  ListVoiceVerifiedNumbersResponses[keyof ListVoiceVerifiedNumbersResponses];
 
-export type GetVoiceCallerIdData = {
+export type GetVoiceVerifiedNumberData = {
   body?: never;
   headers?: {
     /**
@@ -52488,13 +52573,13 @@ export type GetVoiceCallerIdData = {
     "X-Workspace-Id"?: string;
   };
   path: {
-    caller_id: VoiceCallerIdid;
+    verified_number_id: VoiceVerifiedNumberId;
   };
   query?: never;
-  url: "/v1/voice/caller-ids/{caller_id}";
+  url: "/v1/voice/verified-numbers/{verified_number_id}";
 };
 
-export type GetVoiceCallerIdErrors = {
+export type GetVoiceVerifiedNumberErrors = {
   /**
    * Bad request
    */
@@ -52526,21 +52611,21 @@ export type GetVoiceCallerIdErrors = {
   500: Error;
 };
 
-export type GetVoiceCallerIdError =
-  GetVoiceCallerIdErrors[keyof GetVoiceCallerIdErrors];
+export type GetVoiceVerifiedNumberError =
+  GetVoiceVerifiedNumberErrors[keyof GetVoiceVerifiedNumberErrors];
 
-export type GetVoiceCallerIdResponses = {
+export type GetVoiceVerifiedNumberResponses = {
   /**
-   * Caller ID with its current verification status.
+   * Verified number with its current verification status.
    */
-  200: VoiceCallerId;
+  200: VoiceVerifiedNumber;
 };
 
-export type GetVoiceCallerIdResponse =
-  GetVoiceCallerIdResponses[keyof GetVoiceCallerIdResponses];
+export type GetVoiceVerifiedNumberResponse =
+  GetVoiceVerifiedNumberResponses[keyof GetVoiceVerifiedNumberResponses];
 
-export type VerifyVoiceCallerIdData = {
-  body: VoiceCallerIdVerifyRequest;
+export type VerifyVoiceVerifiedNumberData = {
+  body: VoiceVerifiedNumberVerifyRequest;
   headers?: {
     /**
      * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
@@ -52572,13 +52657,13 @@ export type VerifyVoiceCallerIdData = {
     "Idempotency-Key"?: string;
   };
   path: {
-    caller_id: VoiceCallerIdid;
+    verified_number_id: VoiceVerifiedNumberId;
   };
   query?: never;
-  url: "/v1/voice/caller-ids/{caller_id}/verify";
+  url: "/v1/voice/verified-numbers/{verified_number_id}/verify";
 };
 
-export type VerifyVoiceCallerIdErrors = {
+export type VerifyVoiceVerifiedNumberErrors = {
   /**
    * Bad request
    */
@@ -52623,18 +52708,18 @@ export type VerifyVoiceCallerIdErrors = {
   503: Error;
 };
 
-export type VerifyVoiceCallerIdError =
-  VerifyVoiceCallerIdErrors[keyof VerifyVoiceCallerIdErrors];
+export type VerifyVoiceVerifiedNumberError =
+  VerifyVoiceVerifiedNumberErrors[keyof VerifyVoiceVerifiedNumberErrors];
 
-export type VerifyVoiceCallerIdResponses = {
+export type VerifyVoiceVerifiedNumberResponses = {
   /**
-   * Caller ID verified.
+   * Number ownership verified.
    */
-  200: VoiceCallerId;
+  200: VoiceVerifiedNumber;
 };
 
-export type VerifyVoiceCallerIdResponse =
-  VerifyVoiceCallerIdResponses[keyof VerifyVoiceCallerIdResponses];
+export type VerifyVoiceVerifiedNumberResponse =
+  VerifyVoiceVerifiedNumberResponses[keyof VerifyVoiceVerifiedNumberResponses];
 
 export type ListVoiceLegsData = {
   body?: never;

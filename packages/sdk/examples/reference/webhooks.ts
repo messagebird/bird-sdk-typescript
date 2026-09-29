@@ -52,6 +52,11 @@ export async function webhookAttempts() {
   }
 }
 
+export async function webhookReplay() {
+  const since = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+  await bird.webhooks.replay("whk_01krdgeqcxet5s7t44vh8rt9mg", { since });
+}
+
 export async function webhookRotateSecret() {
   const rotated = await bird.webhooks.rotateSecret(
     "whk_01krdgeqcxet5s7t44vh8rt9mg",

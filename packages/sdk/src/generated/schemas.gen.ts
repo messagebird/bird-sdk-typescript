@@ -39902,12 +39902,12 @@ export const VoiceNumberProviderAllocationSchema = {
   },
 } as const;
 
-export const VoiceCallerIDStatusSchema = {
+export const VoiceVerifiedNumberStatusSchema = {
   type: "string",
   minLength: 1,
   "x-extensible-enum": ["pending", "verified", "failed"],
   description:
-    "Verification state of the caller ID.\n\n- `pending`: the number is registered but ownership has not yet been proven.\n- `verified`: the workspace proved ownership of the number. Check the\n  resource's activation or direction fields for outbound availability.\n- `failed`: terminal because the verification challenge expired or the attempt limit was exhausted.\n  Remove and register the caller ID again in the dashboard to retry.\n\nOpen enum: additional states may be added over time, so treat an unrecognized\nvalue as a future state rather than an error.\n",
+    "Verification state of the verified number.\n\n- `pending`: the number is registered but ownership has not yet been proven.\n- `verified`: the workspace proved ownership of the number. Check the\n  resource's activation or direction fields for outbound availability.\n- `failed`: terminal because the verification challenge expired or the attempt limit was exhausted.\n  Remove and register the verified number again in the dashboard to retry.\n\nOpen enum: additional states may be added over time, so treat an unrecognized\nvalue as a future state rather than an error.\n",
   example: "pending",
 } as const;
 
@@ -39923,7 +39923,7 @@ export const VoiceNumberProviderVerifiedNumberSchema = {
         "A number from another carrier that you registered here. That carrier decides where calls to it go; we only present it on calls you place.\n",
     },
     status: {
-      $ref: "#/components/schemas/VoiceCallerIDStatus",
+      $ref: "#/components/schemas/VoiceVerifiedNumberStatus",
       readOnly: true,
       description: "How far proving control of this number has got.",
     },
@@ -40317,21 +40317,21 @@ export const VoiceNumberUpdateSchema = {
   },
 } as const;
 
-export const VoiceCallerIDSortFieldSchema = {
+export const VoiceVerifiedNumberSortFieldSchema = {
   type: "string",
   enum: ["created_at"],
   default: "created_at",
   description: "Field used to sort the list.",
 } as const;
 
-export const VoiceCallerIDIDSchema = {
+export const VoiceVerifiedNumberIDSchema = {
   type: "string",
   minLength: 1,
-  pattern: "^vci_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "vci_01krdgeqcxet5s7t44vh8rt9mg",
+  pattern: "^vvn_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vvn_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
-export const VoiceCallerIDSchema = {
+export const VoiceVerifiedNumberSchema = {
   readOnly: true,
   allOf: [
     {
@@ -40347,8 +40347,8 @@ export const VoiceCallerIDSchema = {
       ],
       properties: {
         id: {
-          $ref: "#/components/schemas/VoiceCallerIDID",
-          description: "Unique identifier for this caller ID.",
+          $ref: "#/components/schemas/VoiceVerifiedNumberID",
+          description: "Unique identifier for this verified number.",
         },
         workspace_id: {
           $ref: "#/components/schemas/WorkspaceID",
@@ -40357,7 +40357,7 @@ export const VoiceCallerIDSchema = {
           type: "string",
           minLength: 1,
           description:
-            "The phone number in E.164 format registered as a caller ID.",
+            "The phone number in E.164 format registered as an outbound caller ID.",
           example: "+14155551234",
         },
         name: {
@@ -40365,11 +40365,11 @@ export const VoiceCallerIDSchema = {
           minLength: 1,
           maxLength: 100,
           description:
-            "Your label for this caller ID, to tell several registered numbers apart. `null` when the caller ID has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the caller ID update operation.\n",
+            "Your label for this verified number, to tell several registered numbers apart. `null` when the verified number has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the verified number update operation.\n",
           example: "Support line",
         },
         status: {
-          $ref: "#/components/schemas/VoiceCallerIDStatus",
+          $ref: "#/components/schemas/VoiceVerifiedNumberStatus",
         },
         outbound_enabled: {
           type: "boolean",
@@ -40380,7 +40380,7 @@ export const VoiceCallerIDSchema = {
           type: ["string", "null"],
           format: "date-time",
           description:
-            "When the caller ID was verified. `null` when its status is `pending` or `failed`.",
+            "When the verified number was verified. `null` when its status is `pending` or `failed`.",
         },
       },
     },
@@ -40390,7 +40390,7 @@ export const VoiceCallerIDSchema = {
   ],
 } as const;
 
-export const VoiceCallerIDListSchema = {
+export const VoiceVerifiedNumberListSchema = {
   allOf: [
     {
       type: "object",
@@ -40399,7 +40399,7 @@ export const VoiceCallerIDListSchema = {
         data: {
           type: "array",
           items: {
-            $ref: "#/components/schemas/VoiceCallerID",
+            $ref: "#/components/schemas/VoiceVerifiedNumber",
           },
         },
       },
@@ -40410,7 +40410,7 @@ export const VoiceCallerIDListSchema = {
   ],
 } as const;
 
-export const VoiceCallerIDVerifyRequestSchema = {
+export const VoiceVerifiedNumberVerifyRequestSchema = {
   type: "object",
   additionalProperties: false,
   properties: {
@@ -48769,7 +48769,7 @@ export const VoiceNumberListWritableSchema = {
   ],
 } as const;
 
-export const VoiceCallerIDWritableSchema = {
+export const VoiceVerifiedNumberWritableSchema = {
   readOnly: true,
   allOf: [
     {
@@ -48785,8 +48785,8 @@ export const VoiceCallerIDWritableSchema = {
       ],
       properties: {
         id: {
-          $ref: "#/components/schemas/VoiceCallerIDID",
-          description: "Unique identifier for this caller ID.",
+          $ref: "#/components/schemas/VoiceVerifiedNumberID",
+          description: "Unique identifier for this verified number.",
         },
         workspace_id: {
           $ref: "#/components/schemas/WorkspaceID",
@@ -48795,7 +48795,7 @@ export const VoiceCallerIDWritableSchema = {
           type: "string",
           minLength: 1,
           description:
-            "The phone number in E.164 format registered as a caller ID.",
+            "The phone number in E.164 format registered as an outbound caller ID.",
           example: "+14155551234",
         },
         name: {
@@ -48803,11 +48803,11 @@ export const VoiceCallerIDWritableSchema = {
           minLength: 1,
           maxLength: 100,
           description:
-            "Your label for this caller ID, to tell several registered numbers apart. `null` when the caller ID has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the caller ID update operation.\n",
+            "Your label for this verified number, to tell several registered numbers apart. `null` when the verified number has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the verified number update operation.\n",
           example: "Support line",
         },
         status: {
-          $ref: "#/components/schemas/VoiceCallerIDStatus",
+          $ref: "#/components/schemas/VoiceVerifiedNumberStatus",
         },
         outbound_enabled: {
           type: "boolean",
@@ -48818,14 +48818,14 @@ export const VoiceCallerIDWritableSchema = {
           type: ["string", "null"],
           format: "date-time",
           description:
-            "When the caller ID was verified. `null` when its status is `pending` or `failed`.",
+            "When the verified number was verified. `null` when its status is `pending` or `failed`.",
         },
       },
     },
   ],
 } as const;
 
-export const VoiceCallerIDListWritableSchema = {
+export const VoiceVerifiedNumberListWritableSchema = {
   allOf: [
     {
       type: "object",
@@ -48834,7 +48834,7 @@ export const VoiceCallerIDListWritableSchema = {
         data: {
           type: "array",
           items: {
-            $ref: "#/components/schemas/VoiceCallerIDWritable",
+            $ref: "#/components/schemas/VoiceVerifiedNumberWritable",
           },
         },
       },

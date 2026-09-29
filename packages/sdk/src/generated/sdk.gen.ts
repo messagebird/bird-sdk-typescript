@@ -134,6 +134,9 @@ import type {
   CreateVoiceTrunkResponses,
   CreateWebhookData,
   CreateWebhookErrors,
+  CreateWebhookReplayData,
+  CreateWebhookReplayErrors,
+  CreateWebhookReplayResponses,
   CreateWebhookResponses,
   CreateWhatsAppGroupData,
   CreateWhatsAppGroupErrors,
@@ -540,9 +543,6 @@ import type {
   GetSuppressionData,
   GetSuppressionErrors,
   GetSuppressionResponses,
-  GetVoiceCallerIdData,
-  GetVoiceCallerIdErrors,
-  GetVoiceCallerIdResponses,
   GetVoiceLegData,
   GetVoiceLegErrors,
   GetVoiceLegResponses,
@@ -555,6 +555,9 @@ import type {
   GetVoiceTrunkGatewayErrors,
   GetVoiceTrunkGatewayResponses,
   GetVoiceTrunkResponses,
+  GetVoiceVerifiedNumberData,
+  GetVoiceVerifiedNumberErrors,
+  GetVoiceVerifiedNumberResponses,
   GetWebhookData,
   GetWebhookErrors,
   GetWebhookResponses,
@@ -761,9 +764,6 @@ import type {
   ListSuppressionsData,
   ListSuppressionsErrors,
   ListSuppressionsResponses,
-  ListVoiceCallerIdsData,
-  ListVoiceCallerIdsErrors,
-  ListVoiceCallerIdsResponses,
   ListVoiceDestinationsData,
   ListVoiceDestinationsErrors,
   ListVoiceDestinationsResponses,
@@ -779,6 +779,9 @@ import type {
   ListVoiceTrunksData,
   ListVoiceTrunksErrors,
   ListVoiceTrunksResponses,
+  ListVoiceVerifiedNumbersData,
+  ListVoiceVerifiedNumbersErrors,
+  ListVoiceVerifiedNumbersResponses,
   ListWebhookAttemptsData,
   ListWebhookAttemptsErrors,
   ListWebhookAttemptsResponses,
@@ -965,9 +968,9 @@ import type {
   VerifyDomainData,
   VerifyDomainErrors,
   VerifyDomainResponses,
-  VerifyVoiceCallerIdData,
-  VerifyVoiceCallerIdErrors,
-  VerifyVoiceCallerIdResponses,
+  VerifyVoiceVerifiedNumberData,
+  VerifyVoiceVerifiedNumberErrors,
+  VerifyVoiceVerifiedNumberResponses,
 } from "./types.gen";
 
 export type Options<
@@ -11333,6 +11336,61 @@ export const testWebhook = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Replay failed deliveries
+ *
+ * Queues redelivery of deliveries that failed. The window runs from `since`
+ * (default: the last 24 hours) to `until`, and events the endpoint already received
+ * successfully are skipped, so a replay never double-delivers.
+ *
+ * Only failed attempts are replayed, and the window selects on attempt time rather than
+ * on when the event occurred. An event the endpoint was never sent, such as one that
+ * arrived while it was paused, has no failed attempt to replay, so a replay does not
+ * recover it. Replay reads the delivery-attempt log, which retains three days, so that
+ * is the oldest history it reaches: an earlier `since` widens the window without
+ * recovering anything older. A paused endpoint redelivers nothing at all:
+ * re-enable it with [Update a webhook endpoint](/docs/api/reference/update-webhook)
+ * first.
+ *
+ * The `202` response means the replay is queued. Each redelivery then takes a single
+ * attempt rather than the retry schedule a live delivery follows, so a replay into an
+ * endpoint that is still broken costs one request per event; fix the endpoint and replay
+ * again. No count or task ID is returned, so track results with
+ * [List delivery attempts](/docs/api/reference/list-webhook-attempts).
+ *
+ * One replay redelivers at most the oldest 10,000 events in the window, and replays are
+ * limited to 20 per organization per UTC day; beyond that the request returns a `429`
+ * `WebhookReplayQuotaExceeded`.
+ *
+ */
+export const createWebhookReplay = <ThrowOnError extends boolean = false>(
+  options: Options<CreateWebhookReplayData, ThrowOnError>,
+): RequestResult<
+  CreateWebhookReplayResponses,
+  CreateWebhookReplayErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateWebhookReplayResponses,
+    CreateWebhookReplayErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/webhooks/{webhook_id}/replay",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * List delivery attempts
  *
  * Returns the endpoint's recent delivery attempts, newest first. Each entry is one HTTP
@@ -12110,20 +12168,20 @@ export const updateVoiceNumber = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * List caller IDs
+ * List verified numbers
  *
- * Returns a paginated list of the workspace's caller IDs and their verification status.
+ * Returns a paginated list of the workspace's verified numbers and their verification status.
  */
-export const listVoiceCallerIds = <ThrowOnError extends boolean = false>(
-  options?: Options<ListVoiceCallerIdsData, ThrowOnError>,
+export const listVoiceVerifiedNumbers = <ThrowOnError extends boolean = false>(
+  options?: Options<ListVoiceVerifiedNumbersData, ThrowOnError>,
 ): RequestResult<
-  ListVoiceCallerIdsResponses,
-  ListVoiceCallerIdsErrors,
+  ListVoiceVerifiedNumbersResponses,
+  ListVoiceVerifiedNumbersErrors,
   ThrowOnError
 > =>
   (options?.client ?? client).get<
-    ListVoiceCallerIdsResponses,
-    ListVoiceCallerIdsErrors,
+    ListVoiceVerifiedNumbersResponses,
+    ListVoiceVerifiedNumbersErrors,
     ThrowOnError
   >({
     security: [
@@ -12134,25 +12192,25 @@ export const listVoiceCallerIds = <ThrowOnError extends boolean = false>(
         type: "apiKey",
       },
     ],
-    url: "/v1/voice/caller-ids",
+    url: "/v1/voice/verified-numbers",
     ...options,
   });
 
 /**
- * Get a caller ID
+ * Get a verified number
  *
- * Returns the caller ID with the given ID, including its verification status.
+ * Returns the verified number with the given ID, including its verification status.
  */
-export const getVoiceCallerId = <ThrowOnError extends boolean = false>(
-  options: Options<GetVoiceCallerIdData, ThrowOnError>,
+export const getVoiceVerifiedNumber = <ThrowOnError extends boolean = false>(
+  options: Options<GetVoiceVerifiedNumberData, ThrowOnError>,
 ): RequestResult<
-  GetVoiceCallerIdResponses,
-  GetVoiceCallerIdErrors,
+  GetVoiceVerifiedNumberResponses,
+  GetVoiceVerifiedNumberErrors,
   ThrowOnError
 > =>
   (options.client ?? client).get<
-    GetVoiceCallerIdResponses,
-    GetVoiceCallerIdErrors,
+    GetVoiceVerifiedNumberResponses,
+    GetVoiceVerifiedNumberErrors,
     ThrowOnError
   >({
     security: [
@@ -12163,27 +12221,27 @@ export const getVoiceCallerId = <ThrowOnError extends boolean = false>(
         type: "apiKey",
       },
     ],
-    url: "/v1/voice/caller-ids/{caller_id}",
+    url: "/v1/voice/verified-numbers/{verified_number_id}",
     ...options,
   });
 
 /**
- * Verify a caller ID
+ * Verify number ownership
  *
- * Completes a caller-ID verification challenge started in the dashboard. Submit
+ * Completes a number ownership verification challenge started in the dashboard. Submit
  * the code delivered by the verification call. An incorrect code is rejected.
  *
  * If the verification call could not be started previously, this request can
  * retry it and place another call to the same number. Your organization must
- * still meet the identity-verification requirements for registering caller IDs;
+ * still meet the identity-verification requirements for registering verified numbers;
  * otherwise the request returns `412`. For an expired or exhausted challenge,
  * use **Get a new code** under **Voice** > **Numbers** in the dashboard to remove
- * and register the caller ID again. List caller IDs again to obtain the new
- * registration ID before submitting its code. Caller-ID creation and deletion
+ * and register the verified number again. List verified numbers again to obtain the new
+ * registration ID before submitting its code. Number registration and deletion
  * are not available through the public API.
  *
  * A successful ownership check is retained even when organization eligibility
- * prevents outbound activation. If the caller ID's `status` is `verified` after
+ * prevents outbound activation. If the verified number's `status` is `verified` after
  * a `412` or `503`, complete the missing steps or contact support, then
  * resubmit an empty object (`{}`). The saved proof is reused without checking
  * a code again. While proof is still pending, include the code; an empty
@@ -12196,19 +12254,19 @@ export const getVoiceCallerId = <ThrowOnError extends boolean = false>(
  * Activation attempts to enable the number's country as a Voice destination.
  * An unavailable country or a failed settings update can leave it disabled.
  * Check **Voice** > **Destinations** before calling; see the
- * [caller ID guide](https://bird.com/docs/guides/voice/caller-ids).
+ * [verified number guide](https://bird.com/docs/guides/voice/caller-ids).
  *
  */
-export const verifyVoiceCallerId = <ThrowOnError extends boolean = false>(
-  options: Options<VerifyVoiceCallerIdData, ThrowOnError>,
+export const verifyVoiceVerifiedNumber = <ThrowOnError extends boolean = false>(
+  options: Options<VerifyVoiceVerifiedNumberData, ThrowOnError>,
 ): RequestResult<
-  VerifyVoiceCallerIdResponses,
-  VerifyVoiceCallerIdErrors,
+  VerifyVoiceVerifiedNumberResponses,
+  VerifyVoiceVerifiedNumberErrors,
   ThrowOnError
 > =>
   (options.client ?? client).post<
-    VerifyVoiceCallerIdResponses,
-    VerifyVoiceCallerIdErrors,
+    VerifyVoiceVerifiedNumberResponses,
+    VerifyVoiceVerifiedNumberErrors,
     ThrowOnError
   >({
     security: [
@@ -12219,7 +12277,7 @@ export const verifyVoiceCallerId = <ThrowOnError extends boolean = false>(
         type: "apiKey",
       },
     ],
-    url: "/v1/voice/caller-ids/{caller_id}/verify",
+    url: "/v1/voice/verified-numbers/{verified_number_id}/verify",
     ...options,
     headers: {
       "Content-Type": "application/json",
