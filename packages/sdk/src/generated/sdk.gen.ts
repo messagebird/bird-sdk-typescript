@@ -24,6 +24,24 @@ import type {
   CancelEmailMessageData,
   CancelEmailMessageErrors,
   CancelEmailMessageResponses,
+  CreateAmbBusinessAccountData,
+  CreateAmbBusinessAccountErrors,
+  CreateAmbBusinessAccountResponses,
+  CreateAmbBusinessAccountSubmissionData,
+  CreateAmbBusinessAccountSubmissionErrors,
+  CreateAmbBusinessAccountSubmissionResponses,
+  CreateAmbConversationTypingData,
+  CreateAmbConversationTypingErrors,
+  CreateAmbConversationTypingResponses,
+  CreateAmbMessageData,
+  CreateAmbMessageErrors,
+  CreateAmbMessageResponses,
+  CreateAmbRoutingRuleData,
+  CreateAmbRoutingRuleErrors,
+  CreateAmbRoutingRuleResponses,
+  CreateAmbSuppressionData,
+  CreateAmbSuppressionErrors,
+  CreateAmbSuppressionResponses,
   CreateAudienceData,
   CreateAudienceErrors,
   CreateAudienceResponses,
@@ -132,6 +150,15 @@ import type {
   CreateWhatsAppSuppressionData,
   CreateWhatsAppSuppressionErrors,
   CreateWhatsAppSuppressionResponses,
+  DeleteAmbBusinessAccountData,
+  DeleteAmbBusinessAccountErrors,
+  DeleteAmbBusinessAccountResponses,
+  DeleteAmbRoutingRuleData,
+  DeleteAmbRoutingRuleErrors,
+  DeleteAmbRoutingRuleResponses,
+  DeleteAmbSuppressionData,
+  DeleteAmbSuppressionErrors,
+  DeleteAmbSuppressionResponses,
   DeleteAudienceData,
   DeleteAudienceErrors,
   DeleteAudienceResponses,
@@ -210,6 +237,78 @@ import type {
   DuplicateEmailTemplateData,
   DuplicateEmailTemplateErrors,
   DuplicateEmailTemplateResponses,
+  GetAmbBusinessAccountData,
+  GetAmbBusinessAccountErrors,
+  GetAmbBusinessAccountResponses,
+  GetAmbChannelSettingsData,
+  GetAmbChannelSettingsErrors,
+  GetAmbChannelSettingsResponses,
+  GetAmbConversationData,
+  GetAmbConversationErrors,
+  GetAmbConversationResponses,
+  GetAmbConversationStatsDailyData,
+  GetAmbConversationStatsDailyErrors,
+  GetAmbConversationStatsDailyResponses,
+  GetAmbConversationStatsHourlyData,
+  GetAmbConversationStatsHourlyErrors,
+  GetAmbConversationStatsHourlyResponses,
+  GetAmbConversationStatsSummaryData,
+  GetAmbConversationStatsSummaryErrors,
+  GetAmbConversationStatsSummaryResponses,
+  GetAmbInboundStatsByBusinessData,
+  GetAmbInboundStatsByBusinessErrors,
+  GetAmbInboundStatsByBusinessResponses,
+  GetAmbInboundStatsByIntentData,
+  GetAmbInboundStatsByIntentErrors,
+  GetAmbInboundStatsByIntentResponses,
+  GetAmbInboundStatsDailyData,
+  GetAmbInboundStatsDailyErrors,
+  GetAmbInboundStatsDailyResponses,
+  GetAmbInboundStatsHourlyData,
+  GetAmbInboundStatsHourlyErrors,
+  GetAmbInboundStatsHourlyResponses,
+  GetAmbInboundStatsSummaryData,
+  GetAmbInboundStatsSummaryErrors,
+  GetAmbInboundStatsSummaryResponses,
+  GetAmbMessageData,
+  GetAmbMessageErrors,
+  GetAmbMessageResponses,
+  GetAmbRoutingRuleData,
+  GetAmbRoutingRuleErrors,
+  GetAmbRoutingRuleResponses,
+  GetAmbStatsByBusinessData,
+  GetAmbStatsByBusinessErrors,
+  GetAmbStatsByBusinessResponses,
+  GetAmbStatsByCategoryData,
+  GetAmbStatsByCategoryErrors,
+  GetAmbStatsByCategoryResponses,
+  GetAmbStatsByErrorCodeData,
+  GetAmbStatsByErrorCodeErrors,
+  GetAmbStatsByErrorCodeResponses,
+  GetAmbStatsByGroupData,
+  GetAmbStatsByGroupErrors,
+  GetAmbStatsByGroupResponses,
+  GetAmbStatsByIntentData,
+  GetAmbStatsByIntentErrors,
+  GetAmbStatsByIntentResponses,
+  GetAmbStatsByMessageKindData,
+  GetAmbStatsByMessageKindErrors,
+  GetAmbStatsByMessageKindResponses,
+  GetAmbStatsByTagData,
+  GetAmbStatsByTagErrors,
+  GetAmbStatsByTagResponses,
+  GetAmbStatsDailyData,
+  GetAmbStatsDailyErrors,
+  GetAmbStatsDailyResponses,
+  GetAmbStatsHourlyData,
+  GetAmbStatsHourlyErrors,
+  GetAmbStatsHourlyResponses,
+  GetAmbStatsSummaryData,
+  GetAmbStatsSummaryErrors,
+  GetAmbStatsSummaryResponses,
+  GetAmbSuppressionData,
+  GetAmbSuppressionErrors,
+  GetAmbSuppressionResponses,
   GetAudienceData,
   GetAudienceErrors,
   GetAudienceResponses,
@@ -533,6 +632,33 @@ import type {
   GetWorkspaceNumberData,
   GetWorkspaceNumberErrors,
   GetWorkspaceNumberResponses,
+  ListAmbBusinessAccountEventsData,
+  ListAmbBusinessAccountEventsErrors,
+  ListAmbBusinessAccountEventsResponses,
+  ListAmbBusinessAccountsData,
+  ListAmbBusinessAccountsErrors,
+  ListAmbBusinessAccountsResponses,
+  ListAmbBusinessAccountSubmissionsData,
+  ListAmbBusinessAccountSubmissionsErrors,
+  ListAmbBusinessAccountSubmissionsResponses,
+  ListAmbConversationMessagesData,
+  ListAmbConversationMessagesErrors,
+  ListAmbConversationMessagesResponses,
+  ListAmbConversationsData,
+  ListAmbConversationsErrors,
+  ListAmbConversationsResponses,
+  ListAmbMessageEventsData,
+  ListAmbMessageEventsErrors,
+  ListAmbMessageEventsResponses,
+  ListAmbMessagesData,
+  ListAmbMessagesErrors,
+  ListAmbMessagesResponses,
+  ListAmbRoutingRulesData,
+  ListAmbRoutingRulesErrors,
+  ListAmbRoutingRulesResponses,
+  ListAmbSuppressionsData,
+  ListAmbSuppressionsErrors,
+  ListAmbSuppressionsResponses,
   ListAudienceContactsData,
   ListAudienceContactsErrors,
   ListAudienceContactsResponses,
@@ -716,6 +842,9 @@ import type {
   ReplyEmailThreadMessageData,
   ReplyEmailThreadMessageErrors,
   ReplyEmailThreadMessageResponses,
+  RestoreAmbBusinessAccountData,
+  RestoreAmbBusinessAccountErrors,
+  RestoreAmbBusinessAccountResponses,
   RestoreMailboxData,
   RestoreMailboxErrors,
   RestoreMailboxResponses,
@@ -758,6 +887,18 @@ import type {
   UnassignAudienceContactsData,
   UnassignAudienceContactsErrors,
   UnassignAudienceContactsResponses,
+  UpdateAmbBusinessAccountData,
+  UpdateAmbBusinessAccountErrors,
+  UpdateAmbBusinessAccountResponses,
+  UpdateAmbChannelSettingsData,
+  UpdateAmbChannelSettingsErrors,
+  UpdateAmbChannelSettingsResponses,
+  UpdateAmbConversationData,
+  UpdateAmbConversationErrors,
+  UpdateAmbConversationResponses,
+  UpdateAmbRoutingRuleData,
+  UpdateAmbRoutingRuleErrors,
+  UpdateAmbRoutingRuleResponses,
   UpdateAudienceData,
   UpdateAudienceErrors,
   UpdateAudienceResponses,
@@ -5860,6 +6001,1547 @@ export const getWhatsAppNumberProfile = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Reconnect an Apple business account
+ *
+ * Restores the local connection. The retained approval and suspension state still determines whether the account can send. Repeated reconnects return the current account.
+ */
+export const restoreAmbBusinessAccount = <ThrowOnError extends boolean = false>(
+  options: Options<RestoreAmbBusinessAccountData, ThrowOnError>,
+): RequestResult<
+  RestoreAmbBusinessAccountResponses,
+  RestoreAmbBusinessAccountErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RestoreAmbBusinessAccountResponses,
+    RestoreAmbBusinessAccountErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/business-accounts/{business_account_id}/reconnect",
+    ...options,
+  });
+
+/**
+ * List Apple business account events
+ *
+ * Returns account activity with event time, summary and source metadata, newest first by default.
+ */
+export const listAmbBusinessAccountEvents = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListAmbBusinessAccountEventsData, ThrowOnError>,
+): RequestResult<
+  ListAmbBusinessAccountEventsResponses,
+  ListAmbBusinessAccountEventsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListAmbBusinessAccountEventsResponses,
+    ListAmbBusinessAccountEventsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/business-accounts/{business_account_id}/events",
+    ...options,
+  });
+
+/**
+ * List Apple Messages for Business records
+ *
+ * Returns a paginated list of your workspace's Apple Messages for Business
+ * records. A workspace can register multiple businesses.
+ *
+ */
+export const listAmbBusinessAccounts = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAmbBusinessAccountsData, ThrowOnError>,
+): RequestResult<
+  ListAmbBusinessAccountsResponses,
+  ListAmbBusinessAccountsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListAmbBusinessAccountsResponses,
+    ListAmbBusinessAccountsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/business-accounts",
+    ...options,
+  });
+
+/**
+ * Create an Apple Messages for Business record
+ *
+ * Creates an Apple Messages for Business record in your workspace. Each
+ * Apple Business ID can belong to only one retained business record in this region.
+ * Disconnecting an account does not release its identifier.
+ *
+ * The account starts with `status: pending` and no `account_review_status`,
+ * including when you supply `apple_business_id`. Upload the required evidence
+ * and create a submission to begin review. The account remains pending until
+ * approved; its submission records review progress.
+ *
+ */
+export const createAmbBusinessAccount = <ThrowOnError extends boolean = false>(
+  options: Options<CreateAmbBusinessAccountData, ThrowOnError>,
+): RequestResult<
+  CreateAmbBusinessAccountResponses,
+  CreateAmbBusinessAccountErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateAmbBusinessAccountResponses,
+    CreateAmbBusinessAccountErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/business-accounts",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Disconnect an Apple business account
+ *
+ * Stops new and queued sends while retaining the account, Apple UUID, approval, credentials and history. Repeated disconnects succeed without changing history. An already-started send attempt may finish; provider requests cannot be recalled. This is a local Bird connection change, not Apple deregistration.
+ */
+export const deleteAmbBusinessAccount = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteAmbBusinessAccountData, ThrowOnError>,
+): RequestResult<
+  DeleteAmbBusinessAccountResponses,
+  DeleteAmbBusinessAccountErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteAmbBusinessAccountResponses,
+    DeleteAmbBusinessAccountErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/business-accounts/{business_account_id}",
+    ...options,
+  });
+
+/**
+ * Get an Apple Messages for Business record
+ *
+ * Returns your workspace's Apple Messages for Business record, including its current status with Apple.
+ *
+ */
+export const getAmbBusinessAccount = <ThrowOnError extends boolean = false>(
+  options: Options<GetAmbBusinessAccountData, ThrowOnError>,
+): RequestResult<
+  GetAmbBusinessAccountResponses,
+  GetAmbBusinessAccountErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAmbBusinessAccountResponses,
+    GetAmbBusinessAccountErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/business-accounts/{business_account_id}",
+    ...options,
+  });
+
+/**
+ * Update an Apple Messages for Business record
+ *
+ * Changes your workspace's Apple Messages for Business record. Fields you
+ * omit are left as they are.
+ *
+ * Sending `apple_business_id` identifies the draft but does not submit it.
+ * Create a submission with all three evidence attachments when the record
+ * is ready for review.
+ *
+ */
+export const updateAmbBusinessAccount = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateAmbBusinessAccountData, ThrowOnError>,
+): RequestResult<
+  UpdateAmbBusinessAccountResponses,
+  UpdateAmbBusinessAccountErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateAmbBusinessAccountResponses,
+    UpdateAmbBusinessAccountErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/business-accounts/{business_account_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List Apple Messages for Business submissions
+ *
+ * Returns review attempts with frozen evidence for this business, newest first, with fresh private evidence URLs.
+ */
+export const listAmbBusinessAccountSubmissions = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListAmbBusinessAccountSubmissionsData, ThrowOnError>,
+): RequestResult<
+  ListAmbBusinessAccountSubmissionsResponses,
+  ListAmbBusinessAccountSubmissionsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListAmbBusinessAccountSubmissionsResponses,
+    ListAmbBusinessAccountSubmissionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/business-accounts/{business_account_id}/submissions",
+    ...options,
+  });
+
+/**
+ * Submit an Apple Messages for Business business for review
+ *
+ * Submits an account for review, making its name, Apple UUID and three uploaded evidence attachments available to Bird staff. This does not approve the account.
+ */
+export const createAmbBusinessAccountSubmission = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateAmbBusinessAccountSubmissionData, ThrowOnError>,
+): RequestResult<
+  CreateAmbBusinessAccountSubmissionResponses,
+  CreateAmbBusinessAccountSubmissionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateAmbBusinessAccountSubmissionResponses,
+    CreateAmbBusinessAccountSubmissionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/business-accounts/{business_account_id}/submissions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get Apple Messages for Business channel settings
+ *
+ * Returns the channel settings for your workspace's Apple Messages for Business record: its entry points, default locale, and the brand name and logo shown on the landing page customers use to connect it.
+ *
+ */
+export const getAmbChannelSettings = <ThrowOnError extends boolean = false>(
+  options: Options<GetAmbChannelSettingsData, ThrowOnError>,
+): RequestResult<
+  GetAmbChannelSettingsResponses,
+  GetAmbChannelSettingsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAmbChannelSettingsResponses,
+    GetAmbChannelSettingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/business-accounts/{business_account_id}/channel-settings",
+    ...options,
+  });
+
+/**
+ * Update Apple Messages for Business channel settings
+ *
+ * Changes the channel settings for your workspace's Apple Messages for
+ * Business record. Fields you omit are left as they are, except
+ * `entry_points`: sending it replaces the entire set, since there is no
+ * way to add or remove a single entry point without resending the rest.
+ *
+ */
+export const updateAmbChannelSettings = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateAmbChannelSettingsData, ThrowOnError>,
+): RequestResult<
+  UpdateAmbChannelSettingsResponses,
+  UpdateAmbChannelSettingsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateAmbChannelSettingsResponses,
+    UpdateAmbChannelSettingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/business-accounts/{business_account_id}/channel-settings",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List Apple Messages for Business routing rules
+ *
+ * Returns the workspace's Apple Messages for Business routing rules, highest precedence first. A rule only runs when a conversation is created or reopened, matching it to a queue based on the group and intent its entry point carried. It never runs again while the conversation stays open, so a queue an operator moves a conversation to is not overwritten by the next message the customer sends.
+ *
+ */
+export const listAmbRoutingRules = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAmbRoutingRulesData, ThrowOnError>,
+): RequestResult<
+  ListAmbRoutingRulesResponses,
+  ListAmbRoutingRulesErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListAmbRoutingRulesResponses,
+    ListAmbRoutingRulesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/routing-rules",
+    ...options,
+  });
+
+/**
+ * Create an Apple Messages for Business routing rule
+ *
+ * Creates a routing rule for one of your Apple Messages for Business brands. Set `is_default` to make it the rule that catches a conversation matching nothing else. A business can have only one default rule, and creating a second while one exists returns a `409`.
+ *
+ */
+export const createAmbRoutingRule = <ThrowOnError extends boolean = false>(
+  options: Options<CreateAmbRoutingRuleData, ThrowOnError>,
+): RequestResult<
+  CreateAmbRoutingRuleResponses,
+  CreateAmbRoutingRuleErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateAmbRoutingRuleResponses,
+    CreateAmbRoutingRuleErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/routing-rules",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete an Apple Messages for Business routing rule
+ *
+ * Deletes a routing rule. A conversation already routed by it keeps its queue; only newly created or reopened conversations stop matching it. Deleting a business's default rule leaves it with none, so unmatched conversations route to an empty queue until you create another.
+ *
+ */
+export const deleteAmbRoutingRule = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteAmbRoutingRuleData, ThrowOnError>,
+): RequestResult<
+  DeleteAmbRoutingRuleResponses,
+  DeleteAmbRoutingRuleErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteAmbRoutingRuleResponses,
+    DeleteAmbRoutingRuleErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/routing-rules/{routing_rule_id}",
+    ...options,
+  });
+
+/**
+ * Get an Apple Messages for Business routing rule
+ *
+ * Returns one routing rule by ID.
+ */
+export const getAmbRoutingRule = <ThrowOnError extends boolean = false>(
+  options: Options<GetAmbRoutingRuleData, ThrowOnError>,
+): RequestResult<
+  GetAmbRoutingRuleResponses,
+  GetAmbRoutingRuleErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAmbRoutingRuleResponses,
+    GetAmbRoutingRuleErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/routing-rules/{routing_rule_id}",
+    ...options,
+  });
+
+/**
+ * Update an Apple Messages for Business routing rule
+ *
+ * Changes a routing rule's queue, precedence, or default status. What it matches is fixed once created; to change that, delete this rule and create another. Setting `is_default` to true while the business already has a different default rule returns a `409`.
+ *
+ */
+export const updateAmbRoutingRule = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateAmbRoutingRuleData, ThrowOnError>,
+): RequestResult<
+  UpdateAmbRoutingRuleResponses,
+  UpdateAmbRoutingRuleErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateAmbRoutingRuleResponses,
+    UpdateAmbRoutingRuleErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/routing-rules/{routing_rule_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List messages
+ *
+ * Returns your business's Apple Messages for Business messages across
+ * conversations, newest first, both received and sent. To page through
+ * older messages, use `starting_after`. Messages do not expire based on age.
+ *
+ * To list messages within a single conversation, use
+ * `listAMBConversationMessages`.
+ *
+ */
+export const listAmbMessages = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAmbMessagesData, ThrowOnError>,
+): RequestResult<
+  ListAmbMessagesResponses,
+  ListAmbMessagesErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListAmbMessagesResponses,
+    ListAmbMessagesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/messages",
+    ...options,
+  });
+
+/**
+ * Send a message
+ *
+ * Send a message in an existing Apple Messages for Business conversation. `from` is the Apple business identifier and `to` is the customer’s opaque identifier for that business. An unknown conversation returns 404; a closed conversation returns 422. Only the customer can reopen a conversation.
+ *
+ * Choose text, rich_link, or interactive content. Interactive content contains a quick reply, list picker, event, form, or custom iMessage app. Native payment and authentication requests are not available through this public operation. Device support varies; an unsupported interaction returns 422.
+ *
+ * Supply attachment URLs or reusable Apple references. Bird downloads source URLs and uploads the files before sending. Interactive images must be PNG files up to 200 kB each, totaling at most 5 MB. Each attachment must be smaller than 100 MB. A media or provider failure after acceptance changes the message status to send_failed.
+ *
+ * The 202 response confirms acceptance, not delivery. Read the message to obtain its final status and any reusable reference returned by Apple.
+ */
+export const createAmbMessage = <ThrowOnError extends boolean = false>(
+  options: Options<CreateAmbMessageData, ThrowOnError>,
+): RequestResult<
+  CreateAmbMessageResponses,
+  CreateAmbMessageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateAmbMessageResponses,
+    CreateAmbMessageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/messages",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get a message
+ *
+ * Returns a single Apple Messages for Business message: its current status, the content it carries, and failure detail when it failed. There is no delivery or read receipt on this channel, so an outbound message's `status` advances only as far as `sent`. For the per-event timeline, use `listAMBMessageEvents` instead. Messages do not expire based on age.
+ *
+ */
+export const getAmbMessage = <ThrowOnError extends boolean = false>(
+  options: Options<GetAmbMessageData, ThrowOnError>,
+): RequestResult<GetAmbMessageResponses, GetAmbMessageErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetAmbMessageResponses,
+    GetAmbMessageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/messages/{message_id}",
+    ...options,
+  });
+
+/**
+ * List events for a message
+ *
+ * Returns a message's lifecycle events in chronological order, one entry per status transition (`amb.accepted`, `amb.sent`, `amb.send_failed`, `amb.received`). The timeline is bounded and returned in full, so this list is not paginated. Event history does not expire based on age.
+ *
+ */
+export const listAmbMessageEvents = <ThrowOnError extends boolean = false>(
+  options: Options<ListAmbMessageEventsData, ThrowOnError>,
+): RequestResult<
+  ListAmbMessageEventsResponses,
+  ListAmbMessageEventsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListAmbMessageEventsResponses,
+    ListAmbMessageEventsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/messages/{message_id}/events",
+    ...options,
+  });
+
+/**
+ * List conversations
+ *
+ * Returns the conversations your business has with customers on Apple
+ * Messages for Business, newest first by last message. To page through
+ * older conversations, use `starting_after`. A closed conversation stays in
+ * this list; filter on `status` to separate them from open ones.
+ *
+ */
+export const listAmbConversations = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAmbConversationsData, ThrowOnError>,
+): RequestResult<
+  ListAmbConversationsResponses,
+  ListAmbConversationsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListAmbConversationsResponses,
+    ListAmbConversationsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/conversations",
+    ...options,
+  });
+
+/**
+ * Get a conversation
+ *
+ * Returns one conversation, including closed conversations. Conversation records have no age limit.
+ *
+ */
+export const getAmbConversation = <ThrowOnError extends boolean = false>(
+  options: Options<GetAmbConversationData, ThrowOnError>,
+): RequestResult<
+  GetAmbConversationResponses,
+  GetAmbConversationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAmbConversationResponses,
+    GetAmbConversationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/conversations/{conversation_id}",
+    ...options,
+  });
+
+/**
+ * Update a conversation
+ *
+ * Updates a conversation's assignment, labels, or read state. There is no close action here: only the customer closes a conversation, from their device.
+ *
+ */
+export const updateAmbConversation = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateAmbConversationData, ThrowOnError>,
+): RequestResult<
+  UpdateAmbConversationResponses,
+  UpdateAmbConversationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateAmbConversationResponses,
+    UpdateAmbConversationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/conversations/{conversation_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List messages in a conversation
+ *
+ * Returns the messages in a conversation, newest first, both received and
+ * sent. To page through older messages, use `starting_after`. The sort
+ * order is fixed, so to render the messages in conversation order, reverse
+ * the page yourself. Messages do not expire based on age.
+ *
+ */
+export const listAmbConversationMessages = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListAmbConversationMessagesData, ThrowOnError>,
+): RequestResult<
+  ListAmbConversationMessagesResponses,
+  ListAmbConversationMessagesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListAmbConversationMessagesResponses,
+    ListAmbConversationMessagesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/conversations/{conversation_id}/messages",
+    ...options,
+  });
+
+/**
+ * Send a typing indicator
+ *
+ * Sends a typing indicator to the customer's device on this conversation. Send `typing_start` before the reply it precedes; sending it again before that reply is not meaningful and may be dropped. Apple's own behavior for `typing_end` sent with no reply following is unproven, so treat it as best-effort. This conversation must be open: the same checks that gate a message on this conversation gate a typing indicator, other than the content checks, since a typing indicator has no content.
+ *
+ */
+export const createAmbConversationTyping = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateAmbConversationTypingData, ThrowOnError>,
+): RequestResult<
+  CreateAmbConversationTypingResponses,
+  CreateAmbConversationTypingErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateAmbConversationTypingResponses,
+    CreateAmbConversationTypingErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/conversations/{conversation_id}/typing",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List Apple Messages for Business suppressions
+ *
+ * Returns a paginated list of the workspace's active Apple Messages for Business suppressions: customers who have opted out of one brand, or of the whole workspace. Episodes that have ended are left out; fetch one by ID to read it. Filter by `business_account_id` to see one brand's suppressions, including the workspace-wide ones that block it too.
+ *
+ */
+export const listAmbSuppressions = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAmbSuppressionsData, ThrowOnError>,
+): RequestResult<
+  ListAmbSuppressionsResponses,
+  ListAmbSuppressionsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListAmbSuppressionsResponses,
+    ListAmbSuppressionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/suppressions",
+    ...options,
+  });
+
+/**
+ * Create an Apple Messages for Business suppression
+ *
+ * Manually opens a suppression episode for a address, blocking every outbound path to it: operator and automated replies, API sends, typing indicators, and invitations. Set `business_account_id` to block the address for one brand only, or omit it to block the address for every brand in the workspace. If the address already has an active episode with reason `manual`, the API returns `200` with the existing episode instead of creating a second one.
+ *
+ */
+export const createAmbSuppression = <ThrowOnError extends boolean = false>(
+  options: Options<CreateAmbSuppressionData, ThrowOnError>,
+): RequestResult<
+  CreateAmbSuppressionResponses,
+  CreateAmbSuppressionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateAmbSuppressionResponses,
+    CreateAmbSuppressionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/suppressions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * End an Apple Messages for Business suppression
+ *
+ * Ends a manual suppression created by a user or API caller, retaining the episode and the time it ended. Repeated requests for an already-ended manual episode succeed. Recipient opt-outs and automatic conversation facts remain protected, including after they have ended. Fresh invitation consent is recorded through preferences.
+ *
+ */
+export const deleteAmbSuppression = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteAmbSuppressionData, ThrowOnError>,
+): RequestResult<
+  DeleteAmbSuppressionResponses,
+  DeleteAmbSuppressionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteAmbSuppressionResponses,
+    DeleteAmbSuppressionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/suppressions/{suppression_id}",
+    ...options,
+  });
+
+/**
+ * Get an Apple Messages for Business suppression
+ *
+ * Returns the suppression episode for the given ID, including one that has already ended. An ended episode keeps its dates and reports when and how it ended.
+ *
+ */
+export const getAmbSuppression = <ThrowOnError extends boolean = false>(
+  options: Options<GetAmbSuppressionData, ThrowOnError>,
+): RequestResult<
+  GetAmbSuppressionResponses,
+  GetAmbSuppressionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAmbSuppressionResponses,
+    GetAmbSuppressionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/suppressions/{suppression_id}",
+    ...options,
+  });
+
+/**
+ * Get aggregate outbound Apple Messages for Business statistics
+ *
+ * Returns one aggregate row of outbound Apple Messages for Business counts and latency percentiles (`p50`, `p95`, and `p99`) for the requested period. Counts are attributed to the time each message was accepted, so a send failure recorded today counts against the day its message was accepted; `period.data_as_of` is the freshness boundary the rollups have reached.
+ *
+ * There is no delivery receipt on this channel, so there is no `delivered` count, delivery rate, or delivery-latency figure anywhere in this response. `latency.processing` covers acceptance to Apple handoff, and `first_response` measures the oldest unanswered inbound message to acceptance of the first outbound reply that claims it. When no qualifying message contributes a measurement, processing percentiles are null and `first_response` is omitted.
+ *
+ * `from` and `to` must both be calendar days or RFC 3339 instants. Day windows cover up to 365 whole days. Instant bounds round down to the hour, remain inclusive, and may span up to 720 hours. Mixing the forms returns `422`. Set `timezone` for local boundaries. Historical dates are supported within the maximum window length; the requested dates are not shifted forward.
+ *
+ * Set one dimension filter at most (`business_account_id`, `message_kind`, `intent`, `group`, `category`, or `tag`); more than one returns `422`. Use `compare=previous_period` to include the preceding equal-length window and each metric's change.
+ *
+ */
+export const getAmbStatsSummary = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAmbStatsSummaryData, ThrowOnError>,
+): RequestResult<
+  GetAmbStatsSummaryResponses,
+  GetAmbStatsSummaryErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbStatsSummaryResponses,
+    GetAmbStatsSummaryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/summary",
+    ...options,
+  });
+
+/**
+ * Get daily outbound Apple Messages for Business statistics
+ *
+ * Returns one row of outbound Apple Messages for Business counts and processing-latency percentiles per calendar day for the workspace, gap-filled so a silent day is a zero row rather than a missing one. Every count in a row is attributed to the day its message was accepted, regardless of when a later event, such as a send failure, arrived.
+ *
+ * There is no delivery receipt on this channel, so there is no `delivered` count or delivery-latency figure in any row. Each row carries its own `latency.processing` percentiles. Read `first_response` from the summary or a breakdown endpoint.
+ *
+ * `from` and `to` are optional calendar days (YYYY-MM-DD), defaulting to the trailing 30 days. The maximum window is 365 days; a longer range returns `422`. Set `timezone` to report rows by your local calendar day. Historical dates are supported within the maximum window length; the requested dates are not shifted forward.
+ *
+ * Set at most one dimension filter (`business_account_id`, `message_kind`, `intent`, `group`, `category`, or `tag`) to restrict the statistics to that dimension's value; setting more than one returns `422`.
+ *
+ */
+export const getAmbStatsDaily = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAmbStatsDailyData, ThrowOnError>,
+): RequestResult<
+  GetAmbStatsDailyResponses,
+  GetAmbStatsDailyErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbStatsDailyResponses,
+    GetAmbStatsDailyErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/daily",
+    ...options,
+  });
+
+/**
+ * Get hourly outbound Apple Messages for Business statistics
+ *
+ * Returns one row of outbound Apple Messages for Business counts and processing-latency percentiles per hour, gap-filled so a silent hour is a zero row rather than a missing one. Every count in a row is attributed to the hour its message was accepted, regardless of when a later event, such as a send failure, arrived. Use it where the daily grain hides the shape; a window spans at most 720 hours (30 days), and for anything longer use the daily endpoint.
+ *
+ * There is no delivery receipt on this channel, so there is no `delivered` count or delivery-latency figure in any row. Each row carries its own `latency.processing` percentiles. Read `first_response` from the summary or a breakdown endpoint.
+ *
+ * `from` and `to` are optional RFC 3339 instants, defaulting to the trailing 168 hours; each bound rounds down to the hour and remains inclusive. A request may span up to 30 days (720 rows). An excessive or reversed window returns `422`. Set `timezone` for local hours instead of UTC, including zones with sub-hour offsets; when the timezone's offset is not a whole number of hours, rows are read from finer-grained internal rollups and combined into hour boundaries automatically, with no parameter to select this. Historical dates are supported within the maximum window length; the requested dates are not shifted forward.
+ *
+ * Set one dimension filter at most (`business_account_id`, `message_kind`, `intent`, `group`, `category`, or `tag`); more than one returns `422`.
+ *
+ */
+export const getAmbStatsHourly = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAmbStatsHourlyData, ThrowOnError>,
+): RequestResult<
+  GetAmbStatsHourlyResponses,
+  GetAmbStatsHourlyErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbStatsHourlyResponses,
+    GetAmbStatsHourlyErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/hourly",
+    ...options,
+  });
+
+/**
+ * Get outbound Apple Messages for Business statistics by business
+ *
+ * Returns outbound counts and latency percentiles grouped by business, for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, omitted when no qualifying message contributes a measurement. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single business, use the summary, daily, or hourly statistics instead.
+ *
+ */
+export const getAmbStatsByBusiness = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAmbStatsByBusinessData, ThrowOnError>,
+): RequestResult<
+  GetAmbStatsByBusinessResponses,
+  GetAmbStatsByBusinessErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbStatsByBusinessResponses,
+    GetAmbStatsByBusinessErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/businesses",
+    ...options,
+  });
+
+/**
+ * Get outbound Apple Messages for Business statistics by message kind
+ *
+ * Returns outbound counts and latency percentiles grouped by message content kind, for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, omitted when no qualifying message contributes a measurement. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single content kind, use the summary, daily, or hourly statistics instead.
+ *
+ */
+export const getAmbStatsByMessageKind = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAmbStatsByMessageKindData, ThrowOnError>,
+): RequestResult<
+  GetAmbStatsByMessageKindResponses,
+  GetAmbStatsByMessageKindErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbStatsByMessageKindResponses,
+    GetAmbStatsByMessageKindErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/message-kinds",
+    ...options,
+  });
+
+/**
+ * Get outbound Apple Messages for Business statistics by intent
+ *
+ * Returns outbound counts and latency percentiles grouped by entry-point intent, for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Intents are workspace-defined strings configured on the business's entry points and have no fixed vocabulary. Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, omitted when no qualifying message contributes a measurement. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single intent, use the summary, daily, or hourly statistics instead.
+ *
+ */
+export const getAmbStatsByIntent = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAmbStatsByIntentData, ThrowOnError>,
+): RequestResult<
+  GetAmbStatsByIntentResponses,
+  GetAmbStatsByIntentErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbStatsByIntentResponses,
+    GetAmbStatsByIntentErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/intents",
+    ...options,
+  });
+
+/**
+ * Get outbound Apple Messages for Business statistics by group
+ *
+ * Returns outbound counts and latency percentiles grouped by entry-point group, for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Groups are workspace-defined strings configured on the business's entry points and have no fixed vocabulary. Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, omitted when no qualifying message contributes a measurement. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single group, use the summary, daily, or hourly statistics instead.
+ *
+ */
+export const getAmbStatsByGroup = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAmbStatsByGroupData, ThrowOnError>,
+): RequestResult<
+  GetAmbStatsByGroupResponses,
+  GetAmbStatsByGroupErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbStatsByGroupResponses,
+    GetAmbStatsByGroupErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/groups",
+    ...options,
+  });
+
+/**
+ * Get outbound Apple Messages for Business statistics by category
+ *
+ * Returns outbound counts and latency percentiles grouped by message category, for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). A send that names no category is grouped under an empty-string category. Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, omitted when no qualifying message contributes a measurement. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single category, use the summary, daily, or hourly statistics instead.
+ *
+ */
+export const getAmbStatsByCategory = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAmbStatsByCategoryData, ThrowOnError>,
+): RequestResult<
+  GetAmbStatsByCategoryResponses,
+  GetAmbStatsByCategoryErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbStatsByCategoryResponses,
+    GetAmbStatsByCategoryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/categories",
+    ...options,
+  });
+
+/**
+ * Get outbound Apple Messages for Business statistics by tag
+ *
+ * Returns outbound counts and latency percentiles grouped by tag (`name` or `name:value`), for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Only tagged messages appear, and one carrying several tags counts once under each, so rows do not sum to the period total. Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, omitted when no qualifying message contributes a measurement. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single tag, use the summary, daily, or hourly statistics instead.
+ *
+ */
+export const getAmbStatsByTag = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAmbStatsByTagData, ThrowOnError>,
+): RequestResult<
+  GetAmbStatsByTagResponses,
+  GetAmbStatsByTagErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbStatsByTagResponses,
+    GetAmbStatsByTagErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/tags",
+    ...options,
+  });
+
+/**
+ * Get outbound Apple Messages for Business statistics by error code
+ *
+ * Returns outbound counts and latency percentiles grouped by failure reason, for the requested period. Rows are ranked by `send_failed + rejected` descending and capped at the requested `limit` (default 50, max 200). Only messages carrying a failure reason appear: a `bird:` code is usually a rejection (never charged, never attempted), an `apple:` code a send failure; use the summary for the period's full accepted total. Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, when a failed reply claimed an unanswered inbound message. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ * This is a workspace-scoped, single-dimension breakdown; it does not cross error code with any other dimension such as business. The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter.
+ *
+ */
+export const getAmbStatsByErrorCode = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAmbStatsByErrorCodeData, ThrowOnError>,
+): RequestResult<
+  GetAmbStatsByErrorCodeResponses,
+  GetAmbStatsByErrorCodeErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbStatsByErrorCodeResponses,
+    GetAmbStatsByErrorCodeErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/error-codes",
+    ...options,
+  });
+
+/**
+ * Get aggregate inbound Apple Messages for Business statistics
+ *
+ * Returns one aggregate row of inbound Apple Messages for Business counts for the requested period. Inbound statistics are attributed to when the event occurred, not to any earlier outbound message, so a reply received today counts against today regardless of when the conversation started. `period.data_as_of` is the freshness boundary the rollups have reached.
+ *
+ * This channel has no delivery receipt and no derived rate; the response carries only the raw `received` count.
+ *
+ * `from` and `to` must both be calendar days or RFC 3339 instants. Day windows cover up to 365 whole days. Instant bounds round down to the hour, remain inclusive, and may span up to 720 hours. Mixing the forms returns `422`. Set `timezone` for local boundaries. Historical dates are supported within the maximum window length; the requested dates are not shifted forward.
+ *
+ * Use `compare=previous_period` to include the preceding equal-length window and the change between the two.
+ *
+ */
+export const getAmbInboundStatsSummary = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAmbInboundStatsSummaryData, ThrowOnError>,
+): RequestResult<
+  GetAmbInboundStatsSummaryResponses,
+  GetAmbInboundStatsSummaryErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbInboundStatsSummaryResponses,
+    GetAmbInboundStatsSummaryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/inbound/summary",
+    ...options,
+  });
+
+/**
+ * Get daily inbound Apple Messages for Business statistics
+ *
+ * Returns one row of inbound Apple Messages for Business counts per calendar day for the workspace, gap-filled so a silent day is a zero row rather than a missing one. Every row is attributed to the day the inbound event occurred, not to any earlier outbound message.
+ *
+ * This channel has no delivery receipt and no derived rate; each row carries only the raw `received` count.
+ *
+ * `from` and `to` are optional calendar days (YYYY-MM-DD), defaulting to the trailing 30 days. The maximum window is 365 days; a longer range returns `422`. Set `timezone` to report rows by your local calendar day. Historical dates are supported within the maximum window length; the requested dates are not shifted forward.
+ *
+ */
+export const getAmbInboundStatsDaily = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAmbInboundStatsDailyData, ThrowOnError>,
+): RequestResult<
+  GetAmbInboundStatsDailyResponses,
+  GetAmbInboundStatsDailyErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbInboundStatsDailyResponses,
+    GetAmbInboundStatsDailyErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/inbound/daily",
+    ...options,
+  });
+
+/**
+ * Get hourly inbound Apple Messages for Business statistics
+ *
+ * Returns one row of inbound Apple Messages for Business counts per hour, gap-filled so a silent hour is a zero row rather than a missing one. Every row is attributed to the hour the inbound event occurred, not to any earlier outbound message. Use it where the daily grain hides the shape; a window spans at most 720 hours (30 days), and for anything longer use the daily endpoint.
+ *
+ * This channel has no delivery receipt and no derived rate; each row carries only the raw `received` count.
+ *
+ * `from` and `to` are optional RFC 3339 instants, defaulting to the trailing 168 hours; each bound rounds down to the hour and remains inclusive. A request may span up to 30 days (720 rows). An excessive or reversed window returns `422`. Set `timezone` for local hours instead of UTC, including zones with sub-hour offsets; when the timezone's offset is not a whole number of hours, rows are read from finer-grained internal rollups and combined into hour boundaries automatically, with no parameter to select this. Historical dates are supported within the maximum window length; the requested dates are not shifted forward.
+ *
+ */
+export const getAmbInboundStatsHourly = <ThrowOnError extends boolean = false>(
+  options?: Options<GetAmbInboundStatsHourlyData, ThrowOnError>,
+): RequestResult<
+  GetAmbInboundStatsHourlyResponses,
+  GetAmbInboundStatsHourlyErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbInboundStatsHourlyResponses,
+    GetAmbInboundStatsHourlyErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/inbound/hourly",
+    ...options,
+  });
+
+/**
+ * Get inbound Apple Messages for Business statistics by business
+ *
+ * Returns inbound received counts grouped by business, for the requested period. Rows are ranked by received volume descending and capped at the requested `limit` (default 50, max 200). Rows are attributed to when the inbound event occurred, not to any earlier outbound message. This channel has no delivery receipt and no derived rate, so each row carries only the raw `received` count.
+ * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single business, use the inbound summary, daily, or hourly statistics instead.
+ *
+ */
+export const getAmbInboundStatsByBusiness = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetAmbInboundStatsByBusinessData, ThrowOnError>,
+): RequestResult<
+  GetAmbInboundStatsByBusinessResponses,
+  GetAmbInboundStatsByBusinessErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbInboundStatsByBusinessResponses,
+    GetAmbInboundStatsByBusinessErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/inbound/businesses",
+    ...options,
+  });
+
+/**
+ * Get inbound Apple Messages for Business statistics by intent
+ *
+ * Returns inbound received counts grouped by entry-point intent, for the requested period. Rows are ranked by received volume descending and capped at the requested `limit` (default 50, max 200). Intents are workspace-defined strings configured on the business's entry points and have no fixed vocabulary. Rows are attributed to when the inbound event occurred, not to any earlier outbound message. This channel has no delivery receipt and no derived rate, so each row carries only the raw `received` count.
+ * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single intent, use the inbound summary, daily, or hourly statistics instead.
+ *
+ */
+export const getAmbInboundStatsByIntent = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetAmbInboundStatsByIntentData, ThrowOnError>,
+): RequestResult<
+  GetAmbInboundStatsByIntentResponses,
+  GetAmbInboundStatsByIntentErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbInboundStatsByIntentResponses,
+    GetAmbInboundStatsByIntentErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/inbound/intents",
+    ...options,
+  });
+
+/**
+ * Get aggregate Apple Messages for Business conversation statistics
+ *
+ * Returns one aggregate row of Apple Messages for Business conversation lifecycle counts (`started`, `reopened`, `closed`, `conversations`) for the requested period. Rows are attributed to when the lifecycle event occurred, not to any earlier outbound message. A conversation can be reopened and closed more than once, so `started`, `reopened`, and `closed` need not sum to `conversations`, and any one of them can exceed it. `period.data_as_of` is the freshness boundary the rollups have reached.
+ *
+ * `from` and `to` must both be calendar days or RFC 3339 instants. Day windows cover up to 365 whole days. Instant bounds round down to the hour, remain inclusive, and may span up to 720 hours. Mixing the forms returns `422`. Set `timezone` for local boundaries. Historical dates are supported within the maximum window length; the requested dates are not shifted forward.
+ *
+ * Use `compare=previous_period` to include the preceding equal-length window and the change between the two.
+ *
+ */
+export const getAmbConversationStatsSummary = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetAmbConversationStatsSummaryData, ThrowOnError>,
+): RequestResult<
+  GetAmbConversationStatsSummaryResponses,
+  GetAmbConversationStatsSummaryErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbConversationStatsSummaryResponses,
+    GetAmbConversationStatsSummaryErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/conversations/summary",
+    ...options,
+  });
+
+/**
+ * Get daily Apple Messages for Business conversation statistics
+ *
+ * Returns one row of Apple Messages for Business conversation lifecycle counts (`started`, `reopened`, `closed`, `conversations`) per calendar day for the workspace, gap-filled so a silent day is a zero row rather than a missing one. Every row is attributed to the day the lifecycle event occurred, not to any earlier outbound message. A conversation can be reopened and closed more than once, so `started`, `reopened`, and `closed` need not sum to `conversations` within a row, and any one of them can exceed it.
+ *
+ * `from` and `to` are optional calendar days (YYYY-MM-DD), defaulting to the trailing 30 days. The maximum window is 365 days; a longer range returns `422`. Set `timezone` to report rows by your local calendar day. Historical dates are supported within the maximum window length; the requested dates are not shifted forward.
+ *
+ */
+export const getAmbConversationStatsDaily = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetAmbConversationStatsDailyData, ThrowOnError>,
+): RequestResult<
+  GetAmbConversationStatsDailyResponses,
+  GetAmbConversationStatsDailyErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbConversationStatsDailyResponses,
+    GetAmbConversationStatsDailyErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/conversations/daily",
+    ...options,
+  });
+
+/**
+ * Get hourly Apple Messages for Business conversation statistics
+ *
+ * Returns one row of Apple Messages for Business conversation lifecycle counts (`started`, `reopened`, `closed`, `conversations`) per hour, gap-filled so a silent hour is a zero row rather than a missing one. Every row is attributed to the hour the lifecycle event occurred, not to any earlier outbound message. A conversation can be reopened and closed more than once, so `started`, `reopened`, and `closed` need not sum to `conversations` within a row, and any one of them can exceed it. Use it where the daily grain hides the shape; a window spans at most 720 hours (30 days), and for anything longer use the daily endpoint.
+ *
+ * `from` and `to` are optional RFC 3339 instants, defaulting to the trailing 168 hours; each bound rounds down to the hour and remains inclusive. A request may span up to 30 days (720 rows). An excessive or reversed window returns `422`. Set `timezone` for local hours instead of UTC, including zones with sub-hour offsets; when the timezone's offset is not a whole number of hours, rows are read from finer-grained internal rollups and combined into hour boundaries automatically, with no parameter to select this. Historical dates are supported within the maximum window length; the requested dates are not shifted forward.
+ *
+ */
+export const getAmbConversationStatsHourly = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetAmbConversationStatsHourlyData, ThrowOnError>,
+): RequestResult<
+  GetAmbConversationStatsHourlyResponses,
+  GetAmbConversationStatsHourlyErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAmbConversationStatsHourlyResponses,
+    GetAmbConversationStatsHourlyErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/stats/conversations/hourly",
+    ...options,
+  });
+
+/**
  * List WhatsApp Business Accounts
  *
  * Returns a paginated list of the WhatsApp Business Accounts your workspace has
@@ -8329,7 +10011,7 @@ export const duplicateEmailTemplate = <ThrowOnError extends boolean = false>(
 /**
  * Get an email template preview
  *
- * Renders a template with the sample values you supply and returns the resulting subject, HTML, and plain-text bodies: the personalized email as it will look once sent. By default it renders the current draft, so you can check your changes before you submit it. Pass `version` to preview a specific published version instead; built-in `system` templates have no versions, so `version` on a `bird_` template returns a validation error. Pass `contact` to see the email the way one of your contacts would receive it. Works for your workspace templates and built-in `system` templates. Sample `parameters` are capped at 16 KB once serialized, and personalization that is not valid or not supported returns a validation error naming what to fix.
+ * Renders a template with the sample values you supply and returns the resulting subject, HTML, and plain-text bodies. Bird does not issue a recipient-specific unsubscribe URL in a preview. If you supply `bird.unsubscribe_url` in `parameters`, the preview renders your value; an empty link is not live. Bird adds unsubscribe content to marketing email at send time; transactional email gets no automatic unsubscribe footer. By default it renders the current draft, so you can check your changes before you submit it. Pass `version` to preview a specific published version instead; built-in `system` templates have no versions, so `version` on a `bird_` template returns a validation error. Pass `contact` to see the email the way one of your contacts would receive it. Works for your workspace templates and built-in `system` templates. Sample `parameters` are capped at 16 KB once serialized, and personalization that is not valid or not supported returns a validation error naming what to fix.
  * The response also reports what the HTML uses that mail clients remove, ignore, or render inconsistently. Each finding in `compatibility` names the pattern, the line and column it sits on, and what to use instead, and `compatibility_severity` reduces them to one word for the whole body. It is advisory: the preview renders either way.
  *
  */
@@ -9816,9 +11498,10 @@ export const listNumbersOrders = <ThrowOnError extends boolean = false>(
  * returns `202`; poll `GET /v1/numbers/orders/{order_id}` until it is
  * `completed` or `failed`.
  *
- * A `412` means the workspace has not
- * completed the identity verification required to acquire a sender. Complete
- * it, then retry.
+ * A `412` means required identity verification is incomplete or organization
+ * eligibility prevents the purchase. Follow the error's recovery guidance:
+ * complete missing verification, or contact support about an eligibility review
+ * or denial. An eligibility assessment still in progress returns `503`; retry later.
  *
  */
 export const createNumbersOrder = <ThrowOnError extends boolean = false>(
@@ -10488,10 +12171,7 @@ export const getVoiceCallerId = <ThrowOnError extends boolean = false>(
  * Verify a caller ID
  *
  * Completes a caller-ID verification challenge started in the dashboard. Submit
- * the code delivered by the verification call. Success marks the caller ID as
- * `verified` so you can present it on outbound calls. While verification is
- * pending, an incorrect code is rejected. Repeating the request for an already
- * verified caller ID returns it without checking the code again.
+ * the code delivered by the verification call. An incorrect code is rejected.
  *
  * If the verification call could not be started previously, this request can
  * retry it and place another call to the same number. Your organization must
@@ -10502,10 +12182,21 @@ export const getVoiceCallerId = <ThrowOnError extends boolean = false>(
  * registration ID before submitting its code. Caller-ID creation and deletion
  * are not available through the public API.
  *
- * Verification attempts to enable the number's country as a Voice destination.
- * An unavailable country or a failed settings update can leave it disabled
- * after the number is verified. Check **Voice** > **Destinations** before calling;
- * see the [caller ID guide](https://bird.com/docs/guides/voice/caller-ids).
+ * A successful ownership check is retained even when organization eligibility
+ * prevents outbound activation. If the caller ID's `status` is `verified` after
+ * a `412` or `503`, complete the missing steps or contact support, then
+ * resubmit an empty object (`{}`). The saved proof is reused without checking
+ * a code again. While proof is still pending, include the code; an empty
+ * object is rejected. A `412` means missing verification steps or an
+ * eligibility decision requiring support; a `503` means assessment is pending
+ * or unavailable. `outbound_enabled` indicates whether activation has
+ * completed. Outbound calls remain subject to routing and number ownership
+ * requirements.
+ *
+ * Activation attempts to enable the number's country as a Voice destination.
+ * An unavailable country or a failed settings update can leave it disabled.
+ * Check **Voice** > **Destinations** before calling; see the
+ * [caller ID guide](https://bird.com/docs/guides/voice/caller-ids).
  *
  */
 export const verifyVoiceCallerId = <ThrowOnError extends boolean = false>(

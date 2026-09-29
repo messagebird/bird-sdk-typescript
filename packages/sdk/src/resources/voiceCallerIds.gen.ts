@@ -35,13 +35,13 @@ export class VoiceCallerIdsResource extends Resource {
   }
 
   /**
-   * Complete a caller-ID verification challenge started in the dashboard. Recovery can place another verification call to the same number and requires the organization to remain eligible to register caller IDs. For expired or exhausted challenges, ask the user to select Get a new code in the dashboard. List caller IDs again to obtain the replacement registration ID before submitting its code. Read Voice destinations separately to confirm whether the number's country is enabled.
+   * Complete a caller-ID verification challenge started in the dashboard. Recovery may place another verification call and requires registration eligibility. Submit the code while ownership proof is pending. If proof was saved but outbound activation returned 412 or 503, resolve the issue and resubmit an empty object to reuse the proof. For expired or exhausted challenges, use Get a new code in the dashboard and list caller IDs to obtain the replacement ID.
    *
    * @example Submit a caller-ID verification code
    * const callerId = await bird.voice.callerIds.verify("CALLER_ID", { code: "123456" });
    * console.log(callerId.id, callerId.status);
    */
-  verify(callerId: string, params: VoiceCallerIdsVerifyParams, options?: RequestOptions): APIPromise<VoiceCallerId> {
+  verify(callerId: string, params: VoiceCallerIdsVerifyParams = {}, options?: RequestOptions): APIPromise<VoiceCallerId> {
     return this.call<VoiceCallerId>("POST", options, ({ signal, headers }) =>
       verifyVoiceCallerId({ client: this.client, path: { caller_id: callerId }, body: params, headers, signal }));
   }

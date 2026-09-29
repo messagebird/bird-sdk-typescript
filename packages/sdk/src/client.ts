@@ -24,6 +24,7 @@ import { ContactsResource } from "./resources/contacts.js";
 import { PreferencesResource } from "./resources/preferences.js";
 import { BroadcastsResource } from "./resources/broadcasts.js";
 import { WorkspaceResource } from "./resources/workspace.gen.js";
+import { AmbResource } from "./resources/amb.js";
 import { SmsResource } from "./resources/sms.js";
 import { SmsKeywordRulesResource } from "./resources/smsKeywordRules.gen.js";
 import { SmsSuppressionsResource } from "./resources/smsSuppressions.gen.js";
@@ -186,6 +187,8 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
   /** Email channel: `bird.email.send(...)`, `.get(...)`, `.list(...)`. */
   readonly email: EmailResource<EmailDefaultsOf<O>>;
 
+  readonly amb: AmbResource;
+
   /** SMS channel: `bird.sms.send(...)`, `.get(...)`, `.list(...)`. */
   readonly sms: SmsResource;
 
@@ -298,6 +301,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
       this.#client,
       opts.email as EmailDefaultsOf<O>,
     );
+    this.amb = new AmbResource(this.core, this.#client);
     this.sms = new SmsResource(this.core, this.#client);
     this.smsTemplates = new SmsTemplatesResource(this.core, this.#client);
     this.smsSuppressions = new SmsSuppressionsResource(this.core, this.#client);

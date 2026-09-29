@@ -90,8 +90,14 @@ export type {
   SmsSendBatchResult,
 } from "./resources/sms.js";
 export type { SmsMessage, SmsListQuery } from "./resources/sms.gen.js";
-export type { VoiceCall, VoiceCallsCreateParams } from "./resources/voiceCalls.gen.js";
-export type { VoiceLeg, VoiceLegsListQuery } from "./resources/voiceLegs.gen.js";
+export type {
+  VoiceCall,
+  VoiceCallsCreateParams,
+} from "./resources/voiceCalls.gen.js";
+export type {
+  VoiceLeg,
+  VoiceLegsListQuery,
+} from "./resources/voiceLegs.gen.js";
 export type {
   VoiceTrunksListQuery,
   VoiceTrunksCreateParams,
@@ -333,9 +339,7 @@ export type {
   ContactUpsertResult,
   ContactListQuery,
 } from "./resources/contacts.gen.js";
-export type {
-  ContactsPreferencesListQuery,
-} from "./resources/contactsPreferences.gen.js";
+export type { ContactsPreferencesListQuery } from "./resources/contactsPreferences.gen.js";
 export type {
   Audience,
   AudienceMember,
@@ -409,6 +413,12 @@ export type {
 export { WebhookEventType } from "./event-types.gen.js";
 export type { WebhookEventTypeValue } from "./event-types.gen.js";
 export {
+  AMBBusinessAccountReviewStatus,
+  AMBMessageEventType,
+  AMBFormKeyboardType,
+  AMBFormTextContentType,
+  AMBSuppressionOrigin,
+  AMBSuppressionReason,
   DestinationRegion,
   DestinationSuperRegion,
   EmailClientFamily,
@@ -473,6 +483,12 @@ export {
   WhatsAppUsernameStatus,
 } from "./open-enums.gen.js";
 export type {
+  AMBBusinessAccountReviewStatusValue,
+  AMBMessageEventTypeValue,
+  AMBFormKeyboardTypeValue,
+  AMBFormTextContentTypeValue,
+  AMBSuppressionOriginValue,
+  AMBSuppressionReasonValue,
   DestinationRegionValue,
   DestinationSuperRegionValue,
   EmailClientFamilyValue,
@@ -646,9 +662,7 @@ export type {
   EmailInboxInsightsBenchmarksIndustryQuery,
 } from "./resources/emailInboxInsightsBenchmarks.gen.js";
 
-export type {
-  EmailInboxInsightsDomainMonitoringResult,
-} from "./resources/emailInboxInsightsDomainMonitoring.gen.js";
+export type { EmailInboxInsightsDomainMonitoringResult } from "./resources/emailInboxInsightsDomainMonitoring.gen.js";
 
 export type {
   EmailInboxInsightsDomain,
@@ -663,3 +677,84 @@ export type {
   VoiceTrunksGatewaysUpdateParams,
 } from "./resources/voiceTrunksGateways.gen.js";
 export type { VoiceCallerIdsVerifyParams } from "./resources/voiceCallerIds.gen.js";
+
+export type {
+  AmbListEventsQuery,
+  AmbListQuery,
+  AmbSendParams,
+  AmbMessageEventList,
+  AmbMessage,
+} from "./resources/amb.gen.js";
+export type {
+  AmbBusinessAccountsUpdateParams,
+  AmbBusinessAccountsListQuery,
+  AmbBusinessAccountsCreateParams,
+  AmbBusinessAccount,
+} from "./resources/ambBusinessAccounts.gen.js";
+export type {
+  AmbBusinessAccountsSettingsUpdateParams,
+  AmbChannelSettings,
+} from "./resources/ambBusinessAccountsSettings.gen.js";
+export type {
+  AmbBusinessAccountsSubmissionsCreateParams,
+  AmbBusinessAccountsSubmissionsListQuery,
+  AmbBusinessAccountSubmission,
+} from "./resources/ambBusinessAccountsSubmissions.gen.js";
+export type {
+  AmbConversationsUpdateParams,
+  AmbConversationsListMessagesQuery,
+  AmbConversationsTypingParams,
+  AmbConversationsListQuery,
+  AmbConversation,
+} from "./resources/ambConversations.gen.js";
+export type {
+  AmbRoutingRulesUpdateParams,
+  AmbRoutingRulesListQuery,
+  AmbRoutingRulesCreateParams,
+  AmbRoutingRule,
+  AmbRoutingRuleList,
+} from "./resources/ambRoutingRules.gen.js";
+export type {
+  AmbStatsByBusinessQuery,
+  AmbStatsByCategoryQuery,
+  AmbStatsDailyQuery,
+  AmbStatsByErrorCodeQuery,
+  AmbStatsByGroupQuery,
+  AmbStatsHourlyQuery,
+  AmbStatsByIntentQuery,
+  AmbStatsByMessageKindQuery,
+  AmbStatsSummaryQuery,
+  AmbStatsByTagQuery,
+  AmbStatsByBusinessResponse,
+  AmbStatsByCategoryResponse,
+  AmbStatsResponse,
+  AmbStatsByErrorCodeResponse,
+  AmbStatsByGroupResponse,
+  AmbStatsByIntentResponse,
+  AmbStatsByMessageKindResponse,
+  AmbStatsSummary,
+  AmbStatsByTagResponse,
+} from "./resources/ambStats.gen.js";
+export type {
+  AmbStatsConversationsDailyQuery,
+  AmbStatsConversationsHourlyQuery,
+  AmbStatsConversationsSummaryQuery,
+  AmbConversationStatsResponse,
+  AmbConversationStatsSummary,
+} from "./resources/ambStatsConversations.gen.js";
+export type {
+  AmbStatsInboundByBusinessQuery,
+  AmbStatsInboundDailyQuery,
+  AmbStatsInboundHourlyQuery,
+  AmbStatsInboundByIntentQuery,
+  AmbStatsInboundSummaryQuery,
+  AmbInboundStatsByBusinessResponse,
+  AmbInboundStatsResponse,
+  AmbInboundStatsByIntentResponse,
+  AmbInboundStatsSummary,
+} from "./resources/ambStatsInbound.gen.js";
+export type {
+  AmbSuppressionsListQuery,
+  AmbSuppressionsCreateParams,
+  AmbSuppression,
+} from "./resources/ambSuppressions.gen.js";

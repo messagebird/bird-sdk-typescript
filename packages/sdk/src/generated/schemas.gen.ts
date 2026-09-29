@@ -5,6 +5,33 @@ export const WebhookEventSchema = {
     "Webhook delivery body. `type` identifies the event variant, `timestamp` is when the event occurred, and `data` contains the event-specific payload. See the [webhooks guide](/docs/guides/webhooks) for signature verification.\n",
   oneOf: [
     {
+      $ref: "#/components/schemas/EventAMBAccepted",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBConversationClosed",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBConversationReopened",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBConversationStarted",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBReceived",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBRejected",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBSendFailed",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBSent",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBSuppressionCreated",
+    },
+    {
       $ref: "#/components/schemas/EventDomainFailed",
     },
     {
@@ -176,6 +203,19 @@ export const WebhookEventSchema = {
   discriminator: {
     propertyName: "type",
     mapping: {
+      "amb.accepted": "#/components/schemas/EventAMBAccepted",
+      "amb.conversation_closed":
+        "#/components/schemas/EventAMBConversationClosed",
+      "amb.conversation_reopened":
+        "#/components/schemas/EventAMBConversationReopened",
+      "amb.conversation_started":
+        "#/components/schemas/EventAMBConversationStarted",
+      "amb.received": "#/components/schemas/EventAMBReceived",
+      "amb.rejected": "#/components/schemas/EventAMBRejected",
+      "amb.send_failed": "#/components/schemas/EventAMBSendFailed",
+      "amb.sent": "#/components/schemas/EventAMBSent",
+      "amb_suppression.created":
+        "#/components/schemas/EventAMBSuppressionCreated",
       "domain.failed": "#/components/schemas/EventDomainFailed",
       "domain.verified": "#/components/schemas/EventDomainVerified",
       "email.accepted": "#/components/schemas/EventEmailAccepted",
@@ -250,6 +290,40 @@ export const WebhookEventSchema = {
       "whatsapp.sent": "#/components/schemas/EventWhatsAppSent",
       "whatsapp_suppression.created":
         "#/components/schemas/EventWhatsAppSuppressionCreated",
+    },
+  },
+} as const;
+
+export const WorkspaceIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^ws_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const _ListEnvelopeSchema = {
+  type: "object",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -444,13 +518,6 @@ export const OrganizationIDSchema = {
   example: "org_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
-export const WorkspaceIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^ws_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "ws_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
 export const TimezoneSchema = {
   type: "string",
   minLength: 1,
@@ -463,33 +530,6 @@ export const SortOrderSchema = {
   type: "string",
   enum: ["asc", "desc"],
   description: "Sort direction, ascending or descending.",
-} as const;
-
-export const _ListEnvelopeSchema = {
-  type: "object",
-  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
-  properties: {
-    next_cursor: {
-      type: ["string", "null"],
-      description:
-        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
-      example:
-        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
-    },
-    prev_cursor: {
-      type: ["string", "null"],
-      description:
-        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
-      example: null,
-    },
-    refresh_cursor: {
-      type: ["string", "null"],
-      description:
-        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
-      example:
-        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
-    },
-  },
 } as const;
 
 export const _ListEnvelopeWithTotalSchema = {
@@ -4141,7 +4181,7 @@ export const PreferenceChannelSchema = {
   minLength: 1,
   description:
     "The channel a preference statement applies to. A preference addresses one channel: the handle that identifies the person differs per channel, so opting out of one channel says nothing about the others. New channels can be added over time, so a value outside this list can be returned.",
-  "x-extensible-enum": ["email", "sms", "whatsapp"],
+  "x-extensible-enum": ["email", "sms", "whatsapp", "amb"],
   example: "sms",
 } as const;
 
@@ -4158,7 +4198,7 @@ export const PreferenceCoverageSchema = {
   type: "string",
   minLength: 1,
   description:
-    "How much traffic the statement covers. `non_transactional` covers marketing and other non-essential messages while transactional messages such as receipts and verification codes keep flowing; `all` covers every message including transactional ones.",
+    "How much traffic the statement covers. `non_transactional` covers marketing and other non-essential messages while transactional messages such as receipts and verification codes keep flowing; `all` covers every message including transactional ones. Apple Messages for Business phone invitations have no transactional exemption, so either value covers them.",
   enum: ["all", "non_transactional"],
   example: "non_transactional",
 } as const;
@@ -4216,14 +4256,14 @@ export const PreferenceSchema = {
           maxLength: 320,
           readOnly: true,
           description:
-            "Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS and WhatsApp.",
+            "Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS, WhatsApp, and Apple Messages for Business.",
           example: "+15550001234",
         },
         sender_scope: {
           type: ["string", "null"],
           readOnly: true,
           description:
-            "The sender the statement is limited to, or null when it covers the whole channel. On SMS this is the originator the person replied to; on WhatsApp it identifies the business account that messaged them. Email preferences are always channel-wide, so it is always null there.",
+            "The sender the statement is limited to, or null when it covers the whole channel. On SMS this is the originator the person replied to; on WhatsApp it identifies the business account that messaged them; on Apple Messages for Business it is the Apple business ID used for invitations. Email preferences are always channel-wide, so it is always null there.",
           example: "+15557654321",
         },
         topic_id: {
@@ -4340,14 +4380,14 @@ export const PreferenceStatementSchema = {
       ],
       default: "non_transactional",
       description:
-        "How much traffic the statement covers. Defaults to `non_transactional`, which keeps transactional messages such as receipts and verification codes flowing.",
+        "How much traffic the statement covers. Defaults to `non_transactional`, which keeps transactional messages such as receipts and verification codes flowing. Apple Messages for Business phone invitations have no transactional exemption, so either value covers them.",
     },
     sender_scope: {
       type: "string",
       minLength: 1,
       maxLength: 255,
       description:
-        "Limit the statement to one sender instead of the whole channel. On SMS this is the originator; on WhatsApp it identifies the business account. Not supported on email, where preferences are always channel-wide.",
+        "Limit the statement to one sender instead of the whole channel. On SMS this is the originator; on WhatsApp it identifies the business account; on Apple Messages for Business it is the Apple business ID used for invitations. Not supported on email, where preferences are always channel-wide.",
       example: "+15557654321",
     },
     source: {
@@ -4380,7 +4420,7 @@ export const PreferenceCreateSchema = {
           minLength: 1,
           maxLength: 320,
           description:
-            "Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS and WhatsApp.",
+            "Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS, WhatsApp, and Apple Messages for Business.",
           example: "+15550001234",
         },
       },
@@ -6971,6 +7011,118 @@ export const SMSKeywordRuleUpdateSchema = {
   },
 } as const;
 
+export const AttachmentIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^tca_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "tca_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AttachmentStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["draft", "attached"],
+  description:
+    "Lifecycle of an attachment. `draft` is a file that has been uploaded but nothing\nhas been registered or submitted with it yet, and it is discarded at its\n`expires_at`. `attached` means at least one registration has cited it, so it is\nkept permanently and can no longer be deleted.\n",
+} as const;
+
+export const AttachmentSchema = {
+  description:
+    "A supporting document uploaded for an SMS registration (10DLC campaign evidence, toll-free verification opt-in screenshots). Reference it from the registration's own attachment-id field to submit it as evidence.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+    {
+      type: "object",
+      required: [
+        "id",
+        "filename",
+        "content_type",
+        "size_bytes",
+        "download_url",
+        "download_url_expires_at",
+        "status",
+        "expires_at",
+      ],
+      properties: {
+        id: {
+          readOnly: true,
+          $ref: "#/components/schemas/AttachmentID",
+        },
+        filename: {
+          type: "string",
+          minLength: 1,
+          readOnly: true,
+          description: "The uploaded file's name.",
+        },
+        content_type: {
+          type: "string",
+          minLength: 1,
+          readOnly: true,
+          description: "The file's content type, determined from its contents.",
+        },
+        size_bytes: {
+          type: "integer",
+          format: "int64",
+          readOnly: true,
+          description: "The file's size in bytes.",
+        },
+        description: {
+          type: "string",
+          maxLength: 255,
+          readOnly: true,
+          description: "A short note describing what the file shows.",
+        },
+        status: {
+          readOnly: true,
+          $ref: "#/components/schemas/AttachmentStatus",
+        },
+        download_url: {
+          type: "string",
+          format: "uri",
+          minLength: 1,
+          readOnly: true,
+          "x-sensitive": true,
+          description:
+            "Short-lived signed URL for downloading or previewing the attachment. Valid for 24 hours from when the resource was fetched; request a fresh resource to obtain a new URL after expiry. Do not cache beyond `download_url_expires_at`. Registration authorities (10DLC and toll-free carriers) retrieve evidence via a separate, longer-lived token; this URL is not that token.",
+        },
+        preview_url: {
+          type: "string",
+          format: "uri",
+          readOnly: true,
+          "x-sensitive": true,
+          description:
+            "Optional signed URL for inline viewing on an isolated storage origin. Valid for one hour; fetch the attachment again to refresh it.",
+        },
+        download_url_expires_at: {
+          type: "string",
+          format: "date-time",
+          minLength: 1,
+          readOnly: true,
+          description:
+            "When `download_url` expires. Both fields are always present; the server returns an error rather than omitting them.",
+        },
+        expires_at: {
+          type: ["string", "null"],
+          format: "date-time",
+          readOnly: true,
+          description:
+            "When this attachment is discarded if nothing is registered or submitted with it. Null once its status is `attached`.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const AssetIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^ast_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "ast_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const ComplianceSubmissionIDSchema = {
   type: "string",
   minLength: 1,
@@ -9289,6 +9441,23 @@ export const WhatsAppTemplateCategorySchema = {
 } as const;
 
 export const VerificationSchema = {
+  example: {
+    id: "vrf_01krdgeqcxet5s7t44vh8rt9mg",
+    status: "pending",
+    reason: null,
+    to: {
+      email: "user@example.com",
+    },
+    channels: [
+      {
+        channel: "email",
+      },
+    ],
+    last_channel: "email",
+    expires_at: "2026-05-20T09:24:52Z",
+    created_at: "2026-05-20T09:14:52Z",
+    updated_at: "2026-05-20T09:14:52Z",
+  },
   allOf: [
     {
       type: "object",
@@ -9480,6 +9649,7 @@ export const VerificationCheckResultSchema = {
     success: {
       type: "boolean",
       readOnly: true,
+      example: false,
       description:
         "Whether the submitted passcode verified this verification. `true` means the passcode was correct and the verification is now complete; `false` means it did not verify, and `reason` says why. A verification that has already reached a final state is no longer checkable and returns `404`.",
     },
@@ -9497,6 +9667,7 @@ export const VerificationCheckResultSchema = {
       type: ["integer", "null"],
       minimum: 0,
       readOnly: true,
+      example: 2,
       description:
         "The number of check attempts left while the verification is still pending, or `null` once it has reached a final state.",
     },
@@ -10711,6 +10882,42 @@ export const WhatsAppReactionSchema = {
       ],
       description:
         "Who reacted. On a group message this is what tells one participant's reaction from another's. On a one-to-one message it is your business number on a reaction you placed and the contact on one they placed, which is why it is here rather than inferred from the message's `direction`.\n",
+    },
+  },
+} as const;
+
+export const ActorSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "type"],
+  properties: {
+    id: {
+      type: "string",
+      minLength: 1,
+      description: "Actor identifier.",
+      example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    type: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": [
+        "user",
+        "api_key",
+        "oauth_token",
+        "system",
+        "sso",
+        "service_account",
+        "automation",
+      ],
+      description:
+        "New actor types may be added. Treat unrecognized values as future types, not errors.\n- `user`: a member's own session.\n- `api_key`: a workspace API key.\n- `oauth_token`: a token issued to a caller on a member's behalf.\n- `system`: an action we perform without a customer actor.\n- `sso`: an organization's SSO connection.\n- `service_account`: a workspace's connected Integration acting with no member behind it.\n- `automation`: an automation execution in your workspace.",
+      example: "user",
+    },
+    display_name: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "The label the actor is shown under: typically a member's name or email address, or the API key's name. Null when it could not be resolved.\n",
     },
   },
 } as const;
@@ -16415,6 +16622,5194 @@ export const WhatsAppNumberProfileSchema = {
         "A link to the profile picture WhatsApp currently shows. WhatsApp signs this link and it expires within days, so load it when you display it and never store it. It is served with permissive cross-origin headers, so a browser can load it directly.",
       example:
         "https://pps.whatsapp.net/v/t61.24694-24/643148303_1005107588793925.jpg",
+    },
+  },
+} as const;
+
+export const AMBBusinessIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^abz_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "abz_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AMBBusinessAccountStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["pending", "active", "suspended", "disconnected"],
+  description:
+    "Pending accounts need setup or review. Active accounts have recorded approval. Suspended accounts retain their recorded suspension. Configured, connected accounts can exchange messages regardless of review status; Apple decides whether to accept outgoing requests. Disconnected accounts retain their identity and history but cannot exchange new messages until reconnected.",
+  example: "active",
+} as const;
+
+export const AMBBusinessAccountReviewStatusSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["pending", "approved", "rejected"],
+  description: "Latest review outcome recorded by Bird staff.",
+  example: "approved",
+} as const;
+
+export const AMBBusinessAccountSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "apple_business_id",
+    "name",
+    "status",
+    "invitations_enabled",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/AMBBusinessID",
+      readOnly: true,
+      description: "Unique identifier for the business record.",
+    },
+    apple_business_id: {
+      type: ["string", "null"],
+      format: "uuid",
+      readOnly: true,
+      description:
+        "Apple business UUID, or null until supplied. Adding this identifier does not submit the account for review.",
+      example: "b52d6267-2b62-4f8a-8842-0533d0f1dc07",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Customer-supplied account name used in Bird. Apple controls the name shown to customers in Messages.",
+      example: "Acme Retail",
+    },
+    status: {
+      $ref: "#/components/schemas/AMBBusinessAccountStatus",
+      readOnly: true,
+      description: "Operational state of the business account.",
+    },
+    status_reason: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Reason for the current operational suspension, when recorded. Review feedback is retained on the submission.",
+    },
+    invitations_enabled: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether Apple has granted invitation access. Sending also requires a configured, connected account and eligible recipient.",
+      example: false,
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the business record was created.",
+      example: "2026-08-20T09:14:52.000Z",
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the business record was last changed.",
+      example: "2026-08-25T16:42:01.000Z",
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Next setup actions on create, update and single-account reads. Active accounts return an empty array. Lists omit this field.",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+    account_review_status: {
+      $ref: "#/components/schemas/AMBBusinessAccountReviewStatus",
+      readOnly: true,
+      description:
+        "Latest recorded review outcome. Absent before the first submission.",
+    },
+    finish_setup_url: {
+      type: "string",
+      format: "uri",
+      readOnly: true,
+      description:
+        "Bird dashboard URL for completing setup. Present only when customer action is available.",
+    },
+  },
+} as const;
+
+export const AMBBusinessAccountEventSortSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Account event ordering field.",
+} as const;
+
+export const AMBBusinessAccountEventIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^abe_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "abe_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AMBBusinessAccountEventSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "type", "summary", "metadata", "created_at"],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/AMBBusinessAccountEventID",
+      readOnly: true,
+    },
+    type: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": [
+        "amb_business_account.created",
+        "amb_business_account.status_changed",
+        "amb_business_account.submission_created",
+        "amb_business_account.review_changed",
+        "amb_business_account.invitation_access_changed",
+        "amb_business_account.suspension_changed",
+      ],
+    },
+    summary: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+    },
+    metadata: {
+      type: "object",
+      additionalProperties: true,
+      readOnly: true,
+      description:
+        "Details of the change. source identifies whether a customer or Bird staff recorded it.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const AMBBusinessAccountEventListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/AMBBusinessAccountEvent",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const AMBSuppressionIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^asp_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "asp_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AMBSuppressionAddressTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["phone_number", "opaque_user_id"],
+  description:
+    "What kind of value `address` holds.\n\n- `phone_number` means `address` is the customer's phone number. Apple's CloseSession event carries a phone number rather than an opaque identifier, so a suppression opened by a close on a conversation identified by phone number takes this kind.\n- `opaque_user_id` means `address` is the opaque identifier Apple assigns to the customer's conversation with the business, stable across a close and a later re-initiation.\n",
+  example: "opaque_user_id",
+} as const;
+
+export const AMBSuppressionReasonSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["manual", "opted_out"],
+  description:
+    "Why the handle is suppressed. `manual` means it was added directly through this API or the dashboard. `opted_out` covers every case where Apple or the customer signaled they should not be contacted: a close, a permanent delivery failure, a declined invitation, or a stop keyword. This list grows over time, so treat an unknown value as informational rather than rejecting the record.\n",
+  example: "manual",
+} as const;
+
+export const AMBSuppressionOriginSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["user", "api_key", "close_session", "gone"],
+  description:
+    "Who created the episode. user and api_key identify manual blocks. close_session and gone are protected automatic conversation facts. Phone invitation opt-outs are recorded as preferences.",
+  example: "user",
+} as const;
+
+export const AMBMessageIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^amb_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "amb_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AMBEventIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^aev_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "aev_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AMBSuppressionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One retained suppression episode for an address. A null account scope covers the same address in every account in the workspace; it does not link different opaque identities.",
+  required: [
+    "id",
+    "business_account_id",
+    "address",
+    "address_type",
+    "reason",
+    "origin",
+    "applies_to",
+    "effective_at",
+    "created_at",
+    "ended_at",
+    "ended_reason",
+    "ended_effective_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/AMBSuppressionID",
+      readOnly: true,
+    },
+    business_account_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBBusinessID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+    },
+    address: {
+      type: "string",
+      minLength: 1,
+      maxLength: 1024,
+      description:
+        "Canonical E.164 phone number, or the exact opaque identifier Apple supplied.",
+      example: "+15551234567",
+    },
+    address_type: {
+      $ref: "#/components/schemas/AMBSuppressionAddressType",
+    },
+    reason: {
+      $ref: "#/components/schemas/AMBSuppressionReason",
+      readOnly: true,
+    },
+    origin: {
+      $ref: "#/components/schemas/AMBSuppressionOrigin",
+      readOnly: true,
+    },
+    applies_to: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": ["all", "invitations"],
+      description:
+        "Paths blocked by this episode. Treat unknown values as blocking.",
+    },
+    source_message_id: {
+      $ref: "#/components/schemas/AMBMessageID",
+      readOnly: true,
+      description:
+        "Message whose permanent delivery failure opened the episode, when applicable.",
+    },
+    source_event_id: {
+      $ref: "#/components/schemas/AMBEventID",
+      readOnly: true,
+      description:
+        "Conversation event that opened the episode, when applicable.",
+    },
+    source_end_message_id: {
+      $ref: "#/components/schemas/AMBMessageID",
+      readOnly: true,
+      description:
+        "Inbound message that ended an eligible automatic episode, when applicable.",
+    },
+    effective_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the blocking state took effect.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When Bird recorded this episode.",
+    },
+    ended_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description: "When Bird recorded the end, or null while active.",
+    },
+    ended_reason: {
+      type: ["string", "null"],
+      readOnly: true,
+      "x-extensible-enum": ["user", "api_key", "reinitiated"],
+      description:
+        "What ended the episode, or null while active. Customers can end only manual episodes.",
+    },
+    ended_effective_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description: "When the end took effect, or null while active.",
+    },
+  },
+} as const;
+
+export const AMBBusinessAccountSortSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Field used to order the records.",
+} as const;
+
+export const AMBBusinessAccountListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "The business records your workspace holds.",
+          items: {
+            $ref: "#/components/schemas/AMBBusinessAccount",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const AMBBusinessAccountCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description: "The brand name shown for this business record inside Bird.",
+      example: "Acme Retail",
+    },
+    apple_business_id: {
+      type: "string",
+      format: "uuid",
+      minLength: 1,
+      description:
+        "The Business ID Apple issued for this brand, if you already have it. Supplying it identifies the draft. Submit the completed evidence requirements explicitly when the business is ready for review.",
+      example: "b52d6267-2b62-4f8a-8842-0533d0f1dc07",
+    },
+  },
+} as const;
+
+export const AMBBusinessAccountUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description: "The brand name shown for this business record inside Bird.",
+      example: "Acme Retail",
+    },
+    apple_business_id: {
+      type: "string",
+      format: "uuid",
+      minLength: 1,
+      description:
+        "The Business ID Apple issued for this brand. Accepted only while the account has not yet been submitted and is connected. Updating it does not submit the business.",
+      example: "b52d6267-2b62-4f8a-8842-0533d0f1dc07",
+    },
+  },
+} as const;
+
+export const AMBBusinessAccountSubmissionSortSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Field used to order the records.",
+} as const;
+
+export const AMBBusinessSubmissionIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^abs_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "abs_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AMBBusinessAccountSubmissionStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["submitted", "in_review", "approved", "rejected"],
+  description:
+    "State of this review attempt. Later suspension or disconnection does not change an approved attempt.",
+  example: "submitted",
+} as const;
+
+export const AMBBusinessAccountSubmissionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "business_account_id",
+    "apple_business_id",
+    "name",
+    "readiness_attachment",
+    "use_cases_attachment",
+    "video_attachment",
+    "status",
+    "status_reason",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBBusinessSubmissionID",
+        },
+      ],
+      readOnly: true,
+    },
+    business_account_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBBusinessID",
+        },
+      ],
+      readOnly: true,
+    },
+    apple_business_id: {
+      type: "string",
+      format: "uuid",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The Apple business UUID frozen when this attempt was submitted.",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The customer-supplied Bird account name frozen when this attempt was submitted.",
+    },
+    readiness_attachment: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/Attachment",
+        },
+      ],
+      readOnly: true,
+    },
+    use_cases_attachment: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/Attachment",
+        },
+      ],
+      readOnly: true,
+    },
+    video_attachment: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/Attachment",
+        },
+      ],
+      readOnly: true,
+    },
+    status: {
+      description:
+        "The review outcome of this attempt. Earlier attempts retain their outcome when a new attempt is submitted.",
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBBusinessAccountSubmissionStatus",
+        },
+      ],
+      readOnly: true,
+    },
+    status_reason: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Read the parent business account for current eligibility and next actions. Present on create responses and each customer submission-list item; historical attempts do not establish current account state.",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const AMBBusinessAccountSubmissionListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/AMBBusinessAccountSubmission",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const AMBBusinessAccountSubmissionCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The submission commits three distinct attachments uploaded to this workspace. `readiness_attachment_id` identifies the PDF business readiness assessment; `use_cases_attachment_id` identifies the PDF describing proposed customer use cases; `video_attachment_id` identifies the MP4 demonstration of the customer experience. Invalid or duplicate evidence returns 422.",
+  required: [
+    "readiness_attachment_id",
+    "use_cases_attachment_id",
+    "video_attachment_id",
+  ],
+  properties: {
+    readiness_attachment_id: {
+      $ref: "#/components/schemas/AttachmentID",
+      description:
+        "Uploaded PDF attachment containing the business readiness assessment.",
+    },
+    use_cases_attachment_id: {
+      $ref: "#/components/schemas/AttachmentID",
+      description:
+        "Uploaded PDF attachment describing the proposed customer use cases.",
+    },
+    video_attachment_id: {
+      $ref: "#/components/schemas/AttachmentID",
+      description:
+        "Uploaded MP4 attachment demonstrating the customer experience.",
+    },
+  },
+} as const;
+
+export const AMBBusinessAccountAttachmentUploadSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["file"],
+  properties: {
+    file: {
+      type: "string",
+      format: "binary",
+      minLength: 1,
+      description:
+        "A PDF up to 10 MiB or an MP4 video up to 25,000,000 bytes. Bird determines the type from the file contents.",
+    },
+  },
+} as const;
+
+export const AMBEntryPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "group", "intent", "body"],
+  properties: {
+    id: {
+      type: "string",
+      minLength: 1,
+      maxLength: 64,
+      description:
+        "Identifier for this entry point, chosen by you and unique within the business's entry points. A conversation opened through this entry point carries it as `entry_point`.",
+      example: "website-footer",
+    },
+    group: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The group value Apple reports on a conversation opened through this entry point. Matched against the `group` the first inbound message carries.",
+      example: "support",
+    },
+    intent: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The intent value Apple reports on a conversation opened through this entry point. Matched against the `intent` the first inbound message carries, together with `group`.",
+      example: "general-inquiry",
+    },
+    body: {
+      type: "string",
+      minLength: 1,
+      maxLength: 1000,
+      description:
+        "The message text pre-filled for the customer when they open a conversation through this entry point.",
+      example: "Hi, I have a question about my order.",
+    },
+  },
+} as const;
+
+export const AMBChannelSettingsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["entry_points", "brand_name", "logo_asset_id"],
+  properties: {
+    entry_points: {
+      type: "array",
+      description:
+        "The entry points customers can use to open a conversation with this business, each matched against the group and intent an inbound message reports.",
+      items: {
+        $ref: "#/components/schemas/AMBEntryPoint",
+      },
+    },
+    default_locale: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "The locale used for this business when a conversation reports none of its own, in canonical BCP-47 form. Null until you set one or after you clear it. Bird converts a configured default to Apple's locale form when sending a message without a conversation locale.",
+      example: "en-US",
+    },
+    brand_name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "The brand name shown on the Bird-hosted landing page customers use to connect this business.",
+      example: "Acme Retail",
+    },
+    logo_asset_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AssetID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The business's logo, as an asset in your media library. Null until one is set, either from Apple's own redirect or from a later change here.",
+      example: "ast_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+  },
+  description:
+    "A business's entry points, default locale, and landing-page brand settings. OpenID Connect providers use separate business authentication provider operations. Apple Pay merchant settings use the separate business Apple Pay configuration operations. Supply custom iMessage app metadata on each message.",
+} as const;
+
+export const AMBChannelSettingsUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  properties: {
+    entry_points: {
+      type: "array",
+      description:
+        "The entry points customers can use to open a conversation with this business. Sending this replaces the entire set; there is no way to add or remove a single entry point without resending the rest.",
+      items: {
+        $ref: "#/components/schemas/AMBEntryPoint",
+      },
+    },
+    default_locale: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "The locale used for this business when a conversation reports none of its own, in BCP-47 form. Omit this field to keep the current default, or send null to clear it. Bird converts a configured default to Apple's locale form when sending a message without a conversation locale.",
+      example: "en-US",
+    },
+    brand_name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "The brand name shown on the Bird-hosted landing page customers use to connect this business.",
+      example: "Acme Retail",
+    },
+    logo_asset_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AssetID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The business's logo, as an asset in your media library. Send null to clear it.",
+      example: "ast_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+  },
+} as const;
+
+export const AMBRoutingRuleIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^arr_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "arr_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AMBRoutingRuleMatchKindSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["intent", "group", "both"],
+  description:
+    "What a routing rule matches against the entry point that started the conversation.\n\n- `intent` matches on the entry point's intent alone: `match_intent_id` is set and `match_group_id` is null.\n- `group` matches on the entry point's group alone: `match_group_id` is set and `match_intent_id` is null.\n- `both` matches only when the entry point carries the given intent and the given group together, so `match_intent_id` and `match_group_id` are both set. There are two match fields rather than one because `both` needs to carry an intent and a group at once.\n",
+  example: "intent",
+} as const;
+
+export const AMBRoutingRuleSchema = {
+  description:
+    "A rule that puts a conversation into a queue when it is created or reopened, based on the group and intent the entry point that started it carried.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+    {
+      type: "object",
+      required: [
+        "id",
+        "business_account_id",
+        "match_kind",
+        "queue",
+        "precedence",
+        "is_default",
+      ],
+      properties: {
+        id: {
+          readOnly: true,
+          description: "Unique identifier for the routing rule.",
+          $ref: "#/components/schemas/AMBRoutingRuleID",
+        },
+        business_account_id: {
+          description:
+            "The Apple Messages for Business brand this rule belongs to.",
+          $ref: "#/components/schemas/AMBBusinessID",
+        },
+        match_kind: {
+          $ref: "#/components/schemas/AMBRoutingRuleMatchKind",
+        },
+        match_intent_id: {
+          type: ["string", "null"],
+          minLength: 1,
+          description:
+            "The entry point intent this rule matches, as sent in Apple's `intentID`. Set when `match_kind` is `intent` or `both`, null when it is `group`.\n",
+          example: "order_status",
+        },
+        match_group_id: {
+          type: ["string", "null"],
+          minLength: 1,
+          description:
+            "The entry point group this rule matches, as sent in Apple's `groupID`. Set when `match_kind` is `group` or `both`, null when it is `intent`.\n",
+          example: "support",
+        },
+        queue: {
+          type: "string",
+          minLength: 1,
+          description:
+            "The queue a matching conversation is filed into. A queue is a label your console filters by rather than a resource you create ahead of time, so any value routes.\n",
+          example: "billing",
+        },
+        precedence: {
+          type: "integer",
+          format: "int32",
+          description:
+            "Evaluation order among this business's rules. The highest-precedence rule a conversation matches wins; rules tied on precedence are evaluated by their `id`.\n",
+          example: 10,
+        },
+        is_default: {
+          type: "boolean",
+          description:
+            "Whether this rule catches a conversation that matches nothing else. A business has at most one. A conversation created or reopened while none exists routes to an empty queue, which the console lists as unrouted.\n",
+          example: false,
+        },
+      },
+    },
+  ],
+} as const;
+
+export const AMBRoutingRuleListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "The workspace's routing rules, optionally filtered by business, highest precedence first and ties broken by `id`. Rules are evaluated within their business in this order. The set is returned in full; this list is not paginated.\n",
+      items: {
+        $ref: "#/components/schemas/AMBRoutingRule",
+      },
+    },
+  },
+} as const;
+
+export const AMBQueueSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 64,
+  description: "Queue label used for routing and filtering conversations.",
+} as const;
+
+export const AMBRoutingRuleCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["business_account_id", "match_kind", "queue"],
+  properties: {
+    business_account_id: {
+      description:
+        "The Apple Messages for Business brand this rule belongs to.",
+      $ref: "#/components/schemas/AMBBusinessID",
+    },
+    match_kind: {
+      $ref: "#/components/schemas/AMBRoutingRuleMatchKind",
+    },
+    match_intent_id: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "The entry point intent to match, as sent in Apple's `intentID`. Required when `match_kind` is `intent` or `both`, and rejected when it is `group`.\n",
+      example: "order_status",
+    },
+    match_group_id: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "The entry point group to match, as sent in Apple's `groupID`. Required when `match_kind` is `group` or `both`, and rejected when it is `intent`.\n",
+      example: "support",
+    },
+    queue: {
+      $ref: "#/components/schemas/AMBQueue",
+      description:
+        "The queue a matching conversation is filed into. Your console lists whichever values your rules use.\n",
+      example: "billing",
+    },
+    precedence: {
+      type: "integer",
+      format: "int32",
+      default: 0,
+      description:
+        "Evaluation order among this business's rules. The highest-precedence rule a conversation matches wins. Omit it to default to 0.\n",
+      example: 10,
+    },
+    is_default: {
+      type: "boolean",
+      default: false,
+      description:
+        "Set to make this the rule that catches a conversation matching nothing else. A business can have only one; creating a second while one exists returns a `409`.\n",
+      example: false,
+    },
+  },
+  oneOf: [
+    {
+      properties: {
+        match_kind: {
+          const: "intent",
+        },
+        match_intent_id: {
+          type: "string",
+          minLength: 1,
+        },
+      },
+      required: ["match_intent_id"],
+      not: {
+        properties: {
+          match_group_id: {
+            type: "string",
+            minLength: 1,
+          },
+        },
+        required: ["match_group_id"],
+      },
+    },
+    {
+      properties: {
+        match_kind: {
+          const: "group",
+        },
+        match_group_id: {
+          type: "string",
+          minLength: 1,
+        },
+      },
+      required: ["match_group_id"],
+      not: {
+        properties: {
+          match_intent_id: {
+            type: "string",
+            minLength: 1,
+          },
+        },
+        required: ["match_intent_id"],
+      },
+    },
+    {
+      properties: {
+        match_kind: {
+          const: "both",
+        },
+        match_intent_id: {
+          type: "string",
+          minLength: 1,
+        },
+        match_group_id: {
+          type: "string",
+          minLength: 1,
+        },
+      },
+      required: ["match_intent_id", "match_group_id"],
+    },
+  ],
+} as const;
+
+export const AMBRoutingRuleUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    queue: {
+      $ref: "#/components/schemas/AMBQueue",
+      minLength: 1,
+      description:
+        "Change the queue this rule files a matching conversation into. What the rule matches is fixed once created; to change that, delete this rule and create another.\n",
+      example: "billing",
+    },
+    precedence: {
+      type: "integer",
+      format: "int32",
+      description:
+        "Change this rule's evaluation order among the business's other rules.",
+      example: 10,
+    },
+    is_default: {
+      type: "boolean",
+      description:
+        "Set to true to make this the rule that catches a conversation matching nothing else, or to false to stop it from being the default. Setting it true while the business already has a different default rule returns a `409`.\n",
+      example: false,
+    },
+  },
+} as const;
+
+export const AMBConversationIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^acv_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "acv_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AMBMessageDirectionSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["outbound", "inbound"],
+  description:
+    "Whether a message was sent by the business or received from the customer:\n\n- `outbound`: A reply the business sent into the conversation.\n- `inbound`: A message the customer sent.\n",
+} as const;
+
+export const AMBMessageStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["accepted", "sent", "send_failed", "rejected", "received"],
+  description:
+    "Send status:\n\n- `accepted`: Accepted and queued for delivery to Apple.\n- `sent`: Handed to Apple. There is no delivery or read receipt on this\n  channel, so `sent` is the furthest an outbound message's status\n  advances.\n- `send_failed`: Sending stopped because of a business or conversation\n  restriction, a recipient opt-out, an Apple refusal, or exhausted attempts.\n  An earlier attempt may have reached Apple if its response or the local\n  record of success was lost. See `last_error` for why sending stopped.\n- `rejected`: Refused by Bird before any send attempt and never charged:\n  the destination has no price, the wallet could not fund the send, or the\n  content cannot be sent yet. See `last_error`.\n- `received`: Received as an inbound message.\n",
+} as const;
+
+export const AMBContentKindSchema = {
+  type: "string",
+  minLength: 1,
+  enum: [
+    "text",
+    "attachment",
+    "rich_link",
+    "quick_reply",
+    "list_picker",
+    "time_picker",
+    "form",
+    "apple_pay",
+    "authenticate",
+    "imessage_app",
+    "interactive",
+  ],
+  description:
+    "Derived message classification for filtering and statistics. Send requests use the native content.type families. Create Apple Pay and authentication requests through the conversation payment and authentication operations.\n\n- text: Text, optionally with a subject.\n- attachment: One or more files, images, audio clips, or videos.\n- rich_link: A link with a preview card.\n- quick_reply: Two to five reply choices.\n- list_picker: A grouped menu of choices.\n- time_picker: Appointment time slots; a reply may contain only a selected label.\n- form: A multi-page form.\n- imessage_app: A custom iMessage app interaction on a compatible device.\n- interactive: An opaque interactive reference whose subtype is unknown.\n- apple_pay: An Apple Pay request created through the conversation payment operations.\n- authenticate: An identity verification request created through the conversation authentication operations.",
+} as const;
+
+export const AMBMessageSourceSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["operator", "automation", "api"],
+  description:
+    "Who sent an outbound message:\n\n- `operator`: A person, through a signed-in dashboard session.\n- `automation`: A workflow or bot acting on the workspace's behalf,\n  through a signed-in session.\n- `api`: A direct API call, authenticated with an API key.\n\nA credential can send only the sources it is permitted; naming one\noutside that set is refused with a `422` `AMBMessageSourceNotPermitted`.\n\nThis is not `from`, which a send carries alongside it. That names\nthe brand the message goes out as; this names who composed it.\n",
+} as const;
+
+export const AMBMessageTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["text", "rich_link", "interactive"],
+  description: "Apple message family.",
+} as const;
+
+export const AMBNativeAttachmentSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Provide source_url or the complete encrypted reference, never both.",
+  properties: {
+    source_url: {
+      type: "string",
+      minLength: 1,
+      description: "HTTPS URL Bird downloads and uploads to Apple.",
+      format: "uri",
+      pattern: "^https://",
+      "x-sensitive": true,
+    },
+    name: {
+      type: "string",
+      description: "Display filename.",
+    },
+    mime_type: {
+      type: "string",
+      description: "Media type of the attachment.",
+    },
+    url: {
+      type: "string",
+      format: "uri",
+      pattern: "^https://",
+      minLength: 1,
+      description: "Encrypted attachment URL returned by Apple.",
+    },
+    owner: {
+      type: "string",
+      minLength: 1,
+      description: "Opaque owner value returned by Apple.",
+    },
+    signature_base64: {
+      type: "string",
+      minLength: 1,
+      description: "Attachment authorization signature returned by Apple.",
+    },
+    key: {
+      type: "string",
+      minLength: 66,
+      maxLength: 66,
+      pattern: "^00[0-9a-fA-F]{64}$",
+      description: "Attachment decryption key returned by Apple.",
+    },
+    size: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description: "Attachment size in bytes.",
+      maximum: 99999999,
+    },
+  },
+  oneOf: [
+    {
+      required: ["source_url"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              url: {},
+            },
+            required: ["url"],
+          },
+          {
+            properties: {
+              owner: {},
+            },
+            required: ["owner"],
+          },
+          {
+            properties: {
+              key: {},
+            },
+            required: ["key"],
+          },
+          {
+            properties: {
+              signature_base64: {},
+            },
+            required: ["signature_base64"],
+          },
+          {
+            properties: {
+              size: {},
+            },
+            required: ["size"],
+          },
+        ],
+      },
+    },
+    {
+      required: ["url", "owner", "key", "signature_base64", "size"],
+      not: {
+        properties: {
+          source_url: {},
+        },
+        required: ["source_url"],
+      },
+    },
+  ],
+} as const;
+
+export const AMBNativeTextContentSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      const: "text",
+      description: "Always text.",
+      $ref: "#/components/schemas/AMBMessageType",
+    },
+    body: {
+      type: "string",
+      description:
+        "Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.",
+      "x-sensitive": true,
+    },
+    subject: {
+      type: "string",
+      description: "Subject displayed above the message body.",
+      "x-sensitive": true,
+    },
+    attachments: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBNativeAttachment",
+      },
+      description:
+        "Ordered attachments. Each object supplies a source URL or an encrypted Apple reference.",
+    },
+  },
+  anyOf: [
+    {
+      required: ["body"],
+    },
+    {
+      required: ["attachments"],
+      properties: {
+        attachments: {
+          minItems: 1,
+        },
+      },
+    },
+  ],
+} as const;
+
+export const AMBNativeRichLinkImageSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["source_url"],
+  properties: {
+    source_url: {
+      type: "string",
+      description:
+        "HTTPS URL of a PNG preview image up to 200 kB. Bird fetches and encodes it when sending.",
+      format: "uri",
+      pattern: "^https://",
+      minLength: 1,
+      "x-sensitive": true,
+    },
+    mime_type: {
+      type: "string",
+      description: "PNG media type required by Apple. Defaults to image/png.",
+      const: "image/png",
+      default: "image/png",
+    },
+  },
+} as const;
+
+export const AMBNativeRichLinkVideoSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["url"],
+  properties: {
+    url: {
+      type: "string",
+      description: "HTTPS video URL fetched by Apple.",
+      format: "uri",
+      pattern: "^https://",
+      minLength: 1,
+      "x-sensitive": true,
+    },
+    mime_type: {
+      type: "string",
+      description:
+        "Media type of the video. Defaults to video/mp4; supply the actual type for other formats.",
+      default: "video/mp4",
+    },
+  },
+} as const;
+
+export const AMBNativeRichLinkAssetsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["image"],
+  properties: {
+    image: {
+      $ref: "#/components/schemas/AMBNativeRichLinkImage",
+    },
+    video: {
+      $ref: "#/components/schemas/AMBNativeRichLinkVideo",
+    },
+  },
+} as const;
+
+export const AMBNativeRichLinkDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["url", "title", "assets"],
+  properties: {
+    url: {
+      type: "string",
+      description: "HTTPS URL opened by the preview.",
+      format: "uri",
+      pattern: "^https://",
+      minLength: 1,
+      "x-sensitive": true,
+    },
+    title: {
+      type: "string",
+      description: "Preview title.",
+      minLength: 1,
+    },
+    assets: {
+      $ref: "#/components/schemas/AMBNativeRichLinkAssets",
+    },
+  },
+} as const;
+
+export const AMBRichLinkReferenceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["url", "owner", "signature_base64", "size"],
+  description:
+    "Reusable Apple content reference. Supply the decryption key, or the signed bid and data_ref_sig returned by Apple.",
+  properties: {
+    title: {
+      type: "string",
+      minLength: 1,
+      description: "Title supplied by Apple for the preview.",
+    },
+    bid: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Messages extension identifier supplied by Apple, when present.",
+    },
+    data_ref_sig: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Signature binding the reference to the business, when supplied by Apple.",
+    },
+    url: {
+      type: "string",
+      format: "uri",
+      pattern: "^https://",
+      minLength: 1,
+      description: "Location of the encrypted preview.",
+    },
+    owner: {
+      type: "string",
+      minLength: 1,
+      description: "Owner identifier supplied by Apple.",
+    },
+    signature_base64: {
+      type: "string",
+      minLength: 1,
+      description: "Signature supplied by Apple.",
+    },
+    key: {
+      type: "string",
+      minLength: 66,
+      maxLength: 66,
+      pattern: "^00[0-9a-fA-F]{64}$",
+      description: "Decryption key supplied by Apple.",
+    },
+    size: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description: "Size of the encrypted preview in bytes.",
+    },
+  },
+  anyOf: [
+    {
+      required: ["key"],
+    },
+    {
+      required: ["bid", "data_ref_sig"],
+    },
+  ],
+  "x-sensitive": true,
+} as const;
+
+export const AMBNativeRichLinkContentSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      const: "rich_link",
+      description: "Always rich_link.",
+      $ref: "#/components/schemas/AMBMessageType",
+    },
+    body: {
+      type: "string",
+      description:
+        "Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.",
+      "x-sensitive": true,
+    },
+    subject: {
+      type: "string",
+      description: "Subject displayed above the message body.",
+      "x-sensitive": true,
+    },
+    attachments: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBNativeAttachment",
+      },
+      description:
+        "Ordered attachments. Each object supplies a source URL or an encrypted Apple reference.",
+    },
+    rich_link_data: {
+      $ref: "#/components/schemas/AMBNativeRichLinkData",
+    },
+    rich_link_data_ref: {
+      $ref: "#/components/schemas/AMBRichLinkReference",
+    },
+  },
+  oneOf: [
+    {
+      required: ["rich_link_data"],
+      not: {
+        properties: {
+          rich_link_data_ref: {},
+        },
+        required: ["rich_link_data_ref"],
+      },
+    },
+    {
+      required: ["rich_link_data_ref"],
+      not: {
+        properties: {
+          rich_link_data: {},
+        },
+        required: ["rich_link_data"],
+      },
+    },
+  ],
+} as const;
+
+export const AMBMessageBubbleStyleSchema = {
+  type: "string",
+  enum: ["icon", "small", "large"],
+  description: "Layout of an Apple interactive message bubble.",
+} as const;
+
+export const AMBMessageBubbleSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title"],
+  properties: {
+    title: {
+      type: "string",
+      minLength: 1,
+      maxLength: 512,
+      description: "Text shown on the message bubble.",
+    },
+    subtitle: {
+      type: "string",
+      maxLength: 512,
+      description: "Secondary text shown below the title.",
+    },
+    style: {
+      $ref: "#/components/schemas/AMBMessageBubbleStyle",
+      description:
+        "Bubble layout. Apple defaults to `icon` when omitted and ignores it for custom iMessage apps.",
+    },
+    image_identifier: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Identifier of an image in interactive_data.data.images. Apple ignores it for custom iMessage apps.",
+    },
+    image_title: {
+      type: "string",
+      maxLength: 512,
+      description:
+        "Title shown over an attached image in a custom iMessage app bubble.",
+    },
+    image_subtitle: {
+      type: "string",
+      maxLength: 512,
+      description:
+        "Subtitle shown over an attached image in a custom iMessage app bubble.",
+    },
+    secondary_subtitle: {
+      type: "string",
+      maxLength: 512,
+      description: "Right-aligned title in a custom iMessage app bubble.",
+    },
+    tertiary_subtitle: {
+      type: "string",
+      maxLength: 512,
+      description: "Right-aligned subtitle in a custom iMessage app bubble.",
+    },
+  },
+} as const;
+
+export const AMBNativeImageSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["identifier", "source_url"],
+  properties: {
+    identifier: {
+      type: "string",
+      description: "Identifier referenced by a bubble, item, or event.",
+      minLength: 1,
+    },
+    source_url: {
+      type: "string",
+      description:
+        "HTTPS URL of a PNG image up to 200 kB. Total interactive image data must not exceed 5 MB.",
+      format: "uri",
+      pattern: "^https://",
+      minLength: 1,
+      "x-sensitive": true,
+    },
+    description: {
+      type: "string",
+      description: "Accessibility description read by VoiceOver.",
+      "x-sensitive": true,
+    },
+  },
+} as const;
+
+export const AMBQuickReplyItemSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["identifier", "title"],
+  properties: {
+    identifier: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Opaque choice identifier returned in interactive_data.data.quick_reply.selected_identifier.",
+    },
+    title: {
+      type: "string",
+      minLength: 1,
+      description: "Label shown on the button.",
+    },
+  },
+} as const;
+
+export const AMBNativeQuickReplySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["summary_text", "items"],
+  properties: {
+    summary_text: {
+      type: "string",
+      minLength: 1,
+      "x-sensitive": true,
+      description:
+        "Text used for the device notification and shown in the transcript after the customer chooses an item. Send a separate text message to introduce the choices.",
+    },
+    items: {
+      type: "array",
+      minItems: 2,
+      maxItems: 5,
+      items: {
+        $ref: "#/components/schemas/AMBQuickReplyItem",
+      },
+      description:
+        "The buttons offered to the customer. Apple requires between two and five; outside that range the request is refused with a `422` `AMBQuickReplyItemsInvalid`. For more choices, send `list_picker` content instead.",
+    },
+  },
+} as const;
+
+export const AMBListPickerItemSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["identifier", "title"],
+  properties: {
+    identifier: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Opaque item identifier returned in interactive_data.data.list_picker.sections.",
+    },
+    title: {
+      type: "string",
+      minLength: 1,
+      description: "Label shown on the row.",
+    },
+    subtitle: {
+      type: ["string", "null"],
+      description: "Secondary line shown under the title.",
+    },
+    image_identifier: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Identifier of an image in interactive_data.data.images, shown next to this row. A key with no matching entry in `images` is refused with a `422` `AMBInteractiveImageInvalid`.",
+    },
+    order: {
+      type: "integer",
+      minimum: 0,
+      description:
+        "Position within the section, ascending. Defaults to the row's array position.",
+    },
+  },
+} as const;
+
+export const AMBListPickerSectionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["title", "items"],
+  properties: {
+    title: {
+      type: "string",
+      minLength: 1,
+      description: "Heading shown above this section's rows.",
+    },
+    order: {
+      type: ["integer", "null"],
+      minimum: 0,
+      description:
+        "Where this section sits relative to its siblings, ascending. Sections omitting it are laid out in list order, after any that specify one.",
+    },
+    items: {
+      type: "array",
+      minItems: 1,
+      items: {
+        $ref: "#/components/schemas/AMBListPickerItem",
+      },
+      description: "The rows in this section.",
+    },
+    multiple_selection: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether the customer can select more than one row in this section.",
+    },
+  },
+} as const;
+
+export const AMBNativeListPickerSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["sections"],
+  properties: {
+    sections: {
+      type: "array",
+      minItems: 1,
+      items: {
+        $ref: "#/components/schemas/AMBListPickerSection",
+      },
+      description: "The menu's sections, each with its own heading and rows.",
+    },
+  },
+} as const;
+
+export const AMBLocationSchema = {
+  type: "object",
+  additionalProperties: false,
+  dependentRequired: {
+    latitude: ["longitude"],
+    longitude: ["latitude"],
+  },
+  properties: {
+    title: {
+      type: "string",
+      description: "Name shown for the appointment location.",
+    },
+    latitude: {
+      type: "number",
+      format: "double",
+      minimum: -90,
+      maximum: 90,
+      description: "Latitude in degrees. Set together with `longitude`.",
+    },
+    longitude: {
+      type: "number",
+      format: "double",
+      minimum: -180,
+      maximum: 180,
+      description: "Longitude in degrees. Set together with `latitude`.",
+    },
+    radius: {
+      type: "number",
+      format: "double",
+      minimum: 0,
+      description:
+        "Location radius in meters. Apple ignores it without coordinates.",
+    },
+  },
+} as const;
+
+export const AMBTimeSlotSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["identifier", "start_at", "duration_seconds"],
+  properties: {
+    identifier: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Opaque slot identifier. Apple may instead return only a localized label in interactive_data.reply_message.title.",
+    },
+    start_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description:
+        "When this slot begins. Seconds and fractional seconds must be zero, for example `2026-09-02T14:30:00Z`; otherwise sending returns `422` with error code `E01001`. The timestamp is converted to UTC for Apple while preserving the instant.",
+    },
+    duration_seconds: {
+      type: "integer",
+      minimum: 0,
+      description: "Duration in seconds. Zero indicates no duration.",
+    },
+  },
+} as const;
+
+export const AMBNativeEventSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["timeslots"],
+  properties: {
+    identifier: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Your identifier for the event. Defaults to the message identifier.",
+    },
+    location: {
+      $ref: "#/components/schemas/AMBLocation",
+      description: "Optional appointment location.",
+    },
+    timezone_offset: {
+      type: "integer",
+      description:
+        "Minutes from GMT at the event location. Omit to use the customer's time zone.",
+    },
+    timeslots: {
+      type: "array",
+      minItems: 1,
+      items: {
+        $ref: "#/components/schemas/AMBTimeSlot",
+      },
+      description:
+        "Appointment times with RFC 3339 timestamps and duration in seconds.",
+    },
+    image_identifier: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Identifier of the event image in interactive_data.data.images.",
+    },
+    title: {
+      type: "string",
+      description: "Event title.",
+    },
+  },
+} as const;
+
+export const AMBFormSplashSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["button_title"],
+  properties: {
+    header: {
+      type: "string",
+    },
+    splash_text: {
+      type: "string",
+    },
+    button_title: {
+      type: "string",
+      minLength: 1,
+    },
+    image_identifier: {
+      type: "string",
+      minLength: 1,
+    },
+  },
+} as const;
+
+export const AMBFormPageCommonSchema = {
+  type: "object",
+  required: ["page_identifier", "type", "subtitle"],
+  properties: {
+    page_identifier: {
+      type: "string",
+      minLength: 1,
+      maxLength: 19,
+      description: "Unique identifier for this page.",
+    },
+    type: {
+      type: "string",
+      minLength: 1,
+    },
+    title: {
+      type: "string",
+    },
+    subtitle: {
+      type: "string",
+      description: "Question shown on this page.",
+      minLength: 0,
+    },
+    next_page_identifier: {
+      type: "string",
+      minLength: 1,
+      maxLength: 19,
+      description:
+        "Next page to show. Omit to finish the form. Single-select pages route through their items instead.",
+    },
+    submit_form: {
+      type: "boolean",
+      default: false,
+      description:
+        "Marks this page as an end page for the form. A page with no next page also finishes the form.",
+    },
+  },
+  if: {
+    required: ["submit_form"],
+    properties: {
+      submit_form: {
+        const: true,
+      },
+    },
+  },
+  then: {
+    properties: {
+      next_page_identifier: {
+        not: {},
+      },
+    },
+  },
+} as const;
+
+export const AMBFormSelectItemSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["identifier", "title", "value"],
+  properties: {
+    identifier: {
+      type: "string",
+      minLength: 1,
+    },
+    title: {
+      type: "string",
+      minLength: 0,
+    },
+    value: {
+      type: "string",
+      minLength: 0,
+    },
+    image_identifier: {
+      type: "string",
+      minLength: 1,
+    },
+    next_page_identifier: {
+      type: "string",
+      minLength: 1,
+      maxLength: 19,
+    },
+  },
+} as const;
+
+export const AMBFormSelectPageSchema = {
+  allOf: [
+    {
+      $ref: "#/components/schemas/AMBFormPageCommon",
+    },
+    {
+      type: "object",
+      required: ["type", "items"],
+      properties: {
+        type: {
+          type: "string",
+          minLength: 1,
+          const: "select",
+        },
+        multiple_selection: {
+          type: "boolean",
+          default: false,
+        },
+        items: {
+          type: "array",
+          minItems: 1,
+          items: {
+            $ref: "#/components/schemas/AMBFormSelectItem",
+          },
+        },
+      },
+      if: {
+        required: ["multiple_selection"],
+        properties: {
+          multiple_selection: {
+            const: true,
+          },
+        },
+      },
+      then: {
+        properties: {
+          items: {
+            items: {
+              properties: {
+                next_page_identifier: {
+                  not: {},
+                },
+              },
+            },
+          },
+        },
+      },
+      else: {
+        properties: {
+          next_page_identifier: {
+            not: {},
+          },
+        },
+      },
+    },
+  ],
+  if: {
+    required: ["submit_form"],
+    properties: {
+      submit_form: {
+        const: true,
+      },
+    },
+  },
+  then: {
+    properties: {
+      items: {
+        items: {
+          properties: {
+            next_page_identifier: {
+              not: {},
+            },
+          },
+        },
+      },
+    },
+  },
+  unevaluatedProperties: false,
+} as const;
+
+export const AMBFormPickerItemSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["identifier", "title", "value"],
+  properties: {
+    identifier: {
+      type: "string",
+      minLength: 1,
+    },
+    title: {
+      type: "string",
+      minLength: 0,
+    },
+    value: {
+      type: "string",
+      minLength: 0,
+    },
+  },
+} as const;
+
+export const AMBFormPickerPageSchema = {
+  allOf: [
+    {
+      $ref: "#/components/schemas/AMBFormPageCommon",
+    },
+    {
+      type: "object",
+      required: ["type", "items"],
+      properties: {
+        type: {
+          type: "string",
+          minLength: 1,
+          const: "picker",
+        },
+        picker_title: {
+          type: "string",
+          description:
+            "Text beside the picker field. Omit to center the field without a label.",
+        },
+        selected_item_index: {
+          type: "integer",
+          minimum: 0,
+          description:
+            "Zero-based index into `items`. Defaults to `0`. Must be less than the number of items; otherwise sending returns `422` `AMBFormPagesInvalid`.",
+        },
+        items: {
+          type: "array",
+          minItems: 1,
+          items: {
+            $ref: "#/components/schemas/AMBFormPickerItem",
+          },
+        },
+      },
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const AMBFormDatePickerOptionsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Apple defaults to UTC when interpreting these dates.",
+  properties: {
+    date_format: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Format used to read the date values in these options. Defaults to `MM/dd/yyyy`.",
+    },
+    start_date: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Date initially shown by the picker, written in `date_format`. Defaults to the current date.",
+    },
+    maximum_date: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Latest date the picker shows, written in `date_format`. Defaults to the current date.",
+    },
+    minimum_date: {
+      type: "string",
+      minLength: 1,
+      description: "Earliest date the picker shows, written in `date_format`.",
+    },
+    label_text: {
+      type: "string",
+      description: "Label beside the date field. Defaults to `Date`.",
+    },
+  },
+} as const;
+
+export const AMBFormDatePickerPageSchema = {
+  allOf: [
+    {
+      $ref: "#/components/schemas/AMBFormPageCommon",
+    },
+    {
+      type: "object",
+      required: ["type"],
+      properties: {
+        type: {
+          type: "string",
+          minLength: 1,
+          const: "date_picker",
+        },
+        hint_text: {
+          type: "string",
+        },
+        options: {
+          $ref: "#/components/schemas/AMBFormDatePickerOptions",
+        },
+      },
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const AMBFormInputTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["singleline", "multiline"],
+} as const;
+
+export const AMBFormKeyboardTypeSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "default",
+    "asciiCapable",
+    "numbersAndPunctuation",
+    "URL",
+    "numberPad",
+    "phonePad",
+    "namePhonePad",
+    "emailAddress",
+    "decimalPad",
+    "webSearch",
+  ],
+  description:
+    "Apple UIKit value, passed through without changing its spelling.",
+} as const;
+
+export const AMBFormTextContentTypeSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "name",
+    "namePrefix",
+    "givenName",
+    "middleName",
+    "familyName",
+    "nameSuffix",
+    "nickname",
+    "jobTitle",
+    "organizationName",
+    "location",
+    "fullStreetAddress",
+    "streetAddressLine1",
+    "streetAddressLine2",
+    "addressCity",
+    "addressState",
+    "addressCityAndState",
+    "sublocality",
+    "countryName",
+    "postalCode",
+    "telephoneNumber",
+    "emailAddress",
+    "URL",
+    "creditCardNumber",
+    "username",
+    "password",
+    "newPassword",
+    "oneTimeCode",
+  ],
+  description:
+    "Apple UIKit value, passed through without changing its spelling.",
+} as const;
+
+export const AMBFormInputOptionsSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    regex: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Pattern Apple uses to validate the input. Use JSON string escaping for backslashes.",
+    },
+    placeholder: {
+      type: "string",
+      description:
+        "Shown when the field is empty. Defaults to `Required` when `required` is true, otherwise `Optional`.",
+    },
+    required: {
+      type: "boolean",
+      default: false,
+      description:
+        "Disables the next-page button until the customer enters a value.",
+    },
+    input_type: {
+      $ref: "#/components/schemas/AMBFormInputType",
+      description: "Defaults to `singleline`.",
+    },
+    label_text: {
+      type: "string",
+      description: "Label for `singleline` input only. Omit for no label.",
+    },
+    prefix_text: {
+      type: "string",
+      description:
+        "Text beside `singleline` input only, such as a currency symbol. Omit for no prefix.",
+    },
+    maximum_character_count: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "Defaults to 30 for `singleline` input and 300 for `multiline` input.",
+    },
+    keyboard_type: {
+      $ref: "#/components/schemas/AMBFormKeyboardType",
+      description: "Keyboard to display. Defaults to `default`.",
+    },
+    text_content_type: {
+      $ref: "#/components/schemas/AMBFormTextContentType",
+      description: "Content hint used for autofill.",
+    },
+  },
+} as const;
+
+export const AMBFormInputPageSchema = {
+  allOf: [
+    {
+      $ref: "#/components/schemas/AMBFormPageCommon",
+    },
+    {
+      type: "object",
+      required: ["type"],
+      properties: {
+        type: {
+          type: "string",
+          minLength: 1,
+          const: "input",
+        },
+        hint_text: {
+          type: "string",
+        },
+        options: {
+          $ref: "#/components/schemas/AMBFormInputOptions",
+        },
+      },
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const AMBFormPageSchema = {
+  oneOf: [
+    {
+      $ref: "#/components/schemas/AMBFormSelectPage",
+    },
+    {
+      $ref: "#/components/schemas/AMBFormPickerPage",
+    },
+    {
+      $ref: "#/components/schemas/AMBFormDatePickerPage",
+    },
+    {
+      $ref: "#/components/schemas/AMBFormInputPage",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      select: "#/components/schemas/AMBFormSelectPage",
+      picker: "#/components/schemas/AMBFormPickerPage",
+      date_picker: "#/components/schemas/AMBFormDatePickerPage",
+      input: "#/components/schemas/AMBFormInputPage",
+    },
+  },
+} as const;
+
+export const AMBNativeFormDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["start_page_identifier", "pages"],
+  properties: {
+    start_page_identifier: {
+      type: "string",
+      minLength: 1,
+      maxLength: 19,
+      description: "Identifier of the first page to show.",
+    },
+    private: {
+      type: "boolean",
+      default: false,
+      description: "Whether Apple marks the submitted response as private.",
+    },
+    show_summary: {
+      type: "boolean",
+      default: false,
+      description: "Whether Apple shows a summary before the customer submits.",
+    },
+    splash: {
+      $ref: "#/components/schemas/AMBFormSplash",
+    },
+    pages: {
+      type: "array",
+      minItems: 1,
+      items: {
+        $ref: "#/components/schemas/AMBFormPage",
+      },
+      description:
+        "Form pages referenced by the start page and navigation identifiers.",
+    },
+  },
+} as const;
+
+export const AMBNativeDynamicSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  description:
+    "Form content. Bird supplies Apple’s messageForms template and protocol version.",
+  properties: {
+    data: {
+      $ref: "#/components/schemas/AMBNativeFormData",
+    },
+  },
+} as const;
+
+export const AMBAuthenticationIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^amauth_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "amauth_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AMBNativeAuthenticationSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Authentication attempt created through the conversation authentication endpoint. Contains no authorization parameters or credentials.",
+  required: ["authentication_id"],
+  properties: {
+    authentication_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBAuthenticationID",
+    },
+  },
+} as const;
+
+export const AMBPaymentIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^apay_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "apay_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AMBNativePaymentSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Apple Pay request created through the conversation payment endpoint. Contains no payment token or provider credentials.",
+  required: ["payment_id"],
+  properties: {
+    payment_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBPaymentID",
+    },
+  },
+} as const;
+
+export const AMBNativeInteractivePayloadSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Exactly one built-in interaction. Protocol versions are managed by Bird.",
+  properties: {
+    request_identifier: {
+      type: "string",
+      pattern:
+        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+      description:
+        "Correlation identifier for this interaction. Bird generates one when omitted.",
+    },
+    images: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBNativeImage",
+      },
+      description: "Images referenced by identifier.",
+    },
+    quick_reply: {
+      $ref: "#/components/schemas/AMBNativeQuickReply",
+    },
+    list_picker: {
+      $ref: "#/components/schemas/AMBNativeListPicker",
+    },
+    event: {
+      $ref: "#/components/schemas/AMBNativeEvent",
+    },
+    dynamic: {
+      $ref: "#/components/schemas/AMBNativeDynamic",
+    },
+    authenticate: {
+      $ref: "#/components/schemas/AMBNativeAuthentication",
+      readOnly: true,
+    },
+    payment: {
+      $ref: "#/components/schemas/AMBNativePayment",
+      readOnly: true,
+    },
+  },
+  oneOf: [
+    {
+      required: ["quick_reply"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              list_picker: {},
+            },
+            required: ["list_picker"],
+          },
+          {
+            properties: {
+              event: {},
+            },
+            required: ["event"],
+          },
+          {
+            properties: {
+              dynamic: {},
+            },
+            required: ["dynamic"],
+          },
+          {
+            properties: {
+              authenticate: {},
+            },
+            required: ["authenticate"],
+          },
+          {
+            properties: {
+              payment: {},
+            },
+            required: ["payment"],
+          },
+        ],
+      },
+    },
+    {
+      required: ["list_picker"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              quick_reply: {},
+            },
+            required: ["quick_reply"],
+          },
+          {
+            properties: {
+              event: {},
+            },
+            required: ["event"],
+          },
+          {
+            properties: {
+              dynamic: {},
+            },
+            required: ["dynamic"],
+          },
+          {
+            properties: {
+              authenticate: {},
+            },
+            required: ["authenticate"],
+          },
+          {
+            properties: {
+              payment: {},
+            },
+            required: ["payment"],
+          },
+        ],
+      },
+    },
+    {
+      required: ["event"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              quick_reply: {},
+            },
+            required: ["quick_reply"],
+          },
+          {
+            properties: {
+              list_picker: {},
+            },
+            required: ["list_picker"],
+          },
+          {
+            properties: {
+              dynamic: {},
+            },
+            required: ["dynamic"],
+          },
+          {
+            properties: {
+              authenticate: {},
+            },
+            required: ["authenticate"],
+          },
+          {
+            properties: {
+              payment: {},
+            },
+            required: ["payment"],
+          },
+        ],
+      },
+    },
+    {
+      required: ["dynamic"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              quick_reply: {},
+            },
+            required: ["quick_reply"],
+          },
+          {
+            properties: {
+              list_picker: {},
+            },
+            required: ["list_picker"],
+          },
+          {
+            properties: {
+              event: {},
+            },
+            required: ["event"],
+          },
+          {
+            properties: {
+              authenticate: {},
+            },
+            required: ["authenticate"],
+          },
+          {
+            properties: {
+              payment: {},
+            },
+            required: ["payment"],
+          },
+        ],
+      },
+    },
+    {
+      required: ["authenticate"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              quick_reply: {},
+            },
+            required: ["quick_reply"],
+          },
+          {
+            properties: {
+              list_picker: {},
+            },
+            required: ["list_picker"],
+          },
+          {
+            properties: {
+              event: {},
+            },
+            required: ["event"],
+          },
+          {
+            properties: {
+              dynamic: {},
+            },
+            required: ["dynamic"],
+          },
+          {
+            properties: {
+              payment: {},
+            },
+            required: ["payment"],
+          },
+        ],
+      },
+    },
+    {
+      required: ["payment"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              quick_reply: {},
+            },
+            required: ["quick_reply"],
+          },
+          {
+            properties: {
+              list_picker: {},
+            },
+            required: ["list_picker"],
+          },
+          {
+            properties: {
+              event: {},
+            },
+            required: ["event"],
+          },
+          {
+            properties: {
+              dynamic: {},
+            },
+            required: ["dynamic"],
+          },
+          {
+            properties: {
+              authenticate: {},
+            },
+            required: ["authenticate"],
+          },
+        ],
+      },
+    },
+  ],
+} as const;
+
+export const AMBNativeInteractiveDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    app_id: {
+      type: "string",
+      minLength: 1,
+      description: "App Store identifier of the iMessage app.",
+    },
+    app_name: {
+      type: "string",
+      minLength: 1,
+      description: "Name of the iMessage app.",
+    },
+    bid: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Identifier of the iMessage extension, in Apple's `com.apple.messages.MSMessageExtensionBalloonPlugin:team-id:extension-id` format.",
+    },
+    url: {
+      "x-sensitive": true,
+      type: "string",
+      minLength: 1,
+      description:
+        "Opaque URL string that Messages passes to the iMessage app.",
+      example: "?order=1234&view=detail",
+    },
+    use_live_layout: {
+      type: "boolean",
+      description:
+        "Whether Messages renders the received and reply bubbles using Live Layout.",
+    },
+    session_identifier: {
+      type: "string",
+      pattern:
+        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+      description:
+        "Session UUID to preserve across interactions. Apple creates one when omitted.",
+    },
+    received_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
+      description: "Content Messages shows in the received message bubble.",
+    },
+    reply_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
+      description: "Content Messages shows in the reply message bubble.",
+    },
+    app_icon_source_url: {
+      type: "string",
+      minLength: 1,
+      format: "uri",
+      pattern: "^https://",
+      description:
+        "Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple.",
+      "x-sensitive": true,
+    },
+    data: {
+      $ref: "#/components/schemas/AMBNativeInteractivePayload",
+    },
+  },
+  description:
+    "A built-in interaction or custom iMessage app. Custom apps require the app metadata and both message bubbles.",
+  oneOf: [
+    {
+      required: ["data"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              app_id: {},
+            },
+            required: ["app_id"],
+          },
+          {
+            properties: {
+              app_name: {},
+            },
+            required: ["app_name"],
+          },
+          {
+            properties: {
+              bid: {},
+            },
+            required: ["bid"],
+          },
+          {
+            properties: {
+              url: {},
+            },
+            required: ["url"],
+          },
+          {
+            properties: {
+              app_icon_source_url: {},
+            },
+            required: ["app_icon_source_url"],
+          },
+          {
+            properties: {
+              use_live_layout: {},
+            },
+            required: ["use_live_layout"],
+          },
+        ],
+      },
+    },
+    {
+      required: [
+        "app_id",
+        "app_name",
+        "bid",
+        "url",
+        "app_icon_source_url",
+        "use_live_layout",
+        "received_message",
+        "reply_message",
+      ],
+      not: {
+        properties: {
+          data: {},
+        },
+        required: ["data"],
+      },
+    },
+  ],
+} as const;
+
+export const AMBNativeInteractiveContentSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      const: "interactive",
+      description: "Always interactive.",
+      $ref: "#/components/schemas/AMBMessageType",
+    },
+    body: {
+      type: "string",
+      description:
+        "Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.",
+      "x-sensitive": true,
+    },
+    subject: {
+      type: "string",
+      description: "Subject displayed above the message body.",
+      "x-sensitive": true,
+    },
+    attachments: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBNativeAttachment",
+      },
+      description:
+        "Ordered attachments. Each object supplies a source URL or an encrypted Apple reference.",
+    },
+    interactive_data: {
+      $ref: "#/components/schemas/AMBNativeInteractiveData",
+    },
+    interactive_data_ref: {
+      $ref: "#/components/schemas/AMBRichLinkReference",
+    },
+  },
+  oneOf: [
+    {
+      required: ["interactive_data"],
+      not: {
+        properties: {
+          interactive_data_ref: {},
+        },
+        required: ["interactive_data_ref"],
+      },
+    },
+    {
+      required: ["interactive_data_ref"],
+      not: {
+        properties: {
+          interactive_data: {},
+        },
+        required: ["interactive_data"],
+      },
+    },
+  ],
+} as const;
+
+export const AMBMessageContentSchema = {
+  description:
+    "Apple message families with Bird field naming and media URLs. Authentication and Apple Pay requests are created through their dedicated conversation endpoints.",
+  oneOf: [
+    {
+      $ref: "#/components/schemas/AMBNativeTextContent",
+    },
+    {
+      $ref: "#/components/schemas/AMBNativeRichLinkContent",
+    },
+    {
+      $ref: "#/components/schemas/AMBNativeInteractiveContent",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      text: "#/components/schemas/AMBNativeTextContent",
+      rich_link: "#/components/schemas/AMBNativeRichLinkContent",
+      interactive: "#/components/schemas/AMBNativeInteractiveContent",
+    },
+  },
+} as const;
+
+export const AMBNativeInboundQuickReplySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["selected_identifier"],
+  properties: {
+    selected_identifier: {
+      type: "string",
+      description: "Identifier selected by the customer.",
+      minLength: 1,
+    },
+    selected_index: {
+      type: "integer",
+      minimum: 0,
+      description: "Index reported by Apple.",
+    },
+    items: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBQuickReplyItem",
+      },
+      description: "Items returned by the customer device.",
+    },
+  },
+} as const;
+
+export const AMBNativeInboundListPickerSectionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["items"],
+  properties: {
+    title: {
+      type: "string",
+      minLength: 1,
+      description: "Heading shown above this section's rows.",
+    },
+    order: {
+      type: ["integer", "null"],
+      minimum: 0,
+      description:
+        "Where this section sits relative to its siblings, ascending. Sections omitting it are laid out in list order, after any that specify one.",
+    },
+    items: {
+      type: "array",
+      minItems: 1,
+      items: {
+        $ref: "#/components/schemas/AMBListPickerItem",
+      },
+      description: "The rows in this section.",
+    },
+    multiple_selection: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether the customer can select more than one row in this section.",
+    },
+  },
+} as const;
+
+export const AMBNativeInboundListPickerSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["sections"],
+  properties: {
+    sections: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBNativeInboundListPickerSection",
+      },
+      description: "Sections and selected rows returned by Apple.",
+    },
+  },
+} as const;
+
+export const AMBNativeInboundEventSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    identifier: {
+      type: "string",
+      minLength: 1,
+      description: "Event identifier returned by Apple, when provided.",
+    },
+    location: {
+      $ref: "#/components/schemas/AMBLocation",
+      description: "Optional appointment location.",
+    },
+    timezone_offset: {
+      type: "integer",
+      description:
+        "Minutes from GMT at the event location. Omit to use the customer's time zone.",
+    },
+    timeslots: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBTimeSlot",
+      },
+      description:
+        "Time slots returned by Apple. May be empty when the device supplies only a selected label.",
+    },
+    image_identifier: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Identifier of the event image in interactive_data.data.images.",
+    },
+    title: {
+      type: "string",
+      description: "Event title.",
+    },
+  },
+} as const;
+
+export const AMBFormPageTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["select", "picker", "date_picker", "input"],
+} as const;
+
+export const AMBInboundFormItemSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["identifier", "type", "title", "value"],
+  properties: {
+    identifier: {
+      type: "string",
+      minLength: 1,
+    },
+    type: {
+      $ref: "#/components/schemas/AMBFormPageType",
+    },
+    title: {
+      type: "string",
+      minLength: 0,
+      "x-sensitive": true,
+      description:
+        "Display value Apple returned, including any input prefix. May be empty for an optional input.",
+    },
+    value: {
+      type: "string",
+      minLength: 0,
+      "x-sensitive": true,
+      description:
+        "Machine value Apple returned for the selection or input. May be empty for an optional input.",
+    },
+  },
+} as const;
+
+export const AMBInboundFormSelectionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["page_identifier", "title", "subtitle", "items"],
+  properties: {
+    page_identifier: {
+      type: "string",
+      minLength: 1,
+    },
+    title: {
+      type: "string",
+      minLength: 0,
+      description:
+        "Page title returned by Apple. Empty when the page has no title.",
+    },
+    subtitle: {
+      type: "string",
+      minLength: 1,
+    },
+    items: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBInboundFormItem",
+      },
+    },
+  },
+} as const;
+
+export const AMBNativeInboundFormDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["selections"],
+  properties: {
+    private: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether the sender asked the MSP to treat this form response as private.",
+    },
+    selections: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBInboundFormSelection",
+      },
+    },
+  },
+} as const;
+
+export const AMBNativeInboundDynamicSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      $ref: "#/components/schemas/AMBNativeInboundFormData",
+    },
+  },
+} as const;
+
+export const AMBNativeInboundPaymentSchema = {
+  type: "object",
+  additionalProperties: false,
+  "x-sensitive": true,
+  properties: {
+    state: {
+      type: "string",
+      description:
+        "Payment state reported by Apple. This does not confirm that a payment settled.",
+    },
+  },
+} as const;
+
+export const AMBNativeInboundAuthenticationSchema = {
+  type: "object",
+  additionalProperties: false,
+  "x-sensitive": true,
+  properties: {
+    status: {
+      type: "string",
+      description:
+        "Authentication status reported by Apple. This does not establish an authenticated Bird session.",
+    },
+  },
+} as const;
+
+export const AMBNativeInboundImageSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["identifier", "download_url"],
+  properties: {
+    identifier: {
+      type: "string",
+      description: "Identifier used by the received message.",
+      minLength: 1,
+    },
+    description: {
+      type: "string",
+      description: "Accessibility description supplied by Apple.",
+      "x-sensitive": true,
+    },
+    download_url: {
+      type: "string",
+      description:
+        "Relative Bird API URL for downloading the image with the same authentication and workspace as the message.",
+      format: "uri-reference",
+      minLength: 1,
+    },
+  },
+} as const;
+
+export const AMBNativeInboundPayloadSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    request_identifier: {
+      type: "string",
+      description: "Correlation identifier reported by Apple.",
+    },
+    quick_reply: {
+      $ref: "#/components/schemas/AMBNativeInboundQuickReply",
+    },
+    list_picker: {
+      $ref: "#/components/schemas/AMBNativeInboundListPicker",
+    },
+    event: {
+      $ref: "#/components/schemas/AMBNativeInboundEvent",
+    },
+    dynamic: {
+      $ref: "#/components/schemas/AMBNativeInboundDynamic",
+    },
+    payment: {
+      $ref: "#/components/schemas/AMBNativeInboundPayment",
+    },
+    authenticate: {
+      $ref: "#/components/schemas/AMBNativeInboundAuthentication",
+    },
+    images: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBNativeInboundImage",
+      },
+      description:
+        "Images returned by Apple, with authenticated download URLs.",
+    },
+  },
+} as const;
+
+export const AMBNativeInboundInteractiveDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    app_id: {
+      type: "string",
+      description: "Custom app identifier.",
+    },
+    app_name: {
+      type: "string",
+      description: "Custom app name.",
+    },
+    bid: {
+      type: "string",
+      description: "Apple extension identifier.",
+    },
+    url: {
+      type: "string",
+      description: "Opaque custom app response URL.",
+      "x-sensitive": true,
+    },
+    use_live_layout: {
+      type: "boolean",
+      description: "Whether the app uses live layout.",
+    },
+    session_identifier: {
+      type: "string",
+      description: "Apple interaction session identifier.",
+    },
+    reply_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
+    },
+    received_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
+    },
+    data: {
+      $ref: "#/components/schemas/AMBNativeInboundPayload",
+    },
+    app_icon_url: {
+      type: "string",
+      description:
+        "Relative Bird API URL for downloading the custom app icon with the same authentication and workspace as the message.",
+      format: "uri-reference",
+    },
+  },
+} as const;
+
+export const AMBNativeInboundInteractiveContentSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "interactive_data"],
+  properties: {
+    type: {
+      const: "interactive",
+      description: "Always interactive.",
+      $ref: "#/components/schemas/AMBMessageType",
+    },
+    body: {
+      type: "string",
+      description: "Message body supplied by Apple.",
+      "x-sensitive": true,
+    },
+    subject: {
+      type: "string",
+      description: "Message subject supplied by Apple.",
+      "x-sensitive": true,
+    },
+    attachments: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBNativeAttachment",
+      },
+      description: "Ordered attachments supplied by Apple.",
+    },
+    interactive_data: {
+      $ref: "#/components/schemas/AMBNativeInboundInteractiveData",
+    },
+  },
+} as const;
+
+export const AMBInboundContentSchema = {
+  description:
+    "Received text, attachments, and interactive replies, preserving Apple message structure.",
+  oneOf: [
+    {
+      $ref: "#/components/schemas/AMBNativeTextContent",
+    },
+    {
+      $ref: "#/components/schemas/AMBNativeInboundInteractiveContent",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      text: "#/components/schemas/AMBNativeTextContent",
+      interactive: "#/components/schemas/AMBNativeInboundInteractiveContent",
+    },
+  },
+} as const;
+
+export const AMBStatsErrorCodeSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^(bird:[a-z0-9_]+|apple:\\d{3})$",
+  description:
+    "Machine-readable reason a send failed, in one of two namespaces: `bird:` for a reason Bird's own pipeline assigned (for example `bird:business_not_registered`), or `apple:` followed by the HTTP status Apple's API returned for the send attempt (for example `apple:404`). This is an open, growing set in both namespaces; accept unrecognized values.\n",
+  example: "bird:business_not_registered",
+} as const;
+
+export const AMBErrorSchema = {
+  type: ["object", "null"],
+  additionalProperties: false,
+  readOnly: true,
+  required: ["code", "description", "occurred_at"],
+  description:
+    "Failure detail for a message or invitation that could not be sent or was rejected.",
+  properties: {
+    code: {
+      $ref: "#/components/schemas/AMBStatsErrorCode",
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The failure in words. Free-form, so branch on `code` and show this to a human.",
+      example: "Apple refused the message with HTTP status 404.",
+    },
+    occurred_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When the failure occurred.",
+    },
+  },
+} as const;
+
+export const AMBMessageSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "conversation_id",
+    "business_account_id",
+    "direction",
+    "status",
+    "kind",
+    "content",
+    "created_at",
+    "cost",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBMessageID",
+      description:
+        "ID of the message, assigned when it is accepted or received. Pass it as `message_id` to the get-message and list-events endpoints.",
+    },
+    conversation_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBConversationID",
+      description: "The conversation this message belongs to.",
+    },
+    business_account_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBBusinessID",
+      description: "The business the message was sent from or received by.",
+    },
+    from: {
+      type: "string",
+      readOnly: true,
+      minLength: 1,
+      description:
+        "Apple business identifier on outbound messages, or the customer's opaque Apple identifier on inbound messages. Omitted when that address is unavailable on a historical record.",
+    },
+    to: {
+      type: "string",
+      readOnly: true,
+      minLength: 1,
+      description:
+        "Customer's opaque Apple identifier on outbound messages, or the Apple business identifier on inbound messages. Omitted when that address is unavailable on a historical record.",
+    },
+    direction: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBMessageDirection",
+    },
+    status: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBMessageStatus",
+    },
+    kind: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBContentKind",
+      description:
+        "Derived content classification for filtering and statistics.",
+    },
+    source: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBMessageSource",
+      description:
+        "Who sent this message. Absent on an inbound message, which has no source to report.",
+    },
+    content: {
+      readOnly: true,
+      description:
+        "Native message content. Outgoing interactions contain requests; incoming interactions contain replies.",
+      anyOf: [
+        {
+          $ref: "#/components/schemas/AMBMessageContent",
+        },
+        {
+          $ref: "#/components/schemas/AMBInboundContent",
+        },
+      ],
+      "x-sensitive": true,
+    },
+    in_reply_to_message_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBMessageID",
+      description:
+        "Original message matched through Apple’s request identifier within the same workspace, business, and conversation. Omitted when no verified match exists.",
+    },
+    locale: {
+      type: ["string", "null"],
+      readOnly: true,
+      minLength: 1,
+      description:
+        "Locale for this message, preserved in Apple’s format, for example en_US. Outbound messages use the request override, then the conversation locale, then the business default. Inbound messages preserve the locale in Apple’s callback. Null when unknown.",
+      example: "en_US",
+    },
+    category: {
+      type: "string",
+      readOnly: true,
+      description:
+        "The category this message was sent with, for reporting only. It does not affect sending or suppression policy, or select an Apple department or purpose. Defaults to an empty string when a send names no category. Absent on an inbound message, which has no category to report.",
+      example: "order_update",
+    },
+    metadata: {
+      type: "object",
+      additionalProperties: true,
+      description:
+        "Arbitrary JSON object for per-message context. Maximum 2 KB serialized. Top-level keys beginning with `__bird` are reserved. Returned in the send response, message reads and customer message webhooks.",
+      readOnly: true,
+    },
+    tags: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      description:
+        "Structured `{name, value}` filter labels applied to this message. Absent on an inbound message.",
+    },
+    cost: {
+      readOnly: true,
+      $ref: "#/components/schemas/MessageCost",
+      description:
+        "Recorded message charge. Null in the initial send response and while unpriced. The AMB charge is the transaction amount; no passthrough component is priced.",
+    },
+    last_error: {
+      readOnly: true,
+      description:
+        "Failure detail on a message whose send failed or that Bird rejected before any send attempt. Omitted when there is no failure detail.",
+      $ref: "#/components/schemas/AMBError",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The moment this message was accepted (outbound) or received (inbound). This is the timestamp the outbound statistics families bucket and attribute on; there is no separate `accepted_at` field.",
+    },
+    sent_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the selected sending outcome occurred. Null unless the current status is `sent` and the message is outbound. For older messages without a retained sending event, the stored record time is used.",
+    },
+    data_ref: {
+      $ref: "#/components/schemas/AMBRichLinkReference",
+      readOnly: true,
+      description:
+        "Reusable encrypted content reference returned by Apple after a successful send. Absent until Apple returns one.",
+    },
+    group: {
+      type: "string",
+      readOnly: true,
+      minLength: 1,
+      description:
+        "Apple department identifier carried by this message. Omitted when absent from the message or unavailable on a historical record.",
+    },
+    intent: {
+      type: "string",
+      readOnly: true,
+      minLength: 1,
+      description:
+        "Apple purpose identifier carried by this message. Omitted when absent from the message or unavailable on a historical record.",
+    },
+  },
+} as const;
+
+export const AMBMessageListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "Page of Apple Messages for Business messages, newest first.",
+          items: {
+            $ref: "#/components/schemas/AMBMessage",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const AMBMessageSendRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["from", "to", "content"],
+  properties: {
+    from: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Apple business identifier of the brand sending the message. Read it from the business’s apple_business_id. The customer must have opened the conversation with this business.",
+      example: "b52d6267-2b62-4f8a-8842-0533d0f1dc07",
+    },
+    to: {
+      example: "opaque-customer-id",
+      type: "string",
+      minLength: 1,
+      description:
+        "Apple’s opaque customer identifier for this business, available as the conversation’s opaque_user_id. The conversation must exist and be open.",
+    },
+    source: {
+      $ref: "#/components/schemas/AMBMessageSource",
+      description:
+        "Who this message is sent as. A signed-in session may send as `operator` or `automation`; an API key may send as `api` or `automation`. Omit it to take the default for your credential. Naming a source your credential cannot use is refused with a `422` `AMBMessageSourceNotPermitted`.",
+    },
+    content: {
+      $ref: "#/components/schemas/AMBMessageContent",
+      description:
+        "Message content in Apple’s native text, rich_link, or interactive family.",
+      "x-sensitive": true,
+    },
+    category: {
+      type: "string",
+      maxLength: 64,
+      description:
+        "Free-form reporting label; it does not change sending or suppression policy, for example `order_update`. Omit it to send with the default empty category.",
+      example: "order_update",
+    },
+    metadata: {
+      type: "object",
+      additionalProperties: true,
+      description:
+        "Arbitrary JSON object for per-message context. Maximum 2 KB serialized. Top-level keys beginning with `__bird` are reserved. Returned in the send response, message reads and customer message webhooks.",
+    },
+    tags: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      maxItems: 20,
+      description:
+        "Structured `{name, value}` labels for filtering. Maximum 20 tags per send.",
+    },
+    group: {
+      type: "string",
+      description: "Department identifier for this message.",
+    },
+    intent: {
+      type: "string",
+      description: "Purpose of this conversation.",
+    },
+    locale: {
+      type: "string",
+      description:
+        "Apple locale identifier, for example en_US. Defaults to the conversation locale.",
+    },
+  },
+  example: {
+    from: "b52d6267-2b62-4f8a-8842-0533d0f1dc07",
+    to: "opaque-customer-id",
+    content: {
+      type: "text",
+      body: "Your order is ready.",
+    },
+  },
+} as const;
+
+export const AMBMessageEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Message timeline event type:\n\n- `amb.accepted`: The API accepted the request.\n- `amb.sent`: The message was handed to Apple.\n- `amb.send_failed`: Apple refused the message, or its send attempts were exhausted.\n- `amb.rejected`: Bird refused the message before any send attempt.\n- `amb.received`: An inbound message arrived from the customer.\n\nThis is an open enum. Accept unrecognized values.\n",
+  "x-extensible-enum": [
+    "amb.accepted",
+    "amb.sent",
+    "amb.send_failed",
+    "amb.rejected",
+    "amb.received",
+  ],
+  example: "amb.sent",
+} as const;
+
+export const AMBMessageEventSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "type", "occurred_at"],
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBEventID",
+      description: "ID of the event, unique within the message's timeline.",
+    },
+    type: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBMessageEventType",
+    },
+    occurred_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When this event occurred.",
+    },
+    error: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBError",
+      description:
+        "Failure detail, on an `amb.send_failed` or `amb.rejected` event. Null on every other event type.",
+    },
+  },
+} as const;
+
+export const AMBMessageEventListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "The message's events, oldest first. Not paginated: a message's timeline is bounded and returned in full.\n",
+      items: {
+        $ref: "#/components/schemas/AMBMessageEvent",
+      },
+    },
+  },
+} as const;
+
+export const AMBConversationStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["open", "closed"],
+  description:
+    "Whether a conversation is open or closed. There is no close operation on this API: only the customer closes a conversation from their device, and any inbound message on a closed conversation reopens it.\n",
+} as const;
+
+export const AMBConversationOriginSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["entry_point", "invitation"],
+  description:
+    "How the conversation started. `entry_point` means the customer opened it from one of your configured Apple Messages for Business entry points. `invitation` means the customer accepted an invitation and sent a message. This is set once when the conversation is created and never changes.\n",
+} as const;
+
+export const AMBConversationClosedReasonSchema = {
+  type: "string",
+  enum: ["user_close", "gone"],
+  description:
+    "Why a closed conversation was closed. `user_close` means the customer sent a close message from their device. `gone` means Apple returned a 410 for the conversation. The console renders this as a banner on a closed conversation.\n",
+} as const;
+
+export const AMBConversationSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A conversation between your business and one customer on Apple Messages for Business. It holds the customer's device capabilities, the console's read state, assignment, and labels, and the routing queue the conversation is in.\n",
+  required: [
+    "id",
+    "business_account_id",
+    "status",
+    "origin",
+    "opaque_user_id",
+    "phone_number",
+    "group_id",
+    "intent_id",
+    "device_capabilities",
+    "supported_content_kinds",
+    "locale",
+    "unread_count",
+    "message_count",
+    "last_message_at",
+    "last_direction",
+    "assigned_to",
+    "labels",
+    "closed_at",
+    "closed_reason",
+    "open_count",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBConversationID",
+      description: "Conversation ID.",
+    },
+    business_account_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBBusinessID",
+      description: "Business this conversation belongs to.",
+    },
+    status: {
+      $ref: "#/components/schemas/AMBConversationStatus",
+      readOnly: true,
+    },
+    origin: {
+      $ref: "#/components/schemas/AMBConversationOrigin",
+      readOnly: true,
+    },
+    opaque_user_id: {
+      type: ["string", "null"],
+      readOnly: true,
+      minLength: 1,
+      description:
+        "Apple's opaque identifier for the customer with this business. The customer must send a message before a conversation is created. Null when no identifier is recorded.\n",
+    },
+    phone_number: {
+      type: ["string", "null"],
+      readOnly: true,
+      minLength: 1,
+      description:
+        "Customer phone number, when recorded. Null when unknown. Read the invitation's `to` field for the number an invitation was sent to.\n",
+    },
+    group_id: {
+      type: ["string", "null"],
+      readOnly: true,
+      minLength: 1,
+      description:
+        "The `group` value carried by the inbound message that opened or most recently reopened the conversation. Your business chooses it when configuring an entry point with Apple, and Apple passes it through; used with `intent_id` to route the conversation. Null when that message carried none.\n",
+    },
+    intent_id: {
+      type: ["string", "null"],
+      readOnly: true,
+      minLength: 1,
+      description:
+        "The `intent` value carried by the inbound message that opened or most recently reopened the conversation. Your business chooses it when configuring an entry point with Apple, and Apple passes it through; used with `group_id` to route the conversation. Null when that message carried none.\n",
+    },
+    entry_point: {
+      type: ["string", "null"],
+      readOnly: true,
+      minLength: 1,
+      description:
+        "The entry point in your channel settings whose group and intent matched the inbound message that opened or most recently reopened the conversation. Null when no configured entry point matched.\n",
+      example: "support",
+    },
+    device_capabilities: {
+      type: "array",
+      readOnly: true,
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      description:
+        "The capability tokens the customer's device advertised on its most recent message, replaced by each inbound rather than accumulated, so this describes the device in use now. An empty list means the device's capabilities are unknown. Implemented message types may still be sent, but device rendering support has not been confirmed. Authentication requires an explicitly advertised AUTH2 capability.\n",
+      example: ["QUICK", "LIST", "TIME"],
+    },
+    supported_content_kinds: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/AMBContentKind",
+      },
+      description:
+        "Implemented baseline types plus interactive types confirmed by `device_capabilities`. An empty capability list yields text, attachments and rich links; it does not establish support for other types. Unadvertised quick replies, list pickers, time pickers and forms are refused when capabilities are known. Custom apps and opaque interactive references are not included because their device support cannot be inferred from these tokens. Unsupported roadmap types cannot be sent.\n",
+    },
+    locale: {
+      type: "string",
+      readOnly: true,
+      minLength: 1,
+      description:
+        "The customer's locale from the most recent inbound message, or your business's default locale before any inbound arrives. Preserved in Apple's locale format, for example `en_US@rg=nlzzzz`.\n",
+      example: "en-US",
+    },
+    unread_count: {
+      type: "integer",
+      readOnly: true,
+      minimum: 0,
+      description:
+        "Number of inbound messages since this conversation was last marked read. Incremented once per inbound message, reset to zero by marking the conversation read and by any outbound message your workspace sends.\n",
+    },
+    message_count: {
+      type: "integer",
+      readOnly: true,
+      minimum: 0,
+      description: "Number of messages in this conversation, both directions.",
+    },
+    last_message_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When the most recent message in this conversation was sent or received.",
+    },
+    last_direction: {
+      $ref: "#/components/schemas/AMBMessageDirection",
+      readOnly: true,
+      description: "Direction of the most recent message.",
+    },
+    assigned_to: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/UserID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The user this conversation is assigned to, or null when unassigned. Assignment is not rechecked against workspace membership on read, so it can still name a user whose access was removed.\n",
+    },
+    labels: {
+      type: "array",
+      items: {
+        type: "string",
+        minLength: 1,
+        maxLength: 64,
+      },
+      maxItems: 20,
+      description:
+        "Operator-set tags on this conversation. Unlike email, there are no system placement labels: every value here is one an operator chose.\n",
+    },
+    queue: {
+      type: "string",
+      readOnly: true,
+      description:
+        "The console queue this conversation is routed to. Empty when no routing rule matched, which the console lists as unrouted.\n",
+      example: "support",
+    },
+    closed_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description: "When this conversation was closed. Null while it is open.",
+    },
+    closed_reason: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBConversationClosedReason",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description: "Why this conversation was closed. Null while it is open.",
+    },
+    open_count: {
+      type: "integer",
+      readOnly: true,
+      minimum: 1,
+      description:
+        "Number of times this conversation has been opened, starting at 1 and incremented on each reopen. A closed conversation reopens on the next inbound message rather than creating a new conversation.\n",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When this conversation was created.",
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When this conversation last changed.",
+    },
+  },
+} as const;
+
+export const AMBConversationListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of conversations, newest first by last message.",
+          items: {
+            $ref: "#/components/schemas/AMBConversation",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const AMBConversationUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Assignment, labels, and read state on a conversation. There is no close action here: only the customer closes a conversation, from their device. Every field is optional; omit a field to leave it unchanged.\n",
+  properties: {
+    assigned_to: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/UserID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "User to assign this conversation to. Pass null to unassign it.",
+    },
+    labels: {
+      type: "array",
+      items: {
+        type: "string",
+        minLength: 1,
+        maxLength: 64,
+      },
+      maxItems: 20,
+      description:
+        "Replaces the full set of labels on this conversation. Pass an empty array to clear every label.\n",
+    },
+    read: {
+      type: "boolean",
+      description:
+        "Set to true to mark this conversation read, resetting `unread_count` to zero. There is no way to mark a conversation unread through this field; false has no effect.\n",
+    },
+  },
+} as const;
+
+export const AMBConversationTypingEventSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["typing_start", "typing_end"],
+  description:
+    "The typing signal to send. `typing_start` tells the customer's device that an operator is composing a reply. `typing_end` tells it composition stopped without a message following. Apple expects at most one `typing_start` before the reply it precedes; sending it again before that reply is not meaningful and may be dropped. `typing_end`'s behavior against a live conversation is unproven: the legacy platform's implementation was disabled after it caused issues, so treat it as best-effort.\n",
+} as const;
+
+export const AMBConversationTypingRequestSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A typing indicator to send to the customer's device on this conversation.\n",
+  required: ["event"],
+  properties: {
+    event: {
+      $ref: "#/components/schemas/AMBConversationTypingEvent",
+    },
+  },
+} as const;
+
+export const AMBSuppressionListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "Active suppression episodes for the workspace, most recently effective first. Episodes that have ended are left out; fetch one by ID to read it.\n",
+          items: {
+            $ref: "#/components/schemas/AMBSuppression",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const AMBSuppressionCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["address", "address_type"],
+  properties: {
+    business_account_id: {
+      $ref: "#/components/schemas/AMBBusinessID",
+      description:
+        "Limit this manual block to one account. Omit to cover the same address across the workspace.",
+    },
+    address: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The phone number or opaque identifier to suppress. For a phone number, supply canonical E.164 with a leading plus sign.\n",
+      example: "+15551234567",
+      maxLength: 1024,
+    },
+    address_type: {
+      $ref: "#/components/schemas/AMBSuppressionAddressType",
+    },
+  },
+} as const;
+
+export const AMBStatsSummaryPeriodSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The window the server actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants on the hour). The grain of `from` and `to` mirrors the grain of the request's bounds.\n",
+  required: ["from", "to"],
+  properties: {
+    from: {
+      type: "string",
+      minLength: 1,
+      pattern:
+        "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2}))?$",
+      readOnly: true,
+      description:
+        "Inclusive start of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary. Historical starts are preserved; the maximum request length does not impose a historical cutoff.",
+      example: "2026-05-01",
+    },
+    to: {
+      type: "string",
+      minLength: 1,
+      pattern:
+        "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2}))?$",
+      readOnly: true,
+      description:
+        "Inclusive end of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.",
+      example: "2026-05-25",
+    },
+    data_as_of: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.\n",
+      example: "2026-05-25T14:03:10Z",
+    },
+  },
+} as const;
+
+export const AMBStatsAttributionSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  enum: ["accepted_time", "event_time"],
+  description:
+    "Which timestamp a statistics response buckets its rows and totals by:\n\n- `accepted_time`: attributed to when Bird accepted the outbound message for sending. The outbound send statistics use this, so a later event for the same message, such as a send failure, still counts against the day or hour its message was accepted.\n- `event_time`: attributed to when the event itself occurred. Inbound message statistics, conversation statistics and the staff per-business failure counts use this, since there is no earlier outbound event to anchor them to.\n\nA response never mixes the two axes: every row and total in one payload shares the same attribution.\n",
+  example: "accepted_time",
+} as const;
+
+export const AMBOutboundStatsCountsSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Outbound Apple Messages for Business counts for the requested scope, attributed to when each message was accepted. Apple Messages for Business has no delivery receipt, so there is no `delivered` count anywhere in this API: `sent` is the last outbound state Bird observes for a message. Very large counts are close estimates rather than exact tallies. Rates are computed once here, clamped to 1, and null when nothing was accepted.\n",
+  required: [
+    "accepted",
+    "sent",
+    "send_failed",
+    "rejected",
+    "sent_rate",
+    "send_failure_rate",
+  ],
+  properties: {
+    accepted: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Distinct messages accepted for sending after admission checks. This is the denominator for `sent_rate` and `send_failure_rate`.",
+      example: 4820,
+    },
+    sent: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Distinct messages handed off to Apple.",
+      example: 4790,
+    },
+    send_failed: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Distinct accepted messages that Apple refused or that exhausted their send attempts. See `last_error.code` on the message for the reason; a refused charge is not a send failure, it is `rejected`.",
+      example: 30,
+    },
+    rejected: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Distinct messages refused before any send attempt, because the destination has no price, the wallet could not fund the send, or the content cannot be sent yet. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `send_failure_rate`, which covers send failures only.",
+      example: 4,
+    },
+    sent_rate: {
+      type: ["number", "null"],
+      minimum: 0,
+      maximum: 1,
+      readOnly: true,
+      description:
+        "Share of accepted messages Apple acknowledged, computed as `sent / accepted`. Null when no messages were accepted in scope. This stands where other channels report a delivery rate.",
+      example: 0.9938,
+    },
+    send_failure_rate: {
+      type: ["number", "null"],
+      minimum: 0,
+      maximum: 1,
+      readOnly: true,
+      description:
+        "Share of accepted messages that failed to send, computed as `send_failed / accepted`. Null when no messages were accepted in scope.",
+      example: 0.0062,
+    },
+  },
+} as const;
+
+export const AMBStatsQuantilesSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Approximate p50, p95, and p99 latency percentiles in milliseconds for one latency family. All three are null when no qualifying event contributed a measurement.\n",
+  required: ["p50_ms", "p95_ms", "p99_ms"],
+  properties: {
+    p50_ms: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Median (50th percentile) latency in milliseconds. Null when no qualifying event contributed a measurement.",
+      example: 610,
+    },
+    p95_ms: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description:
+        "95th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.",
+      example: 2140,
+    },
+    p99_ms: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description:
+        "99th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.",
+      example: 5380,
+    },
+  },
+} as const;
+
+export const AMBStatsLatencySchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Processing-latency percentiles in milliseconds for the requested scope, from acceptance to Apple handoff. Apple Messages for Business has no delivery receipt, so there is no `delivery` or `total` member beside `processing`. Conversation response timing is reported separately in `first_response`. Always present; every percentile is null when no qualifying message in scope has a measurement.\n",
+  required: ["processing"],
+  properties: {
+    processing: {
+      $ref: "#/components/schemas/AMBStatsQuantiles",
+    },
+  },
+} as const;
+
+export const AMBStatsComparisonDeltaSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Changes from the previous period. Each value is the signed relative change `(current - previous) / previous` and is null when the previous count is zero.\n",
+  required: [
+    "accepted_pct_change",
+    "sent_pct_change",
+    "send_failed_pct_change",
+    "rejected_pct_change",
+  ],
+  properties: {
+    accepted_pct_change: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Relative change in accepted messages (`counts.accepted`) versus the previous period, as a signed fraction. Null when the previous period accepted none.",
+      example: 0.508,
+    },
+    sent_pct_change: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Relative change in sent messages (`counts.sent`) versus the previous period, as a signed fraction. Null when the previous period had none.",
+      example: 0.501,
+    },
+    send_failed_pct_change: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Relative change in send failures (`counts.send_failed`) versus the previous period, as a signed fraction. Null when the previous period had none.",
+      example: -0.12,
+    },
+    rejected_pct_change: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Relative change in rejected messages (`counts.rejected`) versus the previous period, as a signed fraction. Null when the previous period had none.",
+      example: 0,
+    },
+  },
+} as const;
+
+export const AMBStatsComparisonSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.\n",
+  required: ["period", "counts", "latency", "delta"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows).",
+    },
+    counts: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBOutboundStatsCounts",
+    },
+    latency: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsLatency",
+    },
+    first_response: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsQuantiles",
+      description:
+        "First-response latency percentiles for the preceding period. Omitted when no qualifying message in that period has a measurement.",
+    },
+    delta: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsComparisonDelta",
+    },
+  },
+} as const;
+
+export const AMBStatsSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound Apple Messages for Business counts and latency percentiles for the full requested period. Counts and percentiles are computed over the whole period rather than combined from the returned time-series values.\n",
+  required: ["period", "attribution", "counts", "latency"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `accepted_time` for outbound statistics.",
+    },
+    counts: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBOutboundStatsCounts",
+    },
+    latency: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsLatency",
+    },
+    first_response: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsQuantiles",
+      description:
+        "Time from the oldest unanswered inbound message to acceptance of the first outbound reply that claims it. Reported on summaries and breakdowns. Omitted when no qualifying reply contributes a measurement.",
+    },
+    comparison: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsComparison",
+    },
+  },
+} as const;
+
+export const AMBStatsSeriesPeriodSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The window and bucket grain the response covers, echoed from the request, plus the freshness boundary the data is current to.\n",
+  required: ["from", "to", "grain"],
+  properties: {
+    from: {
+      type: "string",
+      minLength: 1,
+      pattern:
+        "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2}))?$",
+      readOnly: true,
+      description:
+        "Inclusive start of the window. A calendar day (YYYY-MM-DD) on the day grain, an RFC 3339 instant on the hour grain. Historical starts are preserved; the maximum request length does not impose a historical cutoff.",
+      example: "2026-05-01",
+    },
+    to: {
+      type: "string",
+      minLength: 1,
+      pattern:
+        "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2}))?$",
+      readOnly: true,
+      description:
+        "Inclusive end of the window. A calendar day (YYYY-MM-DD) on the day grain, an RFC 3339 instant on the hour grain.",
+      example: "2026-05-25",
+    },
+    grain: {
+      $ref: "#/components/schemas/StatsGrain",
+      readOnly: true,
+    },
+    data_as_of: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.\n",
+      example: "2026-05-25T14:03:10Z",
+    },
+  },
+} as const;
+
+export const AMBStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Outbound Apple Messages for Business counts and processing-latency percentiles for one time bucket (a calendar day or hour), bucketed by acceptance time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. There is no `first_response` here. Read first-response latency from the summary or a breakdown endpoint.\n",
+  required: ["bucket", "counts", "latency"],
+  properties: {
+    bucket: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.",
+      example: "2026-05-25",
+    },
+    counts: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBOutboundStatsCounts",
+    },
+    latency: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsLatency",
+    },
+  },
+} as const;
+
+export const AMBStatsResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Time-series stats payload. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.\n",
+  required: ["period", "attribution", "data"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSeriesPeriod",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `accepted_time` for outbound statistics.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description:
+        "One row per day or hour in chronological order. Buckets with no activity contain zero counts.",
+      items: {
+        $ref: "#/components/schemas/AMBStatsPoint",
+      },
+    },
+  },
+} as const;
+
+export const AMBBusinessAccountStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single business over the requested period.",
+  required: ["business_account_id", "counts", "latency"],
+  properties: {
+    business_account_id: {
+      $ref: "#/components/schemas/AMBBusinessID",
+      readOnly: true,
+      description: "The business these messages were sent from.",
+    },
+    counts: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBOutboundStatsCounts",
+    },
+    latency: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsLatency",
+    },
+    first_response: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsQuantiles",
+      description:
+        "First-response latency percentiles for this business. Omitted when no qualifying message contributes a measurement.",
+    },
+  },
+} as const;
+
+export const AMBStatsByBusinessResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-business breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
+  required: ["period", "attribution", "data", "total"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The window the response covers (echoed back), plus `data_as_of`.",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `accepted_time` for outbound statistics.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description: "Business rows ranked by accepted volume descending.",
+      items: {
+        $ref: "#/components/schemas/AMBBusinessAccountStatsPoint",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total distinct businesses with activity in the period, regardless of `limit`.",
+      example: 1,
+    },
+  },
+} as const;
+
+export const AMBMessageKindStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single message content kind over the requested period.",
+  required: ["message_kind", "counts", "latency"],
+  properties: {
+    message_kind: {
+      $ref: "#/components/schemas/AMBContentKind",
+      readOnly: true,
+      description:
+        "The content kind these messages were sent as, the same value the message read returns as its content kind discriminator.",
+    },
+    counts: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBOutboundStatsCounts",
+    },
+    latency: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsLatency",
+    },
+    first_response: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsQuantiles",
+      description:
+        "First-response latency percentiles for this content kind. Omitted when no qualifying message contributes a measurement.",
+    },
+  },
+} as const;
+
+export const AMBStatsByMessageKindResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-content-kind breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
+  required: ["period", "attribution", "data", "total"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The window the response covers (echoed back), plus `data_as_of`.",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `accepted_time` for outbound statistics.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description: "Content-kind rows ranked by accepted volume descending.",
+      items: {
+        $ref: "#/components/schemas/AMBMessageKindStatsPoint",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total distinct content kinds with activity in the period, regardless of `limit`.",
+      example: 4,
+    },
+  },
+} as const;
+
+export const AMBIntentStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single entry-point intent over the requested period.",
+  required: ["intent", "counts", "latency"],
+  properties: {
+    intent: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The intent these messages were routed under, as configured in the business's entry points. Intents are workspace-defined and have no fixed vocabulary.",
+      example: "order_support",
+    },
+    counts: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBOutboundStatsCounts",
+    },
+    latency: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsLatency",
+    },
+    first_response: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsQuantiles",
+      description:
+        "First-response latency percentiles for this intent. Omitted when no qualifying message contributes a measurement.",
+    },
+  },
+} as const;
+
+export const AMBStatsByIntentResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-intent breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
+  required: ["period", "attribution", "data", "total"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The window the response covers (echoed back), plus `data_as_of`.",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `accepted_time` for outbound statistics.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description: "Intent rows ranked by accepted volume descending.",
+      items: {
+        $ref: "#/components/schemas/AMBIntentStatsPoint",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total distinct intents with activity in the period, regardless of `limit`.",
+      example: 5,
+    },
+  },
+} as const;
+
+export const AMBGroupStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single entry-point group over the requested period.",
+  required: ["group", "counts", "latency"],
+  properties: {
+    group: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The group these messages were routed under, as configured in the business's entry points. Groups are workspace-defined and have no fixed vocabulary.",
+      example: "sales",
+    },
+    counts: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBOutboundStatsCounts",
+    },
+    latency: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsLatency",
+    },
+    first_response: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsQuantiles",
+      description:
+        "First-response latency percentiles for this group. Omitted when no qualifying message contributes a measurement.",
+    },
+  },
+} as const;
+
+export const AMBStatsByGroupResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-group breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
+  required: ["period", "attribution", "data", "total"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The window the response covers (echoed back), plus `data_as_of`.",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `accepted_time` for outbound statistics.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description: "Group rows ranked by accepted volume descending.",
+      items: {
+        $ref: "#/components/schemas/AMBGroupStatsPoint",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total distinct groups with activity in the period, regardless of `limit`.",
+      example: 3,
+    },
+  },
+} as const;
+
+export const AMBCategoryStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single message category over the requested period.",
+  required: ["category", "counts", "latency"],
+  properties: {
+    category: {
+      type: "string",
+      minLength: 0,
+      readOnly: true,
+      description:
+        "The category these messages were sent with. Defaults to an empty string when a send names no category.",
+      example: "order_update",
+    },
+    counts: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBOutboundStatsCounts",
+    },
+    latency: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsLatency",
+    },
+    first_response: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsQuantiles",
+      description:
+        "First-response latency percentiles for this category. Omitted when no qualifying message contributes a measurement.",
+    },
+  },
+} as const;
+
+export const AMBStatsByCategoryResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
+  required: ["period", "attribution", "data", "total"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The window the response covers (echoed back), plus `data_as_of`.",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `accepted_time` for outbound statistics.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description: "Category rows ranked by accepted volume descending.",
+      items: {
+        $ref: "#/components/schemas/AMBCategoryStatsPoint",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total distinct categories with activity in the period, regardless of `limit`.",
+      example: 6,
+    },
+  },
+} as const;
+
+export const AMBTagStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single tag over the requested period.",
+  required: ["tag", "counts", "latency"],
+  properties: {
+    tag: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The tag these messages carry, as a bare name or a `name:value` pair. A message with several tags is counted once under each, so rows do not sum to the period total.",
+      example: "campaign:spring_launch",
+    },
+    counts: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBOutboundStatsCounts",
+    },
+    latency: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsLatency",
+    },
+    first_response: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsQuantiles",
+      description:
+        "First-response latency percentiles for this tag. Omitted when no qualifying message contributes a measurement.",
+    },
+  },
+} as const;
+
+export const AMBStatsByTagResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Only tagged messages appear.",
+  required: ["period", "attribution", "data", "total"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The window the response covers (echoed back), plus `data_as_of`.",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `accepted_time` for outbound statistics.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description: "Tag rows ranked by accepted volume descending.",
+      items: {
+        $ref: "#/components/schemas/AMBTagStatsPoint",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total distinct tags with activity in the period, regardless of `limit`.",
+      example: 9,
+    },
+  },
+} as const;
+
+export const AMBErrorCodeStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single failure reason over the requested period.",
+  required: ["error_code", "counts", "latency"],
+  properties: {
+    error_code: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsErrorCode",
+      description: "The failure reason these messages share.",
+    },
+    counts: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBOutboundStatsCounts",
+    },
+    latency: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsLatency",
+    },
+    first_response: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsQuantiles",
+      description:
+        "First-response latency for failed replies that claimed an unanswered inbound message. Omitted when no qualifying reply contributes a measurement.\n",
+    },
+  },
+} as const;
+
+export const AMBStatsByErrorCodeResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-failure-reason breakdown for the requested period, ranked by `send_failed + rejected` descending and capped at the requested `limit` (default 50, max 200). Only messages carrying an error code appear: a `bird:` code is usually a rejection, an `apple:` code a send failure.",
+  required: ["period", "attribution", "data", "total"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The window the response covers (echoed back), plus `data_as_of`.",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `accepted_time` for outbound statistics.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Error-code rows ranked by `send_failed + rejected` descending.",
+      items: {
+        $ref: "#/components/schemas/AMBErrorCodeStatsPoint",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total distinct error codes with activity in the period, regardless of `limit`.",
+      example: 2,
+    },
+  },
+} as const;
+
+export const AMBInboundStatsComparisonDeltaSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "The change from the preceding period to the requested one. The `received_pct_change` field is a signed relative change, computed as `(current - previous) / previous`. A value of `0.5` means 50% higher, and `-0.2` means 20% lower. The field is null when the previous period received none.\n",
+  required: ["received_pct_change"],
+  properties: {
+    received_pct_change: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Relative change in received messages versus the previous period, as a signed fraction. Null when the previous period received none.",
+      example: 0.058,
+    },
+  },
+} as const;
+
+export const AMBInboundStatsComparisonSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.\n",
+  required: ["period", "received", "delta"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows).",
+    },
+    received: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Distinct messages received in the preceding period.",
+      example: 3980,
+    },
+    delta: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBInboundStatsComparisonDelta",
+    },
+  },
+} as const;
+
+export const AMBInboundStatsSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Total inbound Apple Messages for Business messages for the requested period.\n",
+  required: ["period", "attribution", "received"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `event_time` for inbound statistics.",
+    },
+    received: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Distinct messages received in the period, counted by the time each message occurred. Computed across the whole window rather than summed from the daily or hourly series, so it can sit slightly below the sum of those rows.",
+      example: 4210,
+    },
+    comparison: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBInboundStatsComparison",
+    },
+  },
+} as const;
+
+export const AMBInboundStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Received-message count for one time bucket (a calendar day or hour), bucketed by the time each message occurred.\n",
+  required: ["bucket", "received"],
+  properties: {
+    bucket: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the request's grain.",
+      example: "2026-05-25",
+    },
+    received: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Distinct messages received in this bucket.",
+      example: 182,
+    },
+  },
+} as const;
+
+export const AMBInboundStatsResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Received-message time series. `period` echoes the range the server computed against; `data` is one row per bucket in chronological order.\n",
+  required: ["period", "attribution", "data"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSeriesPeriod",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `event_time` for inbound statistics.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description:
+        "One row per bucket (day or hour, matching the request) in the period, in chronological order. Buckets with no activity are included with a count of zero, so the series charts continuously without client-side gap handling.",
+      items: {
+        $ref: "#/components/schemas/AMBInboundStatsPoint",
+      },
+    },
+  },
+} as const;
+
+export const AMBInboundBusinessStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Received-message count for a single business over the requested period.",
+  required: ["business_account_id", "received"],
+  properties: {
+    business_account_id: {
+      $ref: "#/components/schemas/AMBBusinessID",
+      readOnly: true,
+      description: "The business that received these messages.",
+    },
+    received: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Distinct messages received by this business in the period.",
+      example: 640,
+    },
+  },
+} as const;
+
+export const AMBInboundStatsByBusinessResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-business breakdown of received messages for the requested period, ranked by volume descending and capped at the requested `limit` (default 50, max 200).",
+  required: ["period", "attribution", "data", "total"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The window the response covers (echoed back), plus `data_as_of`.",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `event_time` for inbound statistics.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Business rows ranked by received-message volume descending, capped at the requested `limit`. A business with no received messages in the period is absent rather than zero-filled, because unlike a time bucket it is not part of a continuous axis.",
+      items: {
+        $ref: "#/components/schemas/AMBInboundBusinessStatsPoint",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total distinct businesses with received messages in the period, regardless of `limit`.",
+      example: 1,
+    },
+  },
+} as const;
+
+export const AMBInboundIntentStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Received-message count for a single entry-point intent over the requested period.",
+  required: ["intent", "received"],
+  properties: {
+    intent: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The intent these messages arrived under, as configured in the business's entry points. Intents are workspace-defined and have no fixed vocabulary.",
+      example: "order_support",
+    },
+    received: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Distinct messages received under this intent in the period.",
+      example: 305,
+    },
+  },
+} as const;
+
+export const AMBInboundStatsByIntentResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-intent breakdown of received messages for the requested period, ranked by volume descending and capped at the requested `limit` (default 50, max 200).",
+  required: ["period", "attribution", "data", "total"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The window the response covers (echoed back), plus `data_as_of`.",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `event_time` for inbound statistics.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Intent rows ranked by received-message volume descending, capped at the requested `limit`. An intent with no received messages in the period is absent rather than zero-filled, because unlike a time bucket it is not part of a continuous axis.",
+      items: {
+        $ref: "#/components/schemas/AMBInboundIntentStatsPoint",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total distinct intents with received messages in the period, regardless of `limit`.",
+      example: 4,
+    },
+  },
+} as const;
+
+export const AMBConversationStatsCountsSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Conversation lifecycle counts for the requested scope, attributed to when each event occurred. A conversation can start, reopen, and close more than once over its life, so `started`, `reopened`, and `closed` can each exceed `conversations`, the number of distinct conversations touched in scope. Very large counts are close estimates rather than exact tallies.\n",
+  required: ["started", "reopened", "closed", "conversations"],
+  properties: {
+    started: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Count of conversation-started events in scope.",
+      example: 210,
+    },
+    reopened: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Count of conversation-reopened events in scope.",
+      example: 34,
+    },
+    closed: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Count of conversation-closed events in scope.",
+      example: 198,
+    },
+    conversations: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Distinct conversations with at least one lifecycle event in scope.",
+      example: 205,
+    },
+  },
+} as const;
+
+export const AMBConversationStatsComparisonDeltaSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Changes from the previous period. Each value is the signed relative change `(current - previous) / previous` and is null when the previous count is zero.\n",
+  required: [
+    "started_pct_change",
+    "reopened_pct_change",
+    "closed_pct_change",
+    "conversations_pct_change",
+  ],
+  properties: {
+    started_pct_change: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Relative change in conversation starts (`counts.started`) versus the previous period, as a signed fraction. Null when the previous period had none.",
+      example: 0.22,
+    },
+    reopened_pct_change: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Relative change in conversation reopens (`counts.reopened`) versus the previous period, as a signed fraction. Null when the previous period had none.",
+      example: -0.05,
+    },
+    closed_pct_change: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Relative change in conversation closes (`counts.closed`) versus the previous period, as a signed fraction. Null when the previous period had none.",
+      example: 0.19,
+    },
+    conversations_pct_change: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Relative change in distinct conversations touched (`counts.conversations`) versus the previous period, as a signed fraction. Null when the previous period had none.",
+      example: 0.21,
+    },
+  },
+} as const;
+
+export const AMBConversationStatsComparisonSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.\n",
+  required: ["period", "counts", "delta"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows).",
+    },
+    counts: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBConversationStatsCounts",
+    },
+    delta: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBConversationStatsComparisonDelta",
+    },
+  },
+} as const;
+
+export const AMBConversationStatsSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Conversation lifecycle counts for the full requested period. Counts aggregate the time buckets.\n",
+  required: ["period", "attribution", "counts"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSummaryPeriod",
+      description:
+        "The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `event_time` for conversation statistics.",
+    },
+    counts: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBConversationStatsCounts",
+    },
+    comparison: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBConversationStatsComparison",
+    },
+  },
+} as const;
+
+export const AMBConversationStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Conversation lifecycle counts for one time bucket (a calendar day or hour), bucketed by when each event occurred.\n",
+  required: ["bucket", "counts"],
+  properties: {
+    bucket: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.",
+      example: "2026-05-25",
+    },
+    counts: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBConversationStatsCounts",
+    },
+  },
+} as const;
+
+export const AMBConversationStatsResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Conversation lifecycle time series. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.\n",
+  required: ["period", "attribution", "data"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsSeriesPeriod",
+    },
+    attribution: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBStatsAttribution",
+      description: "Always `event_time` for conversation statistics.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description:
+        "One row per day or hour in chronological order. Buckets with no activity contain zero counts.",
+      items: {
+        $ref: "#/components/schemas/AMBConversationStatsPoint",
+      },
     },
   },
 } as const;
@@ -22935,7 +28330,7 @@ export const DNSRecordSchema = {
       type: "string",
       minLength: 1,
       description:
-        "What this record is for.\n\n- `dkim`: signs outbound mail and proves domain ownership.\n- `return_path`: identifies the return-path (bounce) CNAME for sending.\n- `tracking`: identifies the optional branded open/click tracking CNAME.\n- `inbound_mx`: identifies the MX record routing mail to us for receiving.\n  Always present wherever inbound is available, as a regional reference,\n  regardless of whether receiving is enabled; publishing it does not\n  enable receiving on its own: see `DomainUpdate.inbound`. It is\n  `optional` until receiving is enabled, and publishing it before then\n  is destructive: on a domain at the zone apex it replaces the MX\n  records that carry the domain's existing mail.\n- `dmarc`: identifies the advisory DMARC policy record.\n",
+        "What this record is for.\n\n- `dkim`: signs outbound mail and proves domain ownership.\n- `return_path`: identifies the return-path (bounce) CNAME for sending.\n- `tracking`: identifies the optional branded open/click tracking CNAME.\n- `inbound_mx`: identifies the MX record routing mail to us for receiving.\n  Always present wherever inbound is available, as a regional reference,\n  regardless of whether receiving is enabled; publishing it does not\n  enable receiving on its own: see `DomainUpdate.inbound`. It is\n  `optional` until receiving is enabled, and publishing it before then\n  is destructive: on a domain at the zone apex it replaces the MX\n  records that carry the domain's existing mail.\n- `dmarc`: identifies the DMARC policy record required for sending.\n",
       enum: ["dkim", "return_path", "tracking", "inbound_mx", "dmarc"],
     },
     state: {
@@ -25817,42 +31212,6 @@ export const EmailTemplateVersionStatusSchema = {
   example: "published",
 } as const;
 
-export const ActorSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["id", "type"],
-  properties: {
-    id: {
-      type: "string",
-      minLength: 1,
-      description: "Actor identifier.",
-      example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
-    },
-    type: {
-      type: "string",
-      minLength: 1,
-      "x-extensible-enum": [
-        "user",
-        "api_key",
-        "oauth_token",
-        "system",
-        "sso",
-        "service_account",
-        "automation",
-      ],
-      description:
-        "New actor types may be added. Treat unrecognized values as future types, not errors.\n- `user`: a member's own session.\n- `api_key`: a workspace API key.\n- `oauth_token`: a token issued to a caller on a member's behalf.\n- `system`: an action we perform without a customer actor.\n- `sso`: an organization's SSO connection.\n- `service_account`: a workspace's connected Integration acting with no member behind it.\n- `automation`: an automation execution in your workspace.",
-      example: "user",
-    },
-    display_name: {
-      type: ["string", "null"],
-      readOnly: true,
-      description:
-        "The label the actor is shown under: typically a member's name or email address, or the API key's name. Null when it could not be resolved.\n",
-    },
-  },
-} as const;
-
 export const EmailTemplateVersionSummarySchema = {
   type: "object",
   additionalProperties: false,
@@ -26259,9 +31618,10 @@ export const EmailTemplateLanguageUpsertSchema = {
   properties: {
     subject: {
       type: "string",
-      minLength: 1,
+      minLength: 0,
       maxLength: 998,
-      description: "The email subject line for this language.",
+      description:
+        "The email subject line. It may be empty in a draft but is required to publish.",
       example: "Welcome to Acme, {{ bird.contact.first_name }}!",
     },
     preview_text: {
@@ -26395,9 +31755,9 @@ export const EmailTemplateLanguageUpdateSchema = {
   properties: {
     subject: {
       type: "string",
-      minLength: 1,
       maxLength: 998,
-      description: "A new email subject line for this language.",
+      description:
+        "The email subject line. It may be empty in a draft but is required to publish.",
       example: "Welcome to Acme, {{ bird.contact.first_name }}!",
     },
     preview_text: {
@@ -26615,7 +31975,7 @@ export const InboundAddressSchema = {
       readOnly: true,
       description:
         "The address to forward your mailbox to. We generate it when the inbound address is created.",
-      example: "a1b2c3@inbound.eu.bird.com",
+      example: "mfzxq2lom5uxi3lb@eu1.inbound.bird.com",
     },
     label: {
       type: ["string", "null"],
@@ -28711,6 +34071,15 @@ export const WebhookEventTypeSchema = {
   description:
     "Webhook event type. This is an open enum, so accept unrecognized values in deliveries. Subscribing to a type outside the event catalog returns a `422`.\n",
   "x-extensible-enum": [
+    "amb.accepted",
+    "amb.conversation_closed",
+    "amb.conversation_reopened",
+    "amb.conversation_started",
+    "amb.received",
+    "amb.rejected",
+    "amb.send_failed",
+    "amb.sent",
+    "amb_suppression.created",
     "domain.failed",
     "domain.verified",
     "email.accepted",
@@ -28969,6 +34338,423 @@ export const WebhookTestRequestSchema = {
   },
   example: {
     event_type: "email.delivered",
+  },
+} as const;
+
+export const AMBAcceptedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["amb.accepted"],
+  description: "Always `amb.accepted` for this event.",
+  example: "amb.accepted",
+} as const;
+
+export const EventAMBMessageDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The workspace and message snapshot at the time of the lifecycle event.",
+  required: ["workspace_id", "message"],
+  properties: {
+    workspace_id: {
+      $ref: "#/components/schemas/WorkspaceID",
+      description: "Workspace that owns this message.",
+    },
+    message: {
+      $ref: "#/components/schemas/AMBMessage",
+      description:
+        "Message state when the event occurred. Later state changes do not alter this snapshot. Customer metadata is included when present; reserved Bird metadata is excluded.",
+    },
+  },
+} as const;
+
+export const EventAMBAcceptedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Bird charged and accepted an outbound message for processing. This does not mean Apple received the message.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBAcceptedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When this lifecycle event occurred, independent of webhook delivery time.",
+      example: "2026-09-25T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBMessageData",
+    },
+  },
+} as const;
+
+export const AMBConversationClosedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["amb.conversation_closed"],
+  description: "Always `amb.conversation_closed` for this event.",
+  example: "amb.conversation_closed",
+} as const;
+
+export const EventAMBConversationDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Conversation identity and routing context when a lifecycle event occurred.",
+  required: [
+    "workspace_id",
+    "business_account_id",
+    "conversation_id",
+    "open_count",
+  ],
+  properties: {
+    workspace_id: {
+      $ref: "#/components/schemas/WorkspaceID",
+      description: "Workspace that owns this conversation.",
+    },
+    business_account_id: {
+      $ref: "#/components/schemas/AMBBusinessID",
+      description: "Business that owns this conversation.",
+    },
+    conversation_id: {
+      $ref: "#/components/schemas/AMBConversationID",
+      description: "Conversation that changed state.",
+    },
+    open_count: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "Number of times the conversation has opened, starting at 1 and increasing on each reopen. Together with the conversation ID and event type, this identifies the lifecycle occurrence across retries.",
+    },
+    origin: {
+      type: "string",
+      minLength: 1,
+      description: "Source of the lifecycle change, when recorded.",
+    },
+    group_id: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Apple entry-point group recorded for this occurrence, when present.",
+    },
+    intent_id: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Apple entry-point intent recorded for this occurrence, when present.",
+    },
+    queue: {
+      type: "string",
+      minLength: 1,
+      description: "Routing queue recorded for this occurrence, when present.",
+    },
+  },
+} as const;
+
+export const EventAMBConversationClosedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A customer conversation closed. Closing a conversation is not a message.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBConversationClosedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When this lifecycle event occurred, independent of webhook delivery time.",
+      example: "2026-09-25T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBConversationData",
+    },
+  },
+} as const;
+
+export const AMBConversationReopenedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["amb.conversation_reopened"],
+  description: "Always `amb.conversation_reopened` for this event.",
+  example: "amb.conversation_reopened",
+} as const;
+
+export const EventAMBConversationReopenedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An existing customer conversation reopened after it had closed.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBConversationReopenedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When this lifecycle event occurred, independent of webhook delivery time.",
+      example: "2026-09-25T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBConversationData",
+    },
+  },
+} as const;
+
+export const AMBConversationStartedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["amb.conversation_started"],
+  description: "Always `amb.conversation_started` for this event.",
+  example: "amb.conversation_started",
+} as const;
+
+export const EventAMBConversationStartedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "A customer conversation opened for the first time.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBConversationStartedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When this lifecycle event occurred, independent of webhook delivery time.",
+      example: "2026-09-25T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBConversationData",
+    },
+  },
+} as const;
+
+export const AMBReceivedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["amb.received"],
+  description: "Always `amb.received` for this event.",
+  example: "amb.received",
+} as const;
+
+export const EventAMBReceivedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Bird received an ordinary customer message from Apple. Invitation responses are excluded.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBReceivedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When this lifecycle event occurred, independent of webhook delivery time.",
+      example: "2026-09-25T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBMessageData",
+    },
+  },
+} as const;
+
+export const AMBRejectedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["amb.rejected"],
+  description: "Always `amb.rejected` for this event.",
+  example: "amb.rejected",
+} as const;
+
+export const EventAMBRejectedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Bird refused an outbound message before acceptance. This message has no accepted event.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBRejectedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When this lifecycle event occurred, independent of webhook delivery time.",
+      example: "2026-09-25T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBMessageData",
+    },
+  },
+} as const;
+
+export const AMBSendFailedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["amb.send_failed"],
+  description: "Always `amb.send_failed` for this event.",
+  example: "amb.send_failed",
+} as const;
+
+export const EventAMBSendFailedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An accepted outbound message could not be handed to Apple. The message snapshot carries the failure detail.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBSendFailedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When this lifecycle event occurred, independent of webhook delivery time.",
+      example: "2026-09-25T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBMessageData",
+    },
+  },
+} as const;
+
+export const AMBSentEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["amb.sent"],
+  description: "Always `amb.sent` for this event.",
+  example: "amb.sent",
+} as const;
+
+export const EventAMBSentSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Apple accepted an outbound message from Bird. This does not establish delivery to the customer or a read receipt.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBSentEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When this lifecycle event occurred, independent of webhook delivery time.",
+      example: "2026-09-25T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBMessageData",
+    },
+  },
+} as const;
+
+export const AMBSuppressionCreatedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["amb_suppression.created"],
+  description: "Always `amb_suppression.created` for this event.",
+  example: "amb_suppression.created",
+} as const;
+
+export const EventAMBSuppressionCreatedDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Payload of the amb_suppression.created event.",
+  required: [
+    "suppression_id",
+    "business_account_id",
+    "address",
+    "address_type",
+    "reason",
+    "origin",
+    "workspace_id",
+  ],
+  properties: {
+    suppression_id: {
+      $ref: "#/components/schemas/AMBSuppressionID",
+      description: "The suppression episode that was opened.",
+      example: "asp_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    business_account_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBBusinessID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The business account this suppression covers, or null when it covers the workspace.",
+      example: "abz_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    address: {
+      type: "string",
+      minLength: 1,
+      maxLength: 1024,
+      description:
+        "The canonical phone number or exact opaque Apple identifier that was suppressed.",
+      example: "+15551234567",
+    },
+    address_type: {
+      $ref: "#/components/schemas/AMBSuppressionAddressType",
+    },
+    reason: {
+      $ref: "#/components/schemas/AMBSuppressionReason",
+    },
+    origin: {
+      $ref: "#/components/schemas/AMBSuppressionOrigin",
+    },
+    workspace_id: {
+      $ref: "#/components/schemas/WorkspaceID",
+      description: "The workspace the suppression belongs to.",
+      example: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+  },
+} as const;
+
+export const EventAMBSuppressionCreatedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An address was added to the workspace's Apple Messages for Business suppression ledger.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBSuppressionCreatedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "When the suppression episode took effect.",
+      example: "2026-09-28T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBSuppressionCreatedData",
+    },
   },
 } as const;
 
@@ -30531,13 +36317,13 @@ export const EventPreferenceBaseSchema = {
       minLength: 1,
       maxLength: 320,
       description:
-        "Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS and WhatsApp.",
+        "Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS, WhatsApp, and Apple Messages for Business.",
       example: "+15550001234",
     },
     sender_scope: {
       type: ["string", "null"],
       description:
-        "The sender the statement is limited to, or null when it covers the whole channel. Present-with-null on every payload of this type: it is part of the key alongside `topic_id`, and pinning its presence keeps a subscriber from ever learning `(handle, channel)` as the unique key.",
+        "The sender the statement is limited to, or null when it covers the whole channel. On Apple Messages for Business, this is the Apple business ID used to send invitations. Present-with-null on every payload of this type: it is part of the key alongside `topic_id`, and pinning its presence keeps a subscriber from ever learning `(handle, channel)` as the unique key.",
       example: "+15557654321",
     },
     topic_id: {
@@ -34058,6 +39844,24 @@ export const VoiceTrunkGatewayUpdateSchema = {
   },
 } as const;
 
+export const VoiceNumberProviderTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["allocation", "verified_number"],
+  description:
+    "Where a number came from. `allocation` is a number we allocated to your workspace, and the only kind whose calls reach us. `verified_number` is a number from another carrier that you registered and proved you control, so it can be presented on a call you place.\n",
+  example: "allocation",
+} as const;
+
+export const VoiceCallRouteTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["reject", "trunk", "forward", "sequence"],
+  description:
+    "Which answer a number carries.\n\n- `reject`: refuses the call. This is where every number starts.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n- `sequence`: runs the configured sequence from its selected voice-call entry.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
+  example: "reject",
+} as const;
+
 export const VoiceNumberSortFieldSchema = {
   type: "string",
   enum: ["phone_number"],
@@ -34070,15 +39874,6 @@ export const VoiceNumberIDSchema = {
   minLength: 1,
   pattern: "^vnu_[0-9a-hjkmnp-tv-z]{26}$",
   example: "vnu_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const VoiceNumberProviderTypeSchema = {
-  type: "string",
-  minLength: 1,
-  enum: ["allocation", "verified_number"],
-  description:
-    "Where a number came from. `allocation` is a number we allocated to your workspace, and the only kind whose calls reach us. `verified_number` is a number from another carrier that you registered and proved you control, so it can be presented on a call you place.\n",
-  example: "allocation",
 } as const;
 
 export const VoiceNumberProviderAllocationSchema = {
@@ -34112,7 +39907,7 @@ export const VoiceCallerIDStatusSchema = {
   minLength: 1,
   "x-extensible-enum": ["pending", "verified", "failed"],
   description:
-    "Verification state of the caller ID.\n\n- `pending`: the number is registered but ownership has not yet been proven.\n- `verified`: the workspace completed the verification call, so the number can\n  be presented as the outbound caller ID.\n- `failed`: terminal because the verification challenge expired or the attempt\n  limit was exhausted. Use the dashboard to remove and register the caller ID\n  again to retry.\n",
+    "Verification state of the caller ID.\n\n- `pending`: the number is registered but ownership has not yet been proven.\n- `verified`: the workspace proved ownership of the number. Check the\n  resource's activation or direction fields for outbound availability.\n- `failed`: terminal because the verification challenge expired or the attempt limit was exhausted.\n  Remove and register the caller ID again in the dashboard to retry.\n\nOpen enum: additional states may be added over time, so treat an unrecognized\nvalue as a future state rather than an error.\n",
   example: "pending",
 } as const;
 
@@ -34186,15 +39981,6 @@ export const VoiceInboundConfigurationErrorSchema = {
   type: "string",
   minLength: 1,
   enum: ["unsupported_route_type"],
-} as const;
-
-export const VoiceCallRouteTypeSchema = {
-  type: "string",
-  minLength: 1,
-  enum: ["reject", "trunk", "forward", "sequence"],
-  description:
-    "Which answer a number carries.\n\n- `reject`: refuses the call. This is where every number starts.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n- `sequence`: runs the configured sequence from its selected voice-call entry.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
-  example: "reject",
 } as const;
 
 export const VoiceCallRouteRejectSchema = {
@@ -34546,6 +40332,7 @@ export const VoiceCallerIDIDSchema = {
 } as const;
 
 export const VoiceCallerIDSchema = {
+  readOnly: true,
   allOf: [
     {
       type: "object",
@@ -34555,22 +40342,20 @@ export const VoiceCallerIDSchema = {
         "phone_number",
         "name",
         "status",
+        "outbound_enabled",
         "verified_at",
       ],
       properties: {
         id: {
-          readOnly: true,
           $ref: "#/components/schemas/VoiceCallerIDID",
           description: "Unique identifier for this caller ID.",
         },
         workspace_id: {
-          readOnly: true,
           $ref: "#/components/schemas/WorkspaceID",
         },
         phone_number: {
           type: "string",
           minLength: 1,
-          readOnly: true,
           description:
             "The phone number in E.164 format registered as a caller ID.",
           example: "+14155551234",
@@ -34579,19 +40364,21 @@ export const VoiceCallerIDSchema = {
           type: ["string", "null"],
           minLength: 1,
           maxLength: 100,
-          readOnly: true,
           description:
             "Your label for this caller ID, to tell several registered numbers apart. `null` when the caller ID has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the caller ID update operation.\n",
           example: "Support line",
         },
         status: {
-          readOnly: true,
           $ref: "#/components/schemas/VoiceCallerIDStatus",
+        },
+        outbound_enabled: {
+          type: "boolean",
+          description:
+            "Whether outbound caller ID activation has completed. A verified number can remain inactive until activation requirements are met. Outbound calls remain subject to routing and number ownership requirements.",
         },
         verified_at: {
           type: ["string", "null"],
           format: "date-time",
-          readOnly: true,
           description:
             "When the caller ID was verified. `null` when its status is `pending` or `failed`.",
         },
@@ -34626,7 +40413,6 @@ export const VoiceCallerIDListSchema = {
 export const VoiceCallerIDVerifyRequestSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["code"],
   properties: {
     code: {
       type: "string",
@@ -34635,7 +40421,7 @@ export const VoiceCallerIDVerifyRequestSchema = {
       maxLength: 6,
       "x-sensitive": true,
       description:
-        "The 6-digit verification code read out by the verification call.",
+        "The 6-digit verification code read out by the verification call. Required until ownership is verified. Omit it when retrying activation of an already verified number.",
       example: "123456",
     },
   },
@@ -35439,6 +41225,33 @@ export const WebhookEventWritableSchema = {
     "Webhook delivery body. `type` identifies the event variant, `timestamp` is when the event occurred, and `data` contains the event-specific payload. See the [webhooks guide](/docs/guides/webhooks) for signature verification.\n",
   oneOf: [
     {
+      $ref: "#/components/schemas/EventAMBAcceptedWritable",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBConversationClosed",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBConversationReopened",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBConversationStarted",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBReceivedWritable",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBRejectedWritable",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBSendFailedWritable",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBSentWritable",
+    },
+    {
+      $ref: "#/components/schemas/EventAMBSuppressionCreated",
+    },
+    {
       $ref: "#/components/schemas/EventDomainFailed",
     },
     {
@@ -35610,6 +41423,19 @@ export const WebhookEventWritableSchema = {
   discriminator: {
     propertyName: "type",
     mapping: {
+      "amb.accepted": "#/components/schemas/EventAMBAcceptedWritable",
+      "amb.conversation_closed":
+        "#/components/schemas/EventAMBConversationClosed",
+      "amb.conversation_reopened":
+        "#/components/schemas/EventAMBConversationReopened",
+      "amb.conversation_started":
+        "#/components/schemas/EventAMBConversationStarted",
+      "amb.received": "#/components/schemas/EventAMBReceivedWritable",
+      "amb.rejected": "#/components/schemas/EventAMBRejectedWritable",
+      "amb.send_failed": "#/components/schemas/EventAMBSendFailedWritable",
+      "amb.sent": "#/components/schemas/EventAMBSentWritable",
+      "amb_suppression.created":
+        "#/components/schemas/EventAMBSuppressionCreated",
       "domain.failed": "#/components/schemas/EventDomainFailed",
       "domain.verified": "#/components/schemas/EventDomainVerified",
       "email.accepted": "#/components/schemas/EventEmailAccepted",
@@ -37148,7 +42974,25 @@ export const SMSInboundStatsByNumberResponseWritableSchema = {
     "Received-message volume broken down by number, ranked by volume.\n",
 } as const;
 
-export const VerificationWritableSchema = {} as const;
+export const VerificationWritableSchema = {
+  example: {
+    id: "vrf_01krdgeqcxet5s7t44vh8rt9mg",
+    status: "pending",
+    reason: null,
+    to: {
+      email: "user@example.com",
+    },
+    channels: [
+      {
+        channel: "email",
+      },
+    ],
+    last_channel: "email",
+    expires_at: "2026-05-20T09:24:52Z",
+    created_at: "2026-05-20T09:14:52Z",
+    updated_at: "2026-05-20T09:14:52Z",
+  },
+} as const;
 
 export const VerificationCheckResultWritableSchema = {
   type: "object",
@@ -37306,6 +43150,36 @@ export const WhatsAppReactionWritableSchema = {
   additionalProperties: false,
   description:
     "An emoji reaction standing on a message. One entry per sender: reacting again replaces that sender's entry rather than adding one, and removing a reaction drops it from the list. A one-to-one message therefore carries at most two, one for the contact and one for your business number. This is the folded current state, so it names no single change; the message's reaction log is what records how each one arrived.\n",
+} as const;
+
+export const ActorWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "type"],
+  properties: {
+    id: {
+      type: "string",
+      minLength: 1,
+      description: "Actor identifier.",
+      example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    type: {
+      type: "string",
+      minLength: 1,
+      "x-extensible-enum": [
+        "user",
+        "api_key",
+        "oauth_token",
+        "system",
+        "sso",
+        "service_account",
+        "automation",
+      ],
+      description:
+        "New actor types may be added. Treat unrecognized values as future types, not errors.\n- `user`: a member's own session.\n- `api_key`: a workspace API key.\n- `oauth_token`: a token issued to a caller on a member's behalf.\n- `system`: an action we perform without a customer actor.\n- `sso`: an organization's SSO connection.\n- `service_account`: a workspace's connected Integration acting with no member behind it.\n- `automation`: an automation execution in your workspace.",
+      example: "user",
+    },
+  },
 } as const;
 
 export const WhatsAppErrorWritableSchema = {
@@ -38150,6 +44024,1015 @@ export const WhatsAppNumberProfileWritableSchema = {
       example: ["https://bird.com"],
     },
   },
+} as const;
+
+export const AMBBusinessAccountWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Customer-supplied account name used in Bird. Apple controls the name shown to customers in Messages.",
+      example: "Acme Retail",
+    },
+  },
+} as const;
+
+export const AMBBusinessAccountEventListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const AMBSuppressionWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One retained suppression episode for an address. A null account scope covers the same address in every account in the workspace; it does not link different opaque identities.",
+  required: ["address", "address_type"],
+  properties: {
+    address: {
+      type: "string",
+      minLength: 1,
+      maxLength: 1024,
+      description:
+        "Canonical E.164 phone number, or the exact opaque identifier Apple supplied.",
+      example: "+15551234567",
+    },
+    address_type: {
+      $ref: "#/components/schemas/AMBSuppressionAddressType",
+    },
+  },
+} as const;
+
+export const AMBBusinessAccountListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "The business records your workspace holds.",
+          items: {
+            $ref: "#/components/schemas/AMBBusinessAccountWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const AMBBusinessAccountSubmissionWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
+export const AMBBusinessAccountSubmissionListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/AMBBusinessAccountSubmissionWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const AMBRoutingRuleWritableSchema = {
+  description:
+    "A rule that puts a conversation into a queue when it is created or reopened, based on the group and intent the entry point that started it carried.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "business_account_id",
+        "match_kind",
+        "queue",
+        "precedence",
+        "is_default",
+      ],
+      properties: {
+        business_account_id: {
+          description:
+            "The Apple Messages for Business brand this rule belongs to.",
+          $ref: "#/components/schemas/AMBBusinessID",
+        },
+        match_kind: {
+          $ref: "#/components/schemas/AMBRoutingRuleMatchKind",
+        },
+        match_intent_id: {
+          type: ["string", "null"],
+          minLength: 1,
+          description:
+            "The entry point intent this rule matches, as sent in Apple's `intentID`. Set when `match_kind` is `intent` or `both`, null when it is `group`.\n",
+          example: "order_status",
+        },
+        match_group_id: {
+          type: ["string", "null"],
+          minLength: 1,
+          description:
+            "The entry point group this rule matches, as sent in Apple's `groupID`. Set when `match_kind` is `group` or `both`, null when it is `intent`.\n",
+          example: "support",
+        },
+        queue: {
+          type: "string",
+          minLength: 1,
+          description:
+            "The queue a matching conversation is filed into. A queue is a label your console filters by rather than a resource you create ahead of time, so any value routes.\n",
+          example: "billing",
+        },
+        precedence: {
+          type: "integer",
+          format: "int32",
+          description:
+            "Evaluation order among this business's rules. The highest-precedence rule a conversation matches wins; rules tied on precedence are evaluated by their `id`.\n",
+          example: 10,
+        },
+        is_default: {
+          type: "boolean",
+          description:
+            "Whether this rule catches a conversation that matches nothing else. A business has at most one. A conversation created or reopened while none exists routes to an empty queue, which the console lists as unrouted.\n",
+          example: false,
+        },
+      },
+    },
+  ],
+} as const;
+
+export const AMBRoutingRuleListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "The workspace's routing rules, optionally filtered by business, highest precedence first and ties broken by `id`. Rules are evaluated within their business in this order. The set is returned in full; this list is not paginated.\n",
+      items: {
+        $ref: "#/components/schemas/AMBRoutingRuleWritable",
+      },
+    },
+  },
+} as const;
+
+export const AMBNativeInteractivePayloadWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Exactly one built-in interaction. Protocol versions are managed by Bird.",
+  properties: {
+    request_identifier: {
+      type: "string",
+      pattern:
+        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+      description:
+        "Correlation identifier for this interaction. Bird generates one when omitted.",
+    },
+    images: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBNativeImage",
+      },
+      description: "Images referenced by identifier.",
+    },
+    quick_reply: {
+      $ref: "#/components/schemas/AMBNativeQuickReply",
+    },
+    list_picker: {
+      $ref: "#/components/schemas/AMBNativeListPicker",
+    },
+    event: {
+      $ref: "#/components/schemas/AMBNativeEvent",
+    },
+    dynamic: {
+      $ref: "#/components/schemas/AMBNativeDynamic",
+    },
+  },
+  oneOf: [
+    {
+      required: ["quick_reply"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              list_picker: {},
+            },
+            required: ["list_picker"],
+          },
+          {
+            properties: {
+              event: {},
+            },
+            required: ["event"],
+          },
+          {
+            properties: {
+              dynamic: {},
+            },
+            required: ["dynamic"],
+          },
+          {
+            properties: {
+              authenticate: {},
+            },
+            required: ["authenticate"],
+          },
+          {
+            properties: {
+              payment: {},
+            },
+            required: ["payment"],
+          },
+        ],
+      },
+    },
+    {
+      required: ["list_picker"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              quick_reply: {},
+            },
+            required: ["quick_reply"],
+          },
+          {
+            properties: {
+              event: {},
+            },
+            required: ["event"],
+          },
+          {
+            properties: {
+              dynamic: {},
+            },
+            required: ["dynamic"],
+          },
+          {
+            properties: {
+              authenticate: {},
+            },
+            required: ["authenticate"],
+          },
+          {
+            properties: {
+              payment: {},
+            },
+            required: ["payment"],
+          },
+        ],
+      },
+    },
+    {
+      required: ["event"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              quick_reply: {},
+            },
+            required: ["quick_reply"],
+          },
+          {
+            properties: {
+              list_picker: {},
+            },
+            required: ["list_picker"],
+          },
+          {
+            properties: {
+              dynamic: {},
+            },
+            required: ["dynamic"],
+          },
+          {
+            properties: {
+              authenticate: {},
+            },
+            required: ["authenticate"],
+          },
+          {
+            properties: {
+              payment: {},
+            },
+            required: ["payment"],
+          },
+        ],
+      },
+    },
+    {
+      required: ["dynamic"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              quick_reply: {},
+            },
+            required: ["quick_reply"],
+          },
+          {
+            properties: {
+              list_picker: {},
+            },
+            required: ["list_picker"],
+          },
+          {
+            properties: {
+              event: {},
+            },
+            required: ["event"],
+          },
+          {
+            properties: {
+              authenticate: {},
+            },
+            required: ["authenticate"],
+          },
+          {
+            properties: {
+              payment: {},
+            },
+            required: ["payment"],
+          },
+        ],
+      },
+    },
+    {
+      required: ["authenticate"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              quick_reply: {},
+            },
+            required: ["quick_reply"],
+          },
+          {
+            properties: {
+              list_picker: {},
+            },
+            required: ["list_picker"],
+          },
+          {
+            properties: {
+              event: {},
+            },
+            required: ["event"],
+          },
+          {
+            properties: {
+              dynamic: {},
+            },
+            required: ["dynamic"],
+          },
+          {
+            properties: {
+              payment: {},
+            },
+            required: ["payment"],
+          },
+        ],
+      },
+    },
+    {
+      required: ["payment"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              quick_reply: {},
+            },
+            required: ["quick_reply"],
+          },
+          {
+            properties: {
+              list_picker: {},
+            },
+            required: ["list_picker"],
+          },
+          {
+            properties: {
+              event: {},
+            },
+            required: ["event"],
+          },
+          {
+            properties: {
+              dynamic: {},
+            },
+            required: ["dynamic"],
+          },
+          {
+            properties: {
+              authenticate: {},
+            },
+            required: ["authenticate"],
+          },
+        ],
+      },
+    },
+  ],
+} as const;
+
+export const AMBNativeInteractiveDataWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    app_id: {
+      type: "string",
+      minLength: 1,
+      description: "App Store identifier of the iMessage app.",
+    },
+    app_name: {
+      type: "string",
+      minLength: 1,
+      description: "Name of the iMessage app.",
+    },
+    bid: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Identifier of the iMessage extension, in Apple's `com.apple.messages.MSMessageExtensionBalloonPlugin:team-id:extension-id` format.",
+    },
+    url: {
+      "x-sensitive": true,
+      type: "string",
+      minLength: 1,
+      description:
+        "Opaque URL string that Messages passes to the iMessage app.",
+      example: "?order=1234&view=detail",
+    },
+    use_live_layout: {
+      type: "boolean",
+      description:
+        "Whether Messages renders the received and reply bubbles using Live Layout.",
+    },
+    session_identifier: {
+      type: "string",
+      pattern:
+        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+      description:
+        "Session UUID to preserve across interactions. Apple creates one when omitted.",
+    },
+    received_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
+      description: "Content Messages shows in the received message bubble.",
+    },
+    reply_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
+      description: "Content Messages shows in the reply message bubble.",
+    },
+    app_icon_source_url: {
+      type: "string",
+      minLength: 1,
+      format: "uri",
+      pattern: "^https://",
+      description:
+        "Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple.",
+      "x-sensitive": true,
+    },
+    data: {
+      $ref: "#/components/schemas/AMBNativeInteractivePayloadWritable",
+    },
+  },
+  description:
+    "A built-in interaction or custom iMessage app. Custom apps require the app metadata and both message bubbles.",
+  oneOf: [
+    {
+      required: ["data"],
+      not: {
+        anyOf: [
+          {
+            properties: {
+              app_id: {},
+            },
+            required: ["app_id"],
+          },
+          {
+            properties: {
+              app_name: {},
+            },
+            required: ["app_name"],
+          },
+          {
+            properties: {
+              bid: {},
+            },
+            required: ["bid"],
+          },
+          {
+            properties: {
+              url: {},
+            },
+            required: ["url"],
+          },
+          {
+            properties: {
+              app_icon_source_url: {},
+            },
+            required: ["app_icon_source_url"],
+          },
+          {
+            properties: {
+              use_live_layout: {},
+            },
+            required: ["use_live_layout"],
+          },
+        ],
+      },
+    },
+    {
+      required: [
+        "app_id",
+        "app_name",
+        "bid",
+        "url",
+        "app_icon_source_url",
+        "use_live_layout",
+        "received_message",
+        "reply_message",
+      ],
+      not: {
+        properties: {
+          data: {},
+        },
+        required: ["data"],
+      },
+    },
+  ],
+} as const;
+
+export const AMBNativeInteractiveContentWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      const: "interactive",
+      description: "Always interactive.",
+      $ref: "#/components/schemas/AMBMessageType",
+    },
+    body: {
+      type: "string",
+      description:
+        "Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.",
+      "x-sensitive": true,
+    },
+    subject: {
+      type: "string",
+      description: "Subject displayed above the message body.",
+      "x-sensitive": true,
+    },
+    attachments: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBNativeAttachment",
+      },
+      description:
+        "Ordered attachments. Each object supplies a source URL or an encrypted Apple reference.",
+    },
+    interactive_data: {
+      $ref: "#/components/schemas/AMBNativeInteractiveDataWritable",
+    },
+    interactive_data_ref: {
+      $ref: "#/components/schemas/AMBRichLinkReference",
+    },
+  },
+  oneOf: [
+    {
+      required: ["interactive_data"],
+      not: {
+        properties: {
+          interactive_data_ref: {},
+        },
+        required: ["interactive_data_ref"],
+      },
+    },
+    {
+      required: ["interactive_data_ref"],
+      not: {
+        properties: {
+          interactive_data: {},
+        },
+        required: ["interactive_data"],
+      },
+    },
+  ],
+} as const;
+
+export const AMBMessageContentWritableSchema = {
+  description:
+    "Apple message families with Bird field naming and media URLs. Authentication and Apple Pay requests are created through their dedicated conversation endpoints.",
+  oneOf: [
+    {
+      $ref: "#/components/schemas/AMBNativeTextContent",
+    },
+    {
+      $ref: "#/components/schemas/AMBNativeRichLinkContent",
+    },
+    {
+      $ref: "#/components/schemas/AMBNativeInteractiveContentWritable",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      text: "#/components/schemas/AMBNativeTextContent",
+      rich_link: "#/components/schemas/AMBNativeRichLinkContent",
+      interactive: "#/components/schemas/AMBNativeInteractiveContentWritable",
+    },
+  },
+} as const;
+
+export const AMBErrorWritableSchema = {
+  type: ["object", "null"],
+  additionalProperties: false,
+  readOnly: true,
+  required: ["code", "description", "occurred_at"],
+  description:
+    "Failure detail for a message or invitation that could not be sent or was rejected.",
+  properties: {
+    code: {
+      $ref: "#/components/schemas/AMBStatsErrorCode",
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The failure in words. Free-form, so branch on `code` and show this to a human.",
+      example: "Apple refused the message with HTTP status 404.",
+    },
+    occurred_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When the failure occurred.",
+    },
+  },
+} as const;
+
+export const AMBMessageWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
+export const AMBMessageListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "Page of Apple Messages for Business messages, newest first.",
+          items: {
+            $ref: "#/components/schemas/AMBMessageWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const AMBMessageSendRequestWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["from", "to", "content"],
+  properties: {
+    from: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Apple business identifier of the brand sending the message. Read it from the business’s apple_business_id. The customer must have opened the conversation with this business.",
+      example: "b52d6267-2b62-4f8a-8842-0533d0f1dc07",
+    },
+    to: {
+      example: "opaque-customer-id",
+      type: "string",
+      minLength: 1,
+      description:
+        "Apple’s opaque customer identifier for this business, available as the conversation’s opaque_user_id. The conversation must exist and be open.",
+    },
+    source: {
+      $ref: "#/components/schemas/AMBMessageSource",
+      description:
+        "Who this message is sent as. A signed-in session may send as `operator` or `automation`; an API key may send as `api` or `automation`. Omit it to take the default for your credential. Naming a source your credential cannot use is refused with a `422` `AMBMessageSourceNotPermitted`.",
+    },
+    content: {
+      $ref: "#/components/schemas/AMBMessageContentWritable",
+      description:
+        "Message content in Apple’s native text, rich_link, or interactive family.",
+      "x-sensitive": true,
+    },
+    category: {
+      type: "string",
+      maxLength: 64,
+      description:
+        "Free-form reporting label; it does not change sending or suppression policy, for example `order_update`. Omit it to send with the default empty category.",
+      example: "order_update",
+    },
+    metadata: {
+      type: "object",
+      additionalProperties: true,
+      description:
+        "Arbitrary JSON object for per-message context. Maximum 2 KB serialized. Top-level keys beginning with `__bird` are reserved. Returned in the send response, message reads and customer message webhooks.",
+    },
+    tags: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      maxItems: 20,
+      description:
+        "Structured `{name, value}` labels for filtering. Maximum 20 tags per send.",
+    },
+    group: {
+      type: "string",
+      description: "Department identifier for this message.",
+    },
+    intent: {
+      type: "string",
+      description: "Purpose of this conversation.",
+    },
+    locale: {
+      type: "string",
+      description:
+        "Apple locale identifier, for example en_US. Defaults to the conversation locale.",
+    },
+  },
+  example: {
+    from: "b52d6267-2b62-4f8a-8842-0533d0f1dc07",
+    to: "opaque-customer-id",
+    content: {
+      type: "text",
+      body: "Your order is ready.",
+    },
+  },
+} as const;
+
+export const AMBMessageEventWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
+export const AMBMessageEventListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "The message's events, oldest first. Not paginated: a message's timeline is bounded and returned in full.\n",
+      items: {
+        $ref: "#/components/schemas/AMBMessageEventWritable",
+      },
+    },
+  },
+} as const;
+
+export const AMBConversationWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A conversation between your business and one customer on Apple Messages for Business. It holds the customer's device capabilities, the console's read state, assignment, and labels, and the routing queue the conversation is in.\n",
+  required: ["assigned_to", "labels"],
+  properties: {
+    assigned_to: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/UserID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The user this conversation is assigned to, or null when unassigned. Assignment is not rechecked against workspace membership on read, so it can still name a user whose access was removed.\n",
+    },
+    labels: {
+      type: "array",
+      items: {
+        type: "string",
+        minLength: 1,
+        maxLength: 64,
+      },
+      maxItems: 20,
+      description:
+        "Operator-set tags on this conversation. Unlike email, there are no system placement labels: every value here is one an operator chose.\n",
+    },
+  },
+} as const;
+
+export const AMBConversationListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of conversations, newest first by last message.",
+          items: {
+            $ref: "#/components/schemas/AMBConversationWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const AMBSuppressionListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "Active suppression episodes for the workspace, most recently effective first. Episodes that have ended are left out; fetch one by ID to read it.\n",
+          items: {
+            $ref: "#/components/schemas/AMBSuppressionWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const AMBStatsLatencyWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Processing-latency percentiles in milliseconds for the requested scope, from acceptance to Apple handoff. Apple Messages for Business has no delivery receipt, so there is no `delivery` or `total` member beside `processing`. Conversation response timing is reported separately in `first_response`. Always present; every percentile is null when no qualifying message in scope has a measurement.\n",
+} as const;
+
+export const AMBStatsComparisonWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.\n",
+} as const;
+
+export const AMBStatsSummaryWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound Apple Messages for Business counts and latency percentiles for the full requested period. Counts and percentiles are computed over the whole period rather than combined from the returned time-series values.\n",
+} as const;
+
+export const AMBStatsPointWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Outbound Apple Messages for Business counts and processing-latency percentiles for one time bucket (a calendar day or hour), bucketed by acceptance time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. There is no `first_response` here. Read first-response latency from the summary or a breakdown endpoint.\n",
+} as const;
+
+export const AMBStatsResponseWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Time-series stats payload. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.\n",
+} as const;
+
+export const AMBBusinessAccountStatsPointWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single business over the requested period.",
+} as const;
+
+export const AMBStatsByBusinessResponseWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-business breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
+} as const;
+
+export const AMBMessageKindStatsPointWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single message content kind over the requested period.",
+} as const;
+
+export const AMBStatsByMessageKindResponseWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-content-kind breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
+} as const;
+
+export const AMBIntentStatsPointWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single entry-point intent over the requested period.",
+} as const;
+
+export const AMBStatsByIntentResponseWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-intent breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
+} as const;
+
+export const AMBGroupStatsPointWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single entry-point group over the requested period.",
+} as const;
+
+export const AMBStatsByGroupResponseWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-group breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
+} as const;
+
+export const AMBCategoryStatsPointWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single message category over the requested period.",
+} as const;
+
+export const AMBStatsByCategoryResponseWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
+} as const;
+
+export const AMBTagStatsPointWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single tag over the requested period.",
+} as const;
+
+export const AMBStatsByTagResponseWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Only tagged messages appear.",
+} as const;
+
+export const AMBErrorCodeStatsPointWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Outbound counts and latency percentiles for a single failure reason over the requested period.",
+} as const;
+
+export const AMBStatsByErrorCodeResponseWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-failure-reason breakdown for the requested period, ranked by `send_failed + rejected` descending and capped at the requested `limit` (default 50, max 200). Only messages carrying an error code appear: a `bird:` code is usually a rejection, an `apple:` code a send failure.",
 } as const;
 
 export const WhatsAppBusinessAccountListWritableSchema = {
@@ -39278,7 +46161,7 @@ export const DNSRecordWritableSchema = {
       type: "string",
       minLength: 1,
       description:
-        "What this record is for.\n\n- `dkim`: signs outbound mail and proves domain ownership.\n- `return_path`: identifies the return-path (bounce) CNAME for sending.\n- `tracking`: identifies the optional branded open/click tracking CNAME.\n- `inbound_mx`: identifies the MX record routing mail to us for receiving.\n  Always present wherever inbound is available, as a regional reference,\n  regardless of whether receiving is enabled; publishing it does not\n  enable receiving on its own: see `DomainUpdate.inbound`. It is\n  `optional` until receiving is enabled, and publishing it before then\n  is destructive: on a domain at the zone apex it replaces the MX\n  records that carry the domain's existing mail.\n- `dmarc`: identifies the advisory DMARC policy record.\n",
+        "What this record is for.\n\n- `dkim`: signs outbound mail and proves domain ownership.\n- `return_path`: identifies the return-path (bounce) CNAME for sending.\n- `tracking`: identifies the optional branded open/click tracking CNAME.\n- `inbound_mx`: identifies the MX record routing mail to us for receiving.\n  Always present wherever inbound is available, as a regional reference,\n  regardless of whether receiving is enabled; publishing it does not\n  enable receiving on its own: see `DomainUpdate.inbound`. It is\n  `optional` until receiving is enabled, and publishing it before then\n  is destructive: on a domain at the zone apex it replaces the MX\n  records that carry the domain's existing mail.\n- `dmarc`: identifies the DMARC policy record required for sending.\n",
       enum: ["dkim", "return_path", "tracking", "inbound_mx", "dmarc"],
     },
   },
@@ -39672,36 +46555,6 @@ export const EmailTemplateWritableSchema = {
     },
     source: {
       $ref: "#/components/schemas/EmailTemplateSource",
-    },
-  },
-} as const;
-
-export const ActorWritableSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["id", "type"],
-  properties: {
-    id: {
-      type: "string",
-      minLength: 1,
-      description: "Actor identifier.",
-      example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
-    },
-    type: {
-      type: "string",
-      minLength: 1,
-      "x-extensible-enum": [
-        "user",
-        "api_key",
-        "oauth_token",
-        "system",
-        "sso",
-        "service_account",
-        "automation",
-      ],
-      description:
-        "New actor types may be added. Treat unrecognized values as future types, not errors.\n- `user`: a member's own session.\n- `api_key`: a workspace API key.\n- `oauth_token`: a token issued to a caller on a member's behalf.\n- `system`: an action we perform without a customer actor.\n- `sso`: an organization's SSO connection.\n- `service_account`: a workspace's connected Integration acting with no member behind it.\n- `automation`: an automation execution in your workspace.",
-      example: "user",
     },
   },
 } as const;
@@ -40479,6 +47332,145 @@ export const WebhookEndpointCreatedWritableSchema = {
       },
     },
   ],
+} as const;
+
+export const EventAMBMessageDataWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The workspace and message snapshot at the time of the lifecycle event.",
+  required: ["workspace_id", "message"],
+  properties: {
+    workspace_id: {
+      $ref: "#/components/schemas/WorkspaceID",
+      description: "Workspace that owns this message.",
+    },
+    message: {
+      $ref: "#/components/schemas/AMBMessageWritable",
+      description:
+        "Message state when the event occurred. Later state changes do not alter this snapshot. Customer metadata is included when present; reserved Bird metadata is excluded.",
+    },
+  },
+} as const;
+
+export const EventAMBAcceptedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Bird charged and accepted an outbound message for processing. This does not mean Apple received the message.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBAcceptedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When this lifecycle event occurred, independent of webhook delivery time.",
+      example: "2026-09-25T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBMessageDataWritable",
+    },
+  },
+} as const;
+
+export const EventAMBReceivedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Bird received an ordinary customer message from Apple. Invitation responses are excluded.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBReceivedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When this lifecycle event occurred, independent of webhook delivery time.",
+      example: "2026-09-25T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBMessageDataWritable",
+    },
+  },
+} as const;
+
+export const EventAMBRejectedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Bird refused an outbound message before acceptance. This message has no accepted event.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBRejectedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When this lifecycle event occurred, independent of webhook delivery time.",
+      example: "2026-09-25T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBMessageDataWritable",
+    },
+  },
+} as const;
+
+export const EventAMBSendFailedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An accepted outbound message could not be handed to Apple. The message snapshot carries the failure detail.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBSendFailedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When this lifecycle event occurred, independent of webhook delivery time.",
+      example: "2026-09-25T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBMessageDataWritable",
+    },
+  },
+} as const;
+
+export const EventAMBSentWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Apple accepted an outbound message from Bird. This does not establish delivery to the customer or a read receipt.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBSentEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When this lifecycle event occurred, independent of webhook delivery time.",
+      example: "2026-09-25T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBMessageDataWritable",
+    },
+  },
 } as const;
 
 export const EventSMSBaseWritableSchema = {
@@ -41777,6 +48769,62 @@ export const VoiceNumberListWritableSchema = {
   ],
 } as const;
 
+export const VoiceCallerIDWritableSchema = {
+  readOnly: true,
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "id",
+        "workspace_id",
+        "phone_number",
+        "name",
+        "status",
+        "outbound_enabled",
+        "verified_at",
+      ],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/VoiceCallerIDID",
+          description: "Unique identifier for this caller ID.",
+        },
+        workspace_id: {
+          $ref: "#/components/schemas/WorkspaceID",
+        },
+        phone_number: {
+          type: "string",
+          minLength: 1,
+          description:
+            "The phone number in E.164 format registered as a caller ID.",
+          example: "+14155551234",
+        },
+        name: {
+          type: ["string", "null"],
+          minLength: 1,
+          maxLength: 100,
+          description:
+            "Your label for this caller ID, to tell several registered numbers apart. `null` when the caller ID has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the caller ID update operation.\n",
+          example: "Support line",
+        },
+        status: {
+          $ref: "#/components/schemas/VoiceCallerIDStatus",
+        },
+        outbound_enabled: {
+          type: "boolean",
+          description:
+            "Whether outbound caller ID activation has completed. A verified number can remain inactive until activation requirements are met. Outbound calls remain subject to routing and number ownership requirements.",
+        },
+        verified_at: {
+          type: ["string", "null"],
+          format: "date-time",
+          description:
+            "When the caller ID was verified. `null` when its status is `pending` or `failed`.",
+        },
+      },
+    },
+  ],
+} as const;
+
 export const VoiceCallerIDListWritableSchema = {
   allOf: [
     {
@@ -41785,6 +48833,9 @@ export const VoiceCallerIDListWritableSchema = {
       properties: {
         data: {
           type: "array",
+          items: {
+            $ref: "#/components/schemas/VoiceCallerIDWritable",
+          },
         },
       },
     },

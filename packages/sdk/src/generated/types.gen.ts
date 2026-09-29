@@ -14,6 +14,33 @@ export type ClientOptions = {
  */
 export type WebhookEvent =
   | ({
+      type: "amb.accepted";
+    } & EventAmbAccepted)
+  | ({
+      type: "amb.conversation_closed";
+    } & EventAmbConversationClosed)
+  | ({
+      type: "amb.conversation_reopened";
+    } & EventAmbConversationReopened)
+  | ({
+      type: "amb.conversation_started";
+    } & EventAmbConversationStarted)
+  | ({
+      type: "amb.received";
+    } & EventAmbReceived)
+  | ({
+      type: "amb.rejected";
+    } & EventAmbRejected)
+  | ({
+      type: "amb.send_failed";
+    } & EventAmbSendFailed)
+  | ({
+      type: "amb.sent";
+    } & EventAmbSent)
+  | ({
+      type: "amb_suppression.created";
+    } & EventAmbSuppressionCreated)
+  | ({
       type: "domain.failed";
     } & EventDomainFailed)
   | ({
@@ -182,6 +209,23 @@ export type WebhookEvent =
       type: "whatsapp_suppression.created";
     } & EventWhatsAppSuppressionCreated);
 
+export type WorkspaceId = string;
+
+export type ListEnvelope = {
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
 export type ErrorDetail = {
   /**
    * Dotted field path, such as `to[0].email`, `subject`, or `.`. When the request was rejected for a query parameter the endpoint does not declare, this carries that parameter's name instead of a field path.
@@ -312,8 +356,6 @@ export type Region = "us1" | "eu1";
 
 export type OrganizationId = string;
 
-export type WorkspaceId = string;
-
 /**
  * IANA timezone identifier, such as `America/New_York`, `Europe/Amsterdam`, or `UTC`.
  */
@@ -323,21 +365,6 @@ export type Timezone = string;
  * Sort direction, ascending or descending.
  */
 export type SortOrder = "asc" | "desc";
-
-export type ListEnvelope = {
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
-};
 
 export type ListEnvelopeWithTotal = ListEnvelope & {
   /**
@@ -2422,7 +2449,8 @@ export type PreferenceId = string;
 /**
  * The channel a preference statement applies to. A preference addresses one channel: the handle that identifies the person differs per channel, so opting out of one channel says nothing about the others. New channels can be added over time, so a value outside this list can be returned.
  */
-export type PreferenceChannel = "email" | "sms" | "whatsapp" | (string & {});
+export type PreferenceChannel =
+  "email" | "sms" | "whatsapp" | "amb" | (string & {});
 
 /**
  * What the statement says: `granted` records consent to receive messages, `revoked` records an opt-out. There is no third state: a person who never stated anything simply has no preference on record.
@@ -2430,7 +2458,7 @@ export type PreferenceChannel = "email" | "sms" | "whatsapp" | (string & {});
 export type PreferenceStatus = "granted" | "revoked";
 
 /**
- * How much traffic the statement covers. `non_transactional` covers marketing and other non-essential messages while transactional messages such as receipts and verification codes keep flowing; `all` covers every message including transactional ones.
+ * How much traffic the statement covers. `non_transactional` covers marketing and other non-essential messages while transactional messages such as receipts and verification codes keep flowing; `all` covers every message including transactional ones. Apple Messages for Business phone invitations have no transactional exemption, so either value covers them.
  */
 export type PreferenceCoverage = "all" | "non_transactional";
 
@@ -2455,11 +2483,11 @@ export type Preference = {
   readonly id: PreferenceId;
   readonly channel: PreferenceChannel;
   /**
-   * Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS and WhatsApp.
+   * Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS, WhatsApp, and Apple Messages for Business.
    */
   readonly handle: string;
   /**
-   * The sender the statement is limited to, or null when it covers the whole channel. On SMS this is the originator the person replied to; on WhatsApp it identifies the business account that messaged them. Email preferences are always channel-wide, so it is always null there.
+   * The sender the statement is limited to, or null when it covers the whole channel. On SMS this is the originator the person replied to; on WhatsApp it identifies the business account that messaged them; on Apple Messages for Business it is the Apple business ID used for invitations. Email preferences are always channel-wide, so it is always null there.
    */
   readonly sender_scope: string | null;
   /**
@@ -2498,11 +2526,11 @@ export type PreferenceStatement = {
   channel: PreferenceChannel;
   status: PreferenceStatus;
   /**
-   * How much traffic the statement covers. Defaults to `non_transactional`, which keeps transactional messages such as receipts and verification codes flowing.
+   * How much traffic the statement covers. Defaults to `non_transactional`, which keeps transactional messages such as receipts and verification codes flowing. Apple Messages for Business phone invitations have no transactional exemption, so either value covers them.
    */
   coverage?: PreferenceCoverage;
   /**
-   * Limit the statement to one sender instead of the whole channel. On SMS this is the originator; on WhatsApp it identifies the business account. Not supported on email, where preferences are always channel-wide.
+   * Limit the statement to one sender instead of the whole channel. On SMS this is the originator; on WhatsApp it identifies the business account; on Apple Messages for Business it is the Apple business ID used for invitations. Not supported on email, where preferences are always channel-wide.
    */
   sender_scope?: string;
   /**
@@ -2521,7 +2549,7 @@ export type PreferenceStatement = {
  */
 export type PreferenceCreate = {
   /**
-   * Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS and WhatsApp.
+   * Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS, WhatsApp, and Apple Messages for Business.
    */
   handle: string;
 } & PreferenceStatement;
@@ -3915,6 +3943,59 @@ export type SmsKeywordRuleUpdate = {
    */
   confirmed_self_managed?: boolean;
 };
+
+export type AttachmentId = string;
+
+/**
+ * Lifecycle of an attachment. `draft` is a file that has been uploaded but nothing
+ * has been registered or submitted with it yet, and it is discarded at its
+ * `expires_at`. `attached` means at least one registration has cited it, so it is
+ * kept permanently and can no longer be deleted.
+ *
+ */
+export type AttachmentStatus = "draft" | "attached";
+
+/**
+ * A supporting document uploaded for an SMS registration (10DLC campaign evidence, toll-free verification opt-in screenshots). Reference it from the registration's own attachment-id field to submit it as evidence.
+ */
+export type Attachment = Timestamps & {
+  readonly id: AttachmentId;
+  /**
+   * The uploaded file's name.
+   */
+  readonly filename: string;
+  /**
+   * The file's content type, determined from its contents.
+   */
+  readonly content_type: string;
+  /**
+   * The file's size in bytes.
+   */
+  readonly size_bytes: number;
+  /**
+   * A short note describing what the file shows.
+   */
+  readonly description?: string;
+  readonly status: AttachmentStatus;
+  /**
+   * Short-lived signed URL for downloading or previewing the attachment. Valid for 24 hours from when the resource was fetched; request a fresh resource to obtain a new URL after expiry. Do not cache beyond `download_url_expires_at`. Registration authorities (10DLC and toll-free carriers) retrieve evidence via a separate, longer-lived token; this URL is not that token.
+   */
+  readonly download_url: string;
+  /**
+   * Optional signed URL for inline viewing on an isolated storage origin. Valid for one hour; fetch the attachment again to refresh it.
+   */
+  readonly preview_url?: string;
+  /**
+   * When `download_url` expires. Both fields are always present; the server returns an error rather than omitting them.
+   */
+  readonly download_url_expires_at: string;
+  /**
+   * When this attachment is discarded if nothing is registered or submitted with it. Null once its status is `attached`.
+   */
+  readonly expires_at: string | null;
+};
+
+export type AssetId = string;
 
 export type ComplianceSubmissionId = string;
 
@@ -6102,6 +6183,29 @@ export type WhatsAppReaction = {
    *
    */
   readonly from: WhatsAppAddress;
+};
+
+export type Actor = {
+  /**
+   * Actor identifier.
+   */
+  id: string;
+  /**
+   * New actor types may be added. Treat unrecognized values as future types, not errors.
+   * - `user`: a member's own session.
+   * - `api_key`: a workspace API key.
+   * - `oauth_token`: a token issued to a caller on a member's behalf.
+   * - `system`: an action we perform without a customer actor.
+   * - `sso`: an organization's SSO connection.
+   * - `service_account`: a workspace's connected Integration acting with no member behind it.
+   * - `automation`: an automation execution in your workspace.
+   */
+  type: string;
+  /**
+   * The label the actor is shown under: typically a member's name or email address, or the API key's name. Null when it could not be resolved.
+   *
+   */
+  readonly display_name?: string | null;
 };
 
 /**
@@ -9118,6 +9222,2558 @@ export type WhatsAppNumberProfile = {
    * A link to the profile picture WhatsApp currently shows. WhatsApp signs this link and it expires within days, so load it when you display it and never store it. It is served with permissive cross-origin headers, so a browser can load it directly.
    */
   readonly profile_picture_url?: string;
+};
+
+export type AmbBusinessId = string;
+
+/**
+ * Pending accounts need setup or review. Active accounts have recorded approval. Suspended accounts retain their recorded suspension. Configured, connected accounts can exchange messages regardless of review status; Apple decides whether to accept outgoing requests. Disconnected accounts retain their identity and history but cannot exchange new messages until reconnected.
+ */
+export type AmbBusinessAccountStatus =
+  "pending" | "active" | "suspended" | "disconnected";
+
+/**
+ * Latest review outcome recorded by Bird staff.
+ */
+export type AmbBusinessAccountReviewStatus =
+  "pending" | "approved" | "rejected" | (string & {});
+
+export type AmbBusinessAccount = {
+  /**
+   * Unique identifier for the business record.
+   */
+  readonly id: AmbBusinessId;
+  /**
+   * Apple business UUID, or null until supplied. Adding this identifier does not submit the account for review.
+   */
+  readonly apple_business_id: string | null;
+  /**
+   * Customer-supplied account name used in Bird. Apple controls the name shown to customers in Messages.
+   */
+  name: string;
+  /**
+   * Operational state of the business account.
+   */
+  readonly status: AmbBusinessAccountStatus;
+  /**
+   * Reason for the current operational suspension, when recorded. Review feedback is retained on the submission.
+   */
+  readonly status_reason?: string;
+  /**
+   * Whether Apple has granted invitation access. Sending also requires a configured, connected account and eligible recipient.
+   */
+  readonly invitations_enabled: boolean;
+  /**
+   * When the business record was created.
+   */
+  readonly created_at: string;
+  /**
+   * When the business record was last changed.
+   */
+  readonly updated_at: string;
+  /**
+   * Next setup actions on create, update and single-account reads. Active accounts return an empty array. Lists omit this field.
+   */
+  readonly next?: Array<NextAction>;
+  /**
+   * Latest recorded review outcome. Absent before the first submission.
+   */
+  readonly account_review_status?: AmbBusinessAccountReviewStatus;
+  /**
+   * Bird dashboard URL for completing setup. Present only when customer action is available.
+   */
+  readonly finish_setup_url?: string;
+};
+
+/**
+ * Account event ordering field.
+ */
+export type AmbBusinessAccountEventSort = "created_at";
+
+export type AmbBusinessAccountEventId = string;
+
+export type AmbBusinessAccountEvent = {
+  readonly id: AmbBusinessAccountEventId;
+  readonly type: string;
+  readonly summary: string;
+  /**
+   * Details of the change. source identifies whether a customer or Bird staff recorded it.
+   */
+  readonly metadata: {
+    [key: string]: unknown;
+  };
+  readonly created_at: string;
+};
+
+export type AmbBusinessAccountEventList = {
+  data: Array<AmbBusinessAccountEvent>;
+} & ListEnvelopeWithTotal;
+
+export type AmbSuppressionId = string;
+
+/**
+ * What kind of value `address` holds.
+ *
+ * - `phone_number` means `address` is the customer's phone number. Apple's CloseSession event carries a phone number rather than an opaque identifier, so a suppression opened by a close on a conversation identified by phone number takes this kind.
+ * - `opaque_user_id` means `address` is the opaque identifier Apple assigns to the customer's conversation with the business, stable across a close and a later re-initiation.
+ *
+ */
+export type AmbSuppressionAddressType = "phone_number" | "opaque_user_id";
+
+/**
+ * Why the handle is suppressed. `manual` means it was added directly through this API or the dashboard. `opted_out` covers every case where Apple or the customer signaled they should not be contacted: a close, a permanent delivery failure, a declined invitation, or a stop keyword. This list grows over time, so treat an unknown value as informational rather than rejecting the record.
+ *
+ */
+export type AmbSuppressionReason = "manual" | "opted_out" | (string & {});
+
+/**
+ * Who created the episode. user and api_key identify manual blocks. close_session and gone are protected automatic conversation facts. Phone invitation opt-outs are recorded as preferences.
+ */
+export type AmbSuppressionOrigin =
+  "user" | "api_key" | "close_session" | "gone" | (string & {});
+
+export type AmbMessageId = string;
+
+export type AmbEventId = string;
+
+/**
+ * One retained suppression episode for an address. A null account scope covers the same address in every account in the workspace; it does not link different opaque identities.
+ */
+export type AmbSuppression = {
+  readonly id: AmbSuppressionId;
+  readonly business_account_id: AmbBusinessId | null;
+  /**
+   * Canonical E.164 phone number, or the exact opaque identifier Apple supplied.
+   */
+  address: string;
+  address_type: AmbSuppressionAddressType;
+  readonly reason: AmbSuppressionReason;
+  readonly origin: AmbSuppressionOrigin;
+  /**
+   * Paths blocked by this episode. Treat unknown values as blocking.
+   */
+  readonly applies_to: string;
+  /**
+   * Message whose permanent delivery failure opened the episode, when applicable.
+   */
+  readonly source_message_id?: AmbMessageId;
+  /**
+   * Conversation event that opened the episode, when applicable.
+   */
+  readonly source_event_id?: AmbEventId;
+  /**
+   * Inbound message that ended an eligible automatic episode, when applicable.
+   */
+  readonly source_end_message_id?: AmbMessageId;
+  /**
+   * When the blocking state took effect.
+   */
+  readonly effective_at: string;
+  /**
+   * When Bird recorded this episode.
+   */
+  readonly created_at: string;
+  /**
+   * When Bird recorded the end, or null while active.
+   */
+  readonly ended_at: string | null;
+  /**
+   * What ended the episode, or null while active. Customers can end only manual episodes.
+   */
+  readonly ended_reason: string | null;
+  /**
+   * When the end took effect, or null while active.
+   */
+  readonly ended_effective_at: string | null;
+};
+
+/**
+ * Field used to order the records.
+ */
+export type AmbBusinessAccountSort = "created_at";
+
+export type AmbBusinessAccountList = {
+  /**
+   * The business records your workspace holds.
+   */
+  data: Array<AmbBusinessAccount>;
+} & ListEnvelopeWithTotal;
+
+export type AmbBusinessAccountCreate = {
+  /**
+   * The brand name shown for this business record inside Bird.
+   */
+  name: string;
+  /**
+   * The Business ID Apple issued for this brand, if you already have it. Supplying it identifies the draft. Submit the completed evidence requirements explicitly when the business is ready for review.
+   */
+  apple_business_id?: string;
+};
+
+export type AmbBusinessAccountUpdate = {
+  /**
+   * The brand name shown for this business record inside Bird.
+   */
+  name?: string;
+  /**
+   * The Business ID Apple issued for this brand. Accepted only while the account has not yet been submitted and is connected. Updating it does not submit the business.
+   */
+  apple_business_id?: string;
+};
+
+/**
+ * Field used to order the records.
+ */
+export type AmbBusinessAccountSubmissionSort = "created_at";
+
+export type AmbBusinessSubmissionId = string;
+
+/**
+ * State of this review attempt. Later suspension or disconnection does not change an approved attempt.
+ */
+export type AmbBusinessAccountSubmissionStatus =
+  "submitted" | "in_review" | "approved" | "rejected";
+
+export type AmbBusinessAccountSubmission = {
+  readonly id: AmbBusinessSubmissionId;
+  readonly business_account_id: AmbBusinessId;
+  /**
+   * The Apple business UUID frozen when this attempt was submitted.
+   */
+  readonly apple_business_id: string;
+  /**
+   * The customer-supplied Bird account name frozen when this attempt was submitted.
+   */
+  readonly name: string;
+  readonly readiness_attachment: Attachment;
+  readonly use_cases_attachment: Attachment;
+  readonly video_attachment: Attachment;
+  /**
+   * The review outcome of this attempt. Earlier attempts retain their outcome when a new attempt is submitted.
+   */
+  readonly status: AmbBusinessAccountSubmissionStatus;
+  readonly status_reason: string | null;
+  readonly created_at: string;
+  /**
+   * Read the parent business account for current eligibility and next actions. Present on create responses and each customer submission-list item; historical attempts do not establish current account state.
+   */
+  readonly next?: Array<NextAction>;
+  readonly updated_at: string;
+};
+
+export type AmbBusinessAccountSubmissionList = {
+  data: Array<AmbBusinessAccountSubmission>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * The submission commits three distinct attachments uploaded to this workspace. `readiness_attachment_id` identifies the PDF business readiness assessment; `use_cases_attachment_id` identifies the PDF describing proposed customer use cases; `video_attachment_id` identifies the MP4 demonstration of the customer experience. Invalid or duplicate evidence returns 422.
+ */
+export type AmbBusinessAccountSubmissionCreate = {
+  /**
+   * Uploaded PDF attachment containing the business readiness assessment.
+   */
+  readiness_attachment_id: AttachmentId;
+  /**
+   * Uploaded PDF attachment describing the proposed customer use cases.
+   */
+  use_cases_attachment_id: AttachmentId;
+  /**
+   * Uploaded MP4 attachment demonstrating the customer experience.
+   */
+  video_attachment_id: AttachmentId;
+};
+
+export type AmbBusinessAccountAttachmentUpload = {
+  /**
+   * A PDF up to 10 MiB or an MP4 video up to 25,000,000 bytes. Bird determines the type from the file contents.
+   */
+  file: Blob | File;
+};
+
+export type AmbEntryPoint = {
+  /**
+   * Identifier for this entry point, chosen by you and unique within the business's entry points. A conversation opened through this entry point carries it as `entry_point`.
+   */
+  id: string;
+  /**
+   * The group value Apple reports on a conversation opened through this entry point. Matched against the `group` the first inbound message carries.
+   */
+  group: string;
+  /**
+   * The intent value Apple reports on a conversation opened through this entry point. Matched against the `intent` the first inbound message carries, together with `group`.
+   */
+  intent: string;
+  /**
+   * The message text pre-filled for the customer when they open a conversation through this entry point.
+   */
+  body: string;
+};
+
+/**
+ * A business's entry points, default locale, and landing-page brand settings. OpenID Connect providers use separate business authentication provider operations. Apple Pay merchant settings use the separate business Apple Pay configuration operations. Supply custom iMessage app metadata on each message.
+ */
+export type AmbChannelSettings = {
+  /**
+   * The entry points customers can use to open a conversation with this business, each matched against the group and intent an inbound message reports.
+   */
+  entry_points: Array<AmbEntryPoint>;
+  /**
+   * The locale used for this business when a conversation reports none of its own, in canonical BCP-47 form. Null until you set one or after you clear it. Bird converts a configured default to Apple's locale form when sending a message without a conversation locale.
+   */
+  default_locale?: string | null;
+  /**
+   * The brand name shown on the Bird-hosted landing page customers use to connect this business.
+   */
+  brand_name: string;
+  /**
+   * The business's logo, as an asset in your media library. Null until one is set, either from Apple's own redirect or from a later change here.
+   */
+  logo_asset_id: AssetId | null;
+};
+
+export type AmbChannelSettingsUpdate = {
+  /**
+   * The entry points customers can use to open a conversation with this business. Sending this replaces the entire set; there is no way to add or remove a single entry point without resending the rest.
+   */
+  entry_points?: Array<AmbEntryPoint>;
+  /**
+   * The locale used for this business when a conversation reports none of its own, in BCP-47 form. Omit this field to keep the current default, or send null to clear it. Bird converts a configured default to Apple's locale form when sending a message without a conversation locale.
+   */
+  default_locale?: string | null;
+  /**
+   * The brand name shown on the Bird-hosted landing page customers use to connect this business.
+   */
+  brand_name?: string;
+  /**
+   * The business's logo, as an asset in your media library. Send null to clear it.
+   */
+  logo_asset_id?: AssetId | null;
+};
+
+export type AmbRoutingRuleId = string;
+
+/**
+ * What a routing rule matches against the entry point that started the conversation.
+ *
+ * - `intent` matches on the entry point's intent alone: `match_intent_id` is set and `match_group_id` is null.
+ * - `group` matches on the entry point's group alone: `match_group_id` is set and `match_intent_id` is null.
+ * - `both` matches only when the entry point carries the given intent and the given group together, so `match_intent_id` and `match_group_id` are both set. There are two match fields rather than one because `both` needs to carry an intent and a group at once.
+ *
+ */
+export type AmbRoutingRuleMatchKind = "intent" | "group" | "both";
+
+/**
+ * A rule that puts a conversation into a queue when it is created or reopened, based on the group and intent the entry point that started it carried.
+ *
+ */
+export type AmbRoutingRule = Timestamps & {
+  /**
+   * Unique identifier for the routing rule.
+   */
+  readonly id: AmbRoutingRuleId;
+  /**
+   * The Apple Messages for Business brand this rule belongs to.
+   */
+  business_account_id: AmbBusinessId;
+  match_kind: AmbRoutingRuleMatchKind;
+  /**
+   * The entry point intent this rule matches, as sent in Apple's `intentID`. Set when `match_kind` is `intent` or `both`, null when it is `group`.
+   *
+   */
+  match_intent_id?: string | null;
+  /**
+   * The entry point group this rule matches, as sent in Apple's `groupID`. Set when `match_kind` is `group` or `both`, null when it is `intent`.
+   *
+   */
+  match_group_id?: string | null;
+  /**
+   * The queue a matching conversation is filed into. A queue is a label your console filters by rather than a resource you create ahead of time, so any value routes.
+   *
+   */
+  queue: string;
+  /**
+   * Evaluation order among this business's rules. The highest-precedence rule a conversation matches wins; rules tied on precedence are evaluated by their `id`.
+   *
+   */
+  precedence: number;
+  /**
+   * Whether this rule catches a conversation that matches nothing else. A business has at most one. A conversation created or reopened while none exists routes to an empty queue, which the console lists as unrouted.
+   *
+   */
+  is_default: boolean;
+};
+
+export type AmbRoutingRuleList = {
+  /**
+   * The workspace's routing rules, optionally filtered by business, highest precedence first and ties broken by `id`. Rules are evaluated within their business in this order. The set is returned in full; this list is not paginated.
+   *
+   */
+  data: Array<AmbRoutingRule>;
+};
+
+/**
+ * Queue label used for routing and filtering conversations.
+ */
+export type AmbQueue = string;
+
+export type AmbRoutingRuleCreate = (
+  | {
+      match_kind?: "intent";
+      match_intent_id: string;
+    }
+  | {
+      match_kind?: "group";
+      match_group_id: string;
+    }
+  | {
+      match_kind?: "both";
+      match_intent_id: string;
+      match_group_id: string;
+    }
+) & {
+  /**
+   * The Apple Messages for Business brand this rule belongs to.
+   */
+  business_account_id: AmbBusinessId;
+  match_kind: AmbRoutingRuleMatchKind;
+  /**
+   * The entry point intent to match, as sent in Apple's `intentID`. Required when `match_kind` is `intent` or `both`, and rejected when it is `group`.
+   *
+   */
+  match_intent_id?: string | null;
+  /**
+   * The entry point group to match, as sent in Apple's `groupID`. Required when `match_kind` is `group` or `both`, and rejected when it is `intent`.
+   *
+   */
+  match_group_id?: string | null;
+  /**
+   * The queue a matching conversation is filed into. Your console lists whichever values your rules use.
+   *
+   */
+  queue: AmbQueue;
+  /**
+   * Evaluation order among this business's rules. The highest-precedence rule a conversation matches wins. Omit it to default to 0.
+   *
+   */
+  precedence?: number;
+  /**
+   * Set to make this the rule that catches a conversation matching nothing else. A business can have only one; creating a second while one exists returns a `409`.
+   *
+   */
+  is_default?: boolean;
+};
+
+export type AmbRoutingRuleUpdate = {
+  /**
+   * Change the queue this rule files a matching conversation into. What the rule matches is fixed once created; to change that, delete this rule and create another.
+   *
+   */
+  queue?: AmbQueue;
+  /**
+   * Change this rule's evaluation order among the business's other rules.
+   */
+  precedence?: number;
+  /**
+   * Set to true to make this the rule that catches a conversation matching nothing else, or to false to stop it from being the default. Setting it true while the business already has a different default rule returns a `409`.
+   *
+   */
+  is_default?: boolean;
+};
+
+export type AmbConversationId = string;
+
+/**
+ * Whether a message was sent by the business or received from the customer:
+ *
+ * - `outbound`: A reply the business sent into the conversation.
+ * - `inbound`: A message the customer sent.
+ *
+ */
+export type AmbMessageDirection = "outbound" | "inbound";
+
+/**
+ * Send status:
+ *
+ * - `accepted`: Accepted and queued for delivery to Apple.
+ * - `sent`: Handed to Apple. There is no delivery or read receipt on this
+ * channel, so `sent` is the furthest an outbound message's status
+ * advances.
+ * - `send_failed`: Sending stopped because of a business or conversation
+ * restriction, a recipient opt-out, an Apple refusal, or exhausted attempts.
+ * An earlier attempt may have reached Apple if its response or the local
+ * record of success was lost. See `last_error` for why sending stopped.
+ * - `rejected`: Refused by Bird before any send attempt and never charged:
+ * the destination has no price, the wallet could not fund the send, or the
+ * content cannot be sent yet. See `last_error`.
+ * - `received`: Received as an inbound message.
+ *
+ */
+export type AmbMessageStatus =
+  "accepted" | "sent" | "send_failed" | "rejected" | "received";
+
+/**
+ * Derived message classification for filtering and statistics. Send requests use the native content.type families. Create Apple Pay and authentication requests through the conversation payment and authentication operations.
+ *
+ * - text: Text, optionally with a subject.
+ * - attachment: One or more files, images, audio clips, or videos.
+ * - rich_link: A link with a preview card.
+ * - quick_reply: Two to five reply choices.
+ * - list_picker: A grouped menu of choices.
+ * - time_picker: Appointment time slots; a reply may contain only a selected label.
+ * - form: A multi-page form.
+ * - imessage_app: A custom iMessage app interaction on a compatible device.
+ * - interactive: An opaque interactive reference whose subtype is unknown.
+ * - apple_pay: An Apple Pay request created through the conversation payment operations.
+ * - authenticate: An identity verification request created through the conversation authentication operations.
+ */
+export type AmbContentKind =
+  | "text"
+  | "attachment"
+  | "rich_link"
+  | "quick_reply"
+  | "list_picker"
+  | "time_picker"
+  | "form"
+  | "apple_pay"
+  | "authenticate"
+  | "imessage_app"
+  | "interactive";
+
+/**
+ * Who sent an outbound message:
+ *
+ * - `operator`: A person, through a signed-in dashboard session.
+ * - `automation`: A workflow or bot acting on the workspace's behalf,
+ * through a signed-in session.
+ * - `api`: A direct API call, authenticated with an API key.
+ *
+ * A credential can send only the sources it is permitted; naming one
+ * outside that set is refused with a `422` `AMBMessageSourceNotPermitted`.
+ *
+ * This is not `from`, which a send carries alongside it. That names
+ * the brand the message goes out as; this names who composed it.
+ *
+ */
+export type AmbMessageSource = "operator" | "automation" | "api";
+
+/**
+ * Apple message family.
+ */
+export type AmbMessageType = "text" | "rich_link" | "interactive";
+
+export type AmbNativeAttachment = unknown & {
+  /**
+   * HTTPS URL Bird downloads and uploads to Apple.
+   */
+  source_url?: string;
+  /**
+   * Display filename.
+   */
+  name?: string;
+  /**
+   * Media type of the attachment.
+   */
+  mime_type?: string;
+  /**
+   * Encrypted attachment URL returned by Apple.
+   */
+  url?: string;
+  /**
+   * Opaque owner value returned by Apple.
+   */
+  owner?: string;
+  /**
+   * Attachment authorization signature returned by Apple.
+   */
+  signature_base64?: string;
+  /**
+   * Attachment decryption key returned by Apple.
+   */
+  key?: string;
+  /**
+   * Attachment size in bytes.
+   */
+  size?: number;
+};
+
+export type AmbNativeTextContent = (
+  | unknown
+  | {
+      attachments: unknown;
+    }
+) & {
+  /**
+   * Always text.
+   */
+  type: AmbMessageType;
+  /**
+   * Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.
+   */
+  body?: string;
+  /**
+   * Subject displayed above the message body.
+   */
+  subject?: string;
+  /**
+   * Ordered attachments. Each object supplies a source URL or an encrypted Apple reference.
+   */
+  attachments?: Array<AmbNativeAttachment>;
+};
+
+export type AmbNativeRichLinkImage = {
+  /**
+   * HTTPS URL of a PNG preview image up to 200 kB. Bird fetches and encodes it when sending.
+   */
+  source_url: string;
+  /**
+   * PNG media type required by Apple. Defaults to image/png.
+   */
+  mime_type?: "image/png";
+};
+
+export type AmbNativeRichLinkVideo = {
+  /**
+   * HTTPS video URL fetched by Apple.
+   */
+  url: string;
+  /**
+   * Media type of the video. Defaults to video/mp4; supply the actual type for other formats.
+   */
+  mime_type?: string;
+};
+
+export type AmbNativeRichLinkAssets = {
+  image: AmbNativeRichLinkImage;
+  video?: AmbNativeRichLinkVideo;
+};
+
+export type AmbNativeRichLinkData = {
+  /**
+   * HTTPS URL opened by the preview.
+   */
+  url: string;
+  /**
+   * Preview title.
+   */
+  title: string;
+  assets: AmbNativeRichLinkAssets;
+};
+
+export type AmbRichLinkReference = unknown & {
+  /**
+   * Title supplied by Apple for the preview.
+   */
+  title?: string;
+  /**
+   * Messages extension identifier supplied by Apple, when present.
+   */
+  bid?: string;
+  /**
+   * Signature binding the reference to the business, when supplied by Apple.
+   */
+  data_ref_sig?: string;
+  /**
+   * Location of the encrypted preview.
+   */
+  url: string;
+  /**
+   * Owner identifier supplied by Apple.
+   */
+  owner: string;
+  /**
+   * Signature supplied by Apple.
+   */
+  signature_base64: string;
+  /**
+   * Decryption key supplied by Apple.
+   */
+  key?: string;
+  /**
+   * Size of the encrypted preview in bytes.
+   */
+  size: number;
+};
+
+export type AmbNativeRichLinkContent = unknown & {
+  /**
+   * Always rich_link.
+   */
+  type: AmbMessageType;
+  /**
+   * Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.
+   */
+  body?: string;
+  /**
+   * Subject displayed above the message body.
+   */
+  subject?: string;
+  /**
+   * Ordered attachments. Each object supplies a source URL or an encrypted Apple reference.
+   */
+  attachments?: Array<AmbNativeAttachment>;
+  rich_link_data?: AmbNativeRichLinkData;
+  rich_link_data_ref?: AmbRichLinkReference;
+};
+
+/**
+ * Layout of an Apple interactive message bubble.
+ */
+export type AmbMessageBubbleStyle = "icon" | "small" | "large";
+
+export type AmbMessageBubble = {
+  /**
+   * Text shown on the message bubble.
+   */
+  title: string;
+  /**
+   * Secondary text shown below the title.
+   */
+  subtitle?: string;
+  /**
+   * Bubble layout. Apple defaults to `icon` when omitted and ignores it for custom iMessage apps.
+   */
+  style?: AmbMessageBubbleStyle;
+  /**
+   * Identifier of an image in interactive_data.data.images. Apple ignores it for custom iMessage apps.
+   */
+  image_identifier?: string;
+  /**
+   * Title shown over an attached image in a custom iMessage app bubble.
+   */
+  image_title?: string;
+  /**
+   * Subtitle shown over an attached image in a custom iMessage app bubble.
+   */
+  image_subtitle?: string;
+  /**
+   * Right-aligned title in a custom iMessage app bubble.
+   */
+  secondary_subtitle?: string;
+  /**
+   * Right-aligned subtitle in a custom iMessage app bubble.
+   */
+  tertiary_subtitle?: string;
+};
+
+export type AmbNativeImage = {
+  /**
+   * Identifier referenced by a bubble, item, or event.
+   */
+  identifier: string;
+  /**
+   * HTTPS URL of a PNG image up to 200 kB. Total interactive image data must not exceed 5 MB.
+   */
+  source_url: string;
+  /**
+   * Accessibility description read by VoiceOver.
+   */
+  description?: string;
+};
+
+export type AmbQuickReplyItem = {
+  /**
+   * Opaque choice identifier returned in interactive_data.data.quick_reply.selected_identifier.
+   */
+  identifier: string;
+  /**
+   * Label shown on the button.
+   */
+  title: string;
+};
+
+export type AmbNativeQuickReply = {
+  /**
+   * Text used for the device notification and shown in the transcript after the customer chooses an item. Send a separate text message to introduce the choices.
+   */
+  summary_text: string;
+  /**
+   * The buttons offered to the customer. Apple requires between two and five; outside that range the request is refused with a `422` `AMBQuickReplyItemsInvalid`. For more choices, send `list_picker` content instead.
+   */
+  items: Array<AmbQuickReplyItem>;
+};
+
+export type AmbListPickerItem = {
+  /**
+   * Opaque item identifier returned in interactive_data.data.list_picker.sections.
+   */
+  identifier: string;
+  /**
+   * Label shown on the row.
+   */
+  title: string;
+  /**
+   * Secondary line shown under the title.
+   */
+  subtitle?: string | null;
+  /**
+   * Identifier of an image in interactive_data.data.images, shown next to this row. A key with no matching entry in `images` is refused with a `422` `AMBInteractiveImageInvalid`.
+   */
+  image_identifier?: string | null;
+  /**
+   * Position within the section, ascending. Defaults to the row's array position.
+   */
+  order?: number;
+};
+
+export type AmbListPickerSection = {
+  /**
+   * Heading shown above this section's rows.
+   */
+  title: string;
+  /**
+   * Where this section sits relative to its siblings, ascending. Sections omitting it are laid out in list order, after any that specify one.
+   */
+  order?: number | null;
+  /**
+   * The rows in this section.
+   */
+  items: Array<AmbListPickerItem>;
+  /**
+   * Whether the customer can select more than one row in this section.
+   */
+  multiple_selection?: boolean;
+};
+
+export type AmbNativeListPicker = {
+  /**
+   * The menu's sections, each with its own heading and rows.
+   */
+  sections: Array<AmbListPickerSection>;
+};
+
+export type AmbLocation = {
+  /**
+   * Name shown for the appointment location.
+   */
+  title?: string;
+  /**
+   * Latitude in degrees. Set together with `longitude`.
+   */
+  latitude?: number;
+  /**
+   * Longitude in degrees. Set together with `latitude`.
+   */
+  longitude?: number;
+  /**
+   * Location radius in meters. Apple ignores it without coordinates.
+   */
+  radius?: number;
+};
+
+export type AmbTimeSlot = {
+  /**
+   * Opaque slot identifier. Apple may instead return only a localized label in interactive_data.reply_message.title.
+   */
+  identifier: string;
+  /**
+   * When this slot begins. Seconds and fractional seconds must be zero, for example `2026-09-02T14:30:00Z`; otherwise sending returns `422` with error code `E01001`. The timestamp is converted to UTC for Apple while preserving the instant.
+   */
+  start_at: string;
+  /**
+   * Duration in seconds. Zero indicates no duration.
+   */
+  duration_seconds: number;
+};
+
+export type AmbNativeEvent = {
+  /**
+   * Your identifier for the event. Defaults to the message identifier.
+   */
+  identifier?: string;
+  /**
+   * Optional appointment location.
+   */
+  location?: AmbLocation;
+  /**
+   * Minutes from GMT at the event location. Omit to use the customer's time zone.
+   */
+  timezone_offset?: number;
+  /**
+   * Appointment times with RFC 3339 timestamps and duration in seconds.
+   */
+  timeslots: Array<AmbTimeSlot>;
+  /**
+   * Identifier of the event image in interactive_data.data.images.
+   */
+  image_identifier?: string;
+  /**
+   * Event title.
+   */
+  title?: string;
+};
+
+export type AmbFormSplash = {
+  header?: string;
+  splash_text?: string;
+  button_title: string;
+  image_identifier?: string;
+};
+
+export type AmbFormPageCommon = {
+  /**
+   * Unique identifier for this page.
+   */
+  page_identifier: string;
+  type: string;
+  title?: string;
+  /**
+   * Question shown on this page.
+   */
+  subtitle: string;
+  /**
+   * Next page to show. Omit to finish the form. Single-select pages route through their items instead.
+   */
+  next_page_identifier?: string;
+  /**
+   * Marks this page as an end page for the form. A page with no next page also finishes the form.
+   */
+  submit_form?: boolean;
+};
+
+export type AmbFormSelectItem = {
+  identifier: string;
+  title: string;
+  value: string;
+  image_identifier?: string;
+  next_page_identifier?: string;
+};
+
+export type AmbFormSelectPage = AmbFormPageCommon & {
+  type: "select";
+  multiple_selection?: boolean;
+  items: Array<AmbFormSelectItem>;
+};
+
+export type AmbFormPickerItem = {
+  identifier: string;
+  title: string;
+  value: string;
+};
+
+export type AmbFormPickerPage = AmbFormPageCommon & {
+  type: "picker";
+  /**
+   * Text beside the picker field. Omit to center the field without a label.
+   */
+  picker_title?: string;
+  /**
+   * Zero-based index into `items`. Defaults to `0`. Must be less than the number of items; otherwise sending returns `422` `AMBFormPagesInvalid`.
+   */
+  selected_item_index?: number;
+  items: Array<AmbFormPickerItem>;
+};
+
+/**
+ * Apple defaults to UTC when interpreting these dates.
+ */
+export type AmbFormDatePickerOptions = {
+  /**
+   * Format used to read the date values in these options. Defaults to `MM/dd/yyyy`.
+   */
+  date_format?: string;
+  /**
+   * Date initially shown by the picker, written in `date_format`. Defaults to the current date.
+   */
+  start_date?: string;
+  /**
+   * Latest date the picker shows, written in `date_format`. Defaults to the current date.
+   */
+  maximum_date?: string;
+  /**
+   * Earliest date the picker shows, written in `date_format`.
+   */
+  minimum_date?: string;
+  /**
+   * Label beside the date field. Defaults to `Date`.
+   */
+  label_text?: string;
+};
+
+export type AmbFormDatePickerPage = AmbFormPageCommon & {
+  type: "date_picker";
+  hint_text?: string;
+  options?: AmbFormDatePickerOptions;
+};
+
+export type AmbFormInputType = "singleline" | "multiline";
+
+/**
+ * Apple UIKit value, passed through without changing its spelling.
+ */
+export type AmbFormKeyboardType =
+  | "default"
+  | "asciiCapable"
+  | "numbersAndPunctuation"
+  | "URL"
+  | "numberPad"
+  | "phonePad"
+  | "namePhonePad"
+  | "emailAddress"
+  | "decimalPad"
+  | "webSearch"
+  | (string & {});
+
+/**
+ * Apple UIKit value, passed through without changing its spelling.
+ */
+export type AmbFormTextContentType =
+  | "name"
+  | "namePrefix"
+  | "givenName"
+  | "middleName"
+  | "familyName"
+  | "nameSuffix"
+  | "nickname"
+  | "jobTitle"
+  | "organizationName"
+  | "location"
+  | "fullStreetAddress"
+  | "streetAddressLine1"
+  | "streetAddressLine2"
+  | "addressCity"
+  | "addressState"
+  | "addressCityAndState"
+  | "sublocality"
+  | "countryName"
+  | "postalCode"
+  | "telephoneNumber"
+  | "emailAddress"
+  | "URL"
+  | "creditCardNumber"
+  | "username"
+  | "password"
+  | "newPassword"
+  | "oneTimeCode"
+  | (string & {});
+
+export type AmbFormInputOptions = {
+  /**
+   * Pattern Apple uses to validate the input. Use JSON string escaping for backslashes.
+   */
+  regex?: string;
+  /**
+   * Shown when the field is empty. Defaults to `Required` when `required` is true, otherwise `Optional`.
+   */
+  placeholder?: string;
+  /**
+   * Disables the next-page button until the customer enters a value.
+   */
+  required?: boolean;
+  /**
+   * Defaults to `singleline`.
+   */
+  input_type?: AmbFormInputType;
+  /**
+   * Label for `singleline` input only. Omit for no label.
+   */
+  label_text?: string;
+  /**
+   * Text beside `singleline` input only, such as a currency symbol. Omit for no prefix.
+   */
+  prefix_text?: string;
+  /**
+   * Defaults to 30 for `singleline` input and 300 for `multiline` input.
+   */
+  maximum_character_count?: number;
+  /**
+   * Keyboard to display. Defaults to `default`.
+   */
+  keyboard_type?: AmbFormKeyboardType;
+  /**
+   * Content hint used for autofill.
+   */
+  text_content_type?: AmbFormTextContentType;
+};
+
+export type AmbFormInputPage = AmbFormPageCommon & {
+  type: "input";
+  hint_text?: string;
+  options?: AmbFormInputOptions;
+};
+
+export type AmbFormPage =
+  | ({
+      type: "select";
+    } & AmbFormSelectPage)
+  | ({
+      type: "picker";
+    } & AmbFormPickerPage)
+  | ({
+      type: "date_picker";
+    } & AmbFormDatePickerPage)
+  | ({
+      type: "input";
+    } & AmbFormInputPage);
+
+export type AmbNativeFormData = {
+  /**
+   * Identifier of the first page to show.
+   */
+  start_page_identifier: string;
+  /**
+   * Whether Apple marks the submitted response as private.
+   */
+  private?: boolean;
+  /**
+   * Whether Apple shows a summary before the customer submits.
+   */
+  show_summary?: boolean;
+  splash?: AmbFormSplash;
+  /**
+   * Form pages referenced by the start page and navigation identifiers.
+   */
+  pages: Array<AmbFormPage>;
+};
+
+/**
+ * Form content. Bird supplies Apple’s messageForms template and protocol version.
+ */
+export type AmbNativeDynamic = {
+  data: AmbNativeFormData;
+};
+
+export type AmbAuthenticationId = string;
+
+/**
+ * Authentication attempt created through the conversation authentication endpoint. Contains no authorization parameters or credentials.
+ */
+export type AmbNativeAuthentication = {
+  readonly authentication_id: AmbAuthenticationId;
+};
+
+export type AmbPaymentId = string;
+
+/**
+ * Apple Pay request created through the conversation payment endpoint. Contains no payment token or provider credentials.
+ */
+export type AmbNativePayment = {
+  readonly payment_id: AmbPaymentId;
+};
+
+export type AmbNativeInteractivePayload = unknown & {
+  /**
+   * Correlation identifier for this interaction. Bird generates one when omitted.
+   */
+  request_identifier?: string;
+  /**
+   * Images referenced by identifier.
+   */
+  images?: Array<AmbNativeImage>;
+  quick_reply?: AmbNativeQuickReply;
+  list_picker?: AmbNativeListPicker;
+  event?: AmbNativeEvent;
+  dynamic?: AmbNativeDynamic;
+  readonly authenticate?: AmbNativeAuthentication;
+  readonly payment?: AmbNativePayment;
+};
+
+export type AmbNativeInteractiveData = unknown & {
+  /**
+   * App Store identifier of the iMessage app.
+   */
+  app_id?: string;
+  /**
+   * Name of the iMessage app.
+   */
+  app_name?: string;
+  /**
+   * Identifier of the iMessage extension, in Apple's `com.apple.messages.MSMessageExtensionBalloonPlugin:team-id:extension-id` format.
+   */
+  bid?: string;
+  /**
+   * Opaque URL string that Messages passes to the iMessage app.
+   */
+  url?: string;
+  /**
+   * Whether Messages renders the received and reply bubbles using Live Layout.
+   */
+  use_live_layout?: boolean;
+  /**
+   * Session UUID to preserve across interactions. Apple creates one when omitted.
+   */
+  session_identifier?: string;
+  /**
+   * Content Messages shows in the received message bubble.
+   */
+  received_message?: AmbMessageBubble;
+  /**
+   * Content Messages shows in the reply message bubble.
+   */
+  reply_message?: AmbMessageBubble;
+  /**
+   * Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple.
+   */
+  app_icon_source_url?: string;
+  data?: AmbNativeInteractivePayload;
+};
+
+export type AmbNativeInteractiveContent = unknown & {
+  /**
+   * Always interactive.
+   */
+  type: AmbMessageType;
+  /**
+   * Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.
+   */
+  body?: string;
+  /**
+   * Subject displayed above the message body.
+   */
+  subject?: string;
+  /**
+   * Ordered attachments. Each object supplies a source URL or an encrypted Apple reference.
+   */
+  attachments?: Array<AmbNativeAttachment>;
+  interactive_data?: AmbNativeInteractiveData;
+  interactive_data_ref?: AmbRichLinkReference;
+};
+
+/**
+ * Apple message families with Bird field naming and media URLs. Authentication and Apple Pay requests are created through their dedicated conversation endpoints.
+ */
+export type AmbMessageContent =
+  | ({
+      type: "text";
+    } & AmbNativeTextContent)
+  | ({
+      type: "rich_link";
+    } & AmbNativeRichLinkContent)
+  | ({
+      type: "interactive";
+    } & AmbNativeInteractiveContent);
+
+export type AmbNativeInboundQuickReply = {
+  /**
+   * Identifier selected by the customer.
+   */
+  selected_identifier: string;
+  /**
+   * Index reported by Apple.
+   */
+  selected_index?: number;
+  /**
+   * Items returned by the customer device.
+   */
+  items?: Array<AmbQuickReplyItem>;
+};
+
+export type AmbNativeInboundListPickerSection = {
+  /**
+   * Heading shown above this section's rows.
+   */
+  title?: string;
+  /**
+   * Where this section sits relative to its siblings, ascending. Sections omitting it are laid out in list order, after any that specify one.
+   */
+  order?: number | null;
+  /**
+   * The rows in this section.
+   */
+  items: Array<AmbListPickerItem>;
+  /**
+   * Whether the customer can select more than one row in this section.
+   */
+  multiple_selection?: boolean;
+};
+
+export type AmbNativeInboundListPicker = {
+  /**
+   * Sections and selected rows returned by Apple.
+   */
+  sections: Array<AmbNativeInboundListPickerSection>;
+};
+
+export type AmbNativeInboundEvent = {
+  /**
+   * Event identifier returned by Apple, when provided.
+   */
+  identifier?: string;
+  /**
+   * Optional appointment location.
+   */
+  location?: AmbLocation;
+  /**
+   * Minutes from GMT at the event location. Omit to use the customer's time zone.
+   */
+  timezone_offset?: number;
+  /**
+   * Time slots returned by Apple. May be empty when the device supplies only a selected label.
+   */
+  timeslots?: Array<AmbTimeSlot>;
+  /**
+   * Identifier of the event image in interactive_data.data.images.
+   */
+  image_identifier?: string;
+  /**
+   * Event title.
+   */
+  title?: string;
+};
+
+export type AmbFormPageType = "select" | "picker" | "date_picker" | "input";
+
+export type AmbInboundFormItem = {
+  identifier: string;
+  type: AmbFormPageType;
+  /**
+   * Display value Apple returned, including any input prefix. May be empty for an optional input.
+   */
+  title: string;
+  /**
+   * Machine value Apple returned for the selection or input. May be empty for an optional input.
+   */
+  value: string;
+};
+
+export type AmbInboundFormSelection = {
+  page_identifier: string;
+  /**
+   * Page title returned by Apple. Empty when the page has no title.
+   */
+  title: string;
+  subtitle: string;
+  items: Array<AmbInboundFormItem>;
+};
+
+export type AmbNativeInboundFormData = {
+  /**
+   * Whether the sender asked the MSP to treat this form response as private.
+   */
+  private?: boolean;
+  selections: Array<AmbInboundFormSelection>;
+};
+
+export type AmbNativeInboundDynamic = {
+  data: AmbNativeInboundFormData;
+};
+
+export type AmbNativeInboundPayment = {
+  /**
+   * Payment state reported by Apple. This does not confirm that a payment settled.
+   */
+  state?: string;
+};
+
+export type AmbNativeInboundAuthentication = {
+  /**
+   * Authentication status reported by Apple. This does not establish an authenticated Bird session.
+   */
+  status?: string;
+};
+
+export type AmbNativeInboundImage = {
+  /**
+   * Identifier used by the received message.
+   */
+  identifier: string;
+  /**
+   * Accessibility description supplied by Apple.
+   */
+  description?: string;
+  /**
+   * Relative Bird API URL for downloading the image with the same authentication and workspace as the message.
+   */
+  download_url: string;
+};
+
+export type AmbNativeInboundPayload = {
+  /**
+   * Correlation identifier reported by Apple.
+   */
+  request_identifier?: string;
+  quick_reply?: AmbNativeInboundQuickReply;
+  list_picker?: AmbNativeInboundListPicker;
+  event?: AmbNativeInboundEvent;
+  dynamic?: AmbNativeInboundDynamic;
+  payment?: AmbNativeInboundPayment;
+  authenticate?: AmbNativeInboundAuthentication;
+  /**
+   * Images returned by Apple, with authenticated download URLs.
+   */
+  images?: Array<AmbNativeInboundImage>;
+};
+
+export type AmbNativeInboundInteractiveData = {
+  /**
+   * Custom app identifier.
+   */
+  app_id?: string;
+  /**
+   * Custom app name.
+   */
+  app_name?: string;
+  /**
+   * Apple extension identifier.
+   */
+  bid?: string;
+  /**
+   * Opaque custom app response URL.
+   */
+  url?: string;
+  /**
+   * Whether the app uses live layout.
+   */
+  use_live_layout?: boolean;
+  /**
+   * Apple interaction session identifier.
+   */
+  session_identifier?: string;
+  reply_message?: AmbMessageBubble;
+  received_message?: AmbMessageBubble;
+  data?: AmbNativeInboundPayload;
+  /**
+   * Relative Bird API URL for downloading the custom app icon with the same authentication and workspace as the message.
+   */
+  app_icon_url?: string;
+};
+
+export type AmbNativeInboundInteractiveContent = {
+  /**
+   * Always interactive.
+   */
+  type: AmbMessageType;
+  /**
+   * Message body supplied by Apple.
+   */
+  body?: string;
+  /**
+   * Message subject supplied by Apple.
+   */
+  subject?: string;
+  /**
+   * Ordered attachments supplied by Apple.
+   */
+  attachments?: Array<AmbNativeAttachment>;
+  interactive_data: AmbNativeInboundInteractiveData;
+};
+
+/**
+ * Received text, attachments, and interactive replies, preserving Apple message structure.
+ */
+export type AmbInboundContent =
+  | ({
+      type: "text";
+    } & AmbNativeTextContent)
+  | ({
+      type: "interactive";
+    } & AmbNativeInboundInteractiveContent);
+
+/**
+ * Machine-readable reason a send failed, in one of two namespaces: `bird:` for a reason Bird's own pipeline assigned (for example `bird:business_not_registered`), or `apple:` followed by the HTTP status Apple's API returned for the send attempt (for example `apple:404`). This is an open, growing set in both namespaces; accept unrecognized values.
+ *
+ */
+export type AmbStatsErrorCode = string;
+
+/**
+ * Failure detail for a message or invitation that could not be sent or was rejected.
+ */
+export type AmbError = {
+  code: AmbStatsErrorCode;
+  /**
+   * The failure in words. Free-form, so branch on `code` and show this to a human.
+   */
+  description: string;
+  /**
+   * When the failure occurred.
+   */
+  occurred_at: string;
+} | null;
+
+export type AmbMessage = {
+  /**
+   * ID of the message, assigned when it is accepted or received. Pass it as `message_id` to the get-message and list-events endpoints.
+   */
+  readonly id: AmbMessageId;
+  /**
+   * The conversation this message belongs to.
+   */
+  readonly conversation_id: AmbConversationId;
+  /**
+   * The business the message was sent from or received by.
+   */
+  readonly business_account_id: AmbBusinessId;
+  /**
+   * Apple business identifier on outbound messages, or the customer's opaque Apple identifier on inbound messages. Omitted when that address is unavailable on a historical record.
+   */
+  readonly from?: string;
+  /**
+   * Customer's opaque Apple identifier on outbound messages, or the Apple business identifier on inbound messages. Omitted when that address is unavailable on a historical record.
+   */
+  readonly to?: string;
+  readonly direction: AmbMessageDirection;
+  readonly status: AmbMessageStatus;
+  /**
+   * Derived content classification for filtering and statistics.
+   */
+  readonly kind: AmbContentKind;
+  /**
+   * Who sent this message. Absent on an inbound message, which has no source to report.
+   */
+  readonly source?: AmbMessageSource;
+  /**
+   * Native message content. Outgoing interactions contain requests; incoming interactions contain replies.
+   */
+  readonly content: AmbMessageContent | AmbInboundContent;
+  /**
+   * Original message matched through Apple’s request identifier within the same workspace, business, and conversation. Omitted when no verified match exists.
+   */
+  readonly in_reply_to_message_id?: AmbMessageId;
+  /**
+   * Locale for this message, preserved in Apple’s format, for example en_US. Outbound messages use the request override, then the conversation locale, then the business default. Inbound messages preserve the locale in Apple’s callback. Null when unknown.
+   */
+  readonly locale?: string | null;
+  /**
+   * The category this message was sent with, for reporting only. It does not affect sending or suppression policy, or select an Apple department or purpose. Defaults to an empty string when a send names no category. Absent on an inbound message, which has no category to report.
+   */
+  readonly category?: string;
+  /**
+   * Arbitrary JSON object for per-message context. Maximum 2 KB serialized. Top-level keys beginning with `__bird` are reserved. Returned in the send response, message reads and customer message webhooks.
+   */
+  readonly metadata?: {
+    [key: string]: unknown;
+  };
+  /**
+   * Structured `{name, value}` filter labels applied to this message. Absent on an inbound message.
+   */
+  readonly tags?: Array<Tag>;
+  /**
+   * Recorded message charge. Null in the initial send response and while unpriced. The AMB charge is the transaction amount; no passthrough component is priced.
+   */
+  readonly cost: MessageCost;
+  /**
+   * Failure detail on a message whose send failed or that Bird rejected before any send attempt. Omitted when there is no failure detail.
+   */
+  readonly last_error?: AmbError;
+  /**
+   * The moment this message was accepted (outbound) or received (inbound). This is the timestamp the outbound statistics families bucket and attribute on; there is no separate `accepted_at` field.
+   */
+  readonly created_at: string;
+  /**
+   * When the selected sending outcome occurred. Null unless the current status is `sent` and the message is outbound. For older messages without a retained sending event, the stored record time is used.
+   */
+  readonly sent_at?: string | null;
+  /**
+   * Reusable encrypted content reference returned by Apple after a successful send. Absent until Apple returns one.
+   */
+  readonly data_ref?: AmbRichLinkReference;
+  /**
+   * Apple department identifier carried by this message. Omitted when absent from the message or unavailable on a historical record.
+   */
+  readonly group?: string;
+  /**
+   * Apple purpose identifier carried by this message. Omitted when absent from the message or unavailable on a historical record.
+   */
+  readonly intent?: string;
+};
+
+export type AmbMessageList = {
+  /**
+   * Page of Apple Messages for Business messages, newest first.
+   */
+  data: Array<AmbMessage>;
+} & ListEnvelope;
+
+export type AmbMessageSendRequest = {
+  /**
+   * Apple business identifier of the brand sending the message. Read it from the business’s apple_business_id. The customer must have opened the conversation with this business.
+   */
+  from: string;
+  /**
+   * Apple’s opaque customer identifier for this business, available as the conversation’s opaque_user_id. The conversation must exist and be open.
+   */
+  to: string;
+  /**
+   * Who this message is sent as. A signed-in session may send as `operator` or `automation`; an API key may send as `api` or `automation`. Omit it to take the default for your credential. Naming a source your credential cannot use is refused with a `422` `AMBMessageSourceNotPermitted`.
+   */
+  source?: AmbMessageSource;
+  /**
+   * Message content in Apple’s native text, rich_link, or interactive family.
+   */
+  content: AmbMessageContent;
+  /**
+   * Free-form reporting label; it does not change sending or suppression policy, for example `order_update`. Omit it to send with the default empty category.
+   */
+  category?: string;
+  /**
+   * Arbitrary JSON object for per-message context. Maximum 2 KB serialized. Top-level keys beginning with `__bird` are reserved. Returned in the send response, message reads and customer message webhooks.
+   */
+  metadata?: {
+    [key: string]: unknown;
+  };
+  /**
+   * Structured `{name, value}` labels for filtering. Maximum 20 tags per send.
+   */
+  tags?: Array<Tag>;
+  /**
+   * Department identifier for this message.
+   */
+  group?: string;
+  /**
+   * Purpose of this conversation.
+   */
+  intent?: string;
+  /**
+   * Apple locale identifier, for example en_US. Defaults to the conversation locale.
+   */
+  locale?: string;
+};
+
+/**
+ * Message timeline event type:
+ *
+ * - `amb.accepted`: The API accepted the request.
+ * - `amb.sent`: The message was handed to Apple.
+ * - `amb.send_failed`: Apple refused the message, or its send attempts were exhausted.
+ * - `amb.rejected`: Bird refused the message before any send attempt.
+ * - `amb.received`: An inbound message arrived from the customer.
+ *
+ * This is an open enum. Accept unrecognized values.
+ *
+ */
+export type AmbMessageEventType =
+  | "amb.accepted"
+  | "amb.sent"
+  | "amb.send_failed"
+  | "amb.rejected"
+  | "amb.received"
+  | (string & {});
+
+export type AmbMessageEvent = {
+  /**
+   * ID of the event, unique within the message's timeline.
+   */
+  readonly id: AmbEventId;
+  readonly type: AmbMessageEventType;
+  /**
+   * When this event occurred.
+   */
+  readonly occurred_at: string;
+  /**
+   * Failure detail, on an `amb.send_failed` or `amb.rejected` event. Null on every other event type.
+   */
+  readonly error?: AmbError;
+};
+
+export type AmbMessageEventList = {
+  /**
+   * The message's events, oldest first. Not paginated: a message's timeline is bounded and returned in full.
+   *
+   */
+  data: Array<AmbMessageEvent>;
+};
+
+/**
+ * Whether a conversation is open or closed. There is no close operation on this API: only the customer closes a conversation from their device, and any inbound message on a closed conversation reopens it.
+ *
+ */
+export type AmbConversationStatus = "open" | "closed";
+
+/**
+ * How the conversation started. `entry_point` means the customer opened it from one of your configured Apple Messages for Business entry points. `invitation` means the customer accepted an invitation and sent a message. This is set once when the conversation is created and never changes.
+ *
+ */
+export type AmbConversationOrigin = "entry_point" | "invitation";
+
+/**
+ * Why a closed conversation was closed. `user_close` means the customer sent a close message from their device. `gone` means Apple returned a 410 for the conversation. The console renders this as a banner on a closed conversation.
+ *
+ */
+export type AmbConversationClosedReason = "user_close" | "gone";
+
+/**
+ * A conversation between your business and one customer on Apple Messages for Business. It holds the customer's device capabilities, the console's read state, assignment, and labels, and the routing queue the conversation is in.
+ *
+ */
+export type AmbConversation = {
+  /**
+   * Conversation ID.
+   */
+  readonly id: AmbConversationId;
+  /**
+   * Business this conversation belongs to.
+   */
+  readonly business_account_id: AmbBusinessId;
+  readonly status: AmbConversationStatus;
+  readonly origin: AmbConversationOrigin;
+  /**
+   * Apple's opaque identifier for the customer with this business. The customer must send a message before a conversation is created. Null when no identifier is recorded.
+   *
+   */
+  readonly opaque_user_id: string | null;
+  /**
+   * Customer phone number, when recorded. Null when unknown. Read the invitation's `to` field for the number an invitation was sent to.
+   *
+   */
+  readonly phone_number: string | null;
+  /**
+   * The `group` value carried by the inbound message that opened or most recently reopened the conversation. Your business chooses it when configuring an entry point with Apple, and Apple passes it through; used with `intent_id` to route the conversation. Null when that message carried none.
+   *
+   */
+  readonly group_id: string | null;
+  /**
+   * The `intent` value carried by the inbound message that opened or most recently reopened the conversation. Your business chooses it when configuring an entry point with Apple, and Apple passes it through; used with `group_id` to route the conversation. Null when that message carried none.
+   *
+   */
+  readonly intent_id: string | null;
+  /**
+   * The entry point in your channel settings whose group and intent matched the inbound message that opened or most recently reopened the conversation. Null when no configured entry point matched.
+   *
+   */
+  readonly entry_point?: string | null;
+  /**
+   * The capability tokens the customer's device advertised on its most recent message, replaced by each inbound rather than accumulated, so this describes the device in use now. An empty list means the device's capabilities are unknown. Implemented message types may still be sent, but device rendering support has not been confirmed. Authentication requires an explicitly advertised AUTH2 capability.
+   *
+   */
+  readonly device_capabilities: Array<string>;
+  /**
+   * Implemented baseline types plus interactive types confirmed by `device_capabilities`. An empty capability list yields text, attachments and rich links; it does not establish support for other types. Unadvertised quick replies, list pickers, time pickers and forms are refused when capabilities are known. Custom apps and opaque interactive references are not included because their device support cannot be inferred from these tokens. Unsupported roadmap types cannot be sent.
+   *
+   */
+  readonly supported_content_kinds: Array<AmbContentKind>;
+  /**
+   * The customer's locale from the most recent inbound message, or your business's default locale before any inbound arrives. Preserved in Apple's locale format, for example `en_US@rg=nlzzzz`.
+   *
+   */
+  readonly locale: string;
+  /**
+   * Number of inbound messages since this conversation was last marked read. Incremented once per inbound message, reset to zero by marking the conversation read and by any outbound message your workspace sends.
+   *
+   */
+  readonly unread_count: number;
+  /**
+   * Number of messages in this conversation, both directions.
+   */
+  readonly message_count: number;
+  /**
+   * When the most recent message in this conversation was sent or received.
+   */
+  readonly last_message_at: string;
+  /**
+   * Direction of the most recent message.
+   */
+  readonly last_direction: AmbMessageDirection;
+  /**
+   * The user this conversation is assigned to, or null when unassigned. Assignment is not rechecked against workspace membership on read, so it can still name a user whose access was removed.
+   *
+   */
+  assigned_to: UserId | null;
+  /**
+   * Operator-set tags on this conversation. Unlike email, there are no system placement labels: every value here is one an operator chose.
+   *
+   */
+  labels: Array<string>;
+  /**
+   * The console queue this conversation is routed to. Empty when no routing rule matched, which the console lists as unrouted.
+   *
+   */
+  readonly queue?: string;
+  /**
+   * When this conversation was closed. Null while it is open.
+   */
+  readonly closed_at: string | null;
+  /**
+   * Why this conversation was closed. Null while it is open.
+   */
+  readonly closed_reason: AmbConversationClosedReason | null;
+  /**
+   * Number of times this conversation has been opened, starting at 1 and incremented on each reopen. A closed conversation reopens on the next inbound message rather than creating a new conversation.
+   *
+   */
+  readonly open_count: number;
+  /**
+   * When this conversation was created.
+   */
+  readonly created_at: string;
+  /**
+   * When this conversation last changed.
+   */
+  readonly updated_at: string;
+};
+
+export type AmbConversationList = {
+  /**
+   * Page of conversations, newest first by last message.
+   */
+  data: Array<AmbConversation>;
+} & ListEnvelope;
+
+/**
+ * Assignment, labels, and read state on a conversation. There is no close action here: only the customer closes a conversation, from their device. Every field is optional; omit a field to leave it unchanged.
+ *
+ */
+export type AmbConversationUpdate = {
+  /**
+   * User to assign this conversation to. Pass null to unassign it.
+   */
+  assigned_to?: UserId | null;
+  /**
+   * Replaces the full set of labels on this conversation. Pass an empty array to clear every label.
+   *
+   */
+  labels?: Array<string>;
+  /**
+   * Set to true to mark this conversation read, resetting `unread_count` to zero. There is no way to mark a conversation unread through this field; false has no effect.
+   *
+   */
+  read?: boolean;
+};
+
+/**
+ * The typing signal to send. `typing_start` tells the customer's device that an operator is composing a reply. `typing_end` tells it composition stopped without a message following. Apple expects at most one `typing_start` before the reply it precedes; sending it again before that reply is not meaningful and may be dropped. `typing_end`'s behavior against a live conversation is unproven: the legacy platform's implementation was disabled after it caused issues, so treat it as best-effort.
+ *
+ */
+export type AmbConversationTypingEvent = "typing_start" | "typing_end";
+
+/**
+ * A typing indicator to send to the customer's device on this conversation.
+ *
+ */
+export type AmbConversationTypingRequest = {
+  event: AmbConversationTypingEvent;
+};
+
+export type AmbSuppressionList = {
+  /**
+   * Active suppression episodes for the workspace, most recently effective first. Episodes that have ended are left out; fetch one by ID to read it.
+   *
+   */
+  data: Array<AmbSuppression>;
+} & ListEnvelope;
+
+export type AmbSuppressionCreate = {
+  /**
+   * Limit this manual block to one account. Omit to cover the same address across the workspace.
+   */
+  business_account_id?: AmbBusinessId;
+  /**
+   * The phone number or opaque identifier to suppress. For a phone number, supply canonical E.164 with a leading plus sign.
+   *
+   */
+  address: string;
+  address_type: AmbSuppressionAddressType;
+};
+
+/**
+ * The window the server actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants on the hour). The grain of `from` and `to` mirrors the grain of the request's bounds.
+ *
+ */
+export type AmbStatsSummaryPeriod = {
+  /**
+   * Inclusive start of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary. Historical starts are preserved; the maximum request length does not impose a historical cutoff.
+   */
+  readonly from: string;
+  /**
+   * Inclusive end of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.
+   */
+  readonly to: string;
+  /**
+   * Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.
+   *
+   */
+  readonly data_as_of?: string | null;
+};
+
+/**
+ * Which timestamp a statistics response buckets its rows and totals by:
+ *
+ * - `accepted_time`: attributed to when Bird accepted the outbound message for sending. The outbound send statistics use this, so a later event for the same message, such as a send failure, still counts against the day or hour its message was accepted.
+ * - `event_time`: attributed to when the event itself occurred. Inbound message statistics, conversation statistics and the staff per-business failure counts use this, since there is no earlier outbound event to anchor them to.
+ *
+ * A response never mixes the two axes: every row and total in one payload shares the same attribution.
+ *
+ */
+export type AmbStatsAttribution = "accepted_time" | "event_time";
+
+/**
+ * Outbound Apple Messages for Business counts for the requested scope, attributed to when each message was accepted. Apple Messages for Business has no delivery receipt, so there is no `delivered` count anywhere in this API: `sent` is the last outbound state Bird observes for a message. Very large counts are close estimates rather than exact tallies. Rates are computed once here, clamped to 1, and null when nothing was accepted.
+ *
+ */
+export type AmbOutboundStatsCounts = {
+  /**
+   * Distinct messages accepted for sending after admission checks. This is the denominator for `sent_rate` and `send_failure_rate`.
+   */
+  readonly accepted: number;
+  /**
+   * Distinct messages handed off to Apple.
+   */
+  readonly sent: number;
+  /**
+   * Distinct accepted messages that Apple refused or that exhausted their send attempts. See `last_error.code` on the message for the reason; a refused charge is not a send failure, it is `rejected`.
+   */
+  readonly send_failed: number;
+  /**
+   * Distinct messages refused before any send attempt, because the destination has no price, the wallet could not fund the send, or the content cannot be sent yet. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `send_failure_rate`, which covers send failures only.
+   */
+  readonly rejected: number;
+  /**
+   * Share of accepted messages Apple acknowledged, computed as `sent / accepted`. Null when no messages were accepted in scope. This stands where other channels report a delivery rate.
+   */
+  readonly sent_rate: number | null;
+  /**
+   * Share of accepted messages that failed to send, computed as `send_failed / accepted`. Null when no messages were accepted in scope.
+   */
+  readonly send_failure_rate: number | null;
+};
+
+/**
+ * Approximate p50, p95, and p99 latency percentiles in milliseconds for one latency family. All three are null when no qualifying event contributed a measurement.
+ *
+ */
+export type AmbStatsQuantiles = {
+  /**
+   * Median (50th percentile) latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p50_ms: number | null;
+  /**
+   * 95th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p95_ms: number | null;
+  /**
+   * 99th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p99_ms: number | null;
+};
+
+/**
+ * Processing-latency percentiles in milliseconds for the requested scope, from acceptance to Apple handoff. Apple Messages for Business has no delivery receipt, so there is no `delivery` or `total` member beside `processing`. Conversation response timing is reported separately in `first_response`. Always present; every percentile is null when no qualifying message in scope has a measurement.
+ *
+ */
+export type AmbStatsLatency = {
+  processing: AmbStatsQuantiles;
+};
+
+/**
+ * Changes from the previous period. Each value is the signed relative change `(current - previous) / previous` and is null when the previous count is zero.
+ *
+ */
+export type AmbStatsComparisonDelta = {
+  /**
+   * Relative change in accepted messages (`counts.accepted`) versus the previous period, as a signed fraction. Null when the previous period accepted none.
+   */
+  readonly accepted_pct_change: number | null;
+  /**
+   * Relative change in sent messages (`counts.sent`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly sent_pct_change: number | null;
+  /**
+   * Relative change in send failures (`counts.send_failed`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly send_failed_pct_change: number | null;
+  /**
+   * Relative change in rejected messages (`counts.rejected`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly rejected_pct_change: number | null;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type AmbStatsComparison = {
+  /**
+   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows).
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * First-response latency percentiles for the preceding period. Omitted when no qualifying message in that period has a measurement.
+   */
+  readonly first_response?: AmbStatsQuantiles;
+  readonly delta: AmbStatsComparisonDelta;
+};
+
+/**
+ * Outbound Apple Messages for Business counts and latency percentiles for the full requested period. Counts and percentiles are computed over the whole period rather than combined from the returned time-series values.
+ *
+ */
+export type AmbStatsSummary = {
+  /**
+   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * Time from the oldest unanswered inbound message to acceptance of the first outbound reply that claims it. Reported on summaries and breakdowns. Omitted when no qualifying reply contributes a measurement.
+   */
+  readonly first_response?: AmbStatsQuantiles;
+  readonly comparison?: AmbStatsComparison;
+};
+
+/**
+ * The window and bucket grain the response covers, echoed from the request, plus the freshness boundary the data is current to.
+ *
+ */
+export type AmbStatsSeriesPeriod = {
+  /**
+   * Inclusive start of the window. A calendar day (YYYY-MM-DD) on the day grain, an RFC 3339 instant on the hour grain. Historical starts are preserved; the maximum request length does not impose a historical cutoff.
+   */
+  readonly from: string;
+  /**
+   * Inclusive end of the window. A calendar day (YYYY-MM-DD) on the day grain, an RFC 3339 instant on the hour grain.
+   */
+  readonly to: string;
+  readonly grain: StatsGrain;
+  /**
+   * Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.
+   *
+   */
+  readonly data_as_of?: string | null;
+};
+
+/**
+ * Outbound Apple Messages for Business counts and processing-latency percentiles for one time bucket (a calendar day or hour), bucketed by acceptance time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. There is no `first_response` here. Read first-response latency from the summary or a breakdown endpoint.
+ *
+ */
+export type AmbStatsPoint = {
+  /**
+   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.
+   */
+  readonly bucket: string;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+};
+
+/**
+ * Time-series stats payload. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
+ *
+ */
+export type AmbStatsResponse = {
+  readonly period: AmbStatsSeriesPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * One row per day or hour in chronological order. Buckets with no activity contain zero counts.
+   */
+  readonly data: Array<AmbStatsPoint>;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single business over the requested period.
+ */
+export type AmbBusinessAccountStatsPoint = {
+  /**
+   * The business these messages were sent from.
+   */
+  readonly business_account_id: AmbBusinessId;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * First-response latency percentiles for this business. Omitted when no qualifying message contributes a measurement.
+   */
+  readonly first_response?: AmbStatsQuantiles;
+};
+
+/**
+ * Per-business breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByBusinessResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Business rows ranked by accepted volume descending.
+   */
+  readonly data: Array<AmbBusinessAccountStatsPoint>;
+  /**
+   * Total distinct businesses with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single message content kind over the requested period.
+ */
+export type AmbMessageKindStatsPoint = {
+  /**
+   * The content kind these messages were sent as, the same value the message read returns as its content kind discriminator.
+   */
+  readonly message_kind: AmbContentKind;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * First-response latency percentiles for this content kind. Omitted when no qualifying message contributes a measurement.
+   */
+  readonly first_response?: AmbStatsQuantiles;
+};
+
+/**
+ * Per-content-kind breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByMessageKindResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Content-kind rows ranked by accepted volume descending.
+   */
+  readonly data: Array<AmbMessageKindStatsPoint>;
+  /**
+   * Total distinct content kinds with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single entry-point intent over the requested period.
+ */
+export type AmbIntentStatsPoint = {
+  /**
+   * The intent these messages were routed under, as configured in the business's entry points. Intents are workspace-defined and have no fixed vocabulary.
+   */
+  readonly intent: string;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * First-response latency percentiles for this intent. Omitted when no qualifying message contributes a measurement.
+   */
+  readonly first_response?: AmbStatsQuantiles;
+};
+
+/**
+ * Per-intent breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByIntentResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Intent rows ranked by accepted volume descending.
+   */
+  readonly data: Array<AmbIntentStatsPoint>;
+  /**
+   * Total distinct intents with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single entry-point group over the requested period.
+ */
+export type AmbGroupStatsPoint = {
+  /**
+   * The group these messages were routed under, as configured in the business's entry points. Groups are workspace-defined and have no fixed vocabulary.
+   */
+  readonly group: string;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * First-response latency percentiles for this group. Omitted when no qualifying message contributes a measurement.
+   */
+  readonly first_response?: AmbStatsQuantiles;
+};
+
+/**
+ * Per-group breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByGroupResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Group rows ranked by accepted volume descending.
+   */
+  readonly data: Array<AmbGroupStatsPoint>;
+  /**
+   * Total distinct groups with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single message category over the requested period.
+ */
+export type AmbCategoryStatsPoint = {
+  /**
+   * The category these messages were sent with. Defaults to an empty string when a send names no category.
+   */
+  readonly category: string;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * First-response latency percentiles for this category. Omitted when no qualifying message contributes a measurement.
+   */
+  readonly first_response?: AmbStatsQuantiles;
+};
+
+/**
+ * Per-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByCategoryResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Category rows ranked by accepted volume descending.
+   */
+  readonly data: Array<AmbCategoryStatsPoint>;
+  /**
+   * Total distinct categories with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single tag over the requested period.
+ */
+export type AmbTagStatsPoint = {
+  /**
+   * The tag these messages carry, as a bare name or a `name:value` pair. A message with several tags is counted once under each, so rows do not sum to the period total.
+   */
+  readonly tag: string;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * First-response latency percentiles for this tag. Omitted when no qualifying message contributes a measurement.
+   */
+  readonly first_response?: AmbStatsQuantiles;
+};
+
+/**
+ * Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Only tagged messages appear.
+ */
+export type AmbStatsByTagResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Tag rows ranked by accepted volume descending.
+   */
+  readonly data: Array<AmbTagStatsPoint>;
+  /**
+   * Total distinct tags with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single failure reason over the requested period.
+ */
+export type AmbErrorCodeStatsPoint = {
+  /**
+   * The failure reason these messages share.
+   */
+  readonly error_code: AmbStatsErrorCode;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * First-response latency for failed replies that claimed an unanswered inbound message. Omitted when no qualifying reply contributes a measurement.
+   *
+   */
+  readonly first_response?: AmbStatsQuantiles;
+};
+
+/**
+ * Per-failure-reason breakdown for the requested period, ranked by `send_failed + rejected` descending and capped at the requested `limit` (default 50, max 200). Only messages carrying an error code appear: a `bird:` code is usually a rejection, an `apple:` code a send failure.
+ */
+export type AmbStatsByErrorCodeResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Error-code rows ranked by `send_failed + rejected` descending.
+   */
+  readonly data: Array<AmbErrorCodeStatsPoint>;
+  /**
+   * Total distinct error codes with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * The change from the preceding period to the requested one. The `received_pct_change` field is a signed relative change, computed as `(current - previous) / previous`. A value of `0.5` means 50% higher, and `-0.2` means 20% lower. The field is null when the previous period received none.
+ *
+ */
+export type AmbInboundStatsComparisonDelta = {
+  /**
+   * Relative change in received messages versus the previous period, as a signed fraction. Null when the previous period received none.
+   */
+  readonly received_pct_change: number | null;
+};
+
+/**
+ * The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type AmbInboundStatsComparison = {
+  /**
+   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows).
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Distinct messages received in the preceding period.
+   */
+  readonly received: number;
+  readonly delta: AmbInboundStatsComparisonDelta;
+};
+
+/**
+ * Total inbound Apple Messages for Business messages for the requested period.
+ *
+ */
+export type AmbInboundStatsSummary = {
+  /**
+   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `event_time` for inbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Distinct messages received in the period, counted by the time each message occurred. Computed across the whole window rather than summed from the daily or hourly series, so it can sit slightly below the sum of those rows.
+   */
+  readonly received: number;
+  readonly comparison?: AmbInboundStatsComparison;
+};
+
+/**
+ * Received-message count for one time bucket (a calendar day or hour), bucketed by the time each message occurred.
+ *
+ */
+export type AmbInboundStatsPoint = {
+  /**
+   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the request's grain.
+   */
+  readonly bucket: string;
+  /**
+   * Distinct messages received in this bucket.
+   */
+  readonly received: number;
+};
+
+/**
+ * Received-message time series. `period` echoes the range the server computed against; `data` is one row per bucket in chronological order.
+ *
+ */
+export type AmbInboundStatsResponse = {
+  readonly period: AmbStatsSeriesPeriod;
+  /**
+   * Always `event_time` for inbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * One row per bucket (day or hour, matching the request) in the period, in chronological order. Buckets with no activity are included with a count of zero, so the series charts continuously without client-side gap handling.
+   */
+  readonly data: Array<AmbInboundStatsPoint>;
+};
+
+/**
+ * Received-message count for a single business over the requested period.
+ */
+export type AmbInboundBusinessStatsPoint = {
+  /**
+   * The business that received these messages.
+   */
+  readonly business_account_id: AmbBusinessId;
+  /**
+   * Distinct messages received by this business in the period.
+   */
+  readonly received: number;
+};
+
+/**
+ * Per-business breakdown of received messages for the requested period, ranked by volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbInboundStatsByBusinessResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `event_time` for inbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Business rows ranked by received-message volume descending, capped at the requested `limit`. A business with no received messages in the period is absent rather than zero-filled, because unlike a time bucket it is not part of a continuous axis.
+   */
+  readonly data: Array<AmbInboundBusinessStatsPoint>;
+  /**
+   * Total distinct businesses with received messages in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Received-message count for a single entry-point intent over the requested period.
+ */
+export type AmbInboundIntentStatsPoint = {
+  /**
+   * The intent these messages arrived under, as configured in the business's entry points. Intents are workspace-defined and have no fixed vocabulary.
+   */
+  readonly intent: string;
+  /**
+   * Distinct messages received under this intent in the period.
+   */
+  readonly received: number;
+};
+
+/**
+ * Per-intent breakdown of received messages for the requested period, ranked by volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbInboundStatsByIntentResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `event_time` for inbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Intent rows ranked by received-message volume descending, capped at the requested `limit`. An intent with no received messages in the period is absent rather than zero-filled, because unlike a time bucket it is not part of a continuous axis.
+   */
+  readonly data: Array<AmbInboundIntentStatsPoint>;
+  /**
+   * Total distinct intents with received messages in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Conversation lifecycle counts for the requested scope, attributed to when each event occurred. A conversation can start, reopen, and close more than once over its life, so `started`, `reopened`, and `closed` can each exceed `conversations`, the number of distinct conversations touched in scope. Very large counts are close estimates rather than exact tallies.
+ *
+ */
+export type AmbConversationStatsCounts = {
+  /**
+   * Count of conversation-started events in scope.
+   */
+  readonly started: number;
+  /**
+   * Count of conversation-reopened events in scope.
+   */
+  readonly reopened: number;
+  /**
+   * Count of conversation-closed events in scope.
+   */
+  readonly closed: number;
+  /**
+   * Distinct conversations with at least one lifecycle event in scope.
+   */
+  readonly conversations: number;
+};
+
+/**
+ * Changes from the previous period. Each value is the signed relative change `(current - previous) / previous` and is null when the previous count is zero.
+ *
+ */
+export type AmbConversationStatsComparisonDelta = {
+  /**
+   * Relative change in conversation starts (`counts.started`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly started_pct_change: number | null;
+  /**
+   * Relative change in conversation reopens (`counts.reopened`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly reopened_pct_change: number | null;
+  /**
+   * Relative change in conversation closes (`counts.closed`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly closed_pct_change: number | null;
+  /**
+   * Relative change in distinct conversations touched (`counts.conversations`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly conversations_pct_change: number | null;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type AmbConversationStatsComparison = {
+  /**
+   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows).
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  readonly counts: AmbConversationStatsCounts;
+  readonly delta: AmbConversationStatsComparisonDelta;
+};
+
+/**
+ * Conversation lifecycle counts for the full requested period. Counts aggregate the time buckets.
+ *
+ */
+export type AmbConversationStatsSummary = {
+  /**
+   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `event_time` for conversation statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  readonly counts: AmbConversationStatsCounts;
+  readonly comparison?: AmbConversationStatsComparison;
+};
+
+/**
+ * Conversation lifecycle counts for one time bucket (a calendar day or hour), bucketed by when each event occurred.
+ *
+ */
+export type AmbConversationStatsPoint = {
+  /**
+   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.
+   */
+  readonly bucket: string;
+  readonly counts: AmbConversationStatsCounts;
+};
+
+/**
+ * Conversation lifecycle time series. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
+ *
+ */
+export type AmbConversationStatsResponse = {
+  readonly period: AmbStatsSeriesPeriod;
+  /**
+   * Always `event_time` for conversation statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * One row per day or hour in chronological order. Buckets with no activity contain zero counts.
+   */
+  readonly data: Array<AmbConversationStatsPoint>;
 };
 
 /**
@@ -12759,7 +15415,7 @@ export type DnsRecord = {
    * `optional` until receiving is enabled, and publishing it before then
    * is destructive: on a domain at the zone apex it replaces the MX
    * records that carry the domain's existing mail.
-   * - `dmarc`: identifies the advisory DMARC policy record.
+   * - `dmarc`: identifies the DMARC policy record required for sending.
    *
    */
   purpose: "dkim" | "return_path" | "tracking" | "inbound_mx" | "dmarc";
@@ -14641,29 +17297,6 @@ export type EmailTemplatePreview = {
  */
 export type EmailTemplateVersionStatus = "draft" | "published" | "archived";
 
-export type Actor = {
-  /**
-   * Actor identifier.
-   */
-  id: string;
-  /**
-   * New actor types may be added. Treat unrecognized values as future types, not errors.
-   * - `user`: a member's own session.
-   * - `api_key`: a workspace API key.
-   * - `oauth_token`: a token issued to a caller on a member's behalf.
-   * - `system`: an action we perform without a customer actor.
-   * - `sso`: an organization's SSO connection.
-   * - `service_account`: a workspace's connected Integration acting with no member behind it.
-   * - `automation`: an automation execution in your workspace.
-   */
-  type: string;
-  /**
-   * The label the actor is shown under: typically a member's name or email address, or the API key's name. Null when it could not be resolved.
-   *
-   */
-  readonly display_name?: string | null;
-};
-
 /**
  * One version of a template, without its content. Version history lists every version a template has ever had, and each one has a full copy of the content in every language it was published with. The listing describes the versions; read a single version to get what it holds.
  *
@@ -14892,7 +17525,7 @@ export type EmailTemplateLanguage = {
  */
 export type EmailTemplateLanguageUpsert = {
   /**
-   * The email subject line for this language.
+   * The email subject line. It may be empty in a draft but is required to publish.
    */
   subject: string;
   /**
@@ -14984,7 +17617,7 @@ export type EmailTemplateLanguageSaved = {
  */
 export type EmailTemplateLanguageUpdate = {
   /**
-   * A new email subject line for this language.
+   * The email subject line. It may be empty in a draft but is required to publish.
    */
   subject?: string;
   /**
@@ -16272,6 +18905,15 @@ export type WebhookEndpointId = string;
  *
  */
 export type WebhookEventType =
+  | "amb.accepted"
+  | "amb.conversation_closed"
+  | "amb.conversation_reopened"
+  | "amb.conversation_started"
+  | "amb.received"
+  | "amb.rejected"
+  | "amb.send_failed"
+  | "amb.sent"
+  | "amb_suppression.created"
   | "domain.failed"
   | "domain.verified"
   | "email.accepted"
@@ -16432,6 +19074,236 @@ export type WebhookTestRequest = {
    *
    */
   event_type?: string;
+};
+
+/**
+ * Always `amb.accepted` for this event.
+ */
+export type AmbAcceptedEventType = "amb.accepted";
+
+/**
+ * The workspace and message snapshot at the time of the lifecycle event.
+ */
+export type EventAmbMessageData = {
+  /**
+   * Workspace that owns this message.
+   */
+  workspace_id: WorkspaceId;
+  /**
+   * Message state when the event occurred. Later state changes do not alter this snapshot. Customer metadata is included when present; reserved Bird metadata is excluded.
+   */
+  message: AmbMessage;
+};
+
+/**
+ * Bird charged and accepted an outbound message for processing. This does not mean Apple received the message.
+ */
+export type EventAmbAccepted = {
+  type: AmbAcceptedEventType;
+  /**
+   * When this lifecycle event occurred, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbMessageData;
+};
+
+/**
+ * Always `amb.conversation_closed` for this event.
+ */
+export type AmbConversationClosedEventType = "amb.conversation_closed";
+
+/**
+ * Conversation identity and routing context when a lifecycle event occurred.
+ */
+export type EventAmbConversationData = {
+  /**
+   * Workspace that owns this conversation.
+   */
+  workspace_id: WorkspaceId;
+  /**
+   * Business that owns this conversation.
+   */
+  business_account_id: AmbBusinessId;
+  /**
+   * Conversation that changed state.
+   */
+  conversation_id: AmbConversationId;
+  /**
+   * Number of times the conversation has opened, starting at 1 and increasing on each reopen. Together with the conversation ID and event type, this identifies the lifecycle occurrence across retries.
+   */
+  open_count: number;
+  /**
+   * Source of the lifecycle change, when recorded.
+   */
+  origin?: string;
+  /**
+   * Apple entry-point group recorded for this occurrence, when present.
+   */
+  group_id?: string;
+  /**
+   * Apple entry-point intent recorded for this occurrence, when present.
+   */
+  intent_id?: string;
+  /**
+   * Routing queue recorded for this occurrence, when present.
+   */
+  queue?: string;
+};
+
+/**
+ * A customer conversation closed. Closing a conversation is not a message.
+ */
+export type EventAmbConversationClosed = {
+  type: AmbConversationClosedEventType;
+  /**
+   * When this lifecycle event occurred, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbConversationData;
+};
+
+/**
+ * Always `amb.conversation_reopened` for this event.
+ */
+export type AmbConversationReopenedEventType = "amb.conversation_reopened";
+
+/**
+ * An existing customer conversation reopened after it had closed.
+ */
+export type EventAmbConversationReopened = {
+  type: AmbConversationReopenedEventType;
+  /**
+   * When this lifecycle event occurred, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbConversationData;
+};
+
+/**
+ * Always `amb.conversation_started` for this event.
+ */
+export type AmbConversationStartedEventType = "amb.conversation_started";
+
+/**
+ * A customer conversation opened for the first time.
+ */
+export type EventAmbConversationStarted = {
+  type: AmbConversationStartedEventType;
+  /**
+   * When this lifecycle event occurred, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbConversationData;
+};
+
+/**
+ * Always `amb.received` for this event.
+ */
+export type AmbReceivedEventType = "amb.received";
+
+/**
+ * Bird received an ordinary customer message from Apple. Invitation responses are excluded.
+ */
+export type EventAmbReceived = {
+  type: AmbReceivedEventType;
+  /**
+   * When this lifecycle event occurred, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbMessageData;
+};
+
+/**
+ * Always `amb.rejected` for this event.
+ */
+export type AmbRejectedEventType = "amb.rejected";
+
+/**
+ * Bird refused an outbound message before acceptance. This message has no accepted event.
+ */
+export type EventAmbRejected = {
+  type: AmbRejectedEventType;
+  /**
+   * When this lifecycle event occurred, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbMessageData;
+};
+
+/**
+ * Always `amb.send_failed` for this event.
+ */
+export type AmbSendFailedEventType = "amb.send_failed";
+
+/**
+ * An accepted outbound message could not be handed to Apple. The message snapshot carries the failure detail.
+ */
+export type EventAmbSendFailed = {
+  type: AmbSendFailedEventType;
+  /**
+   * When this lifecycle event occurred, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbMessageData;
+};
+
+/**
+ * Always `amb.sent` for this event.
+ */
+export type AmbSentEventType = "amb.sent";
+
+/**
+ * Apple accepted an outbound message from Bird. This does not establish delivery to the customer or a read receipt.
+ */
+export type EventAmbSent = {
+  type: AmbSentEventType;
+  /**
+   * When this lifecycle event occurred, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbMessageData;
+};
+
+/**
+ * Always `amb_suppression.created` for this event.
+ */
+export type AmbSuppressionCreatedEventType = "amb_suppression.created";
+
+/**
+ * Payload of the amb_suppression.created event.
+ */
+export type EventAmbSuppressionCreatedData = {
+  /**
+   * The suppression episode that was opened.
+   */
+  suppression_id: AmbSuppressionId;
+  /**
+   * The business account this suppression covers, or null when it covers the workspace.
+   */
+  business_account_id: AmbBusinessId | null;
+  /**
+   * The canonical phone number or exact opaque Apple identifier that was suppressed.
+   */
+  address: string;
+  address_type: AmbSuppressionAddressType;
+  reason: AmbSuppressionReason;
+  origin: AmbSuppressionOrigin;
+  /**
+   * The workspace the suppression belongs to.
+   */
+  workspace_id: WorkspaceId;
+};
+
+/**
+ * An address was added to the workspace's Apple Messages for Business suppression ledger.
+ */
+export type EventAmbSuppressionCreated = {
+  type: AmbSuppressionCreatedEventType;
+  /**
+   * When the suppression episode took effect.
+   */
+  timestamp: string;
+  data: EventAmbSuppressionCreatedData;
 };
 
 /**
@@ -17363,11 +20235,11 @@ export type EventPreferenceBase = {
   transition_id: PreferenceTransitionId;
   channel: PreferenceChannel;
   /**
-   * Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS and WhatsApp.
+   * Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS, WhatsApp, and Apple Messages for Business.
    */
   handle: string;
   /**
-   * The sender the statement is limited to, or null when it covers the whole channel. Present-with-null on every payload of this type: it is part of the key alongside `topic_id`, and pinning its presence keeps a subscriber from ever learning `(handle, channel)` as the unique key.
+   * The sender the statement is limited to, or null when it covers the whole channel. On Apple Messages for Business, this is the Apple business ID used to send invitations. Present-with-null on every payload of this type: it is part of the key alongside `topic_id`, and pinning its presence keeps a subscriber from ever learning `(handle, channel)` as the unique key.
    */
   sender_scope: string | null;
   /**
@@ -19376,17 +22248,31 @@ export type VoiceTrunkGatewayUpdate = {
 };
 
 /**
+ * Where a number came from. `allocation` is a number we allocated to your workspace, and the only kind whose calls reach us. `verified_number` is a number from another carrier that you registered and proved you control, so it can be presented on a call you place.
+ *
+ */
+export type VoiceNumberProviderType = "allocation" | "verified_number";
+
+/**
+ * Which answer a number carries.
+ *
+ * - `reject`: refuses the call. This is where every number starts.
+ * - `trunk`: delivers the call to one of your SIP trunks.
+ * - `forward`: places a call to one of your verified caller IDs and connects the two.
+ * - `sequence`: runs the configured sequence from its selected voice-call entry.
+ *
+ * It selects the answer's own shape, so a new way to answer a call arrives as a
+ * new value alongside a new set of fields.
+ *
+ */
+export type VoiceCallRouteType = "reject" | "trunk" | "forward" | "sequence";
+
+/**
  * Field used to sort the list.
  */
 export type VoiceNumberSortField = "phone_number";
 
 export type VoiceNumberId = string;
-
-/**
- * Where a number came from. `allocation` is a number we allocated to your workspace, and the only kind whose calls reach us. `verified_number` is a number from another carrier that you registered and proved you control, so it can be presented on a call you place.
- *
- */
-export type VoiceNumberProviderType = "allocation" | "verified_number";
 
 export type VoiceNumberProviderAllocation = {
   /**
@@ -19404,11 +22290,13 @@ export type VoiceNumberProviderAllocation = {
  * Verification state of the caller ID.
  *
  * - `pending`: the number is registered but ownership has not yet been proven.
- * - `verified`: the workspace completed the verification call, so the number can
- * be presented as the outbound caller ID.
- * - `failed`: terminal because the verification challenge expired or the attempt
- * limit was exhausted. Use the dashboard to remove and register the caller ID
- * again to retry.
+ * - `verified`: the workspace proved ownership of the number. Check the
+ * resource's activation or direction fields for outbound availability.
+ * - `failed`: terminal because the verification challenge expired or the attempt limit was exhausted.
+ * Remove and register the caller ID again in the dashboard to retry.
+ *
+ * Open enum: additional states may be added over time, so treat an unrecognized
+ * value as a future state rather than an error.
  *
  */
 export type VoiceCallerIdStatus =
@@ -19456,20 +22344,6 @@ export type VoiceNumberDirections = {
 };
 
 export type VoiceInboundConfigurationError = "unsupported_route_type";
-
-/**
- * Which answer a number carries.
- *
- * - `reject`: refuses the call. This is where every number starts.
- * - `trunk`: delivers the call to one of your SIP trunks.
- * - `forward`: places a call to one of your verified caller IDs and connects the two.
- * - `sequence`: runs the configured sequence from its selected voice-call entry.
- *
- * It selects the answer's own shape, so a new way to answer a call arrives as a
- * new value alongside a new set of fields.
- *
- */
-export type VoiceCallRouteType = "reject" | "trunk" | "forward" | "sequence";
 
 export type VoiceCallRouteReject = {
   /**
@@ -19653,22 +22527,26 @@ export type VoiceCallerId = {
   /**
    * Unique identifier for this caller ID.
    */
-  readonly id: VoiceCallerIdid;
-  readonly workspace_id: WorkspaceId;
+  id: VoiceCallerIdid;
+  workspace_id: WorkspaceId;
   /**
    * The phone number in E.164 format registered as a caller ID.
    */
-  readonly phone_number: string;
+  phone_number: string;
   /**
    * Your label for this caller ID, to tell several registered numbers apart. `null` when the caller ID has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the caller ID update operation.
    *
    */
-  readonly name: string | null;
-  readonly status: VoiceCallerIdStatus;
+  name: string | null;
+  status: VoiceCallerIdStatus;
+  /**
+   * Whether outbound caller ID activation has completed. A verified number can remain inactive until activation requirements are met. Outbound calls remain subject to routing and number ownership requirements.
+   */
+  outbound_enabled: boolean;
   /**
    * When the caller ID was verified. `null` when its status is `pending` or `failed`.
    */
-  readonly verified_at: string | null;
+  verified_at: string | null;
 } & Timestamps;
 
 export type VoiceCallerIdList = {
@@ -19677,9 +22555,9 @@ export type VoiceCallerIdList = {
 
 export type VoiceCallerIdVerifyRequest = {
   /**
-   * The 6-digit verification code read out by the verification call.
+   * The 6-digit verification code read out by the verification call. Required until ownership is verified. Omit it when retrying activation of an already verified number.
    */
-  code: string;
+  code?: string;
 };
 
 /**
@@ -20122,6 +23000,33 @@ export type VoiceDestinationsUpdate = {
  *
  */
 export type WebhookEventWritable =
+  | ({
+      type: "amb.accepted";
+    } & EventAmbAcceptedWritable)
+  | ({
+      type: "amb.conversation_closed";
+    } & EventAmbConversationClosed)
+  | ({
+      type: "amb.conversation_reopened";
+    } & EventAmbConversationReopened)
+  | ({
+      type: "amb.conversation_started";
+    } & EventAmbConversationStarted)
+  | ({
+      type: "amb.received";
+    } & EventAmbReceivedWritable)
+  | ({
+      type: "amb.rejected";
+    } & EventAmbRejectedWritable)
+  | ({
+      type: "amb.send_failed";
+    } & EventAmbSendFailedWritable)
+  | ({
+      type: "amb.sent";
+    } & EventAmbSentWritable)
+  | ({
+      type: "amb_suppression.created";
+    } & EventAmbSuppressionCreated)
   | ({
       type: "domain.failed";
     } & EventDomainFailed)
@@ -21276,6 +24181,24 @@ export type WhatsAppReactionWritable = {
   [key: string]: never;
 };
 
+export type ActorWritable = {
+  /**
+   * Actor identifier.
+   */
+  id: string;
+  /**
+   * New actor types may be added. Treat unrecognized values as future types, not errors.
+   * - `user`: a member's own session.
+   * - `api_key`: a workspace API key.
+   * - `oauth_token`: a token issued to a caller on a member's behalf.
+   * - `system`: an action we perform without a customer actor.
+   * - `sso`: an organization's SSO connection.
+   * - `service_account`: a workspace's connected Integration acting with no member behind it.
+   * - `automation`: an automation execution in your workspace.
+   */
+  type: string;
+};
+
 /**
  * Failure detail for a message that could not be delivered or was rejected.
  */
@@ -21817,6 +24740,431 @@ export type WhatsAppNumberProfileWritable = {
    * Up to two websites shown on the profile.
    */
   websites?: Array<string>;
+};
+
+export type AmbBusinessAccountWritable = {
+  /**
+   * Customer-supplied account name used in Bird. Apple controls the name shown to customers in Messages.
+   */
+  name: string;
+};
+
+export type AmbBusinessAccountEventListWritable = {
+  data: Array<unknown>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * One retained suppression episode for an address. A null account scope covers the same address in every account in the workspace; it does not link different opaque identities.
+ */
+export type AmbSuppressionWritable = {
+  /**
+   * Canonical E.164 phone number, or the exact opaque identifier Apple supplied.
+   */
+  address: string;
+  address_type: AmbSuppressionAddressType;
+};
+
+export type AmbBusinessAccountListWritable = {
+  /**
+   * The business records your workspace holds.
+   */
+  data: Array<AmbBusinessAccountWritable>;
+} & ListEnvelopeWithTotal;
+
+export type AmbBusinessAccountSubmissionWritable = {
+  [key: string]: never;
+};
+
+export type AmbBusinessAccountSubmissionListWritable = {
+  data: Array<AmbBusinessAccountSubmissionWritable>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * A rule that puts a conversation into a queue when it is created or reopened, based on the group and intent the entry point that started it carried.
+ *
+ */
+export type AmbRoutingRuleWritable = {
+  /**
+   * The Apple Messages for Business brand this rule belongs to.
+   */
+  business_account_id: AmbBusinessId;
+  match_kind: AmbRoutingRuleMatchKind;
+  /**
+   * The entry point intent this rule matches, as sent in Apple's `intentID`. Set when `match_kind` is `intent` or `both`, null when it is `group`.
+   *
+   */
+  match_intent_id?: string | null;
+  /**
+   * The entry point group this rule matches, as sent in Apple's `groupID`. Set when `match_kind` is `group` or `both`, null when it is `intent`.
+   *
+   */
+  match_group_id?: string | null;
+  /**
+   * The queue a matching conversation is filed into. A queue is a label your console filters by rather than a resource you create ahead of time, so any value routes.
+   *
+   */
+  queue: string;
+  /**
+   * Evaluation order among this business's rules. The highest-precedence rule a conversation matches wins; rules tied on precedence are evaluated by their `id`.
+   *
+   */
+  precedence: number;
+  /**
+   * Whether this rule catches a conversation that matches nothing else. A business has at most one. A conversation created or reopened while none exists routes to an empty queue, which the console lists as unrouted.
+   *
+   */
+  is_default: boolean;
+};
+
+export type AmbRoutingRuleListWritable = {
+  /**
+   * The workspace's routing rules, optionally filtered by business, highest precedence first and ties broken by `id`. Rules are evaluated within their business in this order. The set is returned in full; this list is not paginated.
+   *
+   */
+  data: Array<AmbRoutingRuleWritable>;
+};
+
+export type AmbNativeInteractivePayloadWritable = unknown & {
+  /**
+   * Correlation identifier for this interaction. Bird generates one when omitted.
+   */
+  request_identifier?: string;
+  /**
+   * Images referenced by identifier.
+   */
+  images?: Array<AmbNativeImage>;
+  quick_reply?: AmbNativeQuickReply;
+  list_picker?: AmbNativeListPicker;
+  event?: AmbNativeEvent;
+  dynamic?: AmbNativeDynamic;
+};
+
+export type AmbNativeInteractiveDataWritable = unknown & {
+  /**
+   * App Store identifier of the iMessage app.
+   */
+  app_id?: string;
+  /**
+   * Name of the iMessage app.
+   */
+  app_name?: string;
+  /**
+   * Identifier of the iMessage extension, in Apple's `com.apple.messages.MSMessageExtensionBalloonPlugin:team-id:extension-id` format.
+   */
+  bid?: string;
+  /**
+   * Opaque URL string that Messages passes to the iMessage app.
+   */
+  url?: string;
+  /**
+   * Whether Messages renders the received and reply bubbles using Live Layout.
+   */
+  use_live_layout?: boolean;
+  /**
+   * Session UUID to preserve across interactions. Apple creates one when omitted.
+   */
+  session_identifier?: string;
+  /**
+   * Content Messages shows in the received message bubble.
+   */
+  received_message?: AmbMessageBubble;
+  /**
+   * Content Messages shows in the reply message bubble.
+   */
+  reply_message?: AmbMessageBubble;
+  /**
+   * Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple.
+   */
+  app_icon_source_url?: string;
+  data?: AmbNativeInteractivePayloadWritable;
+};
+
+export type AmbNativeInteractiveContentWritable = unknown & {
+  /**
+   * Always interactive.
+   */
+  type: AmbMessageType;
+  /**
+   * Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.
+   */
+  body?: string;
+  /**
+   * Subject displayed above the message body.
+   */
+  subject?: string;
+  /**
+   * Ordered attachments. Each object supplies a source URL or an encrypted Apple reference.
+   */
+  attachments?: Array<AmbNativeAttachment>;
+  interactive_data?: AmbNativeInteractiveDataWritable;
+  interactive_data_ref?: AmbRichLinkReference;
+};
+
+/**
+ * Apple message families with Bird field naming and media URLs. Authentication and Apple Pay requests are created through their dedicated conversation endpoints.
+ */
+export type AmbMessageContentWritable =
+  | ({
+      type: "text";
+    } & AmbNativeTextContent)
+  | ({
+      type: "rich_link";
+    } & AmbNativeRichLinkContent)
+  | ({
+      type: "interactive";
+    } & AmbNativeInteractiveContentWritable);
+
+/**
+ * Failure detail for a message or invitation that could not be sent or was rejected.
+ */
+export type AmbErrorWritable = {
+  code: AmbStatsErrorCode;
+  /**
+   * The failure in words. Free-form, so branch on `code` and show this to a human.
+   */
+  description: string;
+  /**
+   * When the failure occurred.
+   */
+  occurred_at: string;
+} | null;
+
+export type AmbMessageWritable = {
+  [key: string]: never;
+};
+
+export type AmbMessageListWritable = {
+  /**
+   * Page of Apple Messages for Business messages, newest first.
+   */
+  data: Array<AmbMessageWritable>;
+} & ListEnvelope;
+
+export type AmbMessageSendRequestWritable = {
+  /**
+   * Apple business identifier of the brand sending the message. Read it from the business’s apple_business_id. The customer must have opened the conversation with this business.
+   */
+  from: string;
+  /**
+   * Apple’s opaque customer identifier for this business, available as the conversation’s opaque_user_id. The conversation must exist and be open.
+   */
+  to: string;
+  /**
+   * Who this message is sent as. A signed-in session may send as `operator` or `automation`; an API key may send as `api` or `automation`. Omit it to take the default for your credential. Naming a source your credential cannot use is refused with a `422` `AMBMessageSourceNotPermitted`.
+   */
+  source?: AmbMessageSource;
+  /**
+   * Message content in Apple’s native text, rich_link, or interactive family.
+   */
+  content: AmbMessageContentWritable;
+  /**
+   * Free-form reporting label; it does not change sending or suppression policy, for example `order_update`. Omit it to send with the default empty category.
+   */
+  category?: string;
+  /**
+   * Arbitrary JSON object for per-message context. Maximum 2 KB serialized. Top-level keys beginning with `__bird` are reserved. Returned in the send response, message reads and customer message webhooks.
+   */
+  metadata?: {
+    [key: string]: unknown;
+  };
+  /**
+   * Structured `{name, value}` labels for filtering. Maximum 20 tags per send.
+   */
+  tags?: Array<Tag>;
+  /**
+   * Department identifier for this message.
+   */
+  group?: string;
+  /**
+   * Purpose of this conversation.
+   */
+  intent?: string;
+  /**
+   * Apple locale identifier, for example en_US. Defaults to the conversation locale.
+   */
+  locale?: string;
+};
+
+export type AmbMessageEventWritable = {
+  [key: string]: never;
+};
+
+export type AmbMessageEventListWritable = {
+  /**
+   * The message's events, oldest first. Not paginated: a message's timeline is bounded and returned in full.
+   *
+   */
+  data: Array<AmbMessageEventWritable>;
+};
+
+/**
+ * A conversation between your business and one customer on Apple Messages for Business. It holds the customer's device capabilities, the console's read state, assignment, and labels, and the routing queue the conversation is in.
+ *
+ */
+export type AmbConversationWritable = {
+  /**
+   * The user this conversation is assigned to, or null when unassigned. Assignment is not rechecked against workspace membership on read, so it can still name a user whose access was removed.
+   *
+   */
+  assigned_to: UserId | null;
+  /**
+   * Operator-set tags on this conversation. Unlike email, there are no system placement labels: every value here is one an operator chose.
+   *
+   */
+  labels: Array<string>;
+};
+
+export type AmbConversationListWritable = {
+  /**
+   * Page of conversations, newest first by last message.
+   */
+  data: Array<AmbConversationWritable>;
+} & ListEnvelope;
+
+export type AmbSuppressionListWritable = {
+  /**
+   * Active suppression episodes for the workspace, most recently effective first. Episodes that have ended are left out; fetch one by ID to read it.
+   *
+   */
+  data: Array<AmbSuppressionWritable>;
+} & ListEnvelope;
+
+/**
+ * Processing-latency percentiles in milliseconds for the requested scope, from acceptance to Apple handoff. Apple Messages for Business has no delivery receipt, so there is no `delivery` or `total` member beside `processing`. Conversation response timing is reported separately in `first_response`. Always present; every percentile is null when no qualifying message in scope has a measurement.
+ *
+ */
+export type AmbStatsLatencyWritable = {
+  [key: string]: never;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type AmbStatsComparisonWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound Apple Messages for Business counts and latency percentiles for the full requested period. Counts and percentiles are computed over the whole period rather than combined from the returned time-series values.
+ *
+ */
+export type AmbStatsSummaryWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound Apple Messages for Business counts and processing-latency percentiles for one time bucket (a calendar day or hour), bucketed by acceptance time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. There is no `first_response` here. Read first-response latency from the summary or a breakdown endpoint.
+ *
+ */
+export type AmbStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Time-series stats payload. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
+ *
+ */
+export type AmbStatsResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single business over the requested period.
+ */
+export type AmbBusinessAccountStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-business breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByBusinessResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single message content kind over the requested period.
+ */
+export type AmbMessageKindStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-content-kind breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByMessageKindResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single entry-point intent over the requested period.
+ */
+export type AmbIntentStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-intent breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByIntentResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single entry-point group over the requested period.
+ */
+export type AmbGroupStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-group breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByGroupResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single message category over the requested period.
+ */
+export type AmbCategoryStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByCategoryResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single tag over the requested period.
+ */
+export type AmbTagStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Only tagged messages appear.
+ */
+export type AmbStatsByTagResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single failure reason over the requested period.
+ */
+export type AmbErrorCodeStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-failure-reason breakdown for the requested period, ranked by `send_failed + rejected` descending and capped at the requested `limit` (default 50, max 200). Only messages carrying an error code appear: a `bird:` code is usually a rejection, an `apple:` code a send failure.
+ */
+export type AmbStatsByErrorCodeResponseWritable = {
+  [key: string]: never;
 };
 
 export type WhatsAppBusinessAccountListWritable = {
@@ -22581,7 +25929,7 @@ export type DnsRecordWritable = {
    * `optional` until receiving is enabled, and publishing it before then
    * is destructive: on a domain at the zone apex it replaces the MX
    * records that carry the domain's existing mail.
-   * - `dmarc`: identifies the advisory DMARC policy record.
+   * - `dmarc`: identifies the DMARC policy record required for sending.
    *
    */
   purpose: "dkim" | "return_path" | "tracking" | "inbound_mx" | "dmarc";
@@ -22835,24 +26183,6 @@ export type EmailTemplateWritable = {
   description: string | null;
   category: EmailTemplateCategory;
   source: EmailTemplateSource;
-};
-
-export type ActorWritable = {
-  /**
-   * Actor identifier.
-   */
-  id: string;
-  /**
-   * New actor types may be added. Treat unrecognized values as future types, not errors.
-   * - `user`: a member's own session.
-   * - `api_key`: a workspace API key.
-   * - `oauth_token`: a token issued to a caller on a member's behalf.
-   * - `system`: an action we perform without a customer actor.
-   * - `sso`: an organization's SSO connection.
-   * - `service_account`: a workspace's connected Integration acting with no member behind it.
-   * - `automation`: an automation execution in your workspace.
-   */
-  type: string;
 };
 
 /**
@@ -23277,6 +26607,80 @@ export type WebhookEndpointCreatedWritable = WebhookEndpointWritable & {
    *
    */
   secret: string;
+};
+
+/**
+ * The workspace and message snapshot at the time of the lifecycle event.
+ */
+export type EventAmbMessageDataWritable = {
+  /**
+   * Workspace that owns this message.
+   */
+  workspace_id: WorkspaceId;
+  /**
+   * Message state when the event occurred. Later state changes do not alter this snapshot. Customer metadata is included when present; reserved Bird metadata is excluded.
+   */
+  message: AmbMessageWritable;
+};
+
+/**
+ * Bird charged and accepted an outbound message for processing. This does not mean Apple received the message.
+ */
+export type EventAmbAcceptedWritable = {
+  type: AmbAcceptedEventType;
+  /**
+   * When this lifecycle event occurred, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbMessageDataWritable;
+};
+
+/**
+ * Bird received an ordinary customer message from Apple. Invitation responses are excluded.
+ */
+export type EventAmbReceivedWritable = {
+  type: AmbReceivedEventType;
+  /**
+   * When this lifecycle event occurred, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbMessageDataWritable;
+};
+
+/**
+ * Bird refused an outbound message before acceptance. This message has no accepted event.
+ */
+export type EventAmbRejectedWritable = {
+  type: AmbRejectedEventType;
+  /**
+   * When this lifecycle event occurred, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbMessageDataWritable;
+};
+
+/**
+ * An accepted outbound message could not be handed to Apple. The message snapshot carries the failure detail.
+ */
+export type EventAmbSendFailedWritable = {
+  type: AmbSendFailedEventType;
+  /**
+   * When this lifecycle event occurred, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbMessageDataWritable;
+};
+
+/**
+ * Apple accepted an outbound message from Bird. This does not establish delivery to the customer or a read receipt.
+ */
+export type EventAmbSentWritable = {
+  type: AmbSentEventType;
+  /**
+   * When this lifecycle event occurred, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbMessageDataWritable;
 };
 
 /**
@@ -23954,8 +27358,34 @@ export type VoiceNumberListWritable = {
   data: Array<VoiceNumberWritable>;
 } & ListEnvelope;
 
+export type VoiceCallerIdWritable = {
+  /**
+   * Unique identifier for this caller ID.
+   */
+  id: VoiceCallerIdid;
+  workspace_id: WorkspaceId;
+  /**
+   * The phone number in E.164 format registered as a caller ID.
+   */
+  phone_number: string;
+  /**
+   * Your label for this caller ID, to tell several registered numbers apart. `null` when the caller ID has no label. It is yours to choose and appears nowhere on a call, so changing it never affects what the person you are calling sees. Set it with the caller ID update operation.
+   *
+   */
+  name: string | null;
+  status: VoiceCallerIdStatus;
+  /**
+   * Whether outbound caller ID activation has completed. A verified number can remain inactive until activation requirements are met. Outbound calls remain subject to routing and number ownership requirements.
+   */
+  outbound_enabled: boolean;
+  /**
+   * When the caller ID was verified. `null` when its status is `pending` or `failed`.
+   */
+  verified_at: string | null;
+};
+
 export type VoiceCallerIdListWritable = {
-  data: Array<unknown>;
+  data: Array<VoiceCallerIdWritable>;
 } & ListEnvelope;
 
 export type VoiceLegWritable = {
@@ -23992,6 +27422,16 @@ export type VoiceDestinationListWritable = {
 };
 
 /**
+ * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+ */
+export type StartingAfter = string;
+
+/**
+ * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+ */
+export type EndingBefore = string;
+
+/**
  * Client-supplied key. On operations supporting request deduplication, a retained
  * response is replayed for duplicate requests with the same key within the
  * idempotency window (3 hours by default). This protection requires a workspace,
@@ -24017,25 +27457,15 @@ export type VoiceDestinationListWritable = {
 export type IdempotencyKey = string;
 
 /**
- * Sort direction. Defaults to `asc`, which sorts alphabetically or from oldest to newest, depending on the selected sort field.
- *
- */
-export type OrderAsc = SortOrder;
-
-/**
  * Maximum number of items to return per page.
  */
 export type PaginationLimit = number;
 
 /**
- * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+ * Sort direction. Defaults to `asc`, which sorts alphabetically or from oldest to newest, depending on the selected sort field.
+ *
  */
-export type StartingAfter = string;
-
-/**
- * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
- */
-export type EndingBefore = string;
+export type OrderAsc = SortOrder;
 
 /**
  * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
@@ -34684,6 +38114,3975 @@ export type GetWhatsAppNumberProfileResponses = {
 export type GetWhatsAppNumberProfileResponse =
   GetWhatsAppNumberProfileResponses[keyof GetWhatsAppNumberProfileResponses];
 
+export type RestoreAmbBusinessAccountData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    business_account_id: AmbBusinessId;
+  };
+  query?: never;
+  url: "/v1/amb/business-accounts/{business_account_id}/reconnect";
+};
+
+export type RestoreAmbBusinessAccountErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type RestoreAmbBusinessAccountError =
+  RestoreAmbBusinessAccountErrors[keyof RestoreAmbBusinessAccountErrors];
+
+export type RestoreAmbBusinessAccountResponses = {
+  /**
+   * The reconnected business account.
+   */
+  200: AmbBusinessAccount;
+};
+
+export type RestoreAmbBusinessAccountResponse =
+  RestoreAmbBusinessAccountResponses[keyof RestoreAmbBusinessAccountResponses];
+
+export type ListAmbBusinessAccountEventsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path: {
+    business_account_id: AmbBusinessId;
+  };
+  query?: {
+    /**
+     * Field to sort by. Possible values: `created_at`. Defaults to `created_at`.
+     */
+    sort?: AmbBusinessAccountEventSort;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+  };
+  url: "/v1/amb/business-accounts/{business_account_id}/events";
+};
+
+export type ListAmbBusinessAccountEventsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListAmbBusinessAccountEventsError =
+  ListAmbBusinessAccountEventsErrors[keyof ListAmbBusinessAccountEventsErrors];
+
+export type ListAmbBusinessAccountEventsResponses = {
+  /**
+   * A page of business account activity.
+   */
+  200: AmbBusinessAccountEventList;
+};
+
+export type ListAmbBusinessAccountEventsResponse =
+  ListAmbBusinessAccountEventsResponses[keyof ListAmbBusinessAccountEventsResponses];
+
+export type ListAmbBusinessAccountsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by. Possible values: `created_at`. Defaults to `created_at`.
+     */
+    sort?: AmbBusinessAccountSort;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+  };
+  url: "/v1/amb/business-accounts";
+};
+
+export type ListAmbBusinessAccountsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListAmbBusinessAccountsError =
+  ListAmbBusinessAccountsErrors[keyof ListAmbBusinessAccountsErrors];
+
+export type ListAmbBusinessAccountsResponses = {
+  /**
+   * A page of your workspace's Apple Messages for Business records.
+   */
+  200: AmbBusinessAccountList;
+};
+
+export type ListAmbBusinessAccountsResponse =
+  ListAmbBusinessAccountsResponses[keyof ListAmbBusinessAccountsResponses];
+
+export type CreateAmbBusinessAccountData = {
+  body: AmbBusinessAccountCreate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/amb/business-accounts";
+};
+
+export type CreateAmbBusinessAccountErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateAmbBusinessAccountError =
+  CreateAmbBusinessAccountErrors[keyof CreateAmbBusinessAccountErrors];
+
+export type CreateAmbBusinessAccountResponses = {
+  /**
+   * The created Apple Messages for Business record.
+   */
+  201: AmbBusinessAccount;
+};
+
+export type CreateAmbBusinessAccountResponse =
+  CreateAmbBusinessAccountResponses[keyof CreateAmbBusinessAccountResponses];
+
+export type DeleteAmbBusinessAccountData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    business_account_id: AmbBusinessId;
+  };
+  query?: never;
+  url: "/v1/amb/business-accounts/{business_account_id}";
+};
+
+export type DeleteAmbBusinessAccountErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteAmbBusinessAccountError =
+  DeleteAmbBusinessAccountErrors[keyof DeleteAmbBusinessAccountErrors];
+
+export type DeleteAmbBusinessAccountResponses = {
+  /**
+   * The business account is disconnected.
+   */
+  204: void;
+};
+
+export type DeleteAmbBusinessAccountResponse =
+  DeleteAmbBusinessAccountResponses[keyof DeleteAmbBusinessAccountResponses];
+
+export type GetAmbBusinessAccountData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path: {
+    /**
+     * Bird business account ID (abz_) or Apple business UUID. Both resolve within the current workspace.
+     */
+    business_account_id: string;
+  };
+  query?: never;
+  url: "/v1/amb/business-accounts/{business_account_id}";
+};
+
+export type GetAmbBusinessAccountErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetAmbBusinessAccountError =
+  GetAmbBusinessAccountErrors[keyof GetAmbBusinessAccountErrors];
+
+export type GetAmbBusinessAccountResponses = {
+  /**
+   * The Apple Messages for Business record.
+   */
+  200: AmbBusinessAccount;
+};
+
+export type GetAmbBusinessAccountResponse =
+  GetAmbBusinessAccountResponses[keyof GetAmbBusinessAccountResponses];
+
+export type UpdateAmbBusinessAccountData = {
+  body: AmbBusinessAccountUpdate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the Apple Messages for Business record, as returned by the business list.
+     */
+    business_account_id: AmbBusinessId;
+  };
+  query?: never;
+  url: "/v1/amb/business-accounts/{business_account_id}";
+};
+
+export type UpdateAmbBusinessAccountErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateAmbBusinessAccountError =
+  UpdateAmbBusinessAccountErrors[keyof UpdateAmbBusinessAccountErrors];
+
+export type UpdateAmbBusinessAccountResponses = {
+  /**
+   * The updated Apple Messages for Business record.
+   */
+  200: AmbBusinessAccount;
+};
+
+export type UpdateAmbBusinessAccountResponse =
+  UpdateAmbBusinessAccountResponses[keyof UpdateAmbBusinessAccountResponses];
+
+export type ListAmbBusinessAccountSubmissionsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path: {
+    business_account_id: AmbBusinessId;
+  };
+  query?: {
+    /**
+     * Field to sort by. Possible values: `created_at`. Defaults to `created_at`.
+     */
+    sort?: AmbBusinessAccountSubmissionSort;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+  };
+  url: "/v1/amb/business-accounts/{business_account_id}/submissions";
+};
+
+export type ListAmbBusinessAccountSubmissionsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListAmbBusinessAccountSubmissionsError =
+  ListAmbBusinessAccountSubmissionsErrors[keyof ListAmbBusinessAccountSubmissionsErrors];
+
+export type ListAmbBusinessAccountSubmissionsResponses = {
+  /**
+   * A page of submission attempts, newest first.
+   */
+  200: AmbBusinessAccountSubmissionList;
+};
+
+export type ListAmbBusinessAccountSubmissionsResponse =
+  ListAmbBusinessAccountSubmissionsResponses[keyof ListAmbBusinessAccountSubmissionsResponses];
+
+export type CreateAmbBusinessAccountSubmissionData = {
+  body: AmbBusinessAccountSubmissionCreate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    business_account_id: AmbBusinessId;
+  };
+  query?: never;
+  url: "/v1/amb/business-accounts/{business_account_id}/submissions";
+};
+
+export type CreateAmbBusinessAccountSubmissionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateAmbBusinessAccountSubmissionError =
+  CreateAmbBusinessAccountSubmissionErrors[keyof CreateAmbBusinessAccountSubmissionErrors];
+
+export type CreateAmbBusinessAccountSubmissionResponses = {
+  /**
+   * The submission with its frozen evidence manifest.
+   */
+  201: AmbBusinessAccountSubmission;
+};
+
+export type CreateAmbBusinessAccountSubmissionResponse =
+  CreateAmbBusinessAccountSubmissionResponses[keyof CreateAmbBusinessAccountSubmissionResponses];
+
+export type GetAmbChannelSettingsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the Apple Messages for Business record, as returned by the business list.
+     */
+    business_account_id: AmbBusinessId;
+  };
+  query?: never;
+  url: "/v1/amb/business-accounts/{business_account_id}/channel-settings";
+};
+
+export type GetAmbChannelSettingsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetAmbChannelSettingsError =
+  GetAmbChannelSettingsErrors[keyof GetAmbChannelSettingsErrors];
+
+export type GetAmbChannelSettingsResponses = {
+  /**
+   * The business's channel settings.
+   */
+  200: AmbChannelSettings;
+};
+
+export type GetAmbChannelSettingsResponse =
+  GetAmbChannelSettingsResponses[keyof GetAmbChannelSettingsResponses];
+
+export type UpdateAmbChannelSettingsData = {
+  body: AmbChannelSettingsUpdate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the Apple Messages for Business record, as returned by the business list.
+     */
+    business_account_id: AmbBusinessId;
+  };
+  query?: never;
+  url: "/v1/amb/business-accounts/{business_account_id}/channel-settings";
+};
+
+export type UpdateAmbChannelSettingsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateAmbChannelSettingsError =
+  UpdateAmbChannelSettingsErrors[keyof UpdateAmbChannelSettingsErrors];
+
+export type UpdateAmbChannelSettingsResponses = {
+  /**
+   * The updated channel settings.
+   */
+  200: AmbChannelSettings;
+};
+
+export type UpdateAmbChannelSettingsResponse =
+  UpdateAmbChannelSettingsResponses[keyof UpdateAmbChannelSettingsResponses];
+
+export type ListAmbRoutingRulesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Keep only routing rules belonging to this business. Omit to return rules across all businesses in the workspace.
+     *
+     */
+    business_account_id?: AmbBusinessId;
+  };
+  url: "/v1/amb/routing-rules";
+};
+
+export type ListAmbRoutingRulesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListAmbRoutingRulesError =
+  ListAmbRoutingRulesErrors[keyof ListAmbRoutingRulesErrors];
+
+export type ListAmbRoutingRulesResponses = {
+  /**
+   * The workspace's routing rules, optionally filtered by business.
+   */
+  200: AmbRoutingRuleList;
+};
+
+export type ListAmbRoutingRulesResponse =
+  ListAmbRoutingRulesResponses[keyof ListAmbRoutingRulesResponses];
+
+export type CreateAmbRoutingRuleData = {
+  body: AmbRoutingRuleCreate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/amb/routing-rules";
+};
+
+export type CreateAmbRoutingRuleErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateAmbRoutingRuleError =
+  CreateAmbRoutingRuleErrors[keyof CreateAmbRoutingRuleErrors];
+
+export type CreateAmbRoutingRuleResponses = {
+  /**
+   * Routing rule created.
+   */
+  201: AmbRoutingRule;
+};
+
+export type CreateAmbRoutingRuleResponse =
+  CreateAmbRoutingRuleResponses[keyof CreateAmbRoutingRuleResponses];
+
+export type DeleteAmbRoutingRuleData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    routing_rule_id: AmbRoutingRuleId;
+  };
+  query?: never;
+  url: "/v1/amb/routing-rules/{routing_rule_id}";
+};
+
+export type DeleteAmbRoutingRuleErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteAmbRoutingRuleError =
+  DeleteAmbRoutingRuleErrors[keyof DeleteAmbRoutingRuleErrors];
+
+export type DeleteAmbRoutingRuleResponses = {
+  /**
+   * Routing rule deleted.
+   */
+  204: void;
+};
+
+export type DeleteAmbRoutingRuleResponse =
+  DeleteAmbRoutingRuleResponses[keyof DeleteAmbRoutingRuleResponses];
+
+export type GetAmbRoutingRuleData = {
+  body?: never;
+  path: {
+    routing_rule_id: AmbRoutingRuleId;
+  };
+  query?: never;
+  url: "/v1/amb/routing-rules/{routing_rule_id}";
+};
+
+export type GetAmbRoutingRuleErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetAmbRoutingRuleError =
+  GetAmbRoutingRuleErrors[keyof GetAmbRoutingRuleErrors];
+
+export type GetAmbRoutingRuleResponses = {
+  /**
+   * The requested routing rule.
+   */
+  200: AmbRoutingRule;
+};
+
+export type GetAmbRoutingRuleResponse =
+  GetAmbRoutingRuleResponses[keyof GetAmbRoutingRuleResponses];
+
+export type UpdateAmbRoutingRuleData = {
+  body: AmbRoutingRuleUpdate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    routing_rule_id: AmbRoutingRuleId;
+  };
+  query?: never;
+  url: "/v1/amb/routing-rules/{routing_rule_id}";
+};
+
+export type UpdateAmbRoutingRuleErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateAmbRoutingRuleError =
+  UpdateAmbRoutingRuleErrors[keyof UpdateAmbRoutingRuleErrors];
+
+export type UpdateAmbRoutingRuleResponses = {
+  /**
+   * Routing rule updated.
+   */
+  200: AmbRoutingRule;
+};
+
+export type UpdateAmbRoutingRuleResponse =
+  UpdateAmbRoutingRuleResponses[keyof UpdateAmbRoutingRuleResponses];
+
+export type ListAmbMessagesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Filter to messages belonging to this conversation.
+     */
+    conversation_id?: AmbConversationId;
+    /**
+     * Filter to messages belonging to this business.
+     */
+    business_account_id?: AmbBusinessId;
+    /**
+     * Filter to received (`inbound`) or sent (`outbound`) messages.
+     */
+    direction?: AmbMessageDirection;
+    /**
+     * Filter to messages with this status.
+     */
+    status?: AmbMessageStatus;
+    /**
+     * Filter to messages whose content is this shape.
+     */
+    kind?: AmbContentKind;
+    /**
+     * Filter to outbound messages sent with this category, exact match.
+     */
+    category?: string;
+    /**
+     * Filter by tag. Accepts `name` to match any record carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A record must match every tag listed to be returned.
+     *
+     */
+    tag?: Array<string>;
+    /**
+     * Limits the response to resources created at or after this timestamp. Combine it with `created_before` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_after?: string;
+    /**
+     * Limits the response to resources created before this timestamp. Combine it with `created_after` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_before?: string;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/amb/messages";
+};
+
+export type ListAmbMessagesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ListAmbMessagesError =
+  ListAmbMessagesErrors[keyof ListAmbMessagesErrors];
+
+export type ListAmbMessagesResponses = {
+  /**
+   * Paginated list of messages.
+   */
+  200: AmbMessageList;
+};
+
+export type ListAmbMessagesResponse =
+  ListAmbMessagesResponses[keyof ListAmbMessagesResponses];
+
+export type CreateAmbMessageData = {
+  body: AmbMessageSendRequestWritable;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/amb/messages";
+};
+
+export type CreateAmbMessageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateAmbMessageError =
+  CreateAmbMessageErrors[keyof CreateAmbMessageErrors];
+
+export type CreateAmbMessageResponses = {
+  /**
+   * Message accepted for asynchronous delivery.
+   */
+  202: AmbMessage;
+};
+
+export type CreateAmbMessageResponse =
+  CreateAmbMessageResponses[keyof CreateAmbMessageResponses];
+
+export type GetAmbMessageData = {
+  body?: never;
+  path: {
+    /**
+     * Message identifier. Starts with `amb_`.
+     */
+    message_id: AmbMessageId;
+  };
+  query?: never;
+  url: "/v1/amb/messages/{message_id}";
+};
+
+export type GetAmbMessageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbMessageError = GetAmbMessageErrors[keyof GetAmbMessageErrors];
+
+export type GetAmbMessageResponses = {
+  /**
+   * The message.
+   */
+  200: AmbMessage;
+};
+
+export type GetAmbMessageResponse =
+  GetAmbMessageResponses[keyof GetAmbMessageResponses];
+
+export type ListAmbMessageEventsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path: {
+    /**
+     * Message identifier. Starts with `amb_`.
+     */
+    message_id: AmbMessageId;
+  };
+  query?: {
+    /**
+     * Keep only events of this exact type (for example `amb.sent` or `amb.send_failed`). Omit for the full timeline.
+     *
+     */
+    type?: AmbMessageEventType;
+  };
+  url: "/v1/amb/messages/{message_id}/events";
+};
+
+export type ListAmbMessageEventsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ListAmbMessageEventsError =
+  ListAmbMessageEventsErrors[keyof ListAmbMessageEventsErrors];
+
+export type ListAmbMessageEventsResponses = {
+  /**
+   * Event timeline for this message.
+   */
+  200: AmbMessageEventList;
+};
+
+export type ListAmbMessageEventsResponse =
+  ListAmbMessageEventsResponses[keyof ListAmbMessageEventsResponses];
+
+export type ListAmbConversationsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Filter to conversations belonging to this business.
+     */
+    business_account_id?: AmbBusinessId;
+    /**
+     * Filter to conversations with this status. Omit to return both open and closed conversations.
+     */
+    status?: AmbConversationStatus;
+    /**
+     * Filter to conversations in this queue. Pass an empty string to match unrouted conversations, the ones no routing rule has claimed.
+     *
+     */
+    queue?: string;
+    /**
+     * Filter to conversations assigned to this user. Pass `unassigned` to match conversations with no assignee.
+     *
+     */
+    assigned_to?: string;
+    /**
+     * Filter to conversations that have this label.
+     */
+    label?: string;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/amb/conversations";
+};
+
+export type ListAmbConversationsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListAmbConversationsError =
+  ListAmbConversationsErrors[keyof ListAmbConversationsErrors];
+
+export type ListAmbConversationsResponses = {
+  /**
+   * Paginated list of conversations.
+   */
+  200: AmbConversationList;
+};
+
+export type ListAmbConversationsResponse =
+  ListAmbConversationsResponses[keyof ListAmbConversationsResponses];
+
+export type GetAmbConversationData = {
+  body?: never;
+  path: {
+    /**
+     * Conversation identifier. Starts with `acv_`.
+     */
+    conversation_id: AmbConversationId;
+  };
+  query?: never;
+  url: "/v1/amb/conversations/{conversation_id}";
+};
+
+export type GetAmbConversationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetAmbConversationError =
+  GetAmbConversationErrors[keyof GetAmbConversationErrors];
+
+export type GetAmbConversationResponses = {
+  /**
+   * The conversation.
+   */
+  200: AmbConversation;
+};
+
+export type GetAmbConversationResponse =
+  GetAmbConversationResponses[keyof GetAmbConversationResponses];
+
+export type UpdateAmbConversationData = {
+  body: AmbConversationUpdate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * Conversation identifier. Starts with `acv_`.
+     */
+    conversation_id: AmbConversationId;
+  };
+  query?: never;
+  url: "/v1/amb/conversations/{conversation_id}";
+};
+
+export type UpdateAmbConversationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateAmbConversationError =
+  UpdateAmbConversationErrors[keyof UpdateAmbConversationErrors];
+
+export type UpdateAmbConversationResponses = {
+  /**
+   * The updated conversation.
+   */
+  200: AmbConversation;
+};
+
+export type UpdateAmbConversationResponse =
+  UpdateAmbConversationResponses[keyof UpdateAmbConversationResponses];
+
+export type ListAmbConversationMessagesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path: {
+    /**
+     * Conversation identifier. Starts with `acv_`.
+     */
+    conversation_id: AmbConversationId;
+  };
+  query?: {
+    /**
+     * Filter to received (`inbound`) or sent (`outbound`) messages.
+     */
+    direction?: AmbMessageDirection;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/amb/conversations/{conversation_id}/messages";
+};
+
+export type ListAmbConversationMessagesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ListAmbConversationMessagesError =
+  ListAmbConversationMessagesErrors[keyof ListAmbConversationMessagesErrors];
+
+export type ListAmbConversationMessagesResponses = {
+  /**
+   * Paginated list of messages in the conversation.
+   */
+  200: AmbMessageList;
+};
+
+export type ListAmbConversationMessagesResponse =
+  ListAmbConversationMessagesResponses[keyof ListAmbConversationMessagesResponses];
+
+export type CreateAmbConversationTypingData = {
+  body: AmbConversationTypingRequest;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * Conversation identifier. Starts with `acv_`.
+     */
+    conversation_id: AmbConversationId;
+  };
+  query?: never;
+  url: "/v1/amb/conversations/{conversation_id}/typing";
+};
+
+export type CreateAmbConversationTypingErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateAmbConversationTypingError =
+  CreateAmbConversationTypingErrors[keyof CreateAmbConversationTypingErrors];
+
+export type CreateAmbConversationTypingResponses = {
+  /**
+   * The typing indicator was sent.
+   */
+  204: void;
+};
+
+export type CreateAmbConversationTypingResponse =
+  CreateAmbConversationTypingResponses[keyof CreateAmbConversationTypingResponses];
+
+export type ListAmbSuppressionsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Keep only suppressions for this brand, including the workspace-wide ones that block it too. Omit to see suppressions for every brand in the workspace.
+     *
+     */
+    business_account_id?: AmbBusinessId;
+    /**
+     * Prefix filter on the suppressed phone number or opaque identifier (case-insensitive). A complete value returns only that address; a partial value returns every match.
+     *
+     */
+    address?: string;
+    /**
+     * Keep only suppressions of this kind.
+     */
+    address_type?: AmbSuppressionAddressType;
+    /**
+     * Keep only suppressions with this reason.
+     */
+    reason?: AmbSuppressionReason;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/amb/suppressions";
+};
+
+export type ListAmbSuppressionsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListAmbSuppressionsError =
+  ListAmbSuppressionsErrors[keyof ListAmbSuppressionsErrors];
+
+export type ListAmbSuppressionsResponses = {
+  /**
+   * Paginated list of suppressions.
+   */
+  200: AmbSuppressionList;
+};
+
+export type ListAmbSuppressionsResponse =
+  ListAmbSuppressionsResponses[keyof ListAmbSuppressionsResponses];
+
+export type CreateAmbSuppressionData = {
+  body: AmbSuppressionCreate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/amb/suppressions";
+};
+
+export type CreateAmbSuppressionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateAmbSuppressionError =
+  CreateAmbSuppressionErrors[keyof CreateAmbSuppressionErrors];
+
+export type CreateAmbSuppressionResponses = {
+  /**
+   * Handle was already suppressed for this reason. Existing episode returned.
+   */
+  200: AmbSuppression;
+  /**
+   * Suppression created.
+   */
+  201: AmbSuppression;
+};
+
+export type CreateAmbSuppressionResponse =
+  CreateAmbSuppressionResponses[keyof CreateAmbSuppressionResponses];
+
+export type DeleteAmbSuppressionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    suppression_id: AmbSuppressionId;
+  };
+  query?: never;
+  url: "/v1/amb/suppressions/{suppression_id}";
+};
+
+export type DeleteAmbSuppressionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteAmbSuppressionError =
+  DeleteAmbSuppressionErrors[keyof DeleteAmbSuppressionErrors];
+
+export type DeleteAmbSuppressionResponses = {
+  /**
+   * Suppression ended.
+   */
+  204: void;
+};
+
+export type DeleteAmbSuppressionResponse =
+  DeleteAmbSuppressionResponses[keyof DeleteAmbSuppressionResponses];
+
+export type GetAmbSuppressionData = {
+  body?: never;
+  path: {
+    suppression_id: AmbSuppressionId;
+  };
+  query?: never;
+  url: "/v1/amb/suppressions/{suppression_id}";
+};
+
+export type GetAmbSuppressionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetAmbSuppressionError =
+  GetAmbSuppressionErrors[keyof GetAmbSuppressionErrors];
+
+export type GetAmbSuppressionResponses = {
+  /**
+   * The requested suppression episode.
+   */
+  200: AmbSuppression;
+};
+
+export type GetAmbSuppressionResponse =
+  GetAmbSuppressionResponses[keyof GetAmbSuppressionResponses];
+
+export type GetAmbStatsSummaryData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window: a calendar day (YYYY-MM-DD) or an RFC 3339 instant rounded down to the hour. The `timezone` parameter makes a calendar day local and rounds an instant down to the local hour. Omit `timezone` to use UTC. When `timezone` is set, a numeric UTC offset such as `+05:45` is rejected; use a calendar day or a `Z` (UTC) instant. This value must use the same form as `to`. When omitted, it defaults to 30 days before `to` for day windows or 168 hours (7 days) before `to` for hour windows.
+     *
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window: a calendar day (YYYY-MM-DD) or an RFC 3339 instant rounded down to the hour. The `timezone` parameter makes a calendar day local and rounds an instant down to the local hour. Omit `timezone` to use UTC. When `timezone` is set, a numeric UTC offset is rejected; use a calendar day or a `Z` (UTC) instant. This value must use the same form as `from`. When omitted, it defaults to today for day windows or the current hour for hour windows in that timezone. Day windows may not exceed 365 days; hour windows may not exceed 720 hours (30 days).
+     *
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Restrict the statistics to a single business. Mutually exclusive with the other dimension filters (`message_kind`, `intent`, `group`, `category`, `tag`); only one may be set per request. Matches the `business_account_id` key on a row of the per-business breakdown.
+     *
+     */
+    business_account_id?: AmbBusinessId;
+    /**
+     * Restrict the statistics to a single message content kind. Mutually exclusive with the other dimension filters (`business_account_id`, `intent`, `group`, `category`, `tag`); only one may be set per request. Matches the `message_kind` key on a row of the per-content-kind breakdown.
+     *
+     */
+    message_kind?: AmbContentKind;
+    /**
+     * Restrict the statistics to a single entry-point intent. Mutually exclusive with the other dimension filters (`business_account_id`, `message_kind`, `group`, `category`, `tag`); only one may be set per request. Matches the `intent` key on a row of the per-intent breakdown.
+     *
+     */
+    intent?: string;
+    /**
+     * Restrict the statistics to a single entry-point group. Mutually exclusive with the other dimension filters (`business_account_id`, `message_kind`, `intent`, `category`, `tag`); only one may be set per request. Matches the `group` key on a row of the per-group breakdown.
+     *
+     */
+    group?: string;
+    /**
+     * Restrict the statistics to a single message category. Mutually exclusive with the other dimension filters (`business_account_id`, `message_kind`, `intent`, `group`, `tag`); only one may be set per request. Matches the `category` key on a row of the per-category breakdown.
+     *
+     */
+    category?: string;
+    /**
+     * Restrict the statistics to a single tag. Use `name` to match any value of a tag, or `name:value` for a specific pair (for example `campaign:spring_launch`). Mutually exclusive with the other dimension filters (`business_account_id`, `message_kind`, `intent`, `group`, `category`); only one may be set per request. A row of the per-tag breakdown carries the same pair in its single `tag` key.
+     *
+     */
+    tag?: string;
+    /**
+     * Set to `previous_period` to also include the same statistics for the immediately preceding window of equal length, plus the change between the two, so you can show "+X% vs last period" without a second request. The comparison window carries any dimension filter set on the request, so a filtered comparison compares like with like.
+     *
+     */
+    compare?: StatsComparePeriod;
+  };
+  url: "/v1/amb/stats/summary";
+};
+
+export type GetAmbStatsSummaryErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbStatsSummaryError =
+  GetAmbStatsSummaryErrors[keyof GetAmbStatsSummaryErrors];
+
+export type GetAmbStatsSummaryResponses = {
+  /**
+   * Aggregate summary for the requested period.
+   */
+  200: AmbStatsSummary;
+};
+
+export type GetAmbStatsSummaryResponse =
+  GetAmbStatsSummaryResponses[keyof GetAmbStatsSummaryResponses];
+
+export type GetAmbStatsDailyData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Start date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). The window may not exceed 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * End date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). The window may not exceed 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Restrict the statistics to a single business. Mutually exclusive with the other dimension filters (`message_kind`, `intent`, `group`, `category`, `tag`); only one may be set per request. Matches the `business_account_id` key on a row of the per-business breakdown.
+     *
+     */
+    business_account_id?: AmbBusinessId;
+    /**
+     * Restrict the statistics to a single message content kind. Mutually exclusive with the other dimension filters (`business_account_id`, `intent`, `group`, `category`, `tag`); only one may be set per request. Matches the `message_kind` key on a row of the per-content-kind breakdown.
+     *
+     */
+    message_kind?: AmbContentKind;
+    /**
+     * Restrict the statistics to a single entry-point intent. Mutually exclusive with the other dimension filters (`business_account_id`, `message_kind`, `group`, `category`, `tag`); only one may be set per request. Matches the `intent` key on a row of the per-intent breakdown.
+     *
+     */
+    intent?: string;
+    /**
+     * Restrict the statistics to a single entry-point group. Mutually exclusive with the other dimension filters (`business_account_id`, `message_kind`, `intent`, `category`, `tag`); only one may be set per request. Matches the `group` key on a row of the per-group breakdown.
+     *
+     */
+    group?: string;
+    /**
+     * Restrict the statistics to a single message category. Mutually exclusive with the other dimension filters (`business_account_id`, `message_kind`, `intent`, `group`, `tag`); only one may be set per request. Matches the `category` key on a row of the per-category breakdown.
+     *
+     */
+    category?: string;
+    /**
+     * Restrict the statistics to a single tag. Use `name` to match any value of a tag, or `name:value` for a specific pair (for example `campaign:spring_launch`). Mutually exclusive with the other dimension filters (`business_account_id`, `message_kind`, `intent`, `group`, `category`); only one may be set per request. A row of the per-tag breakdown carries the same pair in its single `tag` key.
+     *
+     */
+    tag?: string;
+  };
+  url: "/v1/amb/stats/daily";
+};
+
+export type GetAmbStatsDailyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbStatsDailyError =
+  GetAmbStatsDailyErrors[keyof GetAmbStatsDailyErrors];
+
+export type GetAmbStatsDailyResponses = {
+  /**
+   * Daily aggregate stats for the requested period.
+   */
+  200: AmbStatsResponse;
+};
+
+export type GetAmbStatsDailyResponse =
+  GetAmbStatsDailyResponses[keyof GetAmbStatsDailyResponses];
+
+export type GetAmbStatsHourlyData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Start of the window (RFC 3339 instant), rounded down to the start of its hour and included. The boundary uses the local hour when `timezone` is set and the UTC hour otherwise. The window may not exceed 30 days (720 hours). Defaults to 168 hours (7 days) before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * End of the window (RFC 3339 instant), rounded down to the start of its hour and included. The boundary uses the local hour when `timezone` is set and the UTC hour otherwise, so both bounds are inclusive. The window may not exceed 30 days (720 hours). Defaults to the current hour when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Restrict the statistics to a single business. Mutually exclusive with the other dimension filters (`message_kind`, `intent`, `group`, `category`, `tag`); only one may be set per request. Matches the `business_account_id` key on a row of the per-business breakdown.
+     *
+     */
+    business_account_id?: AmbBusinessId;
+    /**
+     * Restrict the statistics to a single message content kind. Mutually exclusive with the other dimension filters (`business_account_id`, `intent`, `group`, `category`, `tag`); only one may be set per request. Matches the `message_kind` key on a row of the per-content-kind breakdown.
+     *
+     */
+    message_kind?: AmbContentKind;
+    /**
+     * Restrict the statistics to a single entry-point intent. Mutually exclusive with the other dimension filters (`business_account_id`, `message_kind`, `group`, `category`, `tag`); only one may be set per request. Matches the `intent` key on a row of the per-intent breakdown.
+     *
+     */
+    intent?: string;
+    /**
+     * Restrict the statistics to a single entry-point group. Mutually exclusive with the other dimension filters (`business_account_id`, `message_kind`, `intent`, `category`, `tag`); only one may be set per request. Matches the `group` key on a row of the per-group breakdown.
+     *
+     */
+    group?: string;
+    /**
+     * Restrict the statistics to a single message category. Mutually exclusive with the other dimension filters (`business_account_id`, `message_kind`, `intent`, `group`, `tag`); only one may be set per request. Matches the `category` key on a row of the per-category breakdown.
+     *
+     */
+    category?: string;
+    /**
+     * Restrict the statistics to a single tag. Use `name` to match any value of a tag, or `name:value` for a specific pair (for example `campaign:spring_launch`). Mutually exclusive with the other dimension filters (`business_account_id`, `message_kind`, `intent`, `group`, `category`); only one may be set per request. A row of the per-tag breakdown carries the same pair in its single `tag` key.
+     *
+     */
+    tag?: string;
+  };
+  url: "/v1/amb/stats/hourly";
+};
+
+export type GetAmbStatsHourlyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbStatsHourlyError =
+  GetAmbStatsHourlyErrors[keyof GetAmbStatsHourlyErrors];
+
+export type GetAmbStatsHourlyResponses = {
+  /**
+   * Hourly aggregate stats for the requested period.
+   */
+  200: AmbStatsResponse;
+};
+
+export type GetAmbStatsHourlyResponse =
+  GetAmbStatsHourlyResponses[keyof GetAmbStatsHourlyResponses];
+
+export type GetAmbStatsByBusinessData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of business rows to return, ranked by accepted volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/amb/stats/businesses";
+};
+
+export type GetAmbStatsByBusinessErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbStatsByBusinessError =
+  GetAmbStatsByBusinessErrors[keyof GetAmbStatsByBusinessErrors];
+
+export type GetAmbStatsByBusinessResponses = {
+  /**
+   * Per-business breakdown for the requested period.
+   */
+  200: AmbStatsByBusinessResponse;
+};
+
+export type GetAmbStatsByBusinessResponse =
+  GetAmbStatsByBusinessResponses[keyof GetAmbStatsByBusinessResponses];
+
+export type GetAmbStatsByMessageKindData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of content-kind rows to return, ranked by accepted volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/amb/stats/message-kinds";
+};
+
+export type GetAmbStatsByMessageKindErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbStatsByMessageKindError =
+  GetAmbStatsByMessageKindErrors[keyof GetAmbStatsByMessageKindErrors];
+
+export type GetAmbStatsByMessageKindResponses = {
+  /**
+   * Per-content-kind breakdown for the requested period.
+   */
+  200: AmbStatsByMessageKindResponse;
+};
+
+export type GetAmbStatsByMessageKindResponse =
+  GetAmbStatsByMessageKindResponses[keyof GetAmbStatsByMessageKindResponses];
+
+export type GetAmbStatsByIntentData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of intent rows to return, ranked by accepted volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/amb/stats/intents";
+};
+
+export type GetAmbStatsByIntentErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbStatsByIntentError =
+  GetAmbStatsByIntentErrors[keyof GetAmbStatsByIntentErrors];
+
+export type GetAmbStatsByIntentResponses = {
+  /**
+   * Per-intent breakdown for the requested period.
+   */
+  200: AmbStatsByIntentResponse;
+};
+
+export type GetAmbStatsByIntentResponse =
+  GetAmbStatsByIntentResponses[keyof GetAmbStatsByIntentResponses];
+
+export type GetAmbStatsByGroupData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of group rows to return, ranked by accepted volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/amb/stats/groups";
+};
+
+export type GetAmbStatsByGroupErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbStatsByGroupError =
+  GetAmbStatsByGroupErrors[keyof GetAmbStatsByGroupErrors];
+
+export type GetAmbStatsByGroupResponses = {
+  /**
+   * Per-group breakdown for the requested period.
+   */
+  200: AmbStatsByGroupResponse;
+};
+
+export type GetAmbStatsByGroupResponse =
+  GetAmbStatsByGroupResponses[keyof GetAmbStatsByGroupResponses];
+
+export type GetAmbStatsByCategoryData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of category rows to return, ranked by accepted volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/amb/stats/categories";
+};
+
+export type GetAmbStatsByCategoryErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbStatsByCategoryError =
+  GetAmbStatsByCategoryErrors[keyof GetAmbStatsByCategoryErrors];
+
+export type GetAmbStatsByCategoryResponses = {
+  /**
+   * Per-category breakdown for the requested period.
+   */
+  200: AmbStatsByCategoryResponse;
+};
+
+export type GetAmbStatsByCategoryResponse =
+  GetAmbStatsByCategoryResponses[keyof GetAmbStatsByCategoryResponses];
+
+export type GetAmbStatsByTagData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of tag rows to return, ranked by accepted volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/amb/stats/tags";
+};
+
+export type GetAmbStatsByTagErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbStatsByTagError =
+  GetAmbStatsByTagErrors[keyof GetAmbStatsByTagErrors];
+
+export type GetAmbStatsByTagResponses = {
+  /**
+   * Per-tag breakdown for the requested period.
+   */
+  200: AmbStatsByTagResponse;
+};
+
+export type GetAmbStatsByTagResponse =
+  GetAmbStatsByTagResponses[keyof GetAmbStatsByTagResponses];
+
+export type GetAmbStatsByErrorCodeData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of error-code rows to return, ranked by `send_failed + rejected` descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/amb/stats/error-codes";
+};
+
+export type GetAmbStatsByErrorCodeErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbStatsByErrorCodeError =
+  GetAmbStatsByErrorCodeErrors[keyof GetAmbStatsByErrorCodeErrors];
+
+export type GetAmbStatsByErrorCodeResponses = {
+  /**
+   * Per-error-code breakdown for the requested period.
+   */
+  200: AmbStatsByErrorCodeResponse;
+};
+
+export type GetAmbStatsByErrorCodeResponse =
+  GetAmbStatsByErrorCodeResponses[keyof GetAmbStatsByErrorCodeResponses];
+
+export type GetAmbInboundStatsSummaryData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window: a calendar day (YYYY-MM-DD) or an RFC 3339 instant rounded down to the hour. The `timezone` parameter makes a calendar day local and rounds an instant down to the local hour. Omit `timezone` to use UTC. When `timezone` is set, a numeric UTC offset such as `+05:45` is rejected; use a calendar day or a `Z` (UTC) instant. This value must use the same form as `to`. When omitted, it defaults to 30 days before `to` for day windows or 168 hours (7 days) before `to` for hour windows.
+     *
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window: a calendar day (YYYY-MM-DD) or an RFC 3339 instant rounded down to the hour. The `timezone` parameter makes a calendar day local and rounds an instant down to the local hour. Omit `timezone` to use UTC. When `timezone` is set, a numeric UTC offset is rejected; use a calendar day or a `Z` (UTC) instant. This value must use the same form as `from`. When omitted, it defaults to today for day windows or the current hour for hour windows in that timezone. Day windows may not exceed 365 days; hour windows may not exceed 720 hours (30 days).
+     *
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Set to `previous_period` to also include the same statistics for the immediately preceding window of equal length, plus the change between the two, so you can show "+X% vs last period" without a second request.
+     *
+     */
+    compare?: StatsComparePeriod;
+  };
+  url: "/v1/amb/stats/inbound/summary";
+};
+
+export type GetAmbInboundStatsSummaryErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbInboundStatsSummaryError =
+  GetAmbInboundStatsSummaryErrors[keyof GetAmbInboundStatsSummaryErrors];
+
+export type GetAmbInboundStatsSummaryResponses = {
+  /**
+   * Aggregate inbound summary for the requested period.
+   */
+  200: AmbInboundStatsSummary;
+};
+
+export type GetAmbInboundStatsSummaryResponse =
+  GetAmbInboundStatsSummaryResponses[keyof GetAmbInboundStatsSummaryResponses];
+
+export type GetAmbInboundStatsDailyData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Start date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). The window may not exceed 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * End date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). The window may not exceed 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+  };
+  url: "/v1/amb/stats/inbound/daily";
+};
+
+export type GetAmbInboundStatsDailyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbInboundStatsDailyError =
+  GetAmbInboundStatsDailyErrors[keyof GetAmbInboundStatsDailyErrors];
+
+export type GetAmbInboundStatsDailyResponses = {
+  /**
+   * Daily inbound series for the requested period.
+   */
+  200: AmbInboundStatsResponse;
+};
+
+export type GetAmbInboundStatsDailyResponse =
+  GetAmbInboundStatsDailyResponses[keyof GetAmbInboundStatsDailyResponses];
+
+export type GetAmbInboundStatsHourlyData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Start of the window (RFC 3339 instant), rounded down to the start of its hour and included. The boundary uses the local hour when `timezone` is set and the UTC hour otherwise. The window may not exceed 30 days (720 hours). Defaults to 168 hours (7 days) before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * End of the window (RFC 3339 instant), rounded down to the start of its hour and included. The boundary uses the local hour when `timezone` is set and the UTC hour otherwise, so both bounds are inclusive. The window may not exceed 30 days (720 hours). Defaults to the current hour when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+  };
+  url: "/v1/amb/stats/inbound/hourly";
+};
+
+export type GetAmbInboundStatsHourlyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbInboundStatsHourlyError =
+  GetAmbInboundStatsHourlyErrors[keyof GetAmbInboundStatsHourlyErrors];
+
+export type GetAmbInboundStatsHourlyResponses = {
+  /**
+   * Hourly inbound series for the requested period.
+   */
+  200: AmbInboundStatsResponse;
+};
+
+export type GetAmbInboundStatsHourlyResponse =
+  GetAmbInboundStatsHourlyResponses[keyof GetAmbInboundStatsHourlyResponses];
+
+export type GetAmbInboundStatsByBusinessData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of business rows to return, ranked by received volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/amb/stats/inbound/businesses";
+};
+
+export type GetAmbInboundStatsByBusinessErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbInboundStatsByBusinessError =
+  GetAmbInboundStatsByBusinessErrors[keyof GetAmbInboundStatsByBusinessErrors];
+
+export type GetAmbInboundStatsByBusinessResponses = {
+  /**
+   * Per-business inbound breakdown for the requested period.
+   */
+  200: AmbInboundStatsByBusinessResponse;
+};
+
+export type GetAmbInboundStatsByBusinessResponse =
+  GetAmbInboundStatsByBusinessResponses[keyof GetAmbInboundStatsByBusinessResponses];
+
+export type GetAmbInboundStatsByIntentData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Must not be after `to`. Max window 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window, a calendar day (YYYY-MM-DD). Interpreted in `timezone`, or UTC when omitted. Max window 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum number of intent rows to return, ranked by received volume descending.
+     */
+    limit?: number;
+  };
+  url: "/v1/amb/stats/inbound/intents";
+};
+
+export type GetAmbInboundStatsByIntentErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbInboundStatsByIntentError =
+  GetAmbInboundStatsByIntentErrors[keyof GetAmbInboundStatsByIntentErrors];
+
+export type GetAmbInboundStatsByIntentResponses = {
+  /**
+   * Per-intent inbound breakdown for the requested period.
+   */
+  200: AmbInboundStatsByIntentResponse;
+};
+
+export type GetAmbInboundStatsByIntentResponse =
+  GetAmbInboundStatsByIntentResponses[keyof GetAmbInboundStatsByIntentResponses];
+
+export type GetAmbConversationStatsSummaryData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Inclusive start of the window: a calendar day (YYYY-MM-DD) or an RFC 3339 instant rounded down to the hour. The `timezone` parameter makes a calendar day local and rounds an instant down to the local hour. Omit `timezone` to use UTC. When `timezone` is set, a numeric UTC offset such as `+05:45` is rejected; use a calendar day or a `Z` (UTC) instant. This value must use the same form as `to`. When omitted, it defaults to 30 days before `to` for day windows or 168 hours (7 days) before `to` for hour windows.
+     *
+     */
+    from?: string;
+    /**
+     * Inclusive end of the window: a calendar day (YYYY-MM-DD) or an RFC 3339 instant rounded down to the hour. The `timezone` parameter makes a calendar day local and rounds an instant down to the local hour. Omit `timezone` to use UTC. When `timezone` is set, a numeric UTC offset is rejected; use a calendar day or a `Z` (UTC) instant. This value must use the same form as `from`. When omitted, it defaults to today for day windows or the current hour for hour windows in that timezone. Day windows may not exceed 365 days; hour windows may not exceed 720 hours (30 days).
+     *
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Set to `previous_period` to also include the same statistics for the immediately preceding window of equal length, plus the change between the two, so you can show "+X% vs last period" without a second request.
+     *
+     */
+    compare?: StatsComparePeriod;
+  };
+  url: "/v1/amb/stats/conversations/summary";
+};
+
+export type GetAmbConversationStatsSummaryErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbConversationStatsSummaryError =
+  GetAmbConversationStatsSummaryErrors[keyof GetAmbConversationStatsSummaryErrors];
+
+export type GetAmbConversationStatsSummaryResponses = {
+  /**
+   * Aggregate conversation summary for the requested period.
+   */
+  200: AmbConversationStatsSummary;
+};
+
+export type GetAmbConversationStatsSummaryResponse =
+  GetAmbConversationStatsSummaryResponses[keyof GetAmbConversationStatsSummaryResponses];
+
+export type GetAmbConversationStatsDailyData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Start date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). The window may not exceed 365 days. Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * End date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). The window may not exceed 365 days. Defaults to today in that timezone when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+  };
+  url: "/v1/amb/stats/conversations/daily";
+};
+
+export type GetAmbConversationStatsDailyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbConversationStatsDailyError =
+  GetAmbConversationStatsDailyErrors[keyof GetAmbConversationStatsDailyErrors];
+
+export type GetAmbConversationStatsDailyResponses = {
+  /**
+   * Daily conversation series for the requested period.
+   */
+  200: AmbConversationStatsResponse;
+};
+
+export type GetAmbConversationStatsDailyResponse =
+  GetAmbConversationStatsDailyResponses[keyof GetAmbConversationStatsDailyResponses];
+
+export type GetAmbConversationStatsHourlyData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Start of the window (RFC 3339 instant), rounded down to the start of its hour and included. The boundary uses the local hour when `timezone` is set and the UTC hour otherwise. The window may not exceed 30 days (720 hours). Defaults to 168 hours (7 days) before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * End of the window (RFC 3339 instant), rounded down to the start of its hour and included. The boundary uses the local hour when `timezone` is set and the UTC hour otherwise, so both bounds are inclusive. The window may not exceed 30 days (720 hours). Defaults to the current hour when omitted.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+  };
+  url: "/v1/amb/stats/conversations/hourly";
+};
+
+export type GetAmbConversationStatsHourlyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAmbConversationStatsHourlyError =
+  GetAmbConversationStatsHourlyErrors[keyof GetAmbConversationStatsHourlyErrors];
+
+export type GetAmbConversationStatsHourlyResponses = {
+  /**
+   * Hourly conversation series for the requested period.
+   */
+  200: AmbConversationStatsResponse;
+};
+
+export type GetAmbConversationStatsHourlyResponse =
+  GetAmbConversationStatsHourlyResponses[keyof GetAmbConversationStatsHourlyResponses];
+
 export type ListWhatsAppBusinessAccountsData = {
   body?: never;
   path?: never;
@@ -44765,6 +52164,26 @@ export type ListVoiceNumbersData = {
   };
   path?: never;
   query?: {
+    /**
+     * Matches part of the phone number or name, ignoring case. Characters such as `%` and `_` match literally.
+     */
+    search?: string;
+    /**
+     * Filter by number source. `allocation` selects numbers we allocated to your workspace. `verified_number` selects numbers from another carrier that you registered for use as caller IDs.
+     */
+    provider?: VoiceNumberProviderType;
+    /**
+     * Filter by the configured answer to incoming calls.
+     *
+     * - `reject`: rejects incoming calls, including numbers without a route configured.
+     * - `trunk`: delivers calls to a SIP trunk.
+     * - `forward`: connects calls to the configured forwarding number.
+     * - `sequence`: runs the selected voice sequence entry.
+     *
+     * Numbers with an unsupported route are excluded when this filter is set.
+     *
+     */
+    route?: VoiceCallRouteType;
     /**
      * Field to sort by.
      */

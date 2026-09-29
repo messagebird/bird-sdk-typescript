@@ -6,6 +6,15 @@
  * so switch on these with a `default` branch.
  */
 export const WebhookEventType = {
+  AmbAccepted: "amb.accepted",
+  AmbConversationClosed: "amb.conversation_closed",
+  AmbConversationReopened: "amb.conversation_reopened",
+  AmbConversationStarted: "amb.conversation_started",
+  AmbReceived: "amb.received",
+  AmbRejected: "amb.rejected",
+  AmbSendFailed: "amb.send_failed",
+  AmbSent: "amb.sent",
+  AmbSuppressionCreated: "amb_suppression.created",
   DomainFailed: "domain.failed",
   DomainVerified: "domain.verified",
   EmailAccepted: "email.accepted",
