@@ -20911,7 +20911,7 @@ export type VoiceCallId = string;
 export type VoiceSessionId = string;
 
 /**
- * Whether the call originated from your PBX (outbound) or arrived from a remote party (inbound).
+ * Whether the call was placed from your side, by your PBX, the API, the browser or Bird dialing onward for you (outbound), or arrived from a remote party (inbound).
  */
 export type VoiceCallDirection = "inbound" | "outbound";
 
@@ -21654,7 +21654,7 @@ export type VoicePartyEndpoint = {
 export type VoiceParty = {
   /**
    * What kind of participant sat on this side of a leg, and the coordinate that kind carries: a telephone endpoint off the platform, a SIP or WebRTC endpoint, Bird answering, or the platform placing a leg onward. It does not name a person.
-   * `null` on an observation this API could not read. The entry stays, because the session counted it when it deduplicated, and dropping it here would report fewer participants than were observed.
+   * `null` on an observation this API could not read. The entry stays, because the call counted it when it deduplicated, and dropping it here would report fewer participants than were observed.
    */
   readonly endpoint?: VoicePartyEndpoint | null;
   /**
@@ -22895,7 +22895,7 @@ export type VoiceCall = {
    */
   readonly ended_at?: string | null;
   /**
-   * Whether any leg in the call currently holds a lease. `false` covers the interval between a leg ending and its settlement being confirmed, and says nothing about whether transcription has finished.
+   * Whether any leg in the call is still held live. A leg stays live until its end is recorded or, when no end is observed, until its liveness window expires, so this can remain `true` briefly after a disconnect. `false` covers the interval between a leg ending and its settlement being confirmed, and says nothing about whether transcription has finished.
    */
   readonly live: boolean;
   /**
