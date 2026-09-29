@@ -7237,6 +7237,35 @@ export type WhatsAppReactionEventList = {
 } & ListEnvelope;
 
 /**
+ * Whether the conversation needs attention in the workspace inbox. Set it to `resolved` when the work is finished. A new inbound message reopens the same conversation. Changing inbox status preserves message history and does not change the channel's permission to send messages or mark messages read.
+ */
+export type ConversationInboxStatus = "open" | "resolved";
+
+/**
+ * Workspace labels on this conversation. Labels do not change read state or inbox status.
+ */
+export type ConversationLabels = Array<string>;
+
+export type ConversationUpdate = {
+  /**
+   * User to assign this conversation to. Pass a workspace member's user ID, `me` for the signed-in user, or null to unassign it. An API key cannot use `me` and receives a `422` response.
+   */
+  assigned_to?: string | null;
+  inbox_status?: ConversationInboxStatus;
+  /**
+   * Labels chosen by your workspace. On update, this replaces the full set; pass an empty array to clear every label. Labels do not change read state or inbox status.
+   *
+   * Each label must contain 1 to 64 characters, with no commas, control characters, or leading or trailing whitespace. Duplicate labels are rejected. The names `all`, `archived`, `assigned`, `closed`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `inbox`, `junk`, `muted`, `none`, `open`, `pinned`, `read`, `snoozed`, `spam`, `starred`, `trash`, and `unread` are reserved in every casing.
+   *
+   */
+  labels?: Array<string>;
+  /**
+   * Mark received inbound messages with created_at at or before this timestamp as read in the shared workspace inbox. Messages sharing the timestamp are included together. Later arrivals remain unread until another read update. This does not send a read receipt to the customer or change inbox status. Omit to leave read state unchanged.
+   */
+  read?: string;
+};
+
+/**
  * Sortable fields for a WhatsApp group list.
  */
 export type WhatsAppGroupSortField = "created_at";
@@ -8881,8 +8910,6 @@ export type WhatsAppNumberStatus =
   | "rate_limited"
   | "restricted"
   | (string & {});
-
-export type WhatsAppBusinessAccountId = string;
 
 export type WhatsAppNumberScope = "system" | "workspace";
 
@@ -10779,7 +10806,7 @@ export type AmbMessageSendRequest = {
    */
   from: string;
   /**
-   * Apple’s opaque customer identifier for this business, available as the conversation’s opaque_user_id. The conversation must exist and be open.
+   * Apple’s opaque customer identifier for this business, available as the conversation’s recipient.opaque_user_id. The conversation must exist and its native status must be open.
    */
   to: string;
   /**
@@ -10863,10 +10890,61 @@ export type AmbMessageEventList = {
 };
 
 /**
- * Whether a conversation is open or closed. There is no close operation on this API: only the customer closes a conversation from their device, and any inbound message on a closed conversation reopens it.
+ * Apple's native conversation state, which determines whether replies can be sent. A customer close or an Apple 410 response closes it; a newer inbound message reopens it. This API has no native close operation. Use `inbox_status` to resolve workspace inbox work independently.
  *
  */
 export type AmbConversationStatus = "open" | "closed";
+
+/**
+ * The customer on the other side of this Apple Messages for Business conversation.
+ */
+export type AmbConversationRecipient = {
+  /**
+   * Apple's opaque identifier for this customer with this business. Null when no identifier is recorded.
+   */
+  opaque_user_id: string | null;
+  /**
+   * Customer phone number, or null when unknown. An invitation's destination remains on the invitation's `to` field.
+   */
+  phone_number: string | null;
+};
+
+/**
+ * Routing context from the message that opened or most recently reopened the Apple channel conversation.
+ */
+export type AmbConversationRouting = {
+  /**
+   * The business's routing group carried by Apple from the entry point. This identifies a routing destination within the business. Null when the opening message carried no group.
+   */
+  group_id: string | null;
+  /**
+   * Intent carried by Apple from the entry point, used with `group_id` to route the conversation. Null when none was supplied.
+   */
+  intent_id: string | null;
+  /**
+   * Configured entry point matching the opening message's group and intent. Null when none matched.
+   */
+  entry_point: string | null;
+  /**
+   * Workspace queue selected by routing. Null when the conversation is unrouted.
+   */
+  queue: string | null;
+};
+
+/**
+ * A reference to the most recent message in either direction. Read its content through the conversation's message list.
+ */
+export type AmbConversationLastMessage = {
+  /**
+   * ID of the message.
+   */
+  id: AmbMessageId;
+  direction: AmbMessageDirection;
+  /**
+   * The same `created_at` returned when reading the message. This reference and the conversation transcript use message creation order. Processing an older message again does not move the reference backwards.
+   */
+  created_at: string;
+};
 
 /**
  * How the conversation started. `entry_point` means the customer opened it from one of your configured Apple Messages for Business entry points. `invitation` means the customer accepted an invitation and sent a message. This is set once when the conversation is created and never changes.
@@ -10885,6 +10963,13 @@ export type AmbConversationClosedReason = "user_close" | "gone";
  *
  */
 export type AmbConversation = {
+  inbox_status: ConversationInboxStatus;
+  recipient: AmbConversationRecipient;
+  routing: AmbConversationRouting;
+  /**
+   * Most recent message, or null when its identity has not been recorded.
+   */
+  last_message: AmbConversationLastMessage | null;
   /**
    * Conversation ID.
    */
@@ -10895,31 +10980,6 @@ export type AmbConversation = {
   readonly business_account_id: AmbBusinessId;
   readonly status: AmbConversationStatus;
   readonly origin: AmbConversationOrigin;
-  /**
-   * Apple's opaque identifier for the customer with this business. The customer must send a message before a conversation is created. Null when no identifier is recorded.
-   *
-   */
-  readonly opaque_user_id: string | null;
-  /**
-   * Customer phone number, when recorded. Null when unknown. Read the invitation's `to` field for the number an invitation was sent to.
-   *
-   */
-  readonly phone_number: string | null;
-  /**
-   * The `group` value carried by the inbound message that opened or most recently reopened the conversation. Your business chooses it when configuring an entry point with Apple, and Apple passes it through; used with `intent_id` to route the conversation. Null when that message carried none.
-   *
-   */
-  readonly group_id: string | null;
-  /**
-   * The `intent` value carried by the inbound message that opened or most recently reopened the conversation. Your business chooses it when configuring an entry point with Apple, and Apple passes it through; used with `group_id` to route the conversation. Null when that message carried none.
-   *
-   */
-  readonly intent_id: string | null;
-  /**
-   * The entry point in your channel settings whose group and intent matched the inbound message that opened or most recently reopened the conversation. Null when no configured entry point matched.
-   *
-   */
-  readonly entry_point?: string | null;
   /**
    * The capability tokens the customer's device advertised on its most recent message, replaced by each inbound rather than accumulated, so this describes the device in use now. An empty list means the device's capabilities are unknown. Implemented message types may still be sent, but device rendering support has not been confirmed. Authentication requires an explicitly advertised AUTH2 capability.
    *
@@ -10936,50 +10996,24 @@ export type AmbConversation = {
    */
   readonly locale: string;
   /**
-   * Number of inbound messages since this conversation was last marked read. Incremented once per inbound message, reset to zero by marking the conversation read and by any outbound message your workspace sends.
+   * Number of inbound messages the workspace has not acknowledged. Shared across the workspace. Pass read with a date-time to acknowledge received inbound messages through that timestamp. Sending a reply does not change this count.
    *
    */
   readonly unread_count: number;
-  /**
-   * Number of messages in this conversation, both directions.
-   */
-  readonly message_count: number;
-  /**
-   * When the most recent message in this conversation was sent or received.
-   */
-  readonly last_message_at: string;
-  /**
-   * Direction of the most recent message.
-   */
-  readonly last_direction: AmbMessageDirection;
   /**
    * The user this conversation is assigned to, or null when unassigned. Assignment is not rechecked against workspace membership on read, so it can still name a user whose access was removed.
    *
    */
   assigned_to: UserId | null;
+  labels: ConversationLabels;
   /**
-   * Operator-set tags on this conversation. Unlike email, there are no system placement labels: every value here is one an operator chose.
-   *
-   */
-  labels: Array<string>;
-  /**
-   * The console queue this conversation is routed to. Empty when no routing rule matched, which the console lists as unrouted.
-   *
-   */
-  readonly queue?: string;
-  /**
-   * When this conversation was closed. Null while it is open.
+   * When the native Apple conversation was closed. Null while its native status is open; independent of inbox status.
    */
   readonly closed_at: string | null;
   /**
-   * Why this conversation was closed. Null while it is open.
+   * Why the native Apple conversation was closed. Null while its native status is open; independent of inbox status.
    */
   readonly closed_reason: AmbConversationClosedReason | null;
-  /**
-   * Number of times this conversation has been opened, starting at 1 and incremented on each reopen. A closed conversation reopens on the next inbound message rather than creating a new conversation.
-   *
-   */
-  readonly open_count: number;
   /**
    * When this conversation was created.
    */
@@ -10998,25 +11032,10 @@ export type AmbConversationList = {
 } & ListEnvelope;
 
 /**
- * Assignment, labels, and read state on a conversation. There is no close action here: only the customer closes a conversation, from their device. Every field is optional; omit a field to leave it unchanged.
+ * Assignment, labels, inbox status, and workspace read state. Omit a field to leave it unchanged. Inbox status is independent of the Apple channel's open or closed state.
  *
  */
-export type AmbConversationUpdate = {
-  /**
-   * User to assign this conversation to. Pass null to unassign it.
-   */
-  assigned_to?: UserId | null;
-  /**
-   * Replaces the full set of labels on this conversation. Pass an empty array to clear every label.
-   *
-   */
-  labels?: Array<string>;
-  /**
-   * Set to true to mark this conversation read, resetting `unread_count` to zero. There is no way to mark a conversation unread through this field; false has no effect.
-   *
-   */
-  read?: boolean;
-};
+export type AmbConversationUpdate = ConversationUpdate;
 
 /**
  * The typing signal to send. `typing_start` tells the customer's device that an operator is composing a reply. `typing_end` tells it composition stopped without a message following. Apple expects at most one `typing_start` before the reply it precedes; sending it again before that reply is not meaningful and may be dropped. `typing_end`'s behavior against a live conversation is unproven: the legacy platform's implementation was disabled after it caused issues, so treat it as best-effort.
@@ -11781,6 +11800,8 @@ export type AmbConversationStatsResponse = {
  */
 export type WhatsAppBusinessAccountSortField = "created_at";
 
+export type WhatsAppBusinessAccountId = string;
+
 /**
  * WhatsApp's own state for a WhatsApp Business Account. Values are WhatsApp's own tokens, lower-cased. This enum is open because WhatsApp documents the field in neither its API reference nor its machine-readable schema. The `active` value is the only value in WhatsApp's example response, so it is the only one Bird can name. Treat anything else as a state WhatsApp reports and this list has not caught up with.
  */
@@ -12427,7 +12448,7 @@ export type EmailInboxInsightsPlacementCounts = {
 };
 
 /**
- * How the domain-wide rates moved against the prior period, in percentage points. Present only when the request asked for a comparison and the prior period had data; absence means no comparable prior data, never zero change.
+ * How the domain-wide rates moved against the prior period, in percentage points. Present only when the request asked for a comparison and the prior period had data. Without a requested comparison or comparable prior data they are absent, not zero change.
  *
  */
 export type EmailInboxInsightsPlacementDeltaPts = {
@@ -13384,7 +13405,7 @@ export type EmailBounceStatsWithRates = {
 };
 
 /**
- * Delivery counts and rates for the scope of the containing row (a time bucket, a breakdown dimension, or the whole period). Every count is the number of distinct recipients that reached the named lifecycle stage in scope. On the period summary, each count is the sum of the per-bucket distinct counts. Event time determines attribution; send time does not. A recipient delivered on Monday counts in Monday's row. A recipient who bounced and then succeeded on a retry can appear in both `bounced` and `delivered`. Very large counts are close estimates rather than exact tallies.
+ * Delivery counts and rates for the scope of the containing row (a time bucket, a breakdown dimension, or the whole period). Lifecycle counts identify distinct recipients that reached the named stage in scope; `oob_bounces` counts distinct failure events. Period summaries count each identity once per metric across the whole window, so adding time-bucket distinct counts can overstate the summary. Event time determines attribution; send time does not. A recipient delivered on Monday counts in Monday's row. A recipient who bounced and then succeeded on a retry can appear in both `bounced` and `delivered`. Very large counts are close estimates rather than exact tallies.
  *
  * These counts are successive lifecycle stages, so a recipient can appear in more than one:
  *
@@ -13776,8 +13797,11 @@ export type EmailStatsQueryMetric =
   | "total_p99_ms";
 
 /**
- * Recorded event context used to group results. Grouping by `tag` requires `filters.tag.name`.
- * Missing values form a null group when the metric supports that dimension.
+ * Group by one recorded event dimension. Omit for a single ungrouped summary with optional series.
+ * Grouping by `tag` requires `filters.tag.name`.
+ * Missing values form a null group when the metric supports that dimension. A null value
+ * means the event lacks that attribution; it does not explain how the message was created
+ * or establish membership in another dimension such as a campaign.
  *
  * Every selected metric must support the grouping dimension and every filter dimension.
  * Unsupported combinations return validation error `E04074`, even when the workspace has no events.
@@ -13913,14 +13937,21 @@ export type EmailStatsQueryRequest = {
    */
   timezone?: string;
   /**
-   * Distinct metrics to return. Unselected metrics are absent.
+   * Distinct metrics to return. Unselected metrics are absent. delivered and unique engagement counts estimate distinct message recipients. opens, opens_non_prefetched, clicks, unsubscribes, and oob_bounces estimate deduplicated events. effective_delivered and all_bounces are derived counts. Counts need not add up across buckets or groups. unique_opens and unique_clicks count message recipients, not distinct people across messages. Use returned period metrics; do not reconstruct totals from buckets or average rates or percentiles.
+   *
+   * delivered counts message recipients with a delivery event without subtracting later bounces. effective_delivered is max(delivered - oob_bounces, 0). open_rate uses unique_opens_non_prefetched divided by effective_delivered; click_rate uses unique_clicks divided by effective_delivered. bounce_rate uses min(bounced + oob_bounces, delivered + bounced) divided by (delivered + bounced). complaint_rate and unsubscribe_rate use complained and unsubscribes, respectively, divided by effective_delivered. Undefined rates are null. Engagement rates can exceed 1 across event-time windows.
+   *
+   * An unknown prefetch flag is treated as false. confirmed_unique_opens is the union of message recipients with opens or clicks; confirmed_unique_opens_non_prefetched excludes prefetched opens from that union. Differences between estimated distinct counts cannot establish exact audience overlaps or explain missing opens. Neither confirmation nor prefetch exclusion establishes a count or range of real people who engaged.
+   *
+   * Latency percentiles describe eligible measured logical events, excluding missing latency values and including zero. A percentile is null when no eligible samples exist. delivered is not the latency sample count. Report percentile values without inferring the unmeasured population or the distribution between them. They do not establish maxima or exact threshold counts; multiplying delivered by percentile fractions or subtracting processing and delivery percentiles cannot determine slow-message counts or a stage's latency.
+   *
    */
   metrics: Array<EmailStatsQueryMetric>;
-  /**
-   * Group by this dimension. Omit for a single ungrouped summary with optional series.
-   */
   group_by?: EmailStatsQueryDimension;
   grain?: EmailStatsQueryGrain;
+  /**
+   * Filter recorded event context with include/exclude predicates. Include values combine with OR; dimensions combine with AND. Exclude-only predicates retain missing values. Tag filters require one case-sensitive name; a name without values requires presence. Each predicate accepts at most 20 distinct values across include and exclude. Every selected metric must support every filter dimension, using the same compatibility rules as group_by. Resolve template and IP-pool names to IDs before filtering. Broadcast filters use IDs. Current names do not establish historical attribution.
+   */
   filters?: EmailStatsQueryFilters;
   /**
    * Grouped requests only. Rank groups by this selected metric; defaults to the first metrics entry. Undefined values sort last in either direction. Ties use the dimension value ascending, with null last.
@@ -14350,15 +14381,12 @@ export type EmailStatsComparison = {
  * denominator. The daily and hourly endpoints report the same rates, but
  * per bucket, each one dividing that bucket's own counts.
  *
- * Every count is a sum of per-bucket counts across the window (per day for
- * day windows, per hour for hour windows). A recipient, or a message, that
- * is active in two buckets contributes to each of them, so it is counted
- * twice in the period total. This matches how most mailbox providers report
- * their own numbers. The effect to plan for is that the total is a sum of
- * per-bucket activity rather than a count of distinct recipients or messages
- * across the whole period. Latency percentiles work differently: they are computed
- * once across the whole period rather than summed from the buckets. A rate
- * is null when its denominator is zero.
+ * Distinct message, recipient, and event counts are computed across the whole
+ * requested period. An identity present in more than one time bucket counts
+ * once for that metric in the period summary, so adding daily or hourly
+ * distinct counts can overstate the summary. Very large counts are close
+ * estimates rather than exact tallies. Latency percentiles are also computed
+ * across the whole period. A rate is null when its denominator is zero.
  *
  */
 export type EmailStatsSummary = {
@@ -14367,7 +14395,7 @@ export type EmailStatsSummary = {
    */
   period: EmailStatsSummaryPeriod;
   /**
-   * Distinct email messages accepted, counted at the message level (one per accepted send regardless of recipient count) and summed per bucket across the period. This field counts messages. `delivery.accepted` counts recipients, so the two values are not comparable (a single message to 500 recipients is 1 here and up to 500 there).
+   * Distinct email messages accepted, counted at the message level (one per accepted send regardless of recipient count) across the whole requested period. This field counts messages. `delivery.accepted` counts recipients, so the two values are not comparable (a single message to 500 recipients is 1 here and up to 500 there).
    */
   readonly sends_accepted: number;
   readonly delivery: EmailDeliveryStats;
@@ -15789,11 +15817,9 @@ export type SuppressionCreate = {
 };
 
 /**
- * The period every figure in the response covers, echoed back from the request.
- *
- * Figures are fetched when the request is made, so they are current as of `to`.
- * The period always ends at the moment of the request rather than at a cached
- * boundary, which is why two requests a minute apart can differ slightly.
+ * The period the response describes. Most reports resolve a rolling window when
+ * requested; send-time and notable reports can carry the panel's own window.
+ * These bounds describe coverage, not a guarantee of measurement freshness.
  *
  */
 export type EmailCompetitivePeriod = {
@@ -15955,9 +15981,12 @@ export type EmailCompetitiveWatchlistRowProvenance = {
  * One brand on the watchlist, with its figures for the requested period. Your own
  * workspace appears as a row too, so the table can be read as a single ranking.
  *
- * Every metric is present on every row and is `null` when it is unavailable for
- * that brand, so a `0` is always a real measurement rather than a gap. Check
- * `panel_status` for why a metric is null.
+ * Metrics are present on every row. Interpret `null` using each field's
+ * description: it can mean unavailable, no observed campaign, or no overlap
+ * returned by the panel. A `0` is a measurement rather than a gap.
+ *
+ * Your measured sends and cadence cover the workspace. Your panel rates and
+ * overlap describe only its highest-volume sending domain.
  *
  * `esp` and `list_size` are the exception. They are populated only when you read a
  * single brand, and are always `null` on the watchlist whatever `panel_status`
@@ -15982,7 +16011,7 @@ export type EmailCompetitiveWatchlistRow = {
    */
   readonly industry: string | null;
   /**
-   * The domains the brand's figures describe. Always one domain today: a brand is tracked by the single one the panel sees the most of its mail from, so a brand that splits its mail across several domains reports less than its full volume.
+   * The domains the brand's figures describe. Always one domain today: a brand is tracked by the single one the panel sees the most of its mail from, so a brand that splits its mail across several domains reports less than its full volume. On your own row this domain scopes panel measurements, while measured sends and cadence cover the workspace.
    *
    */
   readonly sending_domains: Array<string>;
@@ -16023,7 +16052,7 @@ export type EmailCompetitiveWatchlistRow = {
    */
   readonly read_rate: number | null;
   /**
-   * Share of your own audience the panel also sees receiving this brand's mail. Null on your own row, and null for a competitor the panel measured no overlap with, which is an answer rather than a gap.
+   * Share of the panel-observed audience of your workspace's highest-volume sending domain that also receives this brand's mail. Null on your own row or when the panel returns no overlap for a competitor. An absent panel result does not establish that the audiences are disjoint.
    *
    */
   readonly audience_overlap_rate: number | null;
@@ -16150,7 +16179,7 @@ export type EmailCompetitiveCampaign = EmailCompetitiveCampaignSummary & {
    */
   readonly has_creative: boolean;
   /**
-   * The discount the subject line leads with, null when it names none. Read from the subject text, so it finds a stated offer and not one revealed inside the email.
+   * The first recognized percentage-discount offer in the subject, null when none is recognized. Does not detect dollar discounts, free shipping or offers revealed only inside the email.
    *
    */
   readonly discount_percent: number | null;
@@ -16357,7 +16386,7 @@ export type EmailCompetitiveCampaignFeed = {
    */
   readonly captured: number;
   /**
-   * Fraction of captured campaigns whose subject leads with a discount. Null when captured is zero. This sampled value is independent of the returned page.
+   * Fraction of captured campaigns whose subject contains a recognized percentage-discount offer. Dollar discounts and free-shipping offers do not count. Null when captured is zero. This sampled value is independent of the returned page.
    *
    */
   readonly promo_rate: number | null;
@@ -16516,7 +16545,7 @@ export type EmailCompetitiveBrandMatch = {
  */
 export type EmailCompetitiveBrandSearchResults = {
   /**
-   * Matching brands. Empty when nothing matched, which for an unusual brand name means the panel does not track it rather than that the search failed.
+   * Watchable matches returned for this query. A capped search or an unresolved sending domain can omit a brand; an empty result does not establish that the panel has never observed it.
    *
    */
   readonly data: Array<EmailCompetitiveBrandMatch>;
@@ -18114,19 +18143,19 @@ export type MailboxUpdate = {
 };
 
 /**
- * Single-row aggregate of the mailbox's email activity across the full requested period. Counts are sums of per-bucket counts across the window. Latency percentiles are computed across the whole period rather than summed per bucket. Rates are `null` when their denominator is zero.
+ * Single-row aggregate of the mailbox's email activity across the full requested period. Counts use each field's message, recipient, or event identity across the whole window. Repeat opens, clicks, and unsubscribes from the same recipient contribute as separate events; unique engagement fields count distinct recipients. Adding per-bucket distinct counts can overstate the summary. Latency percentiles are computed across the whole period. Rates are `null` when their denominator is zero.
  *
  */
 export type MailboxStatsSummary = {
   /**
-   * Distinct email messages the mailbox sent that were accepted, counted at the message level and summed per bucket across the period.
+   * Distinct email messages the mailbox sent that were accepted, counted once at the message level across the period.
    */
   readonly sends_accepted: number;
   readonly delivery: EmailDeliveryStats;
   readonly engagement: EmailEngagementStats;
   readonly latency: EmailLatencyStats;
   /**
-   * Distinct emails the mailbox received, summed per bucket across the period.
+   * Distinct emails the mailbox received, counted once across the period.
    */
   readonly received: number;
 };
@@ -24946,7 +24975,7 @@ export type AmbMessageSendRequestWritable = {
    */
   from: string;
   /**
-   * Apple’s opaque customer identifier for this business, available as the conversation’s opaque_user_id. The conversation must exist and be open.
+   * Apple’s opaque customer identifier for this business, available as the conversation’s recipient.opaque_user_id. The conversation must exist and its native status must be open.
    */
   to: string;
   /**
@@ -24998,20 +25027,38 @@ export type AmbMessageEventListWritable = {
 };
 
 /**
+ * A reference to the most recent message in either direction. Read its content through the conversation's message list.
+ */
+export type AmbConversationLastMessageWritable = {
+  /**
+   * ID of the message.
+   */
+  id: AmbMessageId;
+  direction: AmbMessageDirection;
+  /**
+   * The same `created_at` returned when reading the message. This reference and the conversation transcript use message creation order. Processing an older message again does not move the reference backwards.
+   */
+  created_at: string;
+};
+
+/**
  * A conversation between your business and one customer on Apple Messages for Business. It holds the customer's device capabilities, the console's read state, assignment, and labels, and the routing queue the conversation is in.
  *
  */
 export type AmbConversationWritable = {
+  inbox_status: ConversationInboxStatus;
+  recipient: AmbConversationRecipient;
+  routing: AmbConversationRouting;
+  /**
+   * Most recent message, or null when its identity has not been recorded.
+   */
+  last_message: AmbConversationLastMessageWritable | null;
   /**
    * The user this conversation is assigned to, or null when unassigned. Assignment is not rechecked against workspace membership on read, so it can still name a user whose access was removed.
    *
    */
   assigned_to: UserId | null;
-  /**
-   * Operator-set tags on this conversation. Unlike email, there are no system placement labels: every value here is one an operator chose.
-   *
-   */
-  labels: Array<string>;
+  labels: ConversationLabels;
 };
 
 export type AmbConversationListWritable = {
@@ -25548,15 +25595,12 @@ export type EmailStatsComparisonWritable = {
  * denominator. The daily and hourly endpoints report the same rates, but
  * per bucket, each one dividing that bucket's own counts.
  *
- * Every count is a sum of per-bucket counts across the window (per day for
- * day windows, per hour for hour windows). A recipient, or a message, that
- * is active in two buckets contributes to each of them, so it is counted
- * twice in the period total. This matches how most mailbox providers report
- * their own numbers. The effect to plan for is that the total is a sum of
- * per-bucket activity rather than a count of distinct recipients or messages
- * across the whole period. Latency percentiles work differently: they are computed
- * once across the whole period rather than summed from the buckets. A rate
- * is null when its denominator is zero.
+ * Distinct message, recipient, and event counts are computed across the whole
+ * requested period. An identity present in more than one time bucket counts
+ * once for that metric in the period summary, so adding daily or hourly
+ * distinct counts can overstate the summary. Very large counts are close
+ * estimates rather than exact tallies. Latency percentiles are also computed
+ * across the whole period. A rate is null when its denominator is zero.
  *
  */
 export type EmailStatsSummaryWritable = {
@@ -26043,9 +26087,12 @@ export type SuppressionListWritable = {
  * One brand on the watchlist, with its figures for the requested period. Your own
  * workspace appears as a row too, so the table can be read as a single ranking.
  *
- * Every metric is present on every row and is `null` when it is unavailable for
- * that brand, so a `0` is always a real measurement rather than a gap. Check
- * `panel_status` for why a metric is null.
+ * Metrics are present on every row. Interpret `null` using each field's
+ * description: it can mean unavailable, no observed campaign, or no overlap
+ * returned by the panel. A `0` is a measurement rather than a gap.
+ *
+ * Your measured sends and cadence cover the workspace. Your panel rates and
+ * overlap describe only its highest-volume sending domain.
  *
  * `esp` and `list_size` are the exception. They are populated only when you read a
  * single brand, and are always `null` on the watchlist whatever `panel_status`
@@ -26411,7 +26458,7 @@ export type MailboxListWritable = {
 } & ListEnvelope;
 
 /**
- * Single-row aggregate of the mailbox's email activity across the full requested period. Counts are sums of per-bucket counts across the window. Latency percentiles are computed across the whole period rather than summed per bucket. Rates are `null` when their denominator is zero.
+ * Single-row aggregate of the mailbox's email activity across the full requested period. Counts use each field's message, recipient, or event identity across the whole window. Repeat opens, clicks, and unsubscribes from the same recipient contribute as separate events; unique engagement fields count distinct recipients. Adding per-bucket distinct counts can overstate the summary. Latency percentiles are computed across the whole period. Rates are `null` when their denominator is zero.
  *
  */
 export type MailboxStatsSummaryWritable = {
@@ -27527,6 +27574,21 @@ export type EmailBroadcastSearchFilter = string;
  *
  */
 export type StatsTimezone = string;
+
+/**
+ * Filter by workspace inbox status. Omit to include open and resolved conversations.
+ */
+export type ConversationInboxStatusFilter = ConversationInboxStatus;
+
+/**
+ * Return conversations assigned to this workspace member. Pass `me` for the signed-in user or `unassigned` for conversations without an assignee. An API key cannot use `me` and receives a `422` response.
+ */
+export type ConversationAssigneeFilter = string;
+
+/**
+ * Return conversations carrying this label. Repeat the parameter to require every supplied label.
+ */
+export type ConversationLabelFilter = Array<string>;
 
 /**
  * Restricts the statistics to one template, identified by its ID (`wat_…`) or slug. Mutually exclusive with the other dimension filters (`category`, `phone_number`, `tag`); only one may be set per request. An ID matches the `template_id` key on a row of the per-template breakdown; a slug is accepted for callers that predate that key and resolves to the same messages.
@@ -39803,6 +39865,10 @@ export type ListAmbConversationsData = {
   path?: never;
   query?: {
     /**
+     * Filter by workspace inbox status. Omit to include open and resolved conversations.
+     */
+    inbox_status?: ConversationInboxStatus;
+    /**
      * Filter to conversations belonging to this business.
      */
     business_account_id?: AmbBusinessId;
@@ -39816,14 +39882,13 @@ export type ListAmbConversationsData = {
      */
     queue?: string;
     /**
-     * Filter to conversations assigned to this user. Pass `unassigned` to match conversations with no assignee.
-     *
+     * Return conversations assigned to this workspace member. Pass `me` for the signed-in user or `unassigned` for conversations without an assignee. An API key cannot use `me` and receives a `422` response.
      */
     assigned_to?: string;
     /**
-     * Filter to conversations that have this label.
+     * Return conversations carrying this label. Repeat the parameter to require every supplied label.
      */
-    label?: string;
+    label?: Array<string>;
     /**
      * Maximum number of items to return per page.
      */

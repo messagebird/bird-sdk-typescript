@@ -4336,6 +4336,8 @@ export const getWhatsAppMessage = <ThrowOnError extends boolean = false>(
  *
  * Marks an inbound WhatsApp message as read, showing the contact the blue
  * ticks. WhatsApp also marks every earlier message in that conversation read.
+ * This does not change the workspace inbox unread count. Use the conversation
+ * update endpoint with `read` to acknowledge messages in the inbox.
  *
  * Pass `typing_indicator: true` to show a typing indicator as well. WhatsApp
  * clears it when you send your next message, or after 25 seconds, whichever
@@ -6659,7 +6661,9 @@ export const listAmbMessageEvents = <ThrowOnError extends boolean = false>(
  * Returns the conversations your business has with customers on Apple
  * Messages for Business, newest first by last message. To page through
  * older conversations, use `starting_after`. A closed conversation stays in
- * this list; filter on `status` to separate them from open ones.
+ * this list; filter on `status` for the Apple channel state, or `inbox_status` for open and resolved inbox work.
+ *
+ * Use `assigned_to=me` for your own conversations or `unassigned` for conversations without an assignee. Repeat `label` to require every supplied label.
  *
  */
 export const listAmbConversations = <ThrowOnError extends boolean = false>(
@@ -6719,7 +6723,7 @@ export const getAmbConversation = <ThrowOnError extends boolean = false>(
 /**
  * Update a conversation
  *
- * Updates a conversation's assignment, labels, or read state. There is no close action here: only the customer closes a conversation, from their device.
+ * Updates assignment, labels, inbox status, or shared workspace read state. Resolving inbox work preserves the conversation and its Apple channel state. A new inbound message reopens the inbox work. To acknowledge messages, pass `read` with a date-time cutoff for their `created_at`. Only inbound messages already received at or before that cutoff are marked read. Messages sharing the timestamp are included together; later arrivals remain unread. Use `assigned_to: me` to assign yourself, a workspace member ID to assign a teammate, or null to unassign. An API key cannot use `me`.
  *
  */
 export const updateAmbConversation = <ThrowOnError extends boolean = false>(
@@ -7937,8 +7941,8 @@ export const updateWhatsAppKeywordRule = <ThrowOnError extends boolean = false>(
  * delivered volume, and the domain-wide summary is weighted against the
  * audience mix described in `measurement`, so it can legitimately differ
  * from any single provider row. Delta fields appear only when the request
- * asks for a comparison and the prior period has data; their absence means
- * no comparable prior data, never zero change.
+ * asks for a comparison and the prior period has data. Without a requested
+ * comparison or comparable prior data they are absent, not zero change.
  *
  * The series is sparse: buckets with no measured placement are omitted, not
  * returned as zeros, so charts index by date rather than by position. Each
@@ -8461,9 +8465,9 @@ export const getEmailStatsByTag = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get selected email metrics
+ * Query email delivery and engagement metrics
  *
- * Returns selected delivery, engagement, and latency metrics for the workspace. Combine filters, one grouping dimension, and a time grain for reports such as weekly deliveries by recipient domain for a campaign. Events are selected and bucketed by when they occurred. An open in the window can belong to a message sent earlier; later outcomes outside the window are excluded. Ungrouped requests return one summary; grouped pages retain each group's complete series. Counts estimate distinct identities, and undefined rates or empty latency samples return null.
+ * Returns selected delivery, engagement, and latency metrics for the workspace. Combine filters, one grouping dimension, and a time grain for reports such as weekly deliveries by recipient domain for a campaign. Events are selected and bucketed by when they occurred. An open in the window can belong to a message sent earlier; later outcomes outside the window are excluded. Ungrouped requests return one summary; grouped pages retain each group's complete series. Counts deduplicate by each metric's identity; event counts are not audience sizes. Undefined rates or empty latency samples return null.
  *
  * Dates include whole local days. Instants include the quarter-hour containing the requested end. Responses echo normalized UTC bounds with an exclusive end. Follow cursors using the original body and replace the cursor fields. Requests can cover up to 365 local days or 720 hours for instant bounds, subject to available history. Unsupported combinations, unavailable history, or query-size limits return 422; a failed query returns no partial report.
  *
@@ -9325,15 +9329,15 @@ export const getSuppression = <ThrowOnError extends boolean = false>(
  *
  * Figures about a competitor are estimates from an email panel, which observes a
  * sample of real inboxes and scales what it sees up to a whole audience. They
- * are fetched while the request runs, so they are current rather than cached,
- * and two requests minutes apart can differ slightly. Figures about your own
- * sending are counted rather than estimated wherever that is possible. The
- * `provenance` object on each row records which source each figure came from.
+ * are fetched while the request runs; the panel can revise recent measurements,
+ * so two requests minutes apart can differ. Your send volume and cadence cover
+ * the workspace, while your panel rates and overlap use its highest-volume
+ * sending domain. The `provenance` object records each metric's source.
  *
- * A figure reads `null` when it is unavailable for that brand, so a `0` always
- * means a real measurement. When a whole row has no figures, `panel_status` says
- * why: the panel may not track the brand's sending domain, may track it but have
- * seen no mail in the period, or may have been briefly unreachable.
+ * Interpret `null` using each field's description: rates can be unavailable,
+ * while a last campaign can be unobserved and overlap can be absent from the
+ * panel response. A `0` means a measurement. `panel_status` distinguishes an
+ * untracked domain, no observed mail and a temporarily unavailable panel.
  *
  * `esp` and `list_size` are the exception, and are always `null` here. Read a
  * single brand to get them.
@@ -9651,8 +9655,7 @@ export const getEmailCompetitiveBrandCampaign = <
  *
  * Hours are reported in the timezone you ask for, echoed back in `timezone`, and the
  * week is folded into that zone before it is totalled, so a send at 02:00 UTC on
- * Monday counts as Sunday evening for a reader in New York, which is when it arrived
- * for them. Label an axis from `timezone` rather than from what you asked for: a
+ * Monday counts as Sunday evening in New York. Label an axis from `timezone` rather than from what you asked for: a
  * response the panel could not answer reports UTC regardless.
  *
  * Expect the weekday axis to look flat. For most brands the hour of the day is where
@@ -9697,8 +9700,9 @@ export const getEmailCompetitiveBrandSendTime = <
  * Paste a domain instead of a name to find the brand that sends from it.
  *
  * Brands the panel has never seen send are left out, since no figure could be
- * reported for them. An empty result for a real brand name therefore means the
- * panel does not track that brand rather than that the search failed.
+ * reported for them. Results are capped at eight and can omit matches whose
+ * sending domain could not be resolved. An empty result means no watchable match
+ * was returned for this query; try a more specific name or known sending domain.
  *
  * API-key calls require Insights preview access for your organization.
  *

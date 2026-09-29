@@ -123,7 +123,7 @@ console.log(result);
 export async function _ex_15() {
 const result = await bird.amb.conversations.update(
   "acv_01krdgeqcxet5s7t44vh8rt9mg",
-  { assigned_to: null, labels: [], read: false },
+  { assigned_to: null, labels: [], inbox_status: "resolved" },
 );
 console.log(result);
 }
@@ -1061,14 +1061,15 @@ for (const row of series.data) console.log(row.bucket, row.delivery.delivered);
 }
 
 export async function _ex_146() {
-for await (const group of bird.email.stats.query({
-  from: "2026-08-03",
-  to: "2026-08-16",
+const { data } = await bird.email.stats.query({
+  from: "2026-09-23",
+  to: "2026-09-24",
   metrics: ["delivered", "bounce_rate"],
   group_by: "recipient_domain",
   grain: "week",
   limit: 25,
-})) {
+});
+for (const group of data) {
   console.log(group.dimensions, group.metrics, group.series);
 }
 }

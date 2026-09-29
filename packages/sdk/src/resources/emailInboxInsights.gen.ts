@@ -19,8 +19,17 @@ export class EmailInboxInsightsResourceBase extends Resource {
   /**
    * Read placement for a verified domain owned by the workspace. Dates are inclusive
 UTC days, with at most 30 days between from and to. Rates are percentages, and
-section statuses distinguish missing measurements. Provider filters add series
-lines without filtering the provider table. This read does not enable monitoring.
+section statuses distinguish missing measurements. Deltas require a requested
+comparison and comparable prior data; absence does not mean stable placement.
+Provider filters add series
+lines without filtering the provider table. The response reports domain-wide
+panel/seed estimates with audience weighting, not delivery counts or a
+marketing/transactional split; a domain name alone does not identify a stream.
+Read rate measures reading, not opens. Label freshness from freshness.as_of;
+missing days and nulls are not zeros. Associations do not establish a cause.
+This read does not enable monitoring. Individual seed-test results and Google
+Postmaster connection status are dashboard-only; these aggregates cannot
+substitute for a particular test or prove placement for every customer.
 
 API-key calls require Insights preview access for your organization.
    *
@@ -42,8 +51,12 @@ API-key calls require Insights preview access for your organization.
   /**
    * Read SPF, DKIM and DMARC results for a verified domain owned by the workspace.
 Dates are inclusive UTC days, with at most 30 days between from and to.
-Sections can report not_configured when their data source is not connected.
-This read does not configure authentication or enable monitoring.
+Pass rates are percentages. A not_configured section does not establish that
+DNS records are absent or that authentication failed; the source's coverage
+must be checked. Read section statuses, sources.latest_data_date and freshness
+before drawing conclusions. Authentication and placement changes can coincide
+without establishing cause. This read does not configure authentication or
+enable monitoring.
 
 API-key calls require Insights preview access for your organization.
    *
@@ -63,7 +76,15 @@ API-key calls require Insights preview access for your organization.
   }
 
   /**
-   * Read the Google Postmaster spam rate for a verified domain owned by the workspace. This percentage covers Gmail-received mail, not Bird feedback-loop complaints across providers. Dates are inclusive UTC days with at most 30 days between from and to. Use group_by for the series grain and compare=previous_period for the preceding period. Sections can report not_configured when Google Postmaster setup is incomplete.
+   * Read the Google Postmaster user-reported spam rate for a verified owned domain.
+This percentage differs from spam-folder placement and Bird feedback-loop
+complaints across providers. Dates are inclusive UTC days, at most 30 days
+apart; compare=previous_period adds the preceding period. The period rate is
+an unweighted mean of reported days; sparse days are missing observations,
+not zero complaints. Freshness identifies the last reported day, not a promised
+update schedule. Correlation with placement cannot identify causative sends.
+Sections can report not_configured when setup is incomplete; connection
+status and setup are available in the dashboard, not through this read.
 
 API-key calls require Insights preview access for your organization.
    *
@@ -83,7 +104,12 @@ API-key calls require Insights preview access for your organization.
   }
 
   /**
-   * Read spam-trap hits for a verified domain owned by the workspace, with totals, trap kinds, networks and individual hits. Dates are inclusive UTC days with at most 30 days between from and to; compare=previous_period includes the preceding period. A measured zero is a valid result. Use the response status to distinguish measurements from unavailable data.
+   * Read spam-trap totals, kinds, networks and sampled hits for a verified owned
+domain. Dates are inclusive UTC days, at most 30 days apart;
+compare=previous_period includes the preceding period. hit_rows has its own
+status and truncated_types; empty rows do not negate a positive total, and row
+counts cannot reconstruct total hits. A measured zero is valid. Hits alone
+do not identify the sending campaign or establish why placement changed.
 
 API-key calls require Insights preview access for your organization.
    *

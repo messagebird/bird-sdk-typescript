@@ -13,7 +13,7 @@ export type AmbConversationsListQuery = NonNullable<ListAmbConversationsData["qu
 
 export class AmbConversationsResource extends Resource {
   /**
-   * Reads a customer-initiated conversation in your workspace. Its opaque_user_id supplies the to field for replies; verify the business and open state before sending.
+   * Reads a customer-initiated conversation in your workspace. Its recipient.opaque_user_id supplies the to field for replies; verify the business and open state before sending.
    *
    * @example 
    * const result = await bird.amb.conversations.get(
@@ -27,12 +27,12 @@ export class AmbConversationsResource extends Resource {
   }
 
   /**
-   * Updates assignment, labels and read state on a workspace conversation. Omitted fields stay unchanged; null assigned_to unassigns, empty labels clears labels, and read false has no effect. This operation does not close or reopen a conversation.
+   * Updates assignment, labels, inbox status and shared workspace read state. Omitted fields stay unchanged; null assigned_to unassigns and empty labels clears labels. Pass read as a date-time to acknowledge received inbound messages through that timestamp. Resolving or reopening inbox work preserves the Apple channel state and sending restrictions.
    *
    * @example 
    * const result = await bird.amb.conversations.update(
    *   "acv_01krdgeqcxet5s7t44vh8rt9mg",
-   *   { assigned_to: null, labels: [], read: false },
+   *   { assigned_to: null, labels: [], inbox_status: "resolved" },
    * );
    * console.log(result);
    */
@@ -72,7 +72,7 @@ export class AmbConversationsResource extends Resource {
   }
 
   /**
-   * Returns the conversations your business has with customers on Apple Messages for Business, newest first by last message. To page through older conversations, use `starting_after`. A closed conversation stays in this list; filter on `status` to separate them from open ones.
+   * Returns the conversations your business has with customers on Apple Messages for Business, newest first by last message. To page through older conversations, use `starting_after`. A closed conversation stays in this list; filter on `status` for the Apple channel state, or `inbox_status` for open and resolved inbox work.
    *
    * @example 
    * const result = await bird.amb.conversations.list({

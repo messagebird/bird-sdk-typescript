@@ -94,7 +94,7 @@ export async function ambConversationsGet() {
 export async function ambConversationsUpdate() {
   const result = await bird.amb.conversations.update(
     "acv_01krdgeqcxet5s7t44vh8rt9mg",
-    { assigned_to: null, labels: [], read: false },
+    { assigned_to: null, labels: [], inbox_status: "resolved" },
   );
   console.log(result);
 }
