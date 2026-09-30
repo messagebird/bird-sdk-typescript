@@ -30587,6 +30587,13 @@ export const EmailTemplateSchema = {
     "updated_at",
   ],
   properties: {
+    editor_url: {
+      type: "string",
+      format: "uri",
+      readOnly: true,
+      description:
+        "Optional link to open the saved draft in the browser editor, in its default language. Absent for built-in templates.\n",
+    },
     id: {
       readOnly: true,
       description: "Template ID.",
@@ -31208,6 +31215,13 @@ export const EmailTemplatePreviewSchema = {
     "compatibility_severity",
   ],
   properties: {
+    editor_url: {
+      type: "string",
+      format: "uri",
+      readOnly: true,
+      description:
+        "Optional link to open the saved draft in the browser editor, in the language this preview rendered. Absent for built-in templates, published-version previews, and previews of unsaved `content`.\n",
+    },
     subject: {
       type: ["string", "null"],
       readOnly: true,

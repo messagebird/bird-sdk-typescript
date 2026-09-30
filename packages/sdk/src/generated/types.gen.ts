@@ -16842,6 +16842,11 @@ export type EmailTemplateCreate = {
 
 export type EmailTemplate = {
   /**
+   * Optional link to open the saved draft in the browser editor, in its default language. Absent for built-in templates.
+   *
+   */
+  readonly editor_url?: string;
+  /**
    * Template ID.
    */
   readonly id: EmailTemplateId;
@@ -17274,6 +17279,11 @@ export type EmailCompatibilityFinding = {
  *
  */
 export type EmailTemplatePreview = {
+  /**
+   * Optional link to open the saved draft in the browser editor, in the language this preview rendered. Absent for built-in templates, published-version previews, and previews of unsaved `content`.
+   *
+   */
+  readonly editor_url?: string;
   /**
    * The rendered subject line. Null when the template has no subject.
    */
