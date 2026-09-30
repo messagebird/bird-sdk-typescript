@@ -1,42 +1,74 @@
-import { callerRules, callerBooleanishSkip, callerDefault } from "./caller-rules.gen.js";
+import {
+  callerRules,
+  callerBooleanishSkip,
+  callerDefault,
+  callerFalseLike,
+  callerPublicModels,
+  callerModelEnv,
+} from "./caller-rules.gen.js";
 
-/**
- * Infers the environment driving the SDK for the `Bird-Caller` usage-telemetry
- * label by walking the generated rules in order (single source of truth:
- * `clients/caller-detection.yaml`, shared with the CLI and the other SDKs).
- * Best-effort and non-authoritative — it only labels traffic, never gates
- * behavior.
- *
- * Edge-safe: `process` is read only through a `typeof`-style `globalThis` guard,
- * so on a browser (no `process.env`) it returns `""` and the client sends no
- * `Bird-Caller` header. `env` is injected in tests.
- */
-export function detectCaller(env?: Record<string, string | undefined>): string {
-  // Tests / explicit callers pass `env`. Otherwise derive it from a *real* Node
-  // process only: a browser — including one whose bundler polyfills an empty
-  // `process.env` — has no agent, so we return "" (no header) rather than falling
-  // through to the shell default. A genuine Node process always sets
-  // `process.versions.node`; polyfills do not.
+// Browser runtimes and process polyfills have no local harness environment.
+// Identity and execution evidence are telemetry hints, never authorization.
+export function detectCallerInfo(env?: Record<string, string | undefined>): {
+  model: string;
+  modelSource: string;
+  name: string;
+  source: string;
+  execution: string;
+} {
   let source = env;
   if (source === undefined) {
     const proc = (
       globalThis as {
-        process?: { env?: Record<string, string | undefined>; versions?: { node?: string } };
+        process?: {
+          env?: Record<string, string | undefined>;
+          versions?: { node?: string };
+        };
       }
     ).process;
-    if (proc?.versions?.node === undefined) return "";
+    if (proc?.versions?.node === undefined)
+      return {
+        name: "",
+        source: "",
+        execution: "unknown",
+        model: "",
+        modelSource: "",
+      };
     source = proc.env ?? {};
   }
   for (const rule of callerRules) {
     const value = source[rule.env];
-    if (value === undefined || value === "" || (rule.equals !== undefined && value !== rule.equals)) {
+    if (
+      value === undefined ||
+      value.trim() === "" ||
+      callerFalseLike.has(value.trim().toLowerCase()) ||
+      (rule.equals !== undefined && value !== rule.equals)
+    ) {
       continue;
     }
-    if (!rule.passthrough) return rule.name as string;
-    const sanitized = sanitizeCaller(value);
-    if (sanitized) return sanitized;
+    const name = rule.passthrough
+      ? sanitizeCaller(value)
+      : (rule.name as string);
+    if (name) {
+      const modelEnv = callerModelEnv[name];
+      const model = modelEnv ? normalizeModel(source[modelEnv] ?? "") : "";
+      return {
+        model,
+        modelSource: model ? `env:${modelEnv}` : "",
+        name,
+        source: `env:${rule.env}`,
+        execution:
+          rule.verification === "verified" ? rule.execution : "unknown",
+      };
+    }
   }
-  return callerDefault;
+  return {
+    name: callerDefault,
+    source: "fallback",
+    execution: "unknown",
+    model: "",
+    modelSource: "",
+  };
 }
 
 // Lowercases and bounds a passthrough (AGENT=<name>) value the same charset+length
@@ -46,4 +78,28 @@ function sanitizeCaller(value: string): string {
   const s = value.trim().toLowerCase();
   if (s === "" || s.length > 32 || callerBooleanishSkip.has(s)) return "";
   return /^[a-z0-9._-]+$/.test(s) ? s : "";
+}
+
+export function normalizeModel(raw: string): string {
+  const model = raw.trim().toLowerCase();
+  if (!model) return "";
+  return callerPublicModels.has(model) ? model : "other";
+}
+
+export function clientEnrichmentDisabled(): boolean {
+  const proc = (
+    globalThis as {
+      process?: {
+        env?: Record<string, string | undefined>;
+        versions?: { node?: string };
+      };
+    }
+  ).process;
+  if (proc?.versions?.node === undefined) return false;
+  const env = proc.env ?? {};
+  return (
+    !!env.DO_NOT_TRACK ||
+    env.BIRD_TELEMETRY === "0" ||
+    env.BIRD_CLIENT_ENRICHMENT === "0"
+  );
 }

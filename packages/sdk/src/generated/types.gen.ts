@@ -347,6 +347,11 @@ export type Error = {
   error: ErrorBody;
 };
 
+/**
+ * Sort direction, ascending or descending.
+ */
+export type SortOrder = "asc" | "desc";
+
 export type UserId = string;
 
 /**
@@ -360,11 +365,6 @@ export type OrganizationId = string;
  * IANA timezone identifier, such as `America/New_York`, `Europe/Amsterdam`, or `UTC`.
  */
 export type Timezone = string;
-
-/**
- * Sort direction, ascending or descending.
- */
-export type SortOrder = "asc" | "desc";
 
 export type ListEnvelopeWithTotal = ListEnvelope & {
   /**
@@ -2294,6 +2294,38 @@ export type ContactCreateRequest = {
 };
 
 /**
+ * A contact to create or update. Field values are validated individually during processing, so an invalid contact returns a failed result while valid contacts are saved. The request must still contain an object with the declared field types. Omitted fields keep their stored values on an existing contact.
+ */
+export type ContactBatchEntry = {
+  /**
+   * Email address, up to 254 characters. Trimmed and lowercased before matching. Invalid addresses fail this contact.
+   */
+  email?: string;
+  /**
+   * Phone number with a country code, up to 32 characters. Spaces and punctuation are accepted. An empty string is treated as omitted.
+   */
+  phone_number?: string;
+  /**
+   * First name, up to 100 characters.
+   */
+  first_name?: string;
+  /**
+   * Last name, up to 100 characters.
+   */
+  last_name?: string;
+  /**
+   * Your identifier for the contact, up to 254 characters. Unique within the workspace when set.
+   */
+  external_id?: string;
+  /**
+   * Custom contact property values. Keys must be registered and active; values must match their declared type. Strings can contain up to 500 characters and the serialized map is limited to 2 KB. Invalid values fail this contact. Null values remove keys when updating and are ignored when creating.
+   */
+  data?: {
+    [key: string]: unknown;
+  };
+};
+
+/**
  * A contact identifier a batch entry can be matched on.
  */
 export type ContactMatchKey = "email" | "phone_number" | "external_id";
@@ -2302,7 +2334,7 @@ export type ContactUpsertRequest = {
   /**
    * Contacts to create or update, matched automatically against every identifier an entry supplies. Existing contacts are updated with the fields each entry supplies; omitted fields keep their stored values, so an entry can set fields but never clear them. Unmatched entries create contacts.
    */
-  contacts: Array<ContactCreateRequest>;
+  contacts: Array<ContactBatchEntry>;
   /**
    * Audiences every contact in this request is added to. Contacts that are already members are left in place. Every listed audience must exist, or the whole request fails with a validation error and nothing is written.
    */
@@ -10764,7 +10796,7 @@ export type AmbMessage = {
    */
   readonly tags?: Array<Tag>;
   /**
-   * Recorded message charge. Null in the initial send response and while unpriced. The AMB charge is the transaction amount; no passthrough component is priced.
+   * Recorded per-message charge before MAC pricing. Null in the initial send response, while unpriced, and for MAC-covered replies. MAC fees belong to monthly contact usage, not individual messages. Historical charges have no priced passthrough component.
    */
   readonly cost: MessageCost;
   /**
@@ -11185,10 +11217,14 @@ export type AmbStatsComparisonDelta = {
 };
 
 /**
- * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with computed changes for the message counts and rates listed in `delta`. Present only when `compare=previous_period` is requested. Monthly active contacts and latency values are returned for both periods without a computed change.
  *
  */
 export type AmbStatsComparison = {
+  /**
+   * New monthly active contact charges activated by replies submitted in this window. Each business-scoped contact counts once per UTC calendar month. Omitted for message-kind, intent, group, category or tag filters. Read from retained activation records independently of the message rollup data_as_of boundary; tenant purges remove these records.
+   */
+  readonly monthly_active_contacts?: number;
   /**
    * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows).
    */
@@ -11207,6 +11243,10 @@ export type AmbStatsComparison = {
  *
  */
 export type AmbStatsSummary = {
+  /**
+   * New monthly active contact charges activated by replies submitted in this window. Each business-scoped contact counts once per UTC calendar month. Omitted for message-kind, intent, group, category or tag filters. Read from retained activation records independently of the message rollup data_as_of boundary; tenant purges remove these records.
+   */
+  readonly monthly_active_contacts?: number;
   /**
    * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
    */
@@ -16381,7 +16421,7 @@ export type EmailCompetitiveCampaignFeed = {
    */
   panel_status: EmailCompetitivePanelStatus;
   /**
-   * Number of eligible campaigns in the first 300 newest panel rows for each tracked domain. This sampled value is independent of the returned page.
+   * Number of eligible campaigns in the first 100 newest panel rows for each tracked domain. This sampled value is independent of the returned page.
    *
    */
   readonly captured: number;
@@ -19135,7 +19175,7 @@ export type EventAmbMessageData = {
 };
 
 /**
- * Bird charged and accepted an outbound message for processing. This does not mean Apple received the message.
+ * An outbound message was accepted for processing after confirming billing coverage. This does not confirm receipt by Apple.
  */
 export type EventAmbAccepted = {
   type: AmbAcceptedEventType;
@@ -25120,7 +25160,7 @@ export type AmbStatsLatencyWritable = {
 };
 
 /**
- * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with computed changes for the message counts and rates listed in `delta`. Present only when `compare=previous_period` is requested. Monthly active contacts and latency values are returned for both periods without a computed change.
  *
  */
 export type AmbStatsComparisonWritable = {
@@ -26706,7 +26746,7 @@ export type EventAmbMessageDataWritable = {
 };
 
 /**
- * Bird charged and accepted an outbound message for processing. This does not mean Apple received the message.
+ * An outbound message was accepted for processing after confirming billing coverage. This does not confirm receipt by Apple.
  */
 export type EventAmbAcceptedWritable = {
   type: AmbAcceptedEventType;
@@ -27544,6 +27584,12 @@ export type IdempotencyKey = string;
 export type PaginationLimit = number;
 
 /**
+ * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+ *
+ */
+export type OrderDesc = SortOrder;
+
+/**
  * Sort direction. Defaults to `asc`, which sorts alphabetically or from oldest to newest, depending on the selected sort field.
  *
  */
@@ -27553,12 +27599,6 @@ export type OrderAsc = SortOrder;
  * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
  */
 export type IncludeTotal = boolean;
-
-/**
- * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
- *
- */
-export type OrderDesc = SortOrder;
 
 /**
  * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
@@ -29782,6 +29822,10 @@ export type CreateContactBatchErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Request body or message size exceeds the allowed limit
+   */
+  413: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -39911,6 +39955,14 @@ export type ListAmbConversationsData = {
      * Filter to conversations with this status. Omit to return both open and closed conversations.
      */
     status?: AmbConversationStatus;
+    /**
+     * Filter to conversations with this entry point intent, as sent in Apple's intentID. Conversations whose entry point carried no intent match only when this filter is omitted.
+     */
+    intent_id?: string;
+    /**
+     * Filter to conversations with this entry point group, as sent in Apple's groupID. Conversations whose entry point carried no group match only when this filter is omitted.
+     */
+    group_id?: string;
     /**
      * Filter to conversations in this queue. Pass an empty string to match unrouted conversations, the ones no routing rule has claimed.
      *

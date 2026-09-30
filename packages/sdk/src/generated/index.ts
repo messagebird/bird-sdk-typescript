@@ -596,6 +596,7 @@ export type {
   CompetitiveWatchlistBrandId,
   ComplianceSubmissionId,
   Contact,
+  ContactBatchEntry,
   ContactCreateRequest,
   ContactId,
   ContactIdentifierFilter,

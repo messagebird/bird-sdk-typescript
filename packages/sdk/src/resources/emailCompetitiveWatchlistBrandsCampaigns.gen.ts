@@ -15,7 +15,7 @@ and ordering: next_cursor advances with starting_after; prev_cursor or
 refresh_cursor reads preceding rows with ending_before. captured and
 promo_rate describe a sample independently of this page. next_cursor controls
 continuation; truncated can also describe the sample. captured counts eligible
-campaigns among the first 300 newest raw rows per domain; it is not the total
+campaigns among the first 100 newest raw rows per domain; it is not the total
 available across pages. promo_rate is the fraction of that sample whose
 subjects contain a recognized percentage-discount offer, not the share of all
 campaigns or revenue. Dollar discounts and free-shipping offers do not count.

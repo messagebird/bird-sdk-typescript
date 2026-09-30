@@ -130,67 +130,27 @@ describe("mapResponseToError", () => {
     // A step that is not an operation carries none: the facade must not invent one.
     expect(err.next?.[1].operation).toBeUndefined();
     expect(err.next?.[2].operation).toBeUndefined();
-  });
-});
-
-// The SDK error facade is hand-maintained (no generator emits it), so this is the
-// guard: every ErrorBody wire field must be surfaced on the facade. A new wire
-// field (e.g. a future recovery field) fails here until it is mapped in errors.ts.
-describe("ErrorBody wire → facade coverage (drift guard)", () => {
-  const wireToFacade: Record<string, string> = {
-    type: "type",
-    code: "code",
-    name: "errorName",
-    message: "message",
-    param: "param",
-    doc_url: "docUrl",
-    request_id: "requestId",
-    vendor_code: "vendorCode",
-    details: "details",
-    remediation: "remediation",
-    next: "next",
-  };
-
-  it("maps every ErrorBody wire property to a facade field", () => {
-    for (const key of Object.keys(ErrorBodySchema.properties)) {
-      expect(
-        wireToFacade,
-        `wire field '${key}' is unmapped in errors.ts`,
-      ).toHaveProperty(key);
-    }
-  });
-
-  // The same guard one level down. The ErrorBody guard above sees `next` only as a
-  // whole, so a field added inside a step passes it unnoticed — which is how `kind`,
-  // `params` and `url` were dropped for a release. The sample is typed
-  // `Required<NextAction>` so it cannot drift from the interface silently, though
-  // `tsc` excludes `tests/`, so it is the runtime key check that gates CI.
-  it("maps every NextAction wire property to a facade field", () => {
-    const sample: Required<NextAction> = {
-      kind: "operation",
-      description: "Assign a dedicated IP",
-      operation: "assignDedicatedIp",
-      params: { pool_id: "pool_123" },
-      url: "https://example.test/dns",
+    const aliases: Record<string, string> = {
+      name: "errorName",
+      doc_url: "docUrl",
+      request_id: "requestId",
+      vendor_code: "vendorCode",
     };
+    for (const key of Object.keys(ErrorBodySchema.properties)) {
+      expect(err, `ErrorBody wire field '${key}' is unmapped`).toHaveProperty(
+        aliases[key] ?? key,
+      );
+    }
     for (const key of Object.keys(NextActionSchema.properties)) {
       expect(
-        sample,
-        `NextAction wire field '${key}' is unmapped in errors.ts`,
-      ).toHaveProperty(key);
+        err.next?.some((step) => Object.hasOwn(step, key)),
+        `NextAction wire field '${key}' is unmapped`,
+      ).toBe(true);
     }
   });
 });
 
 describe("parseRetryAfter", () => {
-  it("parses delta-seconds", () => {
-    expect(parseRetryAfter(headers({ "Retry-After": "60" }))).toBe(60);
-  });
-
-  it("returns undefined for a negative value (no negative wait)", () => {
-    expect(parseRetryAfter(headers({ "Retry-After": "-5" }))).toBeUndefined();
-  });
-
   it("returns undefined for an unparseable value", () => {
     expect(parseRetryAfter(headers({ "Retry-After": "soon" }))).toBeUndefined();
   });

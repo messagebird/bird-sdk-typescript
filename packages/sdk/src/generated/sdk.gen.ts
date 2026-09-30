@@ -1947,6 +1947,8 @@ export const createContact = <ThrowOnError extends boolean = false>(
  *
  * Each entry succeeds or fails on its own: the response lists one result per contact in submission order (`created`, `updated`, or `failed` with the reason), and a failed entry does not abort the rest. If the request itself is invalid, for example when an entry in `audience_ids` does not exist, the whole request fails with a validation error and no contacts are written.
  *
+ * The JSON request body can contain up to 24 MiB (25,165,824 bytes), including escaped characters. Larger requests return HTTP `413` before any contacts are written. Split an oversized request into smaller batches.
+ *
  */
 export const createContactBatch = <ThrowOnError extends boolean = false>(
   options: Options<CreateContactBatchData, ThrowOnError>,
@@ -6380,7 +6382,7 @@ export const updateAmbChannelSettings = <ThrowOnError extends boolean = false>(
 /**
  * List Apple Messages for Business routing rules
  *
- * Returns the workspace's Apple Messages for Business routing rules, highest precedence first. A rule only runs when a conversation is created or reopened, matching it to a queue based on the group and intent its entry point carried. It never runs again while the conversation stays open, so a queue an operator moves a conversation to is not overwritten by the next message the customer sends.
+ * Returns the workspace's Apple Messages for Business routing rules, highest precedence first. Rules automatically run when a conversation is created or reopened, matching the group and intent from its entry point to a queue. Messages within an open conversation retain its queue. Rule changes affect only conversations that start or reopen afterwards.
  *
  */
 export const listAmbRoutingRules = <ThrowOnError extends boolean = false>(
@@ -6967,7 +6969,7 @@ export const getAmbSuppression = <ThrowOnError extends boolean = false>(
  *
  * `from` and `to` must both be calendar days or RFC 3339 instants. Day windows cover up to 365 whole days. Instant bounds round down to the hour, remain inclusive, and may span up to 720 hours. Mixing the forms returns `422`. Set `timezone` for local boundaries. Historical dates are supported within the maximum window length; the requested dates are not shifted forward.
  *
- * Set one dimension filter at most (`business_account_id`, `message_kind`, `intent`, `group`, `category`, or `tag`); more than one returns `422`. Use `compare=previous_period` to include the preceding equal-length window and each metric's change.
+ * Set one dimension filter at most (`business_account_id`, `message_kind`, `intent`, `group`, `category`, or `tag`); more than one returns `422`. Use `compare=previous_period` to include the preceding equal-length window and computed changes for the message counts and rates listed in `comparison.delta`. Monthly active contacts and latency values have no computed change.
  *
  */
 export const getAmbStatsSummary = <ThrowOnError extends boolean = false>(
@@ -9565,7 +9567,7 @@ export const getEmailCompetitiveBrand = <ThrowOnError extends boolean = false>(
  *
  * Returns a page of campaigns an email panel observed a watched brand sending over
  * the period, in the requested order. Sampled statistics describe eligible campaigns
- * in the first 300 newest panel rows for each tracked domain, independently of the page.
+ * in the first 100 newest panel rows for each tracked domain, independently of the page.
  *
  * Each campaign is one send the panel saw reach real inboxes, so the subject and
  * timing are what the brand's subscribers received rather than anything the brand

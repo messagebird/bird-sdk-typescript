@@ -49,7 +49,11 @@ const bird = new BirdClient({
   webhooks: { secret: process.env.BIRD_WEBHOOK_SECRET! },
 });
 
-await bird.email.send({ to: ["customer@example.com"], subject: "Hi", html: "…" });
+await bird.email.send({
+  to: ["customer@example.com"],
+  subject: "Hi",
+  html: "…",
+});
 ```
 
 ## Email
@@ -165,7 +169,10 @@ response.headers.get("ratelimit-remaining");
 For endpoints the typed resources don't cover yet, `request<T>()` runs the full lifecycle (auth, retries, idempotency, error mapping) — you supply the response type:
 
 ```ts
-const domains = await bird.request<DomainList>({ method: "GET", path: "/v1/email/domains" });
+const domains = await bird.request<DomainList>({
+  method: "GET",
+  path: "/v1/email/domains",
+});
 ```
 
 ## Configuration
@@ -187,3 +194,7 @@ new BirdClient({
 Use `bird.amb.send` to reply to an open, customer-initiated conversation as a configured, connected business account. Set `BIRD_API_KEY` and `AMB_CONVERSATION_ID`, then run the [Apple Messages example](examples/quickstart-amb.ts). The key needs `amb:read`, `amb:write` and `amb_management:read`.
 
 The example sends a real reply. Verify the recipient and content before running it. `accepted` means queued; `sent` means Apple gateway acceptance, not device delivery or a read receipt. Native payment, authentication and invitation requests are not part of this public channel release.
+
+## Client enrichment
+
+Requests can include caller provenance and **configured model (self-reported)** for matched Claude Code and Gemini environments. Only known public model IDs/aliases or `other` are sent. Set `BIRD_CLIENT_ENRICHMENT=0` to opt out; `DO_NOT_TRACK` and `BIRD_TELEMETRY=0` also disable enrichment. Existing header options accept a per-request `Bird-Model` declaration or `Bird-Enrichment: 0` opt-out; model declarations are normalized before sending.

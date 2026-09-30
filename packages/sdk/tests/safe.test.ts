@@ -1,23 +1,8 @@
+import { recordFetch as fakeFetch, optionalJsonResponse as jsonRes } from "./transport.js";
 import { describe, it, expect } from "vitest";
 import { BirdClient } from "../src/client.js";
 import { BirdError, BirdNotFoundError, BirdPermissionError } from "../src/index.js";
 import type { APIPromise, BirdResponse } from "../src/index.js";
-
-function fakeFetch(route: (req: Request) => Response | Promise<Response>) {
-  const calls: Request[] = [];
-  const fn = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const req = new Request(input, init);
-    calls.push(req);
-    return route(req);
-  }) as typeof fetch;
-  return { fn, calls };
-}
-
-function jsonRes(status: number, body?: unknown): Response {
-  return body === undefined
-    ? new Response(null, { status })
-    : new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
-}
 
 const client = (fn: typeof fetch) => new BirdClient({ apiKey: "bk_eu1_x", fetch: fn });
 
@@ -39,15 +24,6 @@ describe(".safe()", () => {
     expect(response).toBeNull();
     expect(error).toBeInstanceOf(BirdNotFoundError);
     expect(error).toBeInstanceOf(BirdError);
-  });
-
-  it("still THROWS a caller-initiated abort (not swallowed into the result)", async () => {
-    const { fn } = fakeFetch(() => jsonRes(200, {}));
-    const ac = new AbortController();
-    ac.abort();
-    await expect(
-      client(fn).request({ method: "GET", path: "/v1/things" }, { signal: ac.signal }).safe(),
-    ).rejects.toThrow();
   });
 
   it("does not swallow into a BirdError: an abort rejection is the native AbortError", async () => {

@@ -1,24 +1,9 @@
+import { scriptedFetch as fakeFetch, jsonResponse as json } from "../transport.js";
 import { describe, it, expect } from "vitest";
 import { BirdClient } from "../../src/client.js";
 
 // End-to-end through the real stack (client → resource → core → generated SDK);
 // only the transport `fetch` is faked.
-function fakeFetch(responses: Array<() => Response>) {
-  const calls: Request[] = [];
-  const fn = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const req = new Request(input, init);
-    calls.push(req);
-    return responses[Math.min(calls.length - 1, responses.length - 1)]();
-  }) as typeof fetch;
-  return { fn, calls };
-}
-
-function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
-}
 
 function bird(fn: typeof fetch) {
   return new BirdClient({ apiKey: "bk_eu1_test", fetch: fn });

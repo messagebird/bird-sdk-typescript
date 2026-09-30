@@ -1,16 +1,9 @@
+import { recordFetch, jsonResponse } from "../transport.js";
 import { describe, it, expect } from "vitest";
 import { BirdClient } from "../../src/client.js";
 
 function capture() {
-  const calls: Request[] = [];
-  const fn = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    calls.push(new Request(input, init));
-    return new Response(JSON.stringify({ id: "eb_1", status: "scheduled" }), {
-      status: 202,
-      headers: { "content-type": "application/json" },
-    });
-  }) as typeof fetch;
-  return { fn, calls };
+  return recordFetch(() => jsonResponse(202, { id: "eb_1", status: "scheduled" }));
 }
 
 function bird(fn: typeof fetch) {

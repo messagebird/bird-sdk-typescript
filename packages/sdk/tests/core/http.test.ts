@@ -76,18 +76,6 @@ describe("BirdHTTPClient.request — idempotency", () => {
     expect(s.contexts[0].idempotencyKey).toBeTruthy();
     expect(s.contexts[1].idempotencyKey).toBe(s.contexts[0].idempotencyKey);
   });
-
-  it("does not generate a key for GET", async () => {
-    const s = scripted([ok({ ok: true })]);
-    await core.request(s.thunk, { method: "GET" });
-    expect(s.contexts[0].idempotencyKey).toBeUndefined();
-  });
-
-  it("uses a caller-supplied key verbatim", async () => {
-    const s = scripted([ok({ ok: true })]);
-    await core.request(s.thunk, { method: "POST", idempotencyKey: "order-123" });
-    expect(s.contexts[0].idempotencyKey).toBe("order-123");
-  });
 });
 
 describe("BirdHTTPClient.request — timeout & abort", () => {

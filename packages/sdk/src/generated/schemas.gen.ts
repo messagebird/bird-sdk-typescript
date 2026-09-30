@@ -496,6 +496,12 @@ export const ErrorSchema = {
   },
 } as const;
 
+export const SortOrderSchema = {
+  type: "string",
+  enum: ["asc", "desc"],
+  description: "Sort direction, ascending or descending.",
+} as const;
+
 export const UserIDSchema = {
   type: "string",
   minLength: 1,
@@ -524,12 +530,6 @@ export const TimezoneSchema = {
   description:
     "IANA timezone identifier, such as `America/New_York`, `Europe/Amsterdam`, or `UTC`.",
   example: "America/New_York",
-} as const;
-
-export const SortOrderSchema = {
-  type: "string",
-  enum: ["asc", "desc"],
-  description: "Sort direction, ascending or descending.",
 } as const;
 
 export const _ListEnvelopeWithTotalSchema = {
@@ -3896,6 +3896,44 @@ export const ContactCreateRequestSchema = {
   },
 } as const;
 
+export const ContactBatchEntrySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A contact to create or update. Field values are validated individually during processing, so an invalid contact returns a failed result while valid contacts are saved. The request must still contain an object with the declared field types. Omitted fields keep their stored values on an existing contact.",
+  properties: {
+    email: {
+      type: "string",
+      description:
+        "Email address, up to 254 characters. Trimmed and lowercased before matching. Invalid addresses fail this contact.",
+    },
+    phone_number: {
+      type: "string",
+      description:
+        "Phone number with a country code, up to 32 characters. Spaces and punctuation are accepted. An empty string is treated as omitted.",
+    },
+    first_name: {
+      type: "string",
+      description: "First name, up to 100 characters.",
+    },
+    last_name: {
+      type: "string",
+      description: "Last name, up to 100 characters.",
+    },
+    external_id: {
+      type: "string",
+      description:
+        "Your identifier for the contact, up to 254 characters. Unique within the workspace when set.",
+    },
+    data: {
+      type: "object",
+      additionalProperties: true,
+      description:
+        "Custom contact property values. Keys must be registered and active; values must match their declared type. Strings can contain up to 500 characters and the serialized map is limited to 2 KB. Invalid values fail this contact. Null values remove keys when updating and are ignored when creating.",
+    },
+  },
+} as const;
+
 export const ContactMatchKeySchema = {
   type: "string",
   enum: ["email", "phone_number", "external_id"],
@@ -3912,7 +3950,7 @@ export const ContactUpsertRequestSchema = {
       minItems: 1,
       maxItems: 1000,
       items: {
-        $ref: "#/components/schemas/ContactCreateRequest",
+        $ref: "#/components/schemas/ContactBatchEntry",
       },
       description:
         "Contacts to create or update, matched automatically against every identifier an entry supplies. Existing contacts are updated with the fields each entry supplies; omitted fields keep their stored values, so an entry can set fields but never clear them. Unmatched entries create contacts.",
@@ -20002,7 +20040,7 @@ export const AMBMessageSchema = {
       readOnly: true,
       $ref: "#/components/schemas/MessageCost",
       description:
-        "Recorded message charge. Null in the initial send response and while unpriced. The AMB charge is the transaction amount; no passthrough component is priced.",
+        "Recorded per-message charge before MAC pricing. Null in the initial send response, while unpriced, and for MAC-covered replies. MAC fees belong to monthly contact usage, not individual messages. Historical charges have no priced passthrough component.",
     },
     last_error: {
       readOnly: true,
@@ -20779,9 +20817,17 @@ export const AMBStatsComparisonSchema = {
   additionalProperties: false,
   readOnly: true,
   description:
-    "The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.\n",
+    "The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with computed changes for the message counts and rates listed in `delta`. Present only when `compare=previous_period` is requested. Monthly active contacts and latency values are returned for both periods without a computed change.\n",
   required: ["period", "counts", "latency", "delta"],
   properties: {
+    monthly_active_contacts: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "New monthly active contact charges activated by replies submitted in this window. Each business-scoped contact counts once per UTC calendar month. Omitted for message-kind, intent, group, category or tag filters. Read from retained activation records independently of the message rollup data_as_of boundary; tenant purges remove these records.",
+    },
     period: {
       readOnly: true,
       $ref: "#/components/schemas/AMBStatsSummaryPeriod",
@@ -20816,6 +20862,14 @@ export const AMBStatsSummarySchema = {
     "Outbound Apple Messages for Business counts and latency percentiles for the full requested period. Counts and percentiles are computed over the whole period rather than combined from the returned time-series values.\n",
   required: ["period", "attribution", "counts", "latency"],
   properties: {
+    monthly_active_contacts: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "New monthly active contact charges activated by replies submitted in this window. Each business-scoped contact counts once per UTC calendar month. Omitted for message-kind, intent, group, category or tag filters. Read from retained activation records independently of the message rollup data_as_of boundary; tenant purges remove these records.",
+    },
     period: {
       readOnly: true,
       $ref: "#/components/schemas/AMBStatsSummaryPeriod",
@@ -29810,7 +29864,7 @@ export const EmailCompetitiveCampaignFeedSchema = {
           type: "integer",
           readOnly: true,
           description:
-            "Number of eligible campaigns in the first 300 newest panel rows for each tracked domain. This sampled value is independent of the returned page.\n",
+            "Number of eligible campaigns in the first 100 newest panel rows for each tracked domain. This sampled value is independent of the returned page.\n",
           example: 38,
         },
         promo_rate: {
@@ -34447,7 +34501,7 @@ export const EventAMBAcceptedSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Bird charged and accepted an outbound message for processing. This does not mean Apple received the message.",
+    "An outbound message was accepted for processing after confirming billing coverage. This does not confirm receipt by Apple.",
   required: ["type", "timestamp", "data"],
   properties: {
     type: {
@@ -45073,7 +45127,7 @@ export const AMBStatsComparisonWritableSchema = {
   additionalProperties: false,
   readOnly: true,
   description:
-    "The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.\n",
+    "The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with computed changes for the message counts and rates listed in `delta`. Present only when `compare=previous_period` is requested. Monthly active contacts and latency values are returned for both periods without a computed change.\n",
 } as const;
 
 export const AMBStatsSummaryWritableSchema = {
@@ -47518,7 +47572,7 @@ export const EventAMBAcceptedWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Bird charged and accepted an outbound message for processing. This does not mean Apple received the message.",
+    "An outbound message was accepted for processing after confirming billing coverage. This does not confirm receipt by Apple.",
   required: ["type", "timestamp", "data"],
   properties: {
     type: {

@@ -4,7 +4,11 @@ import {
   type Client,
 } from "./generated/client/index.js";
 import { baseUrlForRegion, regionFromApiKey } from "./region.js";
-import { detectCaller } from "./detect-caller.js";
+import {
+  detectCallerInfo,
+  normalizeModel,
+  clientEnrichmentDisabled,
+} from "./detect-caller.js";
 import {
   BirdHTTPClient,
   type AttemptContext,
@@ -103,6 +107,21 @@ type EmailDefaultsOf<O> = O extends {
 }
   ? E
   : undefined;
+
+function withoutCallerHeaders(
+  headers?: Record<string, string>,
+): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(headers ?? {}).filter(
+      ([key]) =>
+        ![
+          "bird-caller",
+          "bird-caller-source",
+          "bird-caller-execution",
+        ].includes(key.toLowerCase()),
+    ),
+  );
+}
 
 // Precedence: explicit baseUrl, then explicit region, then the key's region
 // prefix. There is no region-less data-plane host, so an unresolvable region
@@ -255,9 +274,8 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
         "This client has no API key (webhook verification only); pass `apiKey` to call the API.";
     }
     this.#baseUrl = resolveBaseUrl(opts);
-    this.#fetch = opts.fetch ?? fetch;
     this.#headers = {
-      ...opts.defaultHeaders,
+      ...withoutCallerHeaders(opts.defaultHeaders),
       ...(opts.apiKey ? { Authorization: `Bearer ${opts.apiKey}` } : {}),
       "User-Agent": `bird-sdk-js/${__SDK_VERSION__}`,
       // Bird-* client-identity headers attribute the SDK surface. The User-Agent
@@ -266,10 +284,74 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
       "Bird-Surface": "sdk-js",
       "Bird-Version": __SDK_VERSION__,
     };
-    // Bird-Caller identifies the driving agent harness. It is empty in a browser
-    // or when no agent environment is present, so the header is omitted.
-    const caller = detectCaller();
-    if (caller) this.#headers["Bird-Caller"] = caller;
+    const caller = detectCallerInfo();
+    if (caller.name) {
+      this.#headers["Bird-Caller"] = caller.name;
+      this.#headers["Bird-Caller-Source"] = caller.source;
+      this.#headers["Bird-Caller-Execution"] = caller.execution;
+    }
+    const rawFetch = opts.fetch ?? fetch;
+    const disabled =
+      new Headers(opts.defaultHeaders).get("Bird-Enrichment") === "0";
+    this.#fetch = Object.assign(
+      (
+        input: Parameters<typeof fetch>[0],
+        init?: Parameters<typeof fetch>[1],
+      ) => {
+        const url = input instanceof Request ? input.url : String(input);
+        if (
+          this.#baseUrl === undefined ||
+          new URL(url).origin !== new URL(this.#baseUrl).origin
+        )
+          return rawFetch(input, init);
+        const headers = new Headers(
+          init?.headers ??
+            (input instanceof Request ? input.headers : undefined),
+        );
+        for (const key of [
+          "Bird-Caller",
+          "Bird-Caller-Source",
+          "Bird-Caller-Execution",
+        ]) {
+          const value = this.#headers[key];
+          if (value) headers.set(key, value);
+          else headers.delete(key);
+        }
+        if (
+          disabled ||
+          clientEnrichmentDisabled() ||
+          headers.get("Bird-Enrichment") === "0"
+        ) {
+          headers.set("Bird-Enrichment", "0");
+          for (const key of [
+            "Bird-Caller",
+            "Bird-Caller-Source",
+            "Bird-Caller-Execution",
+            "Bird-Model",
+            "Bird-Model-Source",
+          ])
+            headers.delete(key);
+        } else {
+          const declared = headers.has("Bird-Model");
+          const model = declared
+            ? normalizeModel(headers.get("Bird-Model") ?? "")
+            : caller.model;
+          headers.delete("Bird-Model");
+          headers.delete("Bird-Model-Source");
+          if (model) {
+            headers.set("Bird-Model", model);
+            headers.set(
+              "Bird-Model-Source",
+              declared ? "declared" : caller.modelSource,
+            );
+          }
+        }
+        return input instanceof Request
+          ? rawFetch(new Request(input, { ...init, headers }))
+          : rawFetch(input, { ...init, headers });
+      },
+      rawFetch,
+    );
     this.#client = createClient(
       createConfig({
         baseUrl: this.#baseUrl,
@@ -389,12 +471,23 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
       }
     }
     // SDK-internal headers (auth, idempotency) win over caller-supplied ones.
-    const headers: Record<string, string> = {
-      ...extraHeaders,
+    const headers = new Headers({
+      ...withoutCallerHeaders(req.headers),
+      ...withoutCallerHeaders(extraHeaders),
       ...this.#headers,
-    };
-    if (ctx.idempotencyKey) headers["Idempotency-Key"] = ctx.idempotencyKey;
-    if (req.body !== undefined) headers["Content-Type"] = "application/json";
+    });
+    for (const supplied of [req.headers, extraHeaders]) {
+      for (const [key, value] of Object.entries(supplied ?? {})) {
+        if (
+          ["bird-model", "bird-model-source", "bird-enrichment"].includes(
+            key.toLowerCase(),
+          )
+        )
+          headers.set(key, value);
+      }
+    }
+    if (ctx.idempotencyKey) headers.set("Idempotency-Key", ctx.idempotencyKey);
+    if (req.body !== undefined) headers.set("Content-Type", "application/json");
 
     const response = await this.#fetch(url, {
       method: req.method,
