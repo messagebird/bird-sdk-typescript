@@ -39982,7 +39982,7 @@ export const VoiceVerifiedNumberStatusSchema = {
   minLength: 1,
   "x-extensible-enum": ["pending", "verified", "failed"],
   description:
-    "Verification state of the verified number.\n\n- `pending`: the number is registered but ownership has not yet been proven.\n- `verified`: the workspace proved ownership of the number. Check the\n  resource's activation or direction fields for outbound availability.\n- `failed`: terminal because the verification challenge expired or the attempt limit was exhausted.\n  Remove and register the verified number again in the dashboard to retry.\n\nOpen enum: additional states may be added over time, so treat an unrecognized\nvalue as a future state rather than an error.\n",
+    "Verification state of the verified number.\n\n- `pending`: the number is registered but ownership has not yet been proven.\n- `verified`: the workspace proved ownership of the number. Check the\n  resource's activation or direction fields for outbound availability.\n- `failed`: terminal because the verification challenge expired or the attempt limit was exhausted.\n  Delete the verified number and register it again to retry.\n\nOpen enum: additional states may be added over time, so treat an unrecognized\nvalue as a future state rather than an error.\n",
   example: "pending",
 } as const;
 
@@ -40483,6 +40483,47 @@ export const VoiceVerifiedNumberListSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
+} as const;
+
+export const VoiceVerifiedNumberCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["phone_number"],
+  properties: {
+    phone_number: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The phone number to register as an outbound caller ID, in E.164 format (a leading `+` followed by the country code and national number). Must be unique within the workspace. Creating the verified number starts verification: a verification call is placed to this number.\n",
+      example: "+14155551234",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "Your label for this verified number, to tell several registered numbers apart. Omit it to register the number without one and add it later. It is yours to choose and appears nowhere on a call, so it never affects what the person you are calling sees.\n",
+      example: "Support line",
+    },
+  },
+} as const;
+
+export const VoiceVerifiedNumberUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  description:
+    "A change to the verified number's label. Every field is optional; an omitted field is left unchanged.\n",
+  properties: {
+    name: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "Your new label for this verified number. Send `null` to clear it and go back to identifying the verified number by its number alone. It is yours to choose and appears nowhere on a call, so renaming never affects what the person you are calling sees, and it leaves the number and its verification untouched.\n",
+      example: "Support line",
+    },
+  },
 } as const;
 
 export const VoiceVerifiedNumberVerifyRequestSchema = {

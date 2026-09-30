@@ -132,6 +132,9 @@ import type {
   CreateVoiceTrunkGatewayErrors,
   CreateVoiceTrunkGatewayResponses,
   CreateVoiceTrunkResponses,
+  CreateVoiceVerifiedNumberData,
+  CreateVoiceVerifiedNumberErrors,
+  CreateVoiceVerifiedNumberResponses,
   CreateWebhookData,
   CreateWebhookErrors,
   CreateWebhookReplayData,
@@ -213,6 +216,9 @@ import type {
   DeleteVoiceTrunkGatewayErrors,
   DeleteVoiceTrunkGatewayResponses,
   DeleteVoiceTrunkResponses,
+  DeleteVoiceVerifiedNumberData,
+  DeleteVoiceVerifiedNumberErrors,
+  DeleteVoiceVerifiedNumberResponses,
   DeleteWebhookData,
   DeleteWebhookErrors,
   DeleteWebhookResponses,
@@ -947,6 +953,9 @@ import type {
   UpdateVoiceTrunkGatewayErrors,
   UpdateVoiceTrunkGatewayResponses,
   UpdateVoiceTrunkResponses,
+  UpdateVoiceVerifiedNumberData,
+  UpdateVoiceVerifiedNumberErrors,
+  UpdateVoiceVerifiedNumberResponses,
   UpdateWebhookData,
   UpdateWebhookErrors,
   UpdateWebhookResponses,
@@ -8927,7 +8936,7 @@ export const getEmailStatsByComplaintType = <
  *
  * Rows are ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, hard maximum 200). Rows are computed against event time (not send time), so engagement received during the period for messages sent earlier is included.
  *
- * The maximum window is 365 days. Requesting a longer range returns a `422`. This breakdown is computed from per-message activity retained for 30 days, so it reflects roughly the last 30 days of activity even when the requested window reaches further back.
+ * The maximum window is 365 days. Requesting a longer range returns a `422`. Aggregate statistics remain available after the underlying message activity details expire. Counts and latency percentiles are approximate and may lag newly received activity; `data_as_of` reports refresh freshness when available. Historical results include only activity captured before those details expired.
  *
  */
 export const getEmailStatsByBroadcast = <ThrowOnError extends boolean = false>(
@@ -12201,6 +12210,85 @@ export const listVoiceVerifiedNumbers = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Create a verified number
+ *
+ * Registers a phone number as an outbound caller ID for the workspace and starts
+ * verification. The API places a verification call to the number that reads out
+ * a code; submit that code to the verify endpoint to prove ownership. The
+ * verified number is returned in the "pending" state until verification completes.
+ *
+ * Idempotency is optional. For retry protection, supply an `Idempotency-Key`
+ * on the first attempt and reuse it with the same request. A retained successful
+ * response is replayed for three hours. Without a key, retries are processed
+ * normally and can return `409` if the number is already registered. If a
+ * response is lost, list the workspace's verified numbers to check the registration
+ * before trying again.
+ *
+ * A `412` means required identity verification is incomplete or organization
+ * eligibility prevents registration. Follow the error's recovery guidance:
+ * complete missing verification, or contact support about an eligibility review
+ * or denial. An eligibility assessment still in progress returns `503`; retry later.
+ *
+ */
+export const createVoiceVerifiedNumber = <ThrowOnError extends boolean = false>(
+  options: Options<CreateVoiceVerifiedNumberData, ThrowOnError>,
+): RequestResult<
+  CreateVoiceVerifiedNumberResponses,
+  CreateVoiceVerifiedNumberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateVoiceVerifiedNumberResponses,
+    CreateVoiceVerifiedNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/verified-numbers",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a verified number
+ *
+ * Removes the verified number. After deletion the number can no longer be presented as the outbound caller ID; register and verify it again to reuse it.
+ *
+ */
+export const deleteVoiceVerifiedNumber = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteVoiceVerifiedNumberData, ThrowOnError>,
+): RequestResult<
+  DeleteVoiceVerifiedNumberResponses,
+  DeleteVoiceVerifiedNumberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteVoiceVerifiedNumberResponses,
+    DeleteVoiceVerifiedNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/verified-numbers/{verified_number_id}",
+    ...options,
+  });
+
+/**
  * Get a verified number
  *
  * Returns the verified number with the given ID, including its verification status.
@@ -12230,19 +12318,53 @@ export const getVoiceVerifiedNumber = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Update a verified number
+ *
+ * Updates the verified number's label. Omitted fields stay unchanged, and sending `name` as null clears the label. The number itself cannot be changed: register the number you want and verify it separately. Renaming leaves the verification state untouched, so a verified number stays usable and a pending one keeps the code it is waiting for.
+ *
+ */
+export const updateVoiceVerifiedNumber = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateVoiceVerifiedNumberData, ThrowOnError>,
+): RequestResult<
+  UpdateVoiceVerifiedNumberResponses,
+  UpdateVoiceVerifiedNumberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateVoiceVerifiedNumberResponses,
+    UpdateVoiceVerifiedNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/verified-numbers/{verified_number_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * Verify number ownership
  *
- * Completes a number ownership verification challenge started in the dashboard. Submit
- * the code delivered by the verification call. An incorrect code is rejected.
+ * Completes the number ownership verification challenge that registering the number
+ * started. Submit the code delivered by the verification call. An incorrect code is
+ * rejected.
  *
  * If the verification call could not be started previously, this request can
  * retry it and place another call to the same number. Your organization must
  * still meet the identity-verification requirements for registering verified numbers;
  * otherwise the request returns `412`. For an expired or exhausted challenge,
- * use **Get a new code** under **Voice** > **Numbers** in the dashboard to remove
- * and register the verified number again. List verified numbers again to obtain the new
- * registration ID before submitting its code. Number registration and deletion
- * are not available through the public API.
+ * delete the verified number and register it again, which places a new
+ * verification call, and submit the new code against the ID the registration
+ * returns.
  *
  * A successful ownership check is retained even when organization eligibility
  * prevents outbound activation. If the verified number's `status` is `verified` after

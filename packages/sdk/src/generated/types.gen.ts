@@ -22332,7 +22332,7 @@ export type VoiceNumberProviderAllocation = {
  * - `verified`: the workspace proved ownership of the number. Check the
  * resource's activation or direction fields for outbound availability.
  * - `failed`: terminal because the verification challenge expired or the attempt limit was exhausted.
- * Remove and register the verified number again in the dashboard to retry.
+ * Delete the verified number and register it again to retry.
  *
  * Open enum: additional states may be added over time, so treat an unrecognized
  * value as a future state rather than an error.
@@ -22591,6 +22591,31 @@ export type VoiceVerifiedNumber = {
 export type VoiceVerifiedNumberList = {
   data: Array<VoiceVerifiedNumber>;
 } & ListEnvelope;
+
+export type VoiceVerifiedNumberCreate = {
+  /**
+   * The phone number to register as an outbound caller ID, in E.164 format (a leading `+` followed by the country code and national number). Must be unique within the workspace. Creating the verified number starts verification: a verification call is placed to this number.
+   *
+   */
+  phone_number: string;
+  /**
+   * Your label for this verified number, to tell several registered numbers apart. Omit it to register the number without one and add it later. It is yours to choose and appears nowhere on a call, so it never affects what the person you are calling sees.
+   *
+   */
+  name?: string;
+};
+
+/**
+ * A change to the verified number's label. Every field is optional; an omitted field is left unchanged.
+ *
+ */
+export type VoiceVerifiedNumberUpdate = {
+  /**
+   * Your new label for this verified number. Send `null` to clear it and go back to identifying the verified number by its number alone. It is yours to choose and appears nowhere on a call, so renaming never affects what the person you are calling sees, and it leaves the number and its verification untouched.
+   *
+   */
+  name?: string | null;
+};
 
 export type VoiceVerifiedNumberVerifyRequest = {
   /**
@@ -45311,13 +45336,18 @@ export type GetEmailStatsByBroadcastData = {
      */
     ending_before?: string;
     /**
-     * Start date (inclusive) in `YYYY-MM-DD`, UTC. Defaults to 30 days before `to` when omitted.
+     * Start date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (UTC when omitted). Defaults to 30 days before `to` when omitted.
      */
     from?: string;
     /**
-     * End date (inclusive) in `YYYY-MM-DD`, UTC. Defaults to today (UTC) when omitted. Window may not exceed 365 days.
+     * End date (inclusive) in `YYYY-MM-DD`, interpreted as a calendar day in `timezone` (UTC when omitted). Defaults to today in that timezone when omitted. Window may not exceed 365 days.
      */
     to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
     /**
      * Not supported on breakdown endpoints. Supplying it returns a `422`. To compare categories, use `GET /v1/email/stats/categories`. The summary, daily, and hourly statistics accept `category` as a filter.
      */
@@ -52639,6 +52669,190 @@ export type ListVoiceVerifiedNumbersResponses = {
 export type ListVoiceVerifiedNumbersResponse =
   ListVoiceVerifiedNumbersResponses[keyof ListVoiceVerifiedNumbersResponses];
 
+export type CreateVoiceVerifiedNumberData = {
+  body: VoiceVerifiedNumberCreate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/voice/verified-numbers";
+};
+
+export type CreateVoiceVerifiedNumberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateVoiceVerifiedNumberError =
+  CreateVoiceVerifiedNumberErrors[keyof CreateVoiceVerifiedNumberErrors];
+
+export type CreateVoiceVerifiedNumberResponses = {
+  /**
+   * Verified number registered and pending verification.
+   */
+  201: VoiceVerifiedNumber;
+};
+
+export type CreateVoiceVerifiedNumberResponse =
+  CreateVoiceVerifiedNumberResponses[keyof CreateVoiceVerifiedNumberResponses];
+
+export type DeleteVoiceVerifiedNumberData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    verified_number_id: VoiceVerifiedNumberId;
+  };
+  query?: never;
+  url: "/v1/voice/verified-numbers/{verified_number_id}";
+};
+
+export type DeleteVoiceVerifiedNumberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteVoiceVerifiedNumberError =
+  DeleteVoiceVerifiedNumberErrors[keyof DeleteVoiceVerifiedNumberErrors];
+
+export type DeleteVoiceVerifiedNumberResponses = {
+  /**
+   * Verified number deleted.
+   */
+  204: void;
+};
+
+export type DeleteVoiceVerifiedNumberResponse =
+  DeleteVoiceVerifiedNumberResponses[keyof DeleteVoiceVerifiedNumberResponses];
+
 export type GetVoiceVerifiedNumberData = {
   body?: never;
   headers?: {
@@ -52698,6 +52912,99 @@ export type GetVoiceVerifiedNumberResponses = {
 
 export type GetVoiceVerifiedNumberResponse =
   GetVoiceVerifiedNumberResponses[keyof GetVoiceVerifiedNumberResponses];
+
+export type UpdateVoiceVerifiedNumberData = {
+  body: VoiceVerifiedNumberUpdate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    verified_number_id: VoiceVerifiedNumberId;
+  };
+  query?: never;
+  url: "/v1/voice/verified-numbers/{verified_number_id}";
+};
+
+export type UpdateVoiceVerifiedNumberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateVoiceVerifiedNumberError =
+  UpdateVoiceVerifiedNumberErrors[keyof UpdateVoiceVerifiedNumberErrors];
+
+export type UpdateVoiceVerifiedNumberResponses = {
+  /**
+   * Updated verified number.
+   */
+  200: VoiceVerifiedNumber;
+};
+
+export type UpdateVoiceVerifiedNumberResponse =
+  UpdateVoiceVerifiedNumberResponses[keyof UpdateVoiceVerifiedNumberResponses];
 
 export type VerifyVoiceVerifiedNumberData = {
   body: VoiceVerifiedNumberVerifyRequest;

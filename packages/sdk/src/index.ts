@@ -676,7 +676,11 @@ export type {
   VoiceTrunksGatewaysCreateParams,
   VoiceTrunksGatewaysUpdateParams,
 } from "./resources/voiceTrunksGateways.gen.js";
-export type { VoiceVerifiedNumbersVerifyParams } from "./resources/voiceVerifiedNumbers.gen.js";
+export type {
+  VoiceVerifiedNumbersCreateParams,
+  VoiceVerifiedNumbersUpdateParams,
+  VoiceVerifiedNumbersVerifyParams,
+} from "./resources/voiceVerifiedNumbers.gen.js";
 
 export type {
   AmbListEventsQuery,

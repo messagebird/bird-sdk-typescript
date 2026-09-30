@@ -126,6 +126,21 @@ export async function voiceVerifiedNumbersVerify() {
   console.log(verifiedNumber.id, verifiedNumber.status);
 }
 
+export async function voiceVerifiedNumbersCreate() {
+  // This places a verification call to the number that reads out a code.
+  const verifiedNumber = await bird.voice.verifiedNumbers.create({ phone_number: "+14155551234", name: "Support line" });
+  console.log(verifiedNumber.id, verifiedNumber.status);
+}
+
+export async function voiceVerifiedNumbersUpdate() {
+  const verifiedNumber = await bird.voice.verifiedNumbers.update("vvn_01krdgeqcxet5s7t44vh8rt9mg", { name: "Sales line" });
+  console.log(verifiedNumber.name);
+}
+
+export async function voiceVerifiedNumbersDelete() {
+  await bird.voice.verifiedNumbers.delete("vvn_01krdgeqcxet5s7t44vh8rt9mg");
+}
+
 export async function voiceDestinationsUpdate() {
   const destinations = await bird.voice.destinations.update({
     destinations: [{ country_code: "PT", enabled: true }],
