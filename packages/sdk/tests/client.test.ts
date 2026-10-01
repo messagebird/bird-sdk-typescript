@@ -3,24 +3,12 @@ import { describe, it, expect, vi } from "vitest";
 import {
   BirdClient,
   BirdError,
-  BirdAPIError,
-  BirdAuthError,
   BirdMissingApiKeyError,
-  BirdRateLimitError,
   regionFromApiKey,
   baseUrlForRegion,
 } from "../src/index.js";
 
 import { detectCallerInfo } from "../src/detect-caller.js";
-
-const errorFields = {
-  code: "E1",
-  type: "bad_request_error",
-  errorName: "Bad",
-  message: "msg",
-  docUrl: "",
-  requestId: "",
-};
 
 describe("BirdClient", () => {
   it("keeps SDK provenance when default and call headers use different casing", async () => {
@@ -43,6 +31,7 @@ describe("BirdClient", () => {
           return new Response("{}", { status: 200 });
         }) as typeof fetch,
       });
+      expect(client).toBeInstanceOf(BirdClient);
       await client.request(
         { method: "GET", path: "/v1/workspace" },
         {
@@ -76,19 +65,6 @@ describe("BirdClient", () => {
     }
   });
 
-  it("constructs with required options", () => {
-    const client = new BirdClient({ apiKey: "bk_us1_test123" });
-    expect(client).toBeInstanceOf(BirdClient);
-  });
-
-  it("constructs with custom base URL", () => {
-    const client = new BirdClient({
-      apiKey: "bk_us1_test123",
-      baseUrl: "http://localhost:8080",
-    });
-    expect(client).toBeInstanceOf(BirdClient);
-  });
-
   it("throws when the region cannot be determined", () => {
     expect(() => new BirdClient({ apiKey: "bk_live_legacy" })).toThrow(
       /region/i,
@@ -96,10 +72,13 @@ describe("BirdClient", () => {
   });
 
   it("accepts an unparseable key when baseUrl is given", () => {
-    const client = new BirdClient({
-      apiKey: "bk_live_legacy",
-      baseUrl: "http://localhost:8080",
-    });
+    let client!: BirdClient;
+    expect(() => {
+      client = new BirdClient({
+        apiKey: "bk_live_legacy",
+        baseUrl: "http://localhost:8080",
+      });
+    }).not.toThrow();
     expect(client).toBeInstanceOf(BirdClient);
   });
 });
@@ -121,45 +100,8 @@ describe("region resolution", () => {
   });
 });
 
-describe("Error hierarchy", () => {
-  it("BirdAPIError extends BirdError", () => {
-    const err = new BirdAPIError({ ...errorFields, statusCode: 400 });
-    expect(err).toBeInstanceOf(BirdError);
-    expect(err).toBeInstanceOf(BirdAPIError);
-    expect(err.statusCode).toBe(400);
-    expect(err.code).toBe("E1");
-  });
-
-  it("BirdAuthError extends BirdAPIError", () => {
-    const err = new BirdAuthError({
-      ...errorFields,
-      statusCode: 401,
-      type: "auth_error",
-    });
-    expect(err).toBeInstanceOf(BirdAPIError);
-    expect(err.statusCode).toBe(401);
-  });
-
-  it("BirdRateLimitError extends BirdAPIError", () => {
-    const err = new BirdRateLimitError({
-      ...errorFields,
-      statusCode: 429,
-      type: "rate_limit_error",
-      retryAfter: 30,
-    });
-    expect(err).toBeInstanceOf(BirdAPIError);
-    expect(err.statusCode).toBe(429);
-    expect(err.retryAfter).toBe(30);
-  });
-});
-
 describe("receiver-only client (no apiKey)", () => {
   const secret = "whsec_C2FVsBQIhrscChlQIMV+b5sSYspob7oD";
-
-  it("constructs from a webhook secret alone", () => {
-    const client = new BirdClient({ webhooks: { secret } });
-    expect(client).toBeInstanceOf(BirdClient);
-  });
 
   it("rejects API calls with BirdMissingApiKeyError", async () => {
     const client = new BirdClient({ webhooks: { secret } });

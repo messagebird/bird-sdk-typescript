@@ -1,3 +1,4 @@
+import { recordFetch, jsonResponse } from "../transport.js";
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { BirdClient } from "../../src/client.js";
@@ -59,17 +60,11 @@ const APP = "rap_01krdgeqcxet5s7t44vh8rt9mg";
 const MASTER = vectors.encrypt[0]!.master_key;
 
 function fakeFetch() {
-  const calls: Request[] = [];
   const bodies: unknown[] = [];
-  const fn = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const req = new Request(input, init);
-    calls.push(req);
-    bodies.push(JSON.parse(await req.clone().text()));
-    return new Response(JSON.stringify({ data: [] }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
-  }) as typeof fetch;
+  const { fn, calls } = recordFetch(async (request) => {
+    bodies.push(JSON.parse(await request.clone().text()));
+    return jsonResponse(200, { data: [] });
+  });
   return { fn, calls, bodies };
 }
 

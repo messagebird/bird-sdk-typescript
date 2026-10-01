@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.82.1
+
+- `bird.amb.routingRules.list` documentation now states that routing rules run again when a customer writes to a resolved Apple Messages for Business conversation.
+
 ## 0.82.0
 
 - Add `monthly_active_contacts` to Apple Messages statistics summaries.

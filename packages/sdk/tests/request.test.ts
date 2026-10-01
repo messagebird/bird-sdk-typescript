@@ -1,7 +1,7 @@
 import { recordFetch as fakeFetch, optionalJsonResponse as jsonRes } from "./transport.js";
 import { describe, it, expect } from "vitest";
 import { BirdClient } from "../src/client.js";
-import { BirdNotFoundError } from "../src/index.js";
+import { BirdError, BirdNotFoundError } from "../src/index.js";
 
 const client = (fn: typeof fetch) =>
   new BirdClient({ apiKey: "bk_eu1_secret", fetch: fn });
@@ -62,18 +62,6 @@ describe("bird.request (escape hatch)", () => {
       expect(calls).toHaveLength(0);
     });
 
-    it("allows a valid absolute path and issues a fetch to the configured origin", async () => {
-      const { fn, calls } = fakeFetch(() => jsonRes(200, { ok: true }));
-      await client(fn).request({ method: "GET", path: "/v1/email/domains" });
-      expect(calls).toHaveLength(1);
-      expect(new URL(calls[0].url).origin).toBe(
-        "https://eu1.platform.bird.com",
-      );
-      expect(new URL(calls[0].url).pathname).toBe("/v1/email/domains");
-      expect(calls[0].headers.get("Authorization")).toBe(
-        "Bearer bk_eu1_secret",
-      );
-    });
   });
 
   it("GET returns the caller-typed body, authed, on the right path, with no idempotency key", async () => {
@@ -85,6 +73,8 @@ describe("bird.request (escape hatch)", () => {
       path: "/v1/email/domains",
     });
     expect(out.domains[0].id).toBe("dom_1");
+    expect(calls).toHaveLength(1);
+    expect(new URL(calls[0].url).origin).toBe("https://eu1.platform.bird.com");
     expect(calls[0].method).toBe("GET");
     expect(new URL(calls[0].url).pathname).toBe("/v1/email/domains");
     expect(calls[0].headers.get("Authorization")).toBe("Bearer bk_eu1_secret");
@@ -141,9 +131,9 @@ describe("bird.request (escape hatch)", () => {
     const { fn } = fakeFetch(() =>
       jsonRes(404, { type: "not_found_error", message: "nope" }),
     );
-    await expect(
-      client(fn).request({ method: "GET", path: "/v1/things/missing" }),
-    ).rejects.toBeInstanceOf(BirdNotFoundError);
+    const pending = client(fn).request({ method: "GET", path: "/v1/things/missing" });
+    await expect(pending).rejects.toBeInstanceOf(BirdNotFoundError);
+    await expect(pending).rejects.toBeInstanceOf(BirdError);
   });
 
   it("resolves to undefined on 204", async () => {
@@ -155,12 +145,4 @@ describe("bird.request (escape hatch)", () => {
     expect(out).toBeUndefined();
   });
 
-  it(".withResponse() exposes the raw response", async () => {
-    const { fn } = fakeFetch(() => jsonRes(200, { ok: true }));
-    const { data, response } = await client(fn)
-      .request<{ ok: boolean }>({ method: "GET", path: "/v1/things" })
-      .withResponse();
-    expect(data.ok).toBe(true);
-    expect(response.status).toBe(200);
-  });
 });

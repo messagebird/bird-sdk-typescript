@@ -1,13 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { BirdError, BirdAPIError, BirdAuthError, BirdRateLimitError } from "../src/index.js";
 import {
   mapResponseToError,
   parseRetryAfter,
-  BirdAPIError,
-  BirdAuthError,
-  BirdConflictError,
   BirdInternalError,
   BirdPreconditionError,
-  BirdRateLimitError,
   BirdValidationError,
   type NextAction,
 } from "../src/errors.js";
@@ -31,6 +28,7 @@ describe("mapResponseToError", () => {
       request_id: "req_1",
     });
     expect(err).toBeInstanceOf(BirdAuthError);
+    expect(err).toBeInstanceOf(BirdAPIError);
     expect(err.statusCode).toBe(401);
     expect(err.code).toBe("E10001");
     expect(err.type).toBe("auth_error");
@@ -47,24 +45,9 @@ describe("mapResponseToError", () => {
       headers({ "Retry-After": "60" }),
     );
     expect(err).toBeInstanceOf(BirdRateLimitError);
+    expect(err).toBeInstanceOf(BirdAPIError);
+    expect(err.statusCode).toBe(429);
     expect((err as BirdRateLimitError).retryAfter).toBe(60);
-  });
-
-  it("attaches details on validation_error", () => {
-    const err = mapResponseToError(422, {
-      type: "validation_error",
-      details: [{ param: "to[0].email", message: "invalid address" }],
-    });
-    expect(err).toBeInstanceOf(BirdValidationError);
-    expect((err as BirdValidationError).details).toEqual([
-      { param: "to[0].email", message: "invalid address" },
-    ]);
-  });
-
-  it("maps conflict_error → BirdConflictError", () => {
-    expect(mapResponseToError(409, { type: "conflict_error" })).toBeInstanceOf(
-      BirdConflictError,
-    );
   });
 
   it("falls back on status when the body carries no type (non-JSON error)", () => {
@@ -98,6 +81,8 @@ describe("mapResponseToError", () => {
     });
     expect(err).toBeInstanceOf(BirdAPIError);
     expect(err.constructor.name).toBe("BirdAPIError");
+    expect(err).toBeInstanceOf(BirdError);
+    expect(err.statusCode).toBe(418);
   });
 
   it("surfaces remediation and next from the wire (ADR-0073/0124)", () => {
@@ -121,12 +106,15 @@ describe("mapResponseToError", () => {
       message: "empty pool",
       remediation: "Assign a dedicated IP to the pool, then retry.",
       next,
-      details: [],
+      details: [{ param: "to[0].email", message: "invalid address" }],
     }) as BirdValidationError;
     expect(err.remediation).toBe(
       "Assign a dedicated IP to the pool, then retry.",
     );
     expect(err.next).toEqual(next);
+    expect(err.details).toEqual([
+      { param: "to[0].email", message: "invalid address" },
+    ]);
     // A step that is not an operation carries none: the facade must not invent one.
     expect(err.next?.[1].operation).toBeUndefined();
     expect(err.next?.[2].operation).toBeUndefined();

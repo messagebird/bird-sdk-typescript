@@ -12,21 +12,6 @@ function bird(fn: typeof fetch, realtime?: { key?: string; secret?: string }) {
 }
 
 describe("bird.realtime credentials", () => {
-  it("sends the configured app key and secret as headers", async () => {
-    const { fn, calls } = fakeFetch([() => json(200, { data: [] })]);
-
-    await bird(fn, { key: "rk_live", secret: "rs_live" }).realtime.publish(APP, {
-      event: "greeting",
-      channels: ["orders"],
-      data: { hello: "world" },
-    });
-
-    expect(calls[0].headers.get("X-Realtime-Key")).toBe("rk_live");
-    expect(calls[0].headers.get("X-Realtime-Secret")).toBe("rs_live");
-    // The workspace API key still authenticates the request itself.
-    expect(calls[0].headers.get("Authorization")).toBe("Bearer bk_eu1_test");
-  });
-
   // The app secret must reach ONLY the operations that declare the schemes. A
   // shared header path once put it on every request, so this pins the scope.
   it("does not send the app credentials on an unrelated resource", async () => {
@@ -92,6 +77,9 @@ describe("bird.realtime routes", () => {
     });
 
     expect(result.data?.[0].name).toBe("orders");
+    expect(calls[0].headers.get("X-Realtime-Key")).toBe("rk_live");
+    expect(calls[0].headers.get("X-Realtime-Secret")).toBe("rs_live");
+    expect(calls[0].headers.get("Authorization")).toBe("Bearer bk_eu1_test");
     expect(calls[0].method).toBe("POST");
     expect(new URL(calls[0].url).pathname).toBe(`/v1/realtime/apps/${APP}/events`);
     await expect(calls[0].json()).resolves.toEqual({

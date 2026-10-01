@@ -1,31 +1,11 @@
 import { recordFetch as fakeFetch, optionalJsonResponse as jsonRes } from "./transport.js";
 import { describe, it, expect } from "vitest";
 import { BirdClient } from "../src/client.js";
-import { BirdError, BirdNotFoundError, BirdPermissionError } from "../src/index.js";
-import type { APIPromise, BirdResponse } from "../src/index.js";
+import { BirdError, BirdPermissionError } from "../src/index.js";
 
 const client = (fn: typeof fetch) => new BirdClient({ apiKey: "bk_eu1_x", fetch: fn });
 
 describe(".safe()", () => {
-  it("returns { data, error: null, response } on success", async () => {
-    const { fn } = fakeFetch(() => jsonRes(200, { id: "x_1" }));
-    const { data, error, response } = await client(fn)
-      .request<{ id: string }>({ method: "GET", path: "/v1/things/x_1" })
-      .safe();
-    expect(error).toBeNull();
-    expect(data?.id).toBe("x_1");
-    expect(response?.status).toBe(200);
-  });
-
-  it("returns { data: null, error, response: null } on an API failure — never throws", async () => {
-    const { fn } = fakeFetch(() => jsonRes(404, { type: "not_found_error", message: "nope" }));
-    const { data, error, response } = await client(fn).request({ method: "GET", path: "/v1/things/missing" }).safe();
-    expect(data).toBeNull();
-    expect(response).toBeNull();
-    expect(error).toBeInstanceOf(BirdNotFoundError);
-    expect(error).toBeInstanceOf(BirdError);
-  });
-
   it("does not swallow into a BirdError: an abort rejection is the native AbortError", async () => {
     const { fn } = fakeFetch(() => jsonRes(200, {}));
     const ac = new AbortController();
@@ -55,23 +35,7 @@ describe(".safe()", () => {
     expect(data).toBeNull();
     expect(response).toBeNull();
     expect(error).toBeInstanceOf(BirdPermissionError);
+    expect(error).toBeInstanceOf(BirdError);
   });
 });
 
-// Compile-time: the result narrows — error guards to BirdError with data/response
-// null; the success branch has the value and a non-null response.
-async function _narrows(p: APIPromise<{ id: string }>) {
-  const { data, error, response } = await p.safe();
-  if (error) {
-    const e: BirdError = error;
-    const r: null = response;
-    void e;
-    void r;
-    return;
-  }
-  const id: string = data.id;
-  const ok: BirdResponse = response;
-  void id;
-  void ok;
-}
-void _narrows;

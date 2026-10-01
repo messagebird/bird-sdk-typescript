@@ -33,6 +33,7 @@ describe("bird.email.send", () => {
 
     expect(data.id).toBe("em_1");
     expect(response.requestId).toBe("req_42");
+    expect(response.status).toBe(202);
     expect(calls[0].method).toBe("POST");
     expect(calls[0].headers.get("Idempotency-Key")).toBeTruthy();
   });
@@ -79,24 +80,20 @@ describe("bird.email.list", () => {
     refresh_cursor: "r2",
   };
 
-  it("await resolves the first page", async () => {
-    const { fn } = fakeFetch([() => json(200, page1)]);
-    const page = await bird(fn).email.list({ limit: 2 });
-    expect(page.data.map((m) => m.id)).toEqual(["em_1", "em_2"]);
-    expect(page.next_cursor).toBe("c1");
-  });
-
   it("for-await auto-paginates across pages, advancing with starting_after", async () => {
     const { fn, calls } = fakeFetch([
       () => json(200, page1),
       () => json(200, page2),
     ]);
     const ids: string[] = [];
-    for await (const m of bird(fn).email.list({
+    const pages = bird(fn).email.list({
       limit: 2,
       ending_before: "anchor",
-    }))
-      ids.push(m.id!);
+    });
+    const first = await pages;
+    expect(first.data.map((m) => m.id)).toEqual(["em_1", "em_2"]);
+    expect(first.next_cursor).toBe("c1");
+    for await (const m of pages) ids.push(m.id!);
 
     expect(ids).toEqual(["em_1", "em_2", "em_3"]);
     expect(calls).toHaveLength(2);

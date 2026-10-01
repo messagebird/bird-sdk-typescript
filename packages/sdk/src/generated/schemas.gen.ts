@@ -34403,6 +34403,7 @@ export const WebhookEndpointCreatedSchema = {
 export const WebhookEndpointUpdateSchema = {
   type: "object",
   additionalProperties: false,
+  "x-sensitive": true,
   properties: {
     url: {
       type: "string",
