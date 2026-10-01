@@ -10,6 +10,7 @@ import {
   NumbersResourceBase,
   type Number,
   type NumbersListQuery,
+  type NumbersUpdateParams,
 } from "./numbers.gen.js";
 import {
   NumbersAvailableResource,
@@ -27,6 +28,7 @@ export type {
   Number,
   NumbersAvailableListQuery,
   NumbersListQuery,
+  NumbersUpdateParams,
   NumbersOrder,
   NumbersOrdersListQuery,
 };

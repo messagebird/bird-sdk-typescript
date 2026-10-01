@@ -16478,6 +16478,207 @@ export const NumbersDedicatedAllocationIDSchema = {
   example: "nda_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const WhatsAppAgentNotificationStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["accepted", "success", "skipped", "failed"],
+  description:
+    "Where a notification you sent the agent stands. One state is transient and three are final.\n\n- `accepted` means Bird holds the notification: it is on its way to WhatsApp, or WhatsApp is still working on it. Nothing is charged for a notification, unlike a message that reads `accepted`.\n- `success` means the agent acted on it.\n- `skipped` means the agent read it and chose to say nothing; `skipped_reason` says why.\n- `failed` means WhatsApp refused it or reported a failure, or no outcome arrived within a day; `error` says why.\n",
+  example: "success",
+} as const;
+
+export const WhatsAppAgentNotificationIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^waan_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "waan_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppAgentNotificationErrorSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["description", "meta_error_code"],
+  description: "Why a notification sent to the agent failed.",
+  properties: {
+    description: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "WhatsApp's own explanation, passed through: what it said when it refused the notification, or its failure summary once it had worked on it. Show it to the person who sent the notification; never match on its text. Carries Bird's own words instead when the failure was Bird's verdict, such as no outcome arriving within a day.\n",
+      example: "Event payload exceeds the maximum size.",
+    },
+    meta_error_code: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "WhatsApp's most specific code when it refused the notification outright: its error subcode where it sent one, otherwise its top-level code. Treat it as an opaque string. Null when WhatsApp took the notification and reported the failure later, which carries no code, and when the failure was Bird's own verdict.\n",
+      example: "100",
+    },
+  },
+} as const;
+
+export const WhatsAppAgentNotificationSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A notification you sent the agent about one contact, and what came of it. The agent decides whether to write to the contact about it; that message, if any, shows up on the contact's conversation.\n",
+  required: [
+    "id",
+    "to",
+    "name",
+    "description",
+    "payload",
+    "status",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppAgentNotificationID",
+        },
+      ],
+      readOnly: true,
+      description: "Unique identifier for the notification.",
+    },
+    to: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppAddress",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The contact the notification was about: the phone number or business-scoped user ID you addressed it to, in the same shape a message's `to` uses.\n",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 256,
+      readOnly: true,
+      description: "Your own name for what happened, as you sent it.",
+      example: "order_shipped",
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      maxLength: 1024,
+      readOnly: true,
+      description: "What happened, as you sent it.",
+      example: "Order 88213 left the warehouse and arrives on Thursday.",
+    },
+    payload: {
+      type: "string",
+      minLength: 1,
+      maxLength: 4096,
+      readOnly: true,
+      description: "The data you attached, as you sent it.",
+      example: '{"order_id":"88213","carrier":"ACME Courier"}',
+    },
+    status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppAgentNotificationStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Where the notification stands. `accepted` from the moment Bird takes it, then one of the three final states once WhatsApp has answered.\n",
+    },
+    skipped_reason: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "WhatsApp's own account of why the agent chose to say nothing, passed through. Present only when `status` is `skipped`. Show it to the person who sent the notification; never match on its text.\n",
+      example: "The contact's conversation is currently held by the business.",
+    },
+    error: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppAgentNotificationError",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Why the notification failed. Present only when `status` is `failed`.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When Bird accepted the notification.",
+      example: "2026-10-02T08:00:00Z",
+    },
+  },
+} as const;
+
+export const WhatsAppAgentNotificationListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "A page of the notifications sent to the agent.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppAgentNotification",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppAgentNotificationCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["to", "name", "description", "payload"],
+  properties: {
+    to: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The contact the notification is about: a phone number in E.164 format (for example `+14155551234`), or the contact's business-scoped user ID (for example `US.13491208655302741918`), the same forms a message's `to` accepts. A phone number is normalized before the call reaches WhatsApp, so spacing does not matter. WhatsApp documents a phone number for this call; a business-scoped user ID is passed through as given.\n",
+      example: "+14155551234",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 256,
+      description:
+        "Your own name for what happened, such as `payment_received` or `order_shipped`. The agent reads it as the kind of thing that happened, so keep one name per kind. WhatsApp calls this the event type.\n",
+      example: "order_shipped",
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      maxLength: 1024,
+      description:
+        "What happened, in a sentence the agent can tell the contact.",
+      example: "Order 88213 left the warehouse and arrives on Thursday.",
+    },
+    payload: {
+      type: "string",
+      minLength: 1,
+      maxLength: 4096,
+      description:
+        "Details the agent may draw on when it writes to the contact, as one JSON string. WhatsApp passes it to the agent unchanged and does not read it itself.\n",
+      example:
+        '{"order_id":"88213","carrier":"ACME Courier","eta":"2026-10-02"}',
+    },
+  },
+  description:
+    "Something that happened in your systems that the agent should tell the contact about, such as a payment landing or an order shipping. WhatsApp processes it in the background, so read the notification back for what came of it.\n",
+} as const;
+
 export const WhatsAppNumberEventSortFieldSchema = {
   type: "string",
   enum: ["created_at"],
@@ -39132,6 +39333,553 @@ export const VoicePartySchema = {
   },
 } as const;
 
+export const VoiceSessionCredentialSchema = {
+  type: "object",
+  description:
+    "A short-lived SIP digest credential for a calling client. The `password` is returned once and cannot be recovered. Create a new credential if you lose it.\n",
+  additionalProperties: false,
+  required: ["username", "password", "realm", "expires_at"],
+  properties: {
+    username: {
+      type: "string",
+      minLength: 1,
+      maxLength: 64,
+      description:
+        "SIP digest username. Always `bird`. The credential identifies the workspace through `realm`. The username does not identify the workspace.\n",
+      example: "bird",
+    },
+    password: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+      "x-sensitive": true,
+      description:
+        "SIP digest password, returned once. Treat it as a bearer secret: until it expires it can place calls billed to this workspace.\n",
+      example: "8Kx2mQ7pR4tYvB9nL3sW6dF1gH5jC0aZ",
+    },
+    realm: {
+      type: "string",
+      minLength: 1,
+      maxLength: 253,
+      description:
+        "SIP digest realm to authenticate against. Workspace-scoped, so a credential minted for one workspace cannot authenticate against another.\n",
+      example: "01ARZ3NDEKTSV4RRFFQ69G5FAV.sip.bird.com",
+    },
+    expires_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description:
+        "When the credential stops authenticating, five minutes after creation. Existing calls may continue; use a fresh credential for later authentication.",
+      example: "2026-07-30T12:05:00Z",
+    },
+    handshake_token: {
+      type: "string",
+      minLength: 1,
+      maxLength: 4096,
+      "x-sensitive": true,
+      description:
+        "Short-lived token required when upgrading the WebSocket connection. The token authorizes the connection only; each call still authenticates with `password`.\n",
+      example:
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODU0NDMwMzV9.fp1xWxROEmgCafwiJ-ZHbZg9cIdYC-wLGcH-5gIVbco",
+    },
+  },
+} as const;
+
+export const VoiceLegRejectionReasonSchema = {
+  type: "string",
+  minLength: 1,
+  enum: [
+    "source_not_allowed",
+    "caller_id_not_verified",
+    "routing_not_configured",
+    "no_route_found",
+    "destination_blocked",
+    "destination_not_enabled",
+    "insufficient_balance",
+    "daily_spend_exceeded",
+    "concurrent_calls_exceeded",
+    "calls_per_second_exceeded",
+    "call_not_permitted",
+    "number_ownership_not_verified",
+  ],
+  "x-enum-varnames": [
+    "VoiceCallRejectionReasonSourceNotAllowed",
+    "VoiceCallRejectionReasonCallerIDNotVerified",
+    "VoiceCallRejectionReasonRoutingNotConfigured",
+    "VoiceCallRejectionReasonNoRouteFound",
+    "VoiceCallRejectionReasonDestinationBlocked",
+    "VoiceCallRejectionReasonDestinationNotEnabled",
+    "VoiceCallRejectionReasonInsufficientBalance",
+    "VoiceCallRejectionReasonDailySpendExceeded",
+    "VoiceCallRejectionReasonConcurrentCallsExceeded",
+    "VoiceCallRejectionReasonCallsPerSecondExceeded",
+    "VoiceCallRejectionReasonCallNotPermitted",
+    "VoiceCallRejectionReasonNumberOwnershipNotVerified",
+  ],
+  description:
+    "Why we rejected the leg. Use `rejection_reason` to identify the cause;\n`sip_response_code` alone cannot distinguish these reasons.\n\nYou can resolve these issues:\n\n- `source_not_allowed`: The leg came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it or use a verified caller ID.\n- `number_ownership_not_verified`: The ownership documents for this purchased\n  number have not yet been accepted under its country's requirements. We\n  block outgoing and incoming legs on the number until verification is\n  complete. Blocked incoming legs never reach your PBX, and their route type\n  is `reject` regardless of the number's configuration. Open the number\n  under **Numbers** and complete its ownership requirements, then retry\n  the leg.\n- `destination_not_enabled`: Calling to this destination country is disabled.\n  Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet balance was too low for the leg.\n  Top up or enable automatic top-ups.\n- `daily_spend_exceeded`: The leg would exceed your organization's daily\n  voice spend limit. Retry after the limit resets at the start of the next\n  UTC day.\n- `concurrent_calls_exceeded`: You already have as many legs in progress as\n  your account allows. Wait for one to end or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed legs faster than your account\n  allows. Reduce your dialing rate and retry.\n\nFor all other reasons, contact support and provide the leg `id`:\n\n- `routing_not_configured`: This trunk has no dial plan, which can happen on\n  a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The leg could not be priced for your account.\n",
+  example: "destination_not_enabled",
+} as const;
+
+export const VoiceLegInboundRouteTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["reject", "trunk", "forward", "sequence"],
+  description:
+    "Which answer handled this incoming leg.\n\n- `reject`: the call was refused.\n- `trunk`: the call was delivered to one of your SIP trunks.\n- `forward`: the call was forwarded to one of your verified caller IDs.\n- `sequence`: the call was handled by one of your sequences.\n",
+  example: "trunk",
+} as const;
+
+export const VoiceLegInboundRouteRejectSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegInboundRouteType",
+        },
+      ],
+      const: "reject",
+      description:
+        "The number turned the leg away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.\n",
+    },
+  },
+} as const;
+
+export const VoiceLegInboundRouteTrunkSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "trunk_id"],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegInboundRouteType",
+        },
+      ],
+      const: "trunk",
+      description: "The leg was delivered to one of your SIP trunks.",
+    },
+    trunk_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SIPTrunkID",
+        },
+      ],
+      description:
+        "The SIP trunk the leg was delivered to. Recorded as it was at the time, so it may name a trunk you have since changed or deleted.\n",
+    },
+  },
+} as const;
+
+export const VoiceLegInboundRouteForwardSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "forward_to", "forward_as"],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegInboundRouteType",
+        },
+      ],
+      const: "forward",
+      description: "The leg was forwarded to another of your numbers.",
+    },
+    forward_to: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The number the leg was forwarded to, in E.164 format. Recorded as it was at the time, so it may name a number you have since stopped verifying.\n",
+      example: "+14155551234",
+    },
+    forward_as: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceInboundForwardAs",
+        },
+      ],
+      description:
+        "Which of the leg's two numbers the forwarded leg presented as its caller. The value that went on the wire, not the one the number is set to now.\n",
+    },
+  },
+} as const;
+
+export const VoiceSequenceIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^vsq_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vsq_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoiceSequenceNodeIDSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 64,
+  pattern: "^[a-z][a-z0-9_]{0,63}$",
+  not: {
+    enum: ["false", "in", "null", "true"],
+  },
+  description: "Stable identifier for a node within one sequence definition.",
+} as const;
+
+export const VoiceLegInboundRouteSequenceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "sequence_id", "entry_node_id"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoiceLegInboundRouteType",
+      const: "sequence",
+      description: "The leg was handled by one of your sequences.",
+    },
+    sequence_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceSequenceID",
+        },
+      ],
+      description:
+        "The sequence that handled the leg. Recorded as it was at the time, so it may name a sequence you have since changed or deleted.\n",
+    },
+    entry_node_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceSequenceNodeID",
+        },
+      ],
+      description:
+        "The entry the leg started from in the publication that handled it. Recorded as it was at the time, so it may name an entry the sequence no longer has.\n",
+    },
+  },
+} as const;
+
+export const VoiceLegInboundRouteSchema = {
+  description:
+    "The routing choice recorded for an incoming leg. A recorded route does not\nguarantee that the leg connected. Check `status` for the outcome and\n`rejection_reason` for the cause when present.\n",
+  oneOf: [
+    {
+      $ref: "#/components/schemas/VoiceLegInboundRouteReject",
+    },
+    {
+      $ref: "#/components/schemas/VoiceLegInboundRouteTrunk",
+    },
+    {
+      $ref: "#/components/schemas/VoiceLegInboundRouteForward",
+    },
+    {
+      $ref: "#/components/schemas/VoiceLegInboundRouteSequence",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      reject: "#/components/schemas/VoiceLegInboundRouteReject",
+      trunk: "#/components/schemas/VoiceLegInboundRouteTrunk",
+      forward: "#/components/schemas/VoiceLegInboundRouteForward",
+      sequence: "#/components/schemas/VoiceLegInboundRouteSequence",
+    },
+  },
+} as const;
+
+export const VoiceMediaQualitySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["mos", "jitter_ms", "packet_loss_pct", "round_trip_time_ms"],
+  properties: {
+    mos: {
+      type: "number",
+      minimum: 1,
+      maximum: 5,
+      readOnly: true,
+      description:
+        "Mean opinion score, the single number for how the call sounded, from 1 (unintelligible) to 5 (as good as being in the same room). Anything at or above 4.0 is what most people would call a clear line, and below 3.5 is where callers start asking each other to repeat themselves. The three other fields are the impairments that move it.\n",
+      example: 4.32,
+    },
+    jitter_ms: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Variation in the arrival time of the audio packets, in milliseconds. Audio arriving unevenly is heard as choppiness even when no packets are lost at all.",
+      example: 12,
+    },
+    packet_loss_pct: {
+      type: "number",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Percentage of audio packets that never arrived. Heard as brief gaps or clipped words, and the impairment that degrades a call fastest.",
+      example: 1.5,
+    },
+    round_trip_time_ms: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Round-trip time between the two ends, in milliseconds. It does not distort the audio. Above roughly 300 ms, the two parties start talking over each other.",
+      example: 42,
+    },
+  },
+} as const;
+
+export const VoiceLegCostSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "amount",
+    "currency_code",
+    "outbound_amount",
+    "inbound_amount",
+    "call_handling_amount",
+    "recording_amount",
+    "transcription_amount",
+  ],
+  description:
+    "What was charged for a leg, split into the components that make it up.\n",
+  properties: {
+    amount: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Total charged, as a decimal string: the sum of the components below. Net of tax, which applies to your wallet balance rather than to an individual charge.\n",
+      example: "0.013000",
+    },
+    currency_code: {
+      readOnly: true,
+      $ref: "#/components/schemas/CurrencyCode",
+      description:
+        "ISO 4217 currency code. Every component is denominated in this currency.",
+      example: "USD",
+    },
+    outbound_amount: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What we charged to carry the leg to the destination network, as a decimal string. `null` until this component is priced.\n",
+      example: "0.013000",
+    },
+    inbound_amount: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What we charged to receive the leg from the originating network, as a decimal string. Only a leg that arrived at your number can carry it. `null` until this component is priced.\n",
+      example: null,
+    },
+    call_handling_amount: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What we charged for handling the call itself, as a decimal string. A call is charged for handling once, however many legs it has, so only one leg's record carries it. `null` until this component is priced.\n",
+      example: null,
+    },
+    recording_amount: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What we charged to record the leg, as a decimal string, billed per second over the same billable time as the rest of the leg. `null` until this component is priced.\n",
+      example: null,
+    },
+    transcription_amount: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What we charged to transcribe the leg's audio, as a decimal string, billed per second of recorded audio rather than for the length of the leg. A transcript is produced after the leg ends, so this can appear after the rest of the cost. `null` until this component is priced.\n",
+      example: null,
+    },
+  },
+} as const;
+
+export const VoiceLegSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "workspace_id",
+    "direction",
+    "from",
+    "to",
+    "status",
+    "started_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/VoiceCallID",
+      description: "Unique identifier for this leg record.",
+    },
+    call_id: {
+      readOnly: true,
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceSessionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Call identifier shared across all legs of a multi-party or transferred call. Use this to correlate related leg records. `null` when call correlation is not available for the leg.",
+    },
+    workspace_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/WorkspaceID",
+    },
+    direction: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceCallDirection",
+        },
+      ],
+    },
+    from: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "Calling party number in E.164 format.",
+      example: "+14155551234",
+    },
+    to: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "Called party number in E.164 format.",
+      example: "+16505559876",
+    },
+    actor: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/Actor",
+        },
+      ],
+      description:
+        "Who placed the leg: the API key whose credentials it used, the integration acting for the workspace, or the user who placed it from a browser or the CLI. Absent when the leg was admitted only by its source IP address, or when no actor was recorded.",
+    },
+    sip_trunk_id: {
+      readOnly: true,
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SIPTrunkID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Identifier of the SIP trunk that originated this leg. `null` when no trunk is associated.",
+    },
+    status: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceCallStatus",
+        },
+      ],
+    },
+    sip_response_code: {
+      readOnly: true,
+      type: ["integer", "null"],
+      minimum: 100,
+      description:
+        "Final SIP response code received from the carrier. `null` when no SIP response was received, for example on timeout or DNS failure.",
+      example: 200,
+    },
+    rejection_reason: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegRejectionReason",
+        },
+      ],
+      description:
+        "Why we rejected the leg. Absent on connected legs and legs rejected\nby the carrier or recipient. For carrier or recipient rejections, see\n`sip_response_code`; a `6xx` decline gives the leg a `rejected` status.\n\nRead alongside `route` when present. A refusal caused by the number's\nconfiguration has no rejection reason; the route records that\nconfiguration.\n",
+    },
+    route: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegInboundRoute",
+        },
+      ],
+      description:
+        "Which answer your number gave an incoming leg. Its `type` selects the shape, and each answer carries its own fields; the variants below are the full set you can receive. Recorded when the leg was handled, so changing the number's setup afterwards does not change what its past legs say. Absent on outbound legs, and on legs recorded before this field existed.",
+    },
+    tags: {
+      type: "array",
+      maxItems: 5,
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      description:
+        "Your own `{name, value}` labels for this leg, taken from the `X-Bird-Call-Tag` headers on the INVITE that placed it. Set them to organise legs by a dimension of your own (campaign, queue, agent, cost centre), then filter this list by them with `tag`. Read-only here: a leg is labelled when it is placed, and never afterwards. What is here may be less than what was sent, and the leg still goes through either way: a tag whose name or value breaks the rules below is dropped, anything past the first five is ignored, and a name sent more than once keeps its first value. Absent when the leg carried none, and on legs recorded before this field existed.",
+    },
+    started_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the leg was initiated.",
+    },
+    answered_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the leg was answered (`200` OK received). `null` for unanswered legs.",
+    },
+    ended_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the leg ended (BYE or final non-2xx response). `null` for legs that ended abnormally without a recorded end event.",
+    },
+    duration_ms: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total leg duration in milliseconds, measured from the first INVITE to the BYE or final response. `null` while the leg is still in progress and has no final duration yet.",
+      example: 65000,
+    },
+    pdd_ms: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Post-dial delay in milliseconds: how long the caller heard nothing between dialing and the phone starting to ring at the other end. High values are what callers experience as the leg `not going through`. Absent when the leg never rang, either because it failed first or because the carrier answered it immediately.\n",
+      example: 850,
+    },
+    billable_ms: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Billable duration in milliseconds, measured from answer to leg end. Zero for unanswered legs, and `null` while the leg is still in progress.",
+      example: 60000,
+    },
+    media_quality: {
+      $ref: "#/components/schemas/VoiceMediaQuality",
+      readOnly: true,
+      description:
+        "How the audio sounded, as opposed to whether the leg connected. Absent when the leg carried no audio, or when the far end reported nothing to measure from.",
+    },
+    cost: {
+      $ref: "#/components/schemas/VoiceLegCost",
+      readOnly: true,
+      description:
+        "What the leg cost, net of tax, at full precision, split into the components that make it up. Absent until the leg has been rated; unanswered or unpriced legs have no cost, and neither does a verification call Bird places and answers on your behalf, which is exempt from rating.",
+    },
+  },
+} as const;
+
 export const NumberTypeSchema = {
   type: "string",
   minLength: 1,
@@ -39217,11 +39965,14 @@ export const NumberOwnershipSchema = {
 
 export const NumberSchema = {
   type: "object",
+  readOnly: true,
   additionalProperties: false,
   required: [
     "id",
     "kind",
     "number",
+    "name",
+    "reference",
     "country_code",
     "number_type",
     "capabilities",
@@ -39229,8 +39980,21 @@ export const NumberSchema = {
     "allocated_at",
   ],
   properties: {
+    name: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "The name you gave this number in your workspace. Null when no name is set.",
+    },
+    reference: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "Your own reference for this number in your workspace. Null when no reference is set.",
+    },
     id: {
-      readOnly: true,
       allOf: [
         {
           $ref: "#/components/schemas/AllocatedNumberID",
@@ -39242,7 +40006,6 @@ export const NumberSchema = {
     kind: {
       type: "string",
       minLength: 1,
-      readOnly: true,
       enum: ["dedicated", "shared"],
       description:
         "How this number is allocated. `dedicated` belongs to your workspace and is billed as a subscription. `shared` is provided through Bird-managed shared infrastructure and is not owned or billed as a workspace subscription.",
@@ -39250,7 +40013,6 @@ export const NumberSchema = {
     number: {
       type: "string",
       minLength: 1,
-      readOnly: true,
       description: "Phone number in E.164 format.",
     },
     country_code: {
@@ -39259,7 +40021,6 @@ export const NumberSchema = {
           $ref: "#/components/schemas/CountryCode",
         },
       ],
-      readOnly: true,
     },
     number_type: {
       allOf: [
@@ -39267,12 +40028,10 @@ export const NumberSchema = {
           $ref: "#/components/schemas/NumberType",
         },
       ],
-      readOnly: true,
       description: "Physical type of this phone number.",
     },
     capabilities: {
       type: "array",
-      readOnly: true,
       items: {
         $ref: "#/components/schemas/NumberCapability",
       },
@@ -39281,7 +40040,6 @@ export const NumberSchema = {
     status: {
       type: "string",
       minLength: 1,
-      readOnly: true,
       enum: ["active", "pending_ownership_registration", "released"],
       description:
         "The allocation and ownership-approval status of this number.\n\n- `active` means this number is allocated to your workspace and usable.\n- `pending_ownership_registration` means this number is allocated to your workspace and billed,\n  but outbound SMS and both inbound and outbound voice calls are blocked until ownership registration\n  is approved and activation completes, or the ownership requirement is withdrawn.\n  This ownership status does not gate inbound SMS or WhatsApp.\n  Read `ownership.status` and `ownership.next` for the current decision and remaining work.\n- `released` means this number is no longer allocated to your workspace.\n\nAn allocated number is not always enough to send from it: some destination\ncountries also require an approved registration for the sender.\n",
@@ -39290,18 +40048,15 @@ export const NumberSchema = {
       type: "string",
       format: "date-time",
       minLength: 1,
-      readOnly: true,
       description: "When this number was allocated to your workspace.",
     },
     released_at: {
       type: ["string", "null"],
       format: "date-time",
-      readOnly: true,
       description:
         "When this number was released. `null` while it is still allocated to your workspace.",
     },
     ownership: {
-      readOnly: true,
       description:
         "Ownership paperwork and activation progress. `null` when no ownership requirements, recorded block, or recorded decision apply, or when requirements or progress cannot be read and no ownership block or decision has been recorded. A recorded block still returns an ownership object with `status: unknown` when progress cannot be read; retry the read. We manage the paperwork for shared short codes, so this field is always `null` for them. Other sending requirements can apply even when ownership registration is complete.\n",
       oneOf: [
@@ -39545,6 +40300,38 @@ export const NumbersOrderCreateSchema = {
       description:
         "The number to acquire, in E.164 format, as returned by `GET /v1/numbers/available`.",
       example: "+18005550100",
+    },
+    reference: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "Your own reference to set on the number when this purchase completes. Leading and trailing whitespace is removed. A pending order keeps the reference until the number is allocated.",
+      example: "STORE-042",
+    },
+  },
+} as const;
+
+export const NumberUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  properties: {
+    name: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "A name for this number in your workspace, such as Support line. Send null to clear it, or omit it to keep the current name.",
+      example: "Support line",
+    },
+    reference: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "Your own reference for this number, such as an identifier from your records. References need not be unique. Send null to clear it, or omit it to keep the current reference.",
+      example: "STORE-042",
     },
   },
 } as const;
@@ -39891,59 +40678,6 @@ export const VoiceTrunkUpdateSchema = {
       description:
         "Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP. Off by default; turning it on does not change what the allow lists admit, and turning it off stops those connections at the next call setup without re-issuing anything. Omit the field to leave it unchanged.\n",
       example: true,
-    },
-  },
-} as const;
-
-export const VoiceSessionCredentialSchema = {
-  type: "object",
-  description:
-    "A short-lived SIP digest credential for a calling client. The `password` is returned once and cannot be recovered. Create a new credential if you lose it.\n",
-  additionalProperties: false,
-  required: ["username", "password", "realm", "expires_at"],
-  properties: {
-    username: {
-      type: "string",
-      minLength: 1,
-      maxLength: 64,
-      description:
-        "SIP digest username. Always `bird`. The credential identifies the workspace through `realm`. The username does not identify the workspace.\n",
-      example: "bird",
-    },
-    password: {
-      type: "string",
-      minLength: 1,
-      maxLength: 128,
-      "x-sensitive": true,
-      description:
-        "SIP digest password, returned once. Treat it as a bearer secret: until it expires it can place calls billed to this workspace.\n",
-      example: "8Kx2mQ7pR4tYvB9nL3sW6dF1gH5jC0aZ",
-    },
-    realm: {
-      type: "string",
-      minLength: 1,
-      maxLength: 253,
-      description:
-        "SIP digest realm to authenticate against. Workspace-scoped, so a credential minted for one workspace cannot authenticate against another.\n",
-      example: "01ARZ3NDEKTSV4RRFFQ69G5FAV.sip.bird.com",
-    },
-    expires_at: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      description:
-        "When the credential stops authenticating, five minutes after creation. Existing calls may continue; use a fresh credential for later authentication.",
-      example: "2026-07-30T12:05:00Z",
-    },
-    handshake_token: {
-      type: "string",
-      minLength: 1,
-      maxLength: 4096,
-      "x-sensitive": true,
-      description:
-        "Short-lived token required when upgrading the WebSocket connection. The token authorizes the connection only; each call still authenticates with `password`.\n",
-      example:
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODU0NDMwMzV9.fp1xWxROEmgCafwiJ-ZHbZg9cIdYC-wLGcH-5gIVbco",
     },
   },
 } as const;
@@ -40308,24 +41042,6 @@ export const VoiceCallRouteForwardSchema = {
         "Which number the forwarded leg presents as its caller. Include the choice\non every write. Reads return the effective choice; older configurations\nwithout a stored choice return `dialed_number`.\n",
     },
   },
-} as const;
-
-export const VoiceSequenceIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^vsq_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "vsq_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const VoiceSequenceNodeIDSchema = {
-  type: "string",
-  minLength: 1,
-  maxLength: 64,
-  pattern: "^[a-z][a-z0-9_]{0,63}$",
-  not: {
-    enum: ["false", "in", "null", "true"],
-  },
-  description: "Stable identifier for a node within one sequence definition.",
 } as const;
 
 export const VoiceCallRouteSequenceSchema = {
@@ -40733,482 +41449,6 @@ export const VoiceVerifiedNumberVerifyRequestSchema = {
       description:
         "The 6-digit verification code read out by the verification call. Required until ownership is verified. Omit it when retrying activation of an already verified number.",
       example: "123456",
-    },
-  },
-} as const;
-
-export const VoiceLegRejectionReasonSchema = {
-  type: "string",
-  minLength: 1,
-  enum: [
-    "source_not_allowed",
-    "caller_id_not_verified",
-    "routing_not_configured",
-    "no_route_found",
-    "destination_blocked",
-    "destination_not_enabled",
-    "insufficient_balance",
-    "daily_spend_exceeded",
-    "concurrent_calls_exceeded",
-    "calls_per_second_exceeded",
-    "call_not_permitted",
-    "number_ownership_not_verified",
-  ],
-  "x-enum-varnames": [
-    "VoiceCallRejectionReasonSourceNotAllowed",
-    "VoiceCallRejectionReasonCallerIDNotVerified",
-    "VoiceCallRejectionReasonRoutingNotConfigured",
-    "VoiceCallRejectionReasonNoRouteFound",
-    "VoiceCallRejectionReasonDestinationBlocked",
-    "VoiceCallRejectionReasonDestinationNotEnabled",
-    "VoiceCallRejectionReasonInsufficientBalance",
-    "VoiceCallRejectionReasonDailySpendExceeded",
-    "VoiceCallRejectionReasonConcurrentCallsExceeded",
-    "VoiceCallRejectionReasonCallsPerSecondExceeded",
-    "VoiceCallRejectionReasonCallNotPermitted",
-    "VoiceCallRejectionReasonNumberOwnershipNotVerified",
-  ],
-  description:
-    "Why we rejected the leg. Use `rejection_reason` to identify the cause;\n`sip_response_code` alone cannot distinguish these reasons.\n\nYou can resolve these issues:\n\n- `source_not_allowed`: The leg came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it or use a verified caller ID.\n- `number_ownership_not_verified`: The ownership documents for this purchased\n  number have not yet been accepted under its country's requirements. We\n  block outgoing and incoming legs on the number until verification is\n  complete. Blocked incoming legs never reach your PBX, and their route type\n  is `reject` regardless of the number's configuration. Open the number\n  under **Numbers** and complete its ownership requirements, then retry\n  the leg.\n- `destination_not_enabled`: Calling to this destination country is disabled.\n  Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet balance was too low for the leg.\n  Top up or enable automatic top-ups.\n- `daily_spend_exceeded`: The leg would exceed your organization's daily\n  voice spend limit. Retry after the limit resets at the start of the next\n  UTC day.\n- `concurrent_calls_exceeded`: You already have as many legs in progress as\n  your account allows. Wait for one to end or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed legs faster than your account\n  allows. Reduce your dialing rate and retry.\n\nFor all other reasons, contact support and provide the leg `id`:\n\n- `routing_not_configured`: This trunk has no dial plan, which can happen on\n  a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The leg could not be priced for your account.\n",
-  example: "destination_not_enabled",
-} as const;
-
-export const VoiceLegInboundRouteTypeSchema = {
-  type: "string",
-  minLength: 1,
-  enum: ["reject", "trunk", "forward", "sequence"],
-  description:
-    "Which answer handled this incoming leg.\n\n- `reject`: the call was refused.\n- `trunk`: the call was delivered to one of your SIP trunks.\n- `forward`: the call was forwarded to one of your verified caller IDs.\n- `sequence`: the call was handled by one of your sequences.\n",
-  example: "trunk",
-} as const;
-
-export const VoiceLegInboundRouteRejectSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["type"],
-  properties: {
-    type: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/VoiceLegInboundRouteType",
-        },
-      ],
-      const: "reject",
-      description:
-        "The number turned the leg away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.\n",
-    },
-  },
-} as const;
-
-export const VoiceLegInboundRouteTrunkSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["type", "trunk_id"],
-  properties: {
-    type: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/VoiceLegInboundRouteType",
-        },
-      ],
-      const: "trunk",
-      description: "The leg was delivered to one of your SIP trunks.",
-    },
-    trunk_id: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/SIPTrunkID",
-        },
-      ],
-      description:
-        "The SIP trunk the leg was delivered to. Recorded as it was at the time, so it may name a trunk you have since changed or deleted.\n",
-    },
-  },
-} as const;
-
-export const VoiceLegInboundRouteForwardSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["type", "forward_to", "forward_as"],
-  properties: {
-    type: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/VoiceLegInboundRouteType",
-        },
-      ],
-      const: "forward",
-      description: "The leg was forwarded to another of your numbers.",
-    },
-    forward_to: {
-      type: "string",
-      minLength: 1,
-      description:
-        "The number the leg was forwarded to, in E.164 format. Recorded as it was at the time, so it may name a number you have since stopped verifying.\n",
-      example: "+14155551234",
-    },
-    forward_as: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/VoiceInboundForwardAs",
-        },
-      ],
-      description:
-        "Which of the leg's two numbers the forwarded leg presented as its caller. The value that went on the wire, not the one the number is set to now.\n",
-    },
-  },
-} as const;
-
-export const VoiceLegInboundRouteSequenceSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["type", "sequence_id", "entry_node_id"],
-  properties: {
-    type: {
-      $ref: "#/components/schemas/VoiceLegInboundRouteType",
-      const: "sequence",
-      description: "The leg was handled by one of your sequences.",
-    },
-    sequence_id: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/VoiceSequenceID",
-        },
-      ],
-      description:
-        "The sequence that handled the leg. Recorded as it was at the time, so it may name a sequence you have since changed or deleted.\n",
-    },
-    entry_node_id: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/VoiceSequenceNodeID",
-        },
-      ],
-      description:
-        "The entry the leg started from in the publication that handled it. Recorded as it was at the time, so it may name an entry the sequence no longer has.\n",
-    },
-  },
-} as const;
-
-export const VoiceLegInboundRouteSchema = {
-  description:
-    "The routing choice recorded for an incoming leg. A recorded route does not\nguarantee that the leg connected. Check `status` for the outcome and\n`rejection_reason` for the cause when present.\n",
-  oneOf: [
-    {
-      $ref: "#/components/schemas/VoiceLegInboundRouteReject",
-    },
-    {
-      $ref: "#/components/schemas/VoiceLegInboundRouteTrunk",
-    },
-    {
-      $ref: "#/components/schemas/VoiceLegInboundRouteForward",
-    },
-    {
-      $ref: "#/components/schemas/VoiceLegInboundRouteSequence",
-    },
-  ],
-  discriminator: {
-    propertyName: "type",
-    mapping: {
-      reject: "#/components/schemas/VoiceLegInboundRouteReject",
-      trunk: "#/components/schemas/VoiceLegInboundRouteTrunk",
-      forward: "#/components/schemas/VoiceLegInboundRouteForward",
-      sequence: "#/components/schemas/VoiceLegInboundRouteSequence",
-    },
-  },
-} as const;
-
-export const VoiceMediaQualitySchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["mos", "jitter_ms", "packet_loss_pct", "round_trip_time_ms"],
-  properties: {
-    mos: {
-      type: "number",
-      minimum: 1,
-      maximum: 5,
-      readOnly: true,
-      description:
-        "Mean opinion score, the single number for how the call sounded, from 1 (unintelligible) to 5 (as good as being in the same room). Anything at or above 4.0 is what most people would call a clear line, and below 3.5 is where callers start asking each other to repeat themselves. The three other fields are the impairments that move it.\n",
-      example: 4.32,
-    },
-    jitter_ms: {
-      type: "integer",
-      minimum: 0,
-      readOnly: true,
-      description:
-        "Variation in the arrival time of the audio packets, in milliseconds. Audio arriving unevenly is heard as choppiness even when no packets are lost at all.",
-      example: 12,
-    },
-    packet_loss_pct: {
-      type: "number",
-      minimum: 0,
-      readOnly: true,
-      description:
-        "Percentage of audio packets that never arrived. Heard as brief gaps or clipped words, and the impairment that degrades a call fastest.",
-      example: 1.5,
-    },
-    round_trip_time_ms: {
-      type: "integer",
-      minimum: 0,
-      readOnly: true,
-      description:
-        "Round-trip time between the two ends, in milliseconds. It does not distort the audio. Above roughly 300 ms, the two parties start talking over each other.",
-      example: 42,
-    },
-  },
-} as const;
-
-export const VoiceLegCostSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: [
-    "amount",
-    "currency_code",
-    "outbound_amount",
-    "inbound_amount",
-    "call_handling_amount",
-    "recording_amount",
-    "transcription_amount",
-  ],
-  description:
-    "What was charged for a leg, split into the components that make it up.\n",
-  properties: {
-    amount: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "Total charged, as a decimal string: the sum of the components below. Net of tax, which applies to your wallet balance rather than to an individual charge.\n",
-      example: "0.013000",
-    },
-    currency_code: {
-      readOnly: true,
-      $ref: "#/components/schemas/CurrencyCode",
-      description:
-        "ISO 4217 currency code. Every component is denominated in this currency.",
-      example: "USD",
-    },
-    outbound_amount: {
-      type: ["string", "null"],
-      readOnly: true,
-      description:
-        "What we charged to carry the leg to the destination network, as a decimal string. `null` until this component is priced.\n",
-      example: "0.013000",
-    },
-    inbound_amount: {
-      type: ["string", "null"],
-      readOnly: true,
-      description:
-        "What we charged to receive the leg from the originating network, as a decimal string. Only a leg that arrived at your number can carry it. `null` until this component is priced.\n",
-      example: null,
-    },
-    call_handling_amount: {
-      type: ["string", "null"],
-      readOnly: true,
-      description:
-        "What we charged for handling the call itself, as a decimal string. A call is charged for handling once, however many legs it has, so only one leg's record carries it. `null` until this component is priced.\n",
-      example: null,
-    },
-    recording_amount: {
-      type: ["string", "null"],
-      readOnly: true,
-      description:
-        "What we charged to record the leg, as a decimal string, billed per second over the same billable time as the rest of the leg. `null` until this component is priced.\n",
-      example: null,
-    },
-    transcription_amount: {
-      type: ["string", "null"],
-      readOnly: true,
-      description:
-        "What we charged to transcribe the leg's audio, as a decimal string, billed per second of recorded audio rather than for the length of the leg. A transcript is produced after the leg ends, so this can appear after the rest of the cost. `null` until this component is priced.\n",
-      example: null,
-    },
-  },
-} as const;
-
-export const VoiceLegSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: [
-    "id",
-    "workspace_id",
-    "direction",
-    "from",
-    "to",
-    "status",
-    "started_at",
-  ],
-  properties: {
-    id: {
-      readOnly: true,
-      $ref: "#/components/schemas/VoiceCallID",
-      description: "Unique identifier for this leg record.",
-    },
-    call_id: {
-      readOnly: true,
-      oneOf: [
-        {
-          $ref: "#/components/schemas/VoiceSessionID",
-        },
-        {
-          type: "null",
-        },
-      ],
-      description:
-        "Call identifier shared across all legs of a multi-party or transferred call. Use this to correlate related leg records. `null` when call correlation is not available for the leg.",
-    },
-    workspace_id: {
-      readOnly: true,
-      $ref: "#/components/schemas/WorkspaceID",
-    },
-    direction: {
-      readOnly: true,
-      allOf: [
-        {
-          $ref: "#/components/schemas/VoiceCallDirection",
-        },
-      ],
-    },
-    from: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description: "Calling party number in E.164 format.",
-      example: "+14155551234",
-    },
-    to: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description: "Called party number in E.164 format.",
-      example: "+16505559876",
-    },
-    actor: {
-      readOnly: true,
-      allOf: [
-        {
-          $ref: "#/components/schemas/Actor",
-        },
-      ],
-      description:
-        "Who placed the leg: the API key whose credentials it used, the integration acting for the workspace, or the user who placed it from a browser or the CLI. Absent when the leg was admitted only by its source IP address, or when no actor was recorded.",
-    },
-    sip_trunk_id: {
-      readOnly: true,
-      oneOf: [
-        {
-          $ref: "#/components/schemas/SIPTrunkID",
-        },
-        {
-          type: "null",
-        },
-      ],
-      description:
-        "Identifier of the SIP trunk that originated this leg. `null` when no trunk is associated.",
-    },
-    status: {
-      readOnly: true,
-      allOf: [
-        {
-          $ref: "#/components/schemas/VoiceCallStatus",
-        },
-      ],
-    },
-    sip_response_code: {
-      readOnly: true,
-      type: ["integer", "null"],
-      minimum: 100,
-      description:
-        "Final SIP response code received from the carrier. `null` when no SIP response was received, for example on timeout or DNS failure.",
-      example: 200,
-    },
-    rejection_reason: {
-      readOnly: true,
-      allOf: [
-        {
-          $ref: "#/components/schemas/VoiceLegRejectionReason",
-        },
-      ],
-      description:
-        "Why we rejected the leg. Absent on connected legs and legs rejected\nby the carrier or recipient. For carrier or recipient rejections, see\n`sip_response_code`; a `6xx` decline gives the leg a `rejected` status.\n\nRead alongside `route` when present. A refusal caused by the number's\nconfiguration has no rejection reason; the route records that\nconfiguration.\n",
-    },
-    route: {
-      readOnly: true,
-      allOf: [
-        {
-          $ref: "#/components/schemas/VoiceLegInboundRoute",
-        },
-      ],
-      description:
-        "Which answer your number gave an incoming leg. Its `type` selects the shape, and each answer carries its own fields; the variants below are the full set you can receive. Recorded when the leg was handled, so changing the number's setup afterwards does not change what its past legs say. Absent on outbound legs, and on legs recorded before this field existed.",
-    },
-    tags: {
-      type: "array",
-      maxItems: 5,
-      readOnly: true,
-      items: {
-        $ref: "#/components/schemas/Tag",
-      },
-      description:
-        "Your own `{name, value}` labels for this leg, taken from the `X-Bird-Call-Tag` headers on the INVITE that placed it. Set them to organise legs by a dimension of your own (campaign, queue, agent, cost centre), then filter this list by them with `tag`. Read-only here: a leg is labelled when it is placed, and never afterwards. What is here may be less than what was sent, and the leg still goes through either way: a tag whose name or value breaks the rules below is dropped, anything past the first five is ignored, and a name sent more than once keeps its first value. Absent when the leg carried none, and on legs recorded before this field existed.",
-    },
-    started_at: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      readOnly: true,
-      description: "When the leg was initiated.",
-    },
-    answered_at: {
-      type: ["string", "null"],
-      format: "date-time",
-      readOnly: true,
-      description:
-        "When the leg was answered (`200` OK received). `null` for unanswered legs.",
-    },
-    ended_at: {
-      type: ["string", "null"],
-      format: "date-time",
-      readOnly: true,
-      description:
-        "When the leg ended (BYE or final non-2xx response). `null` for legs that ended abnormally without a recorded end event.",
-    },
-    duration_ms: {
-      type: ["integer", "null"],
-      minimum: 0,
-      readOnly: true,
-      description:
-        "Total leg duration in milliseconds, measured from the first INVITE to the BYE or final response. `null` while the leg is still in progress and has no final duration yet.",
-      example: 65000,
-    },
-    pdd_ms: {
-      type: "integer",
-      minimum: 0,
-      readOnly: true,
-      description:
-        "Post-dial delay in milliseconds: how long the caller heard nothing between dialing and the phone starting to ring at the other end. High values are what callers experience as the leg `not going through`. Absent when the leg never rang, either because it failed first or because the carrier answered it immediately.\n",
-      example: 850,
-    },
-    billable_ms: {
-      type: ["integer", "null"],
-      minimum: 0,
-      readOnly: true,
-      description:
-        "Billable duration in milliseconds, measured from answer to leg end. Zero for unanswered legs, and `null` while the leg is still in progress.",
-      example: 60000,
-    },
-    media_quality: {
-      $ref: "#/components/schemas/VoiceMediaQuality",
-      readOnly: true,
-      description:
-        "How the audio sounded, as opposed to whether the leg connected. Absent when the leg carried no audio, or when the far end reported nothing to measure from.",
-    },
-    cost: {
-      $ref: "#/components/schemas/VoiceLegCost",
-      readOnly: true,
-      description:
-        "What the leg cost, net of tax, at full precision, split into the components that make it up. Absent until the leg has been rated; unanswered or unpriced legs have no cost, and neither does a verification call Bird places and answers on your behalf, which is exempt from rating.",
     },
   },
 } as const;
@@ -44464,6 +44704,34 @@ export const WhatsAppNumberListWritableSchema = {
           description: "The WhatsApp numbers your workspace can send from.",
           items: {
             $ref: "#/components/schemas/WhatsAppNumberWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppAgentNotificationWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A notification you sent the agent about one contact, and what came of it. The agent decides whether to write to the contact about it; that message, if any, shows up on the contact's conversation.\n",
+} as const;
+
+export const WhatsAppAgentNotificationListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "A page of the notifications sent to the agent.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppAgentNotificationWritable",
           },
         },
       },
@@ -49002,6 +49270,11 @@ export const VoicePartyWritableSchema = {
   additionalProperties: false,
 } as const;
 
+export const VoiceLegWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
 export const NumberOwnershipWritableSchema = {
   type: "object",
   readOnly: true,
@@ -49034,7 +49307,110 @@ export const NumberOwnershipWritableSchema = {
 
 export const NumberWritableSchema = {
   type: "object",
+  readOnly: true,
   additionalProperties: false,
+  required: [
+    "id",
+    "kind",
+    "number",
+    "name",
+    "reference",
+    "country_code",
+    "number_type",
+    "capabilities",
+    "status",
+    "allocated_at",
+  ],
+  properties: {
+    name: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "The name you gave this number in your workspace. Null when no name is set.",
+    },
+    reference: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "Your own reference for this number in your workspace. Null when no reference is set.",
+    },
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AllocatedNumberID",
+        },
+      ],
+      description:
+        "Identifier of this allocated number. Pass it as `number_id` to read this number, or to release it when kind is dedicated.",
+    },
+    kind: {
+      type: "string",
+      minLength: 1,
+      enum: ["dedicated", "shared"],
+      description:
+        "How this number is allocated. `dedicated` belongs to your workspace and is billed as a subscription. `shared` is provided through Bird-managed shared infrastructure and is not owned or billed as a workspace subscription.",
+    },
+    number: {
+      type: "string",
+      minLength: 1,
+      description: "Phone number in E.164 format.",
+    },
+    country_code: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/CountryCode",
+        },
+      ],
+    },
+    number_type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/NumberType",
+        },
+      ],
+      description: "Physical type of this phone number.",
+    },
+    capabilities: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/NumberCapability",
+      },
+      description: "Capabilities supported by this number.",
+    },
+    status: {
+      type: "string",
+      minLength: 1,
+      enum: ["active", "pending_ownership_registration", "released"],
+      description:
+        "The allocation and ownership-approval status of this number.\n\n- `active` means this number is allocated to your workspace and usable.\n- `pending_ownership_registration` means this number is allocated to your workspace and billed,\n  but outbound SMS and both inbound and outbound voice calls are blocked until ownership registration\n  is approved and activation completes, or the ownership requirement is withdrawn.\n  This ownership status does not gate inbound SMS or WhatsApp.\n  Read `ownership.status` and `ownership.next` for the current decision and remaining work.\n- `released` means this number is no longer allocated to your workspace.\n\nAn allocated number is not always enough to send from it: some destination\ncountries also require an approved registration for the sender.\n",
+    },
+    allocated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When this number was allocated to your workspace.",
+    },
+    released_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When this number was released. `null` while it is still allocated to your workspace.",
+    },
+    ownership: {
+      description:
+        "Ownership paperwork and activation progress. `null` when no ownership requirements, recorded block, or recorded decision apply, or when requirements or progress cannot be read and no ownership block or decision has been recorded. A recorded block still returns an ownership object with `status: unknown` when progress cannot be read; retry the read. We manage the paperwork for shared short codes, so this field is always `null` for them. Other sending requirements can apply even when ownership registration is complete.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/NumberOwnershipWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+  },
 } as const;
 
 export const NumberListWritableSchema = {
@@ -49449,11 +49825,6 @@ export const VoiceVerifiedNumberListWritableSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
-} as const;
-
-export const VoiceLegWritableSchema = {
-  type: "object",
-  additionalProperties: false,
 } as const;
 
 export const VoiceLegListWritableSchema = {

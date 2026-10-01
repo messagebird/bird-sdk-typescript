@@ -377,3 +377,34 @@ export async function whatsappSuppressionsRemove() {
   // theirs to reverse. The record is kept and still reads back by id.
   await bird.whatsapp.suppressions.remove("was_01krdgeqcxet5s7t44vh8rt9mg");
 }
+
+export async function whatsappAgentsNotificationsCreate() {
+  // The agent decides whether and how to tell the contact. The answer reads
+  // accepted; read it back to see whether the agent acted on it.
+  const notification = await bird.whatsapp.agents.notifications.create("wan_01krdgeqcxet5s7t44vh8rt9mg", {
+    to: "+14155551234",
+    name: "order_shipped",
+    description: "Order 88213 left the warehouse and arrives on Thursday.",
+    payload: JSON.stringify({ order_id: "88213", carrier: "ACME Courier" }),
+  });
+  console.log(notification.id, notification.status);
+}
+
+export async function whatsappAgentsNotificationsList() {
+  const notifications = await bird.whatsapp.agents.notifications.list("wan_01krdgeqcxet5s7t44vh8rt9mg", {
+    status: "skipped",
+  });
+  for (const notification of notifications.data ?? []) {
+    console.log(notification.name, notification.skipped_reason);
+  }
+}
+
+export async function whatsappAgentsNotificationsGet() {
+  // A notification still on its way to WhatsApp is not readable yet, so a read
+  // straight after create can throw a not-found error.
+  const notification = await bird.whatsapp.agents.notifications.get(
+    "wan_01krdgeqcxet5s7t44vh8rt9mg",
+    "waan_01krdgeqcxet5s7t44vh8rt9m7",
+  );
+  console.log(notification.status, notification.skipped_reason ?? notification.error?.description);
+}

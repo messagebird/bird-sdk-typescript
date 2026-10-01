@@ -69,3 +69,11 @@ export async function numbersRelease() {
   // Only a dedicated number can be released; a shared one answers E14002.
   await bird.numbers.release("nda_01krdgeqcxet5s7t44vh8rt9mg");
 }
+
+export async function numbersUpdate() {
+  const allocated = await bird.numbers.update("nda_01krdgeqcxet5s7t44vh8rt9mg", {
+    name: "Support line",
+    reference: "STORE-042",
+  });
+  console.log(allocated.name, allocated.reference);
+}

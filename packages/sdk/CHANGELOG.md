@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.84.0
+
+- Add names and customer references to allocated numbers, with updates and search. Set an optional reference when buying a number, including orders that complete later.
+
 ## 0.83.0
 
 - `bird.amb.routingRules.update` accepts `business_account_id`, `match_kind`, `match_intent_id` and `match_group_id`, so a rule can move to another business or replace what it matches.

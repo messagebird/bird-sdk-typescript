@@ -141,6 +141,9 @@ import type {
   CreateWebhookReplayErrors,
   CreateWebhookReplayResponses,
   CreateWebhookResponses,
+  CreateWhatsAppAgentNotificationData,
+  CreateWhatsAppAgentNotificationErrors,
+  CreateWhatsAppAgentNotificationResponses,
   CreateWhatsAppGroupData,
   CreateWhatsAppGroupErrors,
   CreateWhatsAppGroupPinnedMessageData,
@@ -567,6 +570,9 @@ import type {
   GetWebhookData,
   GetWebhookErrors,
   GetWebhookResponses,
+  GetWhatsAppAgentNotificationData,
+  GetWhatsAppAgentNotificationErrors,
+  GetWhatsAppAgentNotificationResponses,
   GetWhatsAppBusinessAccountData,
   GetWhatsAppBusinessAccountErrors,
   GetWhatsAppBusinessAccountResponses,
@@ -794,6 +800,9 @@ import type {
   ListWebhooksData,
   ListWebhooksErrors,
   ListWebhooksResponses,
+  ListWhatsAppAgentNotificationsData,
+  ListWhatsAppAgentNotificationsErrors,
+  ListWhatsAppAgentNotificationsResponses,
   ListWhatsAppBusinessAccountsData,
   ListWhatsAppBusinessAccountsErrors,
   ListWhatsAppBusinessAccountsResponses,
@@ -965,6 +974,9 @@ import type {
   UpdateWhatsAppKeywordRuleData,
   UpdateWhatsAppKeywordRuleErrors,
   UpdateWhatsAppKeywordRuleResponses,
+  UpdateWorkspaceNumberData,
+  UpdateWorkspaceNumberErrors,
+  UpdateWorkspaceNumberResponses,
   UpsertEmailInboxInsightsDomainMonitoringData,
   UpsertEmailInboxInsightsDomainMonitoringErrors,
   UpsertEmailInboxInsightsDomainMonitoringResponses,
@@ -5943,6 +5955,110 @@ export const getWhatsAppNumber = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/whatsapp/numbers/{number_id}",
+    ...options,
+  });
+
+/**
+ * List the notifications sent to an agent
+ *
+ * Returns the notifications you have sent the agent, newest first, each with what came of it. Filter by `status` to find the ones the agent skipped or WhatsApp refused, or by `to` to follow one contact. A notification still in flight to WhatsApp is not listed yet.
+ *
+ * A number without an agent returns `404`. Page through the full set with the response cursors.
+ *
+ */
+export const listWhatsAppAgentNotifications = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListWhatsAppAgentNotificationsData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppAgentNotificationsResponses,
+  ListWhatsAppAgentNotificationsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListWhatsAppAgentNotificationsResponses,
+    ListWhatsAppAgentNotificationsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/numbers/{number_id}/agent/notifications",
+    ...options,
+  });
+
+/**
+ * Send an agent a notification
+ *
+ * Tells the agent that something happened in your systems for one contact, such as a payment landing, an order shipping or an identity check passing. The agent decides whether and how to tell the contact, drawing on `description` and `payload`, and may write to them without waiting for their next message.
+ *
+ * Bird takes the notification, hands it to WhatsApp in the background and keeps asking WhatsApp what became of it, so this answers `202` with the notification as you sent it at `status: accepted`. A read in the first moments after the `202` can answer `404` while the hand-off is still in flight. Read it back, or list the notifications, to see it settle: `success` when the agent acted on it, `skipped` with WhatsApp's reason when the agent chose to say nothing, or `failed` with what went wrong. The notification records whether the agent acted on it, not what the agent said to the contact. A number without an agent returns `404`, and one whose agent WhatsApp is still preparing returns `409`.
+ *
+ */
+export const createWhatsAppAgentNotification = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateWhatsAppAgentNotificationData, ThrowOnError>,
+): RequestResult<
+  CreateWhatsAppAgentNotificationResponses,
+  CreateWhatsAppAgentNotificationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateWhatsAppAgentNotificationResponses,
+    CreateWhatsAppAgentNotificationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/numbers/{number_id}/agent/notifications",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get a notification sent to an agent
+ *
+ * Returns one notification you sent the agent, with what came of it: `accepted` while WhatsApp is still working on it, then `success`, `skipped` with WhatsApp's reason, or `failed` with what went wrong. A notification still in flight to WhatsApp is not readable yet. A number without an agent, and an id the agent does not hold, both return `404`.
+ *
+ */
+export const getWhatsAppAgentNotification = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetWhatsAppAgentNotificationData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppAgentNotificationResponses,
+  GetWhatsAppAgentNotificationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWhatsAppAgentNotificationResponses,
+    GetWhatsAppAgentNotificationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/numbers/{number_id}/agent/notifications/{notification_id}",
     ...options,
   });
 
@@ -11445,7 +11561,7 @@ export const listWebhookAttempts = <ThrowOnError extends boolean = false>(
 /**
  * List your allocated numbers
  *
- * Returns a paginated list of the phone numbers currently allocated to your workspace, newest first. Each entry is either a dedicated number you bought or a shared number managed for you, as its `kind` field indicates. Pass `number` to look one up, or narrow the list with `country_code`, `number_type`, `prefix`, and `capabilities`. An allocated number is not always enough to send from it: some countries also require an approved registration for the sender.
+ * Returns a paginated list of the phone numbers currently allocated to your workspace, newest first. Each entry is either a dedicated number you bought or a shared number managed for you, as its `kind` field indicates. Pass `number` to look one up, or narrow the list with `country_code`, `number_type`, `prefix`, and `capabilities`. Use `search` to find a number by its name or reference, or `reference` for an exact match. An allocated number is not always enough to send from it: some countries also require an approved registration for the sender.
  */
 export const listWorkspaceNumbers = <ThrowOnError extends boolean = false>(
   options?: Options<ListWorkspaceNumbersData, ThrowOnError>,
@@ -11690,6 +11806,39 @@ export const getWorkspaceNumber = <ThrowOnError extends boolean = false>(
     ],
     url: "/v1/numbers/{number_id}",
     ...options,
+  });
+
+/**
+ * Update an allocated number
+ *
+ * Updates the name and reference for a number allocated to your workspace. Omit a field to keep its current value, or send null to clear it. Leading and trailing whitespace is removed. References need not be unique.
+ */
+export const updateWorkspaceNumber = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateWorkspaceNumberData, ThrowOnError>,
+): RequestResult<
+  UpdateWorkspaceNumberResponses,
+  UpdateWorkspaceNumberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateWorkspaceNumberResponses,
+    UpdateWorkspaceNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/numbers/{number_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**

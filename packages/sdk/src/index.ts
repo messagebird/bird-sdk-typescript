@@ -89,6 +89,7 @@ export type {
   SmsSendBatchParams,
   SmsSendBatchResult,
 } from "./resources/sms.js";
+export type { NumbersUpdateParams } from "./resources/numbers.js";
 export type { SmsMessage, SmsListQuery } from "./resources/sms.gen.js";
 export type {
   VoiceCall,
@@ -249,6 +250,11 @@ export type {
   WhatsappSuppressionsListQuery,
   WhatsappSuppressionsAddParams,
 } from "./resources/whatsappSuppressions.gen.js";
+export type {
+  WhatsAppAgentNotification,
+  WhatsappAgentsNotificationsListQuery,
+  WhatsappAgentsNotificationsCreateParams,
+} from "./resources/whatsappAgentsNotifications.gen.js";
 export type {
   WhatsAppTemplate,
   WhatsappTemplatesListQuery,

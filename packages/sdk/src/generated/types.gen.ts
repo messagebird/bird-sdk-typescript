@@ -9143,6 +9143,115 @@ export type WhatsAppNumberList = {
 export type NumbersDedicatedAllocationId = string;
 
 /**
+ * Where a notification you sent the agent stands. One state is transient and three are final.
+ *
+ * - `accepted` means Bird holds the notification: it is on its way to WhatsApp, or WhatsApp is still working on it. Nothing is charged for a notification, unlike a message that reads `accepted`.
+ * - `success` means the agent acted on it.
+ * - `skipped` means the agent read it and chose to say nothing; `skipped_reason` says why.
+ * - `failed` means WhatsApp refused it or reported a failure, or no outcome arrived within a day; `error` says why.
+ *
+ */
+export type WhatsAppAgentNotificationStatus =
+  "accepted" | "success" | "skipped" | "failed";
+
+export type WhatsAppAgentNotificationId = string;
+
+/**
+ * Why a notification sent to the agent failed.
+ */
+export type WhatsAppAgentNotificationError = {
+  /**
+   * WhatsApp's own explanation, passed through: what it said when it refused the notification, or its failure summary once it had worked on it. Show it to the person who sent the notification; never match on its text. Carries Bird's own words instead when the failure was Bird's verdict, such as no outcome arriving within a day.
+   *
+   */
+  readonly description: string;
+  /**
+   * WhatsApp's most specific code when it refused the notification outright: its error subcode where it sent one, otherwise its top-level code. Treat it as an opaque string. Null when WhatsApp took the notification and reported the failure later, which carries no code, and when the failure was Bird's own verdict.
+   *
+   */
+  readonly meta_error_code: string | null;
+};
+
+/**
+ * A notification you sent the agent about one contact, and what came of it. The agent decides whether to write to the contact about it; that message, if any, shows up on the contact's conversation.
+ *
+ */
+export type WhatsAppAgentNotification = {
+  /**
+   * Unique identifier for the notification.
+   */
+  readonly id: WhatsAppAgentNotificationId;
+  /**
+   * The contact the notification was about: the phone number or business-scoped user ID you addressed it to, in the same shape a message's `to` uses.
+   *
+   */
+  readonly to: WhatsAppAddress;
+  /**
+   * Your own name for what happened, as you sent it.
+   */
+  readonly name: string;
+  /**
+   * What happened, as you sent it.
+   */
+  readonly description: string;
+  /**
+   * The data you attached, as you sent it.
+   */
+  readonly payload: string;
+  /**
+   * Where the notification stands. `accepted` from the moment Bird takes it, then one of the three final states once WhatsApp has answered.
+   *
+   */
+  readonly status: WhatsAppAgentNotificationStatus;
+  /**
+   * WhatsApp's own account of why the agent chose to say nothing, passed through. Present only when `status` is `skipped`. Show it to the person who sent the notification; never match on its text.
+   *
+   */
+  readonly skipped_reason?: string;
+  /**
+   * Why the notification failed. Present only when `status` is `failed`.
+   */
+  readonly error?: WhatsAppAgentNotificationError;
+  /**
+   * When Bird accepted the notification.
+   */
+  readonly created_at: string;
+};
+
+export type WhatsAppAgentNotificationList = {
+  /**
+   * A page of the notifications sent to the agent.
+   */
+  data: Array<WhatsAppAgentNotification>;
+} & ListEnvelope;
+
+/**
+ * Something that happened in your systems that the agent should tell the contact about, such as a payment landing or an order shipping. WhatsApp processes it in the background, so read the notification back for what came of it.
+ *
+ */
+export type WhatsAppAgentNotificationCreate = {
+  /**
+   * The contact the notification is about: a phone number in E.164 format (for example `+14155551234`), or the contact's business-scoped user ID (for example `US.13491208655302741918`), the same forms a message's `to` accepts. A phone number is normalized before the call reaches WhatsApp, so spacing does not matter. WhatsApp documents a phone number for this call; a business-scoped user ID is passed through as given.
+   *
+   */
+  to: string;
+  /**
+   * Your own name for what happened, such as `payment_received` or `order_shipped`. The agent reads it as the kind of thing that happened, so keep one name per kind. WhatsApp calls this the event type.
+   *
+   */
+  name: string;
+  /**
+   * What happened, in a sentence the agent can tell the contact.
+   */
+  description: string;
+  /**
+   * Details the agent may draw on when it writes to the contact, as one JSON string. WhatsApp passes it to the agent unchanged and does not read it itself.
+   *
+   */
+  payload: string;
+};
+
+/**
  * Sortable fields for a WhatsApp number's event list.
  */
 export type WhatsAppNumberEventSortField = "created_at";
@@ -21782,6 +21891,331 @@ export type VoiceParty = {
 };
 
 /**
+ * A short-lived SIP digest credential for a calling client. The `password` is returned once and cannot be recovered. Create a new credential if you lose it.
+ *
+ */
+export type VoiceSessionCredential = {
+  /**
+   * SIP digest username. Always `bird`. The credential identifies the workspace through `realm`. The username does not identify the workspace.
+   *
+   */
+  username: string;
+  /**
+   * SIP digest password, returned once. Treat it as a bearer secret: until it expires it can place calls billed to this workspace.
+   *
+   */
+  password: string;
+  /**
+   * SIP digest realm to authenticate against. Workspace-scoped, so a credential minted for one workspace cannot authenticate against another.
+   *
+   */
+  realm: string;
+  /**
+   * When the credential stops authenticating, five minutes after creation. Existing calls may continue; use a fresh credential for later authentication.
+   */
+  expires_at: string;
+  /**
+   * Short-lived token required when upgrading the WebSocket connection. The token authorizes the connection only; each call still authenticates with `password`.
+   *
+   */
+  handshake_token?: string;
+};
+
+/**
+ * Why we rejected the leg. Use `rejection_reason` to identify the cause;
+ * `sip_response_code` alone cannot distinguish these reasons.
+ *
+ * You can resolve these issues:
+ *
+ * - `source_not_allowed`: The leg came from an IP address that is not in the
+ * trunk's allowed-address list. Add the address your PBX sends from.
+ * - `caller_id_not_verified`: The number in the `From` header is not a verified
+ * caller ID for this workspace. Verify it or use a verified caller ID.
+ * - `number_ownership_not_verified`: The ownership documents for this purchased
+ * number have not yet been accepted under its country's requirements. We
+ * block outgoing and incoming legs on the number until verification is
+ * complete. Blocked incoming legs never reach your PBX, and their route type
+ * is `reject` regardless of the number's configuration. Open the number
+ * under **Numbers** and complete its ownership requirements, then retry
+ * the leg.
+ * - `destination_not_enabled`: Calling to this destination country is disabled.
+ * Enable it in your voice destination settings.
+ * - `insufficient_balance`: Your wallet balance was too low for the leg.
+ * Top up or enable automatic top-ups.
+ * - `daily_spend_exceeded`: The leg would exceed your organization's daily
+ * voice spend limit. Retry after the limit resets at the start of the next
+ * UTC day.
+ * - `concurrent_calls_exceeded`: You already have as many legs in progress as
+ * your account allows. Wait for one to end or ask support to raise the limit.
+ * - `calls_per_second_exceeded`: You placed legs faster than your account
+ * allows. Reduce your dialing rate and retry.
+ *
+ * For all other reasons, contact support and provide the leg `id`:
+ *
+ * - `routing_not_configured`: This trunk has no dial plan, which can happen on
+ * a new trunk.
+ * - `no_route_found`: A dial plan is attached, but no rule in it covers this
+ * destination.
+ * - `destination_blocked`: The destination is blocked by our routing
+ * configuration.
+ * - `call_not_permitted`: The leg could not be priced for your account.
+ *
+ */
+export type VoiceLegRejectionReason =
+  | "source_not_allowed"
+  | "caller_id_not_verified"
+  | "routing_not_configured"
+  | "no_route_found"
+  | "destination_blocked"
+  | "destination_not_enabled"
+  | "insufficient_balance"
+  | "daily_spend_exceeded"
+  | "concurrent_calls_exceeded"
+  | "calls_per_second_exceeded"
+  | "call_not_permitted"
+  | "number_ownership_not_verified";
+
+/**
+ * Which answer handled this incoming leg.
+ *
+ * - `reject`: the call was refused.
+ * - `trunk`: the call was delivered to one of your SIP trunks.
+ * - `forward`: the call was forwarded to one of your verified caller IDs.
+ * - `sequence`: the call was handled by one of your sequences.
+ *
+ */
+export type VoiceLegInboundRouteType =
+  "reject" | "trunk" | "forward" | "sequence";
+
+export type VoiceLegInboundRouteReject = {
+  /**
+   * The number turned the leg away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.
+   *
+   */
+  type: VoiceLegInboundRouteType;
+};
+
+export type VoiceLegInboundRouteTrunk = {
+  /**
+   * The leg was delivered to one of your SIP trunks.
+   */
+  type: VoiceLegInboundRouteType;
+  /**
+   * The SIP trunk the leg was delivered to. Recorded as it was at the time, so it may name a trunk you have since changed or deleted.
+   *
+   */
+  trunk_id: SipTrunkId;
+};
+
+export type VoiceLegInboundRouteForward = {
+  /**
+   * The leg was forwarded to another of your numbers.
+   */
+  type: VoiceLegInboundRouteType;
+  /**
+   * The number the leg was forwarded to, in E.164 format. Recorded as it was at the time, so it may name a number you have since stopped verifying.
+   *
+   */
+  forward_to: string;
+  /**
+   * Which of the leg's two numbers the forwarded leg presented as its caller. The value that went on the wire, not the one the number is set to now.
+   *
+   */
+  forward_as: VoiceInboundForwardAs;
+};
+
+export type VoiceSequenceId = string;
+
+/**
+ * Stable identifier for a node within one sequence definition.
+ */
+export type VoiceSequenceNodeId = string;
+
+export type VoiceLegInboundRouteSequence = {
+  /**
+   * The leg was handled by one of your sequences.
+   */
+  type: VoiceLegInboundRouteType;
+  /**
+   * The sequence that handled the leg. Recorded as it was at the time, so it may name a sequence you have since changed or deleted.
+   *
+   */
+  sequence_id: VoiceSequenceId;
+  /**
+   * The entry the leg started from in the publication that handled it. Recorded as it was at the time, so it may name an entry the sequence no longer has.
+   *
+   */
+  entry_node_id: VoiceSequenceNodeId;
+};
+
+/**
+ * The routing choice recorded for an incoming leg. A recorded route does not
+ * guarantee that the leg connected. Check `status` for the outcome and
+ * `rejection_reason` for the cause when present.
+ *
+ */
+export type VoiceLegInboundRoute =
+  | ({
+      type: "reject";
+    } & VoiceLegInboundRouteReject)
+  | ({
+      type: "trunk";
+    } & VoiceLegInboundRouteTrunk)
+  | ({
+      type: "forward";
+    } & VoiceLegInboundRouteForward)
+  | ({
+      type: "sequence";
+    } & VoiceLegInboundRouteSequence);
+
+export type VoiceMediaQuality = {
+  /**
+   * Mean opinion score, the single number for how the call sounded, from 1 (unintelligible) to 5 (as good as being in the same room). Anything at or above 4.0 is what most people would call a clear line, and below 3.5 is where callers start asking each other to repeat themselves. The three other fields are the impairments that move it.
+   *
+   */
+  readonly mos: number;
+  /**
+   * Variation in the arrival time of the audio packets, in milliseconds. Audio arriving unevenly is heard as choppiness even when no packets are lost at all.
+   */
+  readonly jitter_ms: number;
+  /**
+   * Percentage of audio packets that never arrived. Heard as brief gaps or clipped words, and the impairment that degrades a call fastest.
+   */
+  readonly packet_loss_pct: number;
+  /**
+   * Round-trip time between the two ends, in milliseconds. It does not distort the audio. Above roughly 300 ms, the two parties start talking over each other.
+   */
+  readonly round_trip_time_ms: number;
+};
+
+/**
+ * What was charged for a leg, split into the components that make it up.
+ *
+ */
+export type VoiceLegCost = {
+  /**
+   * Total charged, as a decimal string: the sum of the components below. Net of tax, which applies to your wallet balance rather than to an individual charge.
+   *
+   */
+  readonly amount: string;
+  /**
+   * ISO 4217 currency code. Every component is denominated in this currency.
+   */
+  readonly currency_code: CurrencyCode;
+  /**
+   * What we charged to carry the leg to the destination network, as a decimal string. `null` until this component is priced.
+   *
+   */
+  readonly outbound_amount: string | null;
+  /**
+   * What we charged to receive the leg from the originating network, as a decimal string. Only a leg that arrived at your number can carry it. `null` until this component is priced.
+   *
+   */
+  readonly inbound_amount: string | null;
+  /**
+   * What we charged for handling the call itself, as a decimal string. A call is charged for handling once, however many legs it has, so only one leg's record carries it. `null` until this component is priced.
+   *
+   */
+  readonly call_handling_amount: string | null;
+  /**
+   * What we charged to record the leg, as a decimal string, billed per second over the same billable time as the rest of the leg. `null` until this component is priced.
+   *
+   */
+  readonly recording_amount: string | null;
+  /**
+   * What we charged to transcribe the leg's audio, as a decimal string, billed per second of recorded audio rather than for the length of the leg. A transcript is produced after the leg ends, so this can appear after the rest of the cost. `null` until this component is priced.
+   *
+   */
+  readonly transcription_amount: string | null;
+};
+
+export type VoiceLeg = {
+  /**
+   * Unique identifier for this leg record.
+   */
+  readonly id: VoiceCallId;
+  /**
+   * Call identifier shared across all legs of a multi-party or transferred call. Use this to correlate related leg records. `null` when call correlation is not available for the leg.
+   */
+  readonly call_id?: VoiceSessionId | null;
+  readonly workspace_id: WorkspaceId;
+  readonly direction: VoiceCallDirection;
+  /**
+   * Calling party number in E.164 format.
+   */
+  readonly from: string;
+  /**
+   * Called party number in E.164 format.
+   */
+  readonly to: string;
+  /**
+   * Who placed the leg: the API key whose credentials it used, the integration acting for the workspace, or the user who placed it from a browser or the CLI. Absent when the leg was admitted only by its source IP address, or when no actor was recorded.
+   */
+  readonly actor?: Actor;
+  /**
+   * Identifier of the SIP trunk that originated this leg. `null` when no trunk is associated.
+   */
+  readonly sip_trunk_id?: SipTrunkId | null;
+  readonly status: VoiceCallStatus;
+  /**
+   * Final SIP response code received from the carrier. `null` when no SIP response was received, for example on timeout or DNS failure.
+   */
+  readonly sip_response_code?: number | null;
+  /**
+   * Why we rejected the leg. Absent on connected legs and legs rejected
+   * by the carrier or recipient. For carrier or recipient rejections, see
+   * `sip_response_code`; a `6xx` decline gives the leg a `rejected` status.
+   *
+   * Read alongside `route` when present. A refusal caused by the number's
+   * configuration has no rejection reason; the route records that
+   * configuration.
+   *
+   */
+  readonly rejection_reason?: VoiceLegRejectionReason;
+  /**
+   * Which answer your number gave an incoming leg. Its `type` selects the shape, and each answer carries its own fields; the variants below are the full set you can receive. Recorded when the leg was handled, so changing the number's setup afterwards does not change what its past legs say. Absent on outbound legs, and on legs recorded before this field existed.
+   */
+  readonly route?: VoiceLegInboundRoute;
+  /**
+   * Your own `{name, value}` labels for this leg, taken from the `X-Bird-Call-Tag` headers on the INVITE that placed it. Set them to organise legs by a dimension of your own (campaign, queue, agent, cost centre), then filter this list by them with `tag`. Read-only here: a leg is labelled when it is placed, and never afterwards. What is here may be less than what was sent, and the leg still goes through either way: a tag whose name or value breaks the rules below is dropped, anything past the first five is ignored, and a name sent more than once keeps its first value. Absent when the leg carried none, and on legs recorded before this field existed.
+   */
+  readonly tags?: Array<Tag>;
+  /**
+   * When the leg was initiated.
+   */
+  readonly started_at: string;
+  /**
+   * When the leg was answered (`200` OK received). `null` for unanswered legs.
+   */
+  readonly answered_at?: string | null;
+  /**
+   * When the leg ended (BYE or final non-2xx response). `null` for legs that ended abnormally without a recorded end event.
+   */
+  readonly ended_at?: string | null;
+  /**
+   * Total leg duration in milliseconds, measured from the first INVITE to the BYE or final response. `null` while the leg is still in progress and has no final duration yet.
+   */
+  readonly duration_ms?: number | null;
+  /**
+   * Post-dial delay in milliseconds: how long the caller heard nothing between dialing and the phone starting to ring at the other end. High values are what callers experience as the leg `not going through`. Absent when the leg never rang, either because it failed first or because the carrier answered it immediately.
+   *
+   */
+  readonly pdd_ms?: number;
+  /**
+   * Billable duration in milliseconds, measured from answer to leg end. Zero for unanswered legs, and `null` while the leg is still in progress.
+   */
+  readonly billable_ms?: number | null;
+  /**
+   * How the audio sounded, as opposed to whether the leg connected. Absent when the leg carried no audio, or when the far end reported nothing to measure from.
+   */
+  readonly media_quality?: VoiceMediaQuality;
+  /**
+   * What the leg cost, net of tax, at full precision, split into the components that make it up. Absent until the leg has been rated; unanswered or unpriced legs have no cost, and neither does a verification call Bird places and answers on your behalf, which is exempt from rating.
+   */
+  readonly cost?: VoiceLegCost;
+};
+
+/**
  * Physical type of a phone number. New number types may be added over time, so treat unrecognized values as supported types rather than errors.
  */
 export type NumberType =
@@ -21849,26 +22283,34 @@ export type NumberOwnership = {
 
 export type Number = {
   /**
+   * The name you gave this number in your workspace. Null when no name is set.
+   */
+  name: string | null;
+  /**
+   * Your own reference for this number in your workspace. Null when no reference is set.
+   */
+  reference: string | null;
+  /**
    * Identifier of this allocated number. Pass it as `number_id` to read this number, or to release it when kind is dedicated.
    */
-  readonly id: AllocatedNumberId;
+  id: AllocatedNumberId;
   /**
    * How this number is allocated. `dedicated` belongs to your workspace and is billed as a subscription. `shared` is provided through Bird-managed shared infrastructure and is not owned or billed as a workspace subscription.
    */
-  readonly kind: "dedicated" | "shared";
+  kind: "dedicated" | "shared";
   /**
    * Phone number in E.164 format.
    */
-  readonly number: string;
-  readonly country_code: CountryCode;
+  number: string;
+  country_code: CountryCode;
   /**
    * Physical type of this phone number.
    */
-  readonly number_type: NumberType;
+  number_type: NumberType;
   /**
    * Capabilities supported by this number.
    */
-  readonly capabilities: Array<NumberCapability>;
+  capabilities: Array<NumberCapability>;
   /**
    * The allocation and ownership-approval status of this number.
    *
@@ -21884,20 +22326,20 @@ export type Number = {
    * countries also require an approved registration for the sender.
    *
    */
-  readonly status: "active" | "pending_ownership_registration" | "released";
+  status: "active" | "pending_ownership_registration" | "released";
   /**
    * When this number was allocated to your workspace.
    */
-  readonly allocated_at: string;
+  allocated_at: string;
   /**
    * When this number was released. `null` while it is still allocated to your workspace.
    */
-  readonly released_at?: string | null;
+  released_at?: string | null;
   /**
    * Ownership paperwork and activation progress. `null` when no ownership requirements, recorded block, or recorded decision apply, or when requirements or progress cannot be read and no ownership block or decision has been recorded. A recorded block still returns an ownership object with `status: unknown` when progress cannot be read; retry the read. We manage the paperwork for shared short codes, so this field is always `null` for them. Other sending requirements can apply even when ownership registration is complete.
    *
    */
-  readonly ownership?: NumberOwnership | null;
+  ownership?: NumberOwnership | null;
 };
 
 export type NumberList = {
@@ -21988,6 +22430,21 @@ export type NumbersOrderCreate = {
    * The number to acquire, in E.164 format, as returned by `GET /v1/numbers/available`.
    */
   number: string;
+  /**
+   * Your own reference to set on the number when this purchase completes. Leading and trailing whitespace is removed. A pending order keeps the reference until the number is allocated.
+   */
+  reference?: string;
+};
+
+export type NumberUpdate = {
+  /**
+   * A name for this number in your workspace, such as Support line. Send null to clear it, or omit it to keep the current name.
+   */
+  name?: string | null;
+  /**
+   * Your own reference for this number, such as an identifier from your records. References need not be unique. Send null to clear it, or omit it to keep the current reference.
+   */
+  reference?: string | null;
 };
 
 /**
@@ -22185,37 +22642,6 @@ export type VoiceTrunkUpdate = {
    *
    */
   session_credentials_enabled?: boolean;
-};
-
-/**
- * A short-lived SIP digest credential for a calling client. The `password` is returned once and cannot be recovered. Create a new credential if you lose it.
- *
- */
-export type VoiceSessionCredential = {
-  /**
-   * SIP digest username. Always `bird`. The credential identifies the workspace through `realm`. The username does not identify the workspace.
-   *
-   */
-  username: string;
-  /**
-   * SIP digest password, returned once. Treat it as a bearer secret: until it expires it can place calls billed to this workspace.
-   *
-   */
-  password: string;
-  /**
-   * SIP digest realm to authenticate against. Workspace-scoped, so a credential minted for one workspace cannot authenticate against another.
-   *
-   */
-  realm: string;
-  /**
-   * When the credential stops authenticating, five minutes after creation. Existing calls may continue; use a fresh credential for later authentication.
-   */
-  expires_at: string;
-  /**
-   * Short-lived token required when upgrading the WebSocket connection. The token authorizes the connection only; each call still authenticates with `password`.
-   *
-   */
-  handshake_token?: string;
 };
 
 export type VoiceTrunkGatewayId = string;
@@ -22503,13 +22929,6 @@ export type VoiceCallRouteForward = {
   forward_as: VoiceInboundForwardAs;
 };
 
-export type VoiceSequenceId = string;
-
-/**
- * Stable identifier for a node within one sequence definition.
- */
-export type VoiceSequenceNodeId = string;
-
 export type VoiceCallRouteSequence = {
   /**
    * Runs the named sequence's active publication from the selected voice-call entry.
@@ -22702,293 +23121,6 @@ export type VoiceVerifiedNumberVerifyRequest = {
    * The 6-digit verification code read out by the verification call. Required until ownership is verified. Omit it when retrying activation of an already verified number.
    */
   code?: string;
-};
-
-/**
- * Why we rejected the leg. Use `rejection_reason` to identify the cause;
- * `sip_response_code` alone cannot distinguish these reasons.
- *
- * You can resolve these issues:
- *
- * - `source_not_allowed`: The leg came from an IP address that is not in the
- * trunk's allowed-address list. Add the address your PBX sends from.
- * - `caller_id_not_verified`: The number in the `From` header is not a verified
- * caller ID for this workspace. Verify it or use a verified caller ID.
- * - `number_ownership_not_verified`: The ownership documents for this purchased
- * number have not yet been accepted under its country's requirements. We
- * block outgoing and incoming legs on the number until verification is
- * complete. Blocked incoming legs never reach your PBX, and their route type
- * is `reject` regardless of the number's configuration. Open the number
- * under **Numbers** and complete its ownership requirements, then retry
- * the leg.
- * - `destination_not_enabled`: Calling to this destination country is disabled.
- * Enable it in your voice destination settings.
- * - `insufficient_balance`: Your wallet balance was too low for the leg.
- * Top up or enable automatic top-ups.
- * - `daily_spend_exceeded`: The leg would exceed your organization's daily
- * voice spend limit. Retry after the limit resets at the start of the next
- * UTC day.
- * - `concurrent_calls_exceeded`: You already have as many legs in progress as
- * your account allows. Wait for one to end or ask support to raise the limit.
- * - `calls_per_second_exceeded`: You placed legs faster than your account
- * allows. Reduce your dialing rate and retry.
- *
- * For all other reasons, contact support and provide the leg `id`:
- *
- * - `routing_not_configured`: This trunk has no dial plan, which can happen on
- * a new trunk.
- * - `no_route_found`: A dial plan is attached, but no rule in it covers this
- * destination.
- * - `destination_blocked`: The destination is blocked by our routing
- * configuration.
- * - `call_not_permitted`: The leg could not be priced for your account.
- *
- */
-export type VoiceLegRejectionReason =
-  | "source_not_allowed"
-  | "caller_id_not_verified"
-  | "routing_not_configured"
-  | "no_route_found"
-  | "destination_blocked"
-  | "destination_not_enabled"
-  | "insufficient_balance"
-  | "daily_spend_exceeded"
-  | "concurrent_calls_exceeded"
-  | "calls_per_second_exceeded"
-  | "call_not_permitted"
-  | "number_ownership_not_verified";
-
-/**
- * Which answer handled this incoming leg.
- *
- * - `reject`: the call was refused.
- * - `trunk`: the call was delivered to one of your SIP trunks.
- * - `forward`: the call was forwarded to one of your verified caller IDs.
- * - `sequence`: the call was handled by one of your sequences.
- *
- */
-export type VoiceLegInboundRouteType =
-  "reject" | "trunk" | "forward" | "sequence";
-
-export type VoiceLegInboundRouteReject = {
-  /**
-   * The number turned the leg away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.
-   *
-   */
-  type: VoiceLegInboundRouteType;
-};
-
-export type VoiceLegInboundRouteTrunk = {
-  /**
-   * The leg was delivered to one of your SIP trunks.
-   */
-  type: VoiceLegInboundRouteType;
-  /**
-   * The SIP trunk the leg was delivered to. Recorded as it was at the time, so it may name a trunk you have since changed or deleted.
-   *
-   */
-  trunk_id: SipTrunkId;
-};
-
-export type VoiceLegInboundRouteForward = {
-  /**
-   * The leg was forwarded to another of your numbers.
-   */
-  type: VoiceLegInboundRouteType;
-  /**
-   * The number the leg was forwarded to, in E.164 format. Recorded as it was at the time, so it may name a number you have since stopped verifying.
-   *
-   */
-  forward_to: string;
-  /**
-   * Which of the leg's two numbers the forwarded leg presented as its caller. The value that went on the wire, not the one the number is set to now.
-   *
-   */
-  forward_as: VoiceInboundForwardAs;
-};
-
-export type VoiceLegInboundRouteSequence = {
-  /**
-   * The leg was handled by one of your sequences.
-   */
-  type: VoiceLegInboundRouteType;
-  /**
-   * The sequence that handled the leg. Recorded as it was at the time, so it may name a sequence you have since changed or deleted.
-   *
-   */
-  sequence_id: VoiceSequenceId;
-  /**
-   * The entry the leg started from in the publication that handled it. Recorded as it was at the time, so it may name an entry the sequence no longer has.
-   *
-   */
-  entry_node_id: VoiceSequenceNodeId;
-};
-
-/**
- * The routing choice recorded for an incoming leg. A recorded route does not
- * guarantee that the leg connected. Check `status` for the outcome and
- * `rejection_reason` for the cause when present.
- *
- */
-export type VoiceLegInboundRoute =
-  | ({
-      type: "reject";
-    } & VoiceLegInboundRouteReject)
-  | ({
-      type: "trunk";
-    } & VoiceLegInboundRouteTrunk)
-  | ({
-      type: "forward";
-    } & VoiceLegInboundRouteForward)
-  | ({
-      type: "sequence";
-    } & VoiceLegInboundRouteSequence);
-
-export type VoiceMediaQuality = {
-  /**
-   * Mean opinion score, the single number for how the call sounded, from 1 (unintelligible) to 5 (as good as being in the same room). Anything at or above 4.0 is what most people would call a clear line, and below 3.5 is where callers start asking each other to repeat themselves. The three other fields are the impairments that move it.
-   *
-   */
-  readonly mos: number;
-  /**
-   * Variation in the arrival time of the audio packets, in milliseconds. Audio arriving unevenly is heard as choppiness even when no packets are lost at all.
-   */
-  readonly jitter_ms: number;
-  /**
-   * Percentage of audio packets that never arrived. Heard as brief gaps or clipped words, and the impairment that degrades a call fastest.
-   */
-  readonly packet_loss_pct: number;
-  /**
-   * Round-trip time between the two ends, in milliseconds. It does not distort the audio. Above roughly 300 ms, the two parties start talking over each other.
-   */
-  readonly round_trip_time_ms: number;
-};
-
-/**
- * What was charged for a leg, split into the components that make it up.
- *
- */
-export type VoiceLegCost = {
-  /**
-   * Total charged, as a decimal string: the sum of the components below. Net of tax, which applies to your wallet balance rather than to an individual charge.
-   *
-   */
-  readonly amount: string;
-  /**
-   * ISO 4217 currency code. Every component is denominated in this currency.
-   */
-  readonly currency_code: CurrencyCode;
-  /**
-   * What we charged to carry the leg to the destination network, as a decimal string. `null` until this component is priced.
-   *
-   */
-  readonly outbound_amount: string | null;
-  /**
-   * What we charged to receive the leg from the originating network, as a decimal string. Only a leg that arrived at your number can carry it. `null` until this component is priced.
-   *
-   */
-  readonly inbound_amount: string | null;
-  /**
-   * What we charged for handling the call itself, as a decimal string. A call is charged for handling once, however many legs it has, so only one leg's record carries it. `null` until this component is priced.
-   *
-   */
-  readonly call_handling_amount: string | null;
-  /**
-   * What we charged to record the leg, as a decimal string, billed per second over the same billable time as the rest of the leg. `null` until this component is priced.
-   *
-   */
-  readonly recording_amount: string | null;
-  /**
-   * What we charged to transcribe the leg's audio, as a decimal string, billed per second of recorded audio rather than for the length of the leg. A transcript is produced after the leg ends, so this can appear after the rest of the cost. `null` until this component is priced.
-   *
-   */
-  readonly transcription_amount: string | null;
-};
-
-export type VoiceLeg = {
-  /**
-   * Unique identifier for this leg record.
-   */
-  readonly id: VoiceCallId;
-  /**
-   * Call identifier shared across all legs of a multi-party or transferred call. Use this to correlate related leg records. `null` when call correlation is not available for the leg.
-   */
-  readonly call_id?: VoiceSessionId | null;
-  readonly workspace_id: WorkspaceId;
-  readonly direction: VoiceCallDirection;
-  /**
-   * Calling party number in E.164 format.
-   */
-  readonly from: string;
-  /**
-   * Called party number in E.164 format.
-   */
-  readonly to: string;
-  /**
-   * Who placed the leg: the API key whose credentials it used, the integration acting for the workspace, or the user who placed it from a browser or the CLI. Absent when the leg was admitted only by its source IP address, or when no actor was recorded.
-   */
-  readonly actor?: Actor;
-  /**
-   * Identifier of the SIP trunk that originated this leg. `null` when no trunk is associated.
-   */
-  readonly sip_trunk_id?: SipTrunkId | null;
-  readonly status: VoiceCallStatus;
-  /**
-   * Final SIP response code received from the carrier. `null` when no SIP response was received, for example on timeout or DNS failure.
-   */
-  readonly sip_response_code?: number | null;
-  /**
-   * Why we rejected the leg. Absent on connected legs and legs rejected
-   * by the carrier or recipient. For carrier or recipient rejections, see
-   * `sip_response_code`; a `6xx` decline gives the leg a `rejected` status.
-   *
-   * Read alongside `route` when present. A refusal caused by the number's
-   * configuration has no rejection reason; the route records that
-   * configuration.
-   *
-   */
-  readonly rejection_reason?: VoiceLegRejectionReason;
-  /**
-   * Which answer your number gave an incoming leg. Its `type` selects the shape, and each answer carries its own fields; the variants below are the full set you can receive. Recorded when the leg was handled, so changing the number's setup afterwards does not change what its past legs say. Absent on outbound legs, and on legs recorded before this field existed.
-   */
-  readonly route?: VoiceLegInboundRoute;
-  /**
-   * Your own `{name, value}` labels for this leg, taken from the `X-Bird-Call-Tag` headers on the INVITE that placed it. Set them to organise legs by a dimension of your own (campaign, queue, agent, cost centre), then filter this list by them with `tag`. Read-only here: a leg is labelled when it is placed, and never afterwards. What is here may be less than what was sent, and the leg still goes through either way: a tag whose name or value breaks the rules below is dropped, anything past the first five is ignored, and a name sent more than once keeps its first value. Absent when the leg carried none, and on legs recorded before this field existed.
-   */
-  readonly tags?: Array<Tag>;
-  /**
-   * When the leg was initiated.
-   */
-  readonly started_at: string;
-  /**
-   * When the leg was answered (`200` OK received). `null` for unanswered legs.
-   */
-  readonly answered_at?: string | null;
-  /**
-   * When the leg ended (BYE or final non-2xx response). `null` for legs that ended abnormally without a recorded end event.
-   */
-  readonly ended_at?: string | null;
-  /**
-   * Total leg duration in milliseconds, measured from the first INVITE to the BYE or final response. `null` while the leg is still in progress and has no final duration yet.
-   */
-  readonly duration_ms?: number | null;
-  /**
-   * Post-dial delay in milliseconds: how long the caller heard nothing between dialing and the phone starting to ring at the other end. High values are what callers experience as the leg `not going through`. Absent when the leg never rang, either because it failed first or because the carrier answered it immediately.
-   *
-   */
-  readonly pdd_ms?: number;
-  /**
-   * Billable duration in milliseconds, measured from answer to leg end. Zero for unanswered legs, and `null` while the leg is still in progress.
-   */
-  readonly billable_ms?: number | null;
-  /**
-   * How the audio sounded, as opposed to whether the leg connected. Absent when the leg carried no audio, or when the far end reported nothing to measure from.
-   */
-  readonly media_quality?: VoiceMediaQuality;
-  /**
-   * What the leg cost, net of tax, at full precision, split into the components that make it up. Absent until the leg has been rated; unanswered or unpriced legs have no cost, and neither does a verification call Bird places and answers on your behalf, which is exempt from rating.
-   */
-  readonly cost?: VoiceLegCost;
 };
 
 export type VoiceLegList = {
@@ -24940,6 +25072,21 @@ export type WhatsAppNumberListWritable = {
    * The WhatsApp numbers your workspace can send from.
    */
   data: Array<WhatsAppNumberWritable>;
+} & ListEnvelope;
+
+/**
+ * A notification you sent the agent about one contact, and what came of it. The agent decides whether to write to the contact about it; that message, if any, shows up on the contact's conversation.
+ *
+ */
+export type WhatsAppAgentNotificationWritable = {
+  [key: string]: never;
+};
+
+export type WhatsAppAgentNotificationListWritable = {
+  /**
+   * A page of the notifications sent to the agent.
+   */
+  data: Array<WhatsAppAgentNotificationWritable>;
 } & ListEnvelope;
 
 export type WhatsAppNumberEventWritable = {
@@ -27460,6 +27607,10 @@ export type VoicePartyWritable = {
   [key: string]: never;
 };
 
+export type VoiceLegWritable = {
+  [key: string]: never;
+};
+
 /**
  * Ownership paperwork and registration approval progress for this number. Reported when ownership requirements or a recorded ownership block or decision apply. If requirements or progress cannot be read, a recorded block or decision preserves this object; without either, the object is absent. Other sending requirements can apply even when ownership is approved.
  *
@@ -27483,7 +27634,64 @@ export type NumberOwnershipWritable = {
 };
 
 export type NumberWritable = {
-  [key: string]: never;
+  /**
+   * The name you gave this number in your workspace. Null when no name is set.
+   */
+  name: string | null;
+  /**
+   * Your own reference for this number in your workspace. Null when no reference is set.
+   */
+  reference: string | null;
+  /**
+   * Identifier of this allocated number. Pass it as `number_id` to read this number, or to release it when kind is dedicated.
+   */
+  id: AllocatedNumberId;
+  /**
+   * How this number is allocated. `dedicated` belongs to your workspace and is billed as a subscription. `shared` is provided through Bird-managed shared infrastructure and is not owned or billed as a workspace subscription.
+   */
+  kind: "dedicated" | "shared";
+  /**
+   * Phone number in E.164 format.
+   */
+  number: string;
+  country_code: CountryCode;
+  /**
+   * Physical type of this phone number.
+   */
+  number_type: NumberType;
+  /**
+   * Capabilities supported by this number.
+   */
+  capabilities: Array<NumberCapability>;
+  /**
+   * The allocation and ownership-approval status of this number.
+   *
+   * - `active` means this number is allocated to your workspace and usable.
+   * - `pending_ownership_registration` means this number is allocated to your workspace and billed,
+   * but outbound SMS and both inbound and outbound voice calls are blocked until ownership registration
+   * is approved and activation completes, or the ownership requirement is withdrawn.
+   * This ownership status does not gate inbound SMS or WhatsApp.
+   * Read `ownership.status` and `ownership.next` for the current decision and remaining work.
+   * - `released` means this number is no longer allocated to your workspace.
+   *
+   * An allocated number is not always enough to send from it: some destination
+   * countries also require an approved registration for the sender.
+   *
+   */
+  status: "active" | "pending_ownership_registration" | "released";
+  /**
+   * When this number was allocated to your workspace.
+   */
+  allocated_at: string;
+  /**
+   * When this number was released. `null` while it is still allocated to your workspace.
+   */
+  released_at?: string | null;
+  /**
+   * Ownership paperwork and activation progress. `null` when no ownership requirements, recorded block, or recorded decision apply, or when requirements or progress cannot be read and no ownership block or decision has been recorded. A recorded block still returns an ownership object with `status: unknown` when progress cannot be read; retry the read. We manage the paperwork for shared short codes, so this field is always `null` for them. Other sending requirements can apply even when ownership registration is complete.
+   *
+   */
+  ownership?: NumberOwnershipWritable | null;
 };
 
 export type NumberListWritable = {
@@ -27663,10 +27871,6 @@ export type VoiceVerifiedNumberWritable = {
 export type VoiceVerifiedNumberListWritable = {
   data: Array<VoiceVerifiedNumberWritable>;
 } & ListEnvelope;
-
-export type VoiceLegWritable = {
-  [key: string]: never;
-};
 
 export type VoiceLegListWritable = {
   data: Array<VoiceLegWritable>;
@@ -38271,6 +38475,229 @@ export type GetWhatsAppNumberResponses = {
 
 export type GetWhatsAppNumberResponse =
   GetWhatsAppNumberResponses[keyof GetWhatsAppNumberResponses];
+
+export type ListWhatsAppAgentNotificationsData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the WhatsApp number (`wan_` prefix), as returned by the number list.
+     */
+    number_id: WhatsAppNumberId;
+  };
+  query?: {
+    /**
+     * Return only notifications in this state.
+     */
+    status?: WhatsAppAgentNotificationStatus;
+    /**
+     * Return only notifications about this contact, a phone number in E.164 format or a business-scoped user ID. A phone number is normalized before matching, so spacing does not matter.
+     */
+    to?: string;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/numbers/{number_id}/agent/notifications";
+};
+
+export type ListWhatsAppAgentNotificationsErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppAgentNotificationsError =
+  ListWhatsAppAgentNotificationsErrors[keyof ListWhatsAppAgentNotificationsErrors];
+
+export type ListWhatsAppAgentNotificationsResponses = {
+  /**
+   * A page of the notifications sent to the agent.
+   */
+  200: WhatsAppAgentNotificationList;
+};
+
+export type ListWhatsAppAgentNotificationsResponse =
+  ListWhatsAppAgentNotificationsResponses[keyof ListWhatsAppAgentNotificationsResponses];
+
+export type CreateWhatsAppAgentNotificationData = {
+  body: WhatsAppAgentNotificationCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * ID of the WhatsApp number (`wan_` prefix), as returned by the number list.
+     */
+    number_id: WhatsAppNumberId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/numbers/{number_id}/agent/notifications";
+};
+
+export type CreateWhatsAppAgentNotificationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateWhatsAppAgentNotificationError =
+  CreateWhatsAppAgentNotificationErrors[keyof CreateWhatsAppAgentNotificationErrors];
+
+export type CreateWhatsAppAgentNotificationResponses = {
+  /**
+   * Bird accepted the notification and will hand it to WhatsApp. The notification reads `accepted` until WhatsApp has worked on it.
+   */
+  202: WhatsAppAgentNotification;
+};
+
+export type CreateWhatsAppAgentNotificationResponse =
+  CreateWhatsAppAgentNotificationResponses[keyof CreateWhatsAppAgentNotificationResponses];
+
+export type GetWhatsAppAgentNotificationData = {
+  body?: never;
+  path: {
+    /**
+     * ID of the WhatsApp number (`wan_` prefix), as returned by the number list.
+     */
+    number_id: WhatsAppNumberId;
+    /**
+     * ID of the notification (`waan_` prefix), as returned when it was sent.
+     */
+    notification_id: WhatsAppAgentNotificationId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/numbers/{number_id}/agent/notifications/{notification_id}";
+};
+
+export type GetWhatsAppAgentNotificationErrors = {
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWhatsAppAgentNotificationError =
+  GetWhatsAppAgentNotificationErrors[keyof GetWhatsAppAgentNotificationErrors];
+
+export type GetWhatsAppAgentNotificationResponses = {
+  /**
+   * The notification.
+   */
+  200: WhatsAppAgentNotification;
+};
+
+export type GetWhatsAppAgentNotificationResponse =
+  GetWhatsAppAgentNotificationResponses[keyof GetWhatsAppAgentNotificationResponses];
 
 export type ListWhatsAppNumberEventsData = {
   body?: never;
@@ -51070,6 +51497,14 @@ export type ListWorkspaceNumbersData = {
   path?: never;
   query?: {
     /**
+     * Matches part of the number, name, or reference, ignoring case. Characters such as percent and underscore match literally.
+     */
+    search?: string;
+    /**
+     * Return numbers with this exact reference. Matching is case-sensitive.
+     */
+    reference?: string;
+    /**
      * Return only the number matching these digits. Give a full number with its country code, however your own records spell it: `+12025550188`, `12025550188`, `0012025550188`, and `+1 202 555 0188` all resolve to the same number. Spacing and punctuation are fine once a leading `+` or `00` marks the country code, or when `country_code` names the country; a grouped spelling without either is refused rather than guessed at, and a national spelling (bare digits without the country code) matches only when `country_code` names the country. A short code is matched on its bare digits instead, and since the same short code can be allocated in more than one country, pass `country_code` alongside it to name which one. This filter narrows the list like the others rather than replacing them, so a country or capability filter still applies. To match a range of numbers rather than one, use `prefix`.
      */
     number?: string;
@@ -51655,6 +52090,102 @@ export type GetWorkspaceNumberResponses = {
 
 export type GetWorkspaceNumberResponse =
   GetWorkspaceNumberResponses[keyof GetWorkspaceNumberResponses];
+
+export type UpdateWorkspaceNumberData = {
+  body: NumberUpdate;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+  };
+  path: {
+    /**
+     * Identifier returned by the allocated-number list.
+     */
+    number_id: AllocatedNumberId;
+  };
+  query?: never;
+  url: "/v1/numbers/{number_id}";
+};
+
+export type UpdateWorkspaceNumberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateWorkspaceNumberError =
+  UpdateWorkspaceNumberErrors[keyof UpdateWorkspaceNumberErrors];
+
+export type UpdateWorkspaceNumberResponses = {
+  /**
+   * The updated number.
+   */
+  200: Number;
+};
+
+export type UpdateWorkspaceNumberResponse =
+  UpdateWorkspaceNumberResponses[keyof UpdateWorkspaceNumberResponses];
 
 export type ListVoiceTrunksData = {
   body?: never;
