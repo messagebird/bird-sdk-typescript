@@ -294,40 +294,6 @@ export const WebhookEventSchema = {
   },
 } as const;
 
-export const WorkspaceIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^ws_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "ws_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const _ListEnvelopeSchema = {
-  type: "object",
-  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
-  properties: {
-    next_cursor: {
-      type: ["string", "null"],
-      description:
-        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
-      example:
-        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
-    },
-    prev_cursor: {
-      type: ["string", "null"],
-      description:
-        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
-      example: null,
-    },
-    refresh_cursor: {
-      type: ["string", "null"],
-      description:
-        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
-      example:
-        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
-    },
-  },
-} as const;
-
 export const ErrorDetailSchema = {
   type: "object",
   additionalProperties: false,
@@ -492,6 +458,47 @@ export const ErrorSchema = {
   properties: {
     error: {
       $ref: "#/components/schemas/ErrorBody",
+    },
+  },
+} as const;
+
+export const APIKeyIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^key_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "key_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WorkspaceIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^ws_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const _ListEnvelopeSchema = {
+  type: "object",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -818,13 +825,6 @@ export const WorkspaceSchema = {
       $ref: "#/components/schemas/Timestamps",
     },
   ],
-} as const;
-
-export const APIKeyIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^key_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "key_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const RealtimeRegionSchema = {
@@ -2065,7 +2065,7 @@ export const EmailTemplateSendSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A reference to the template to send. Identify the template by its `id` or its `slug`, supplying exactly one of the two, and give the values for its variables in `parameters`.\n",
+    "A reference to the template to send. Identify the template by its `id` or its `slug`, supplying exactly one of the two, and give the values for its caller parameters in `parameters`.\n",
   oneOf: [
     {
       required: ["id"],
@@ -2098,7 +2098,7 @@ export const EmailTemplateSendSchema = {
       type: "object",
       additionalProperties: true,
       description:
-        "Values for the template's variables, keyed by the variable name. A variable name is a single word.\n\nEvery variable in the template's `variables` list needs a value. A send\nthat omits one is rejected. Languages can use different variables, and a\nvalue unused by the selected language is ignored.\n\nThe API supplies values under the reserved `bird` key, so a send that sets\nit is rejected. `parameters` is capped at 16 KB once serialized.\n",
+        "Values for caller parameters, keyed by name. A parameter name is a single word.\n\nCaller parameters have `system` set to false or absent in the template's\n`variables` list. Supply each required caller parameter used by the\nresolved send language; omitting one returns `422`. A version's list\ncovers all its languages, and values unused by the resolved language are\nignored.\n\nThe `bird` namespace is reserved for values filled by Bird, so a send that\nsets it is rejected. `parameters` is capped at 16 KB once serialized.\n",
       example: {
         animal: "otter",
       },
@@ -6123,7 +6123,7 @@ export const TemplateVariableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A single variable slot a template fills in from the values supplied when sending. The same shape on email, SMS and WhatsApp, so reading what a template needs works the same way whichever channel you are sending on.\n",
+    "A single variable slot a template fills in when it sends. Most slots are filled from the values supplied when sending; on email, a slot with `system` true is filled by Bird itself, per recipient. The same shape on email, SMS and WhatsApp, so reading what a template needs works the same way whichever channel you are sending on.\n",
   required: ["key", "type", "required", "constraint"],
   properties: {
     key: {
@@ -6131,7 +6131,7 @@ export const TemplateVariableSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "The key this slot is filled by. On email and SMS it is the key you set in the send's `parameters` object. On WhatsApp it is the `name` you repeat on the matching parameter inside `components`, or, for a template whose placeholders are positional, the position itself as `1`, `2` and so on.\n",
+        "The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the `name` you repeat on the matching parameter inside `components`, or, for a template whose placeholders are positional, the position itself as `1`, `2` and so on.\n",
     },
     type: {
       type: "string",
@@ -6155,14 +6155,14 @@ export const TemplateVariableSchema = {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether the send must supply this variable. Omitting a required value returns `422` on email, SMS, and WhatsApp sends.\n",
+        "Whether the send must supply this variable. Omitting a required value returns `422` on email, SMS, and WhatsApp sends. Always false when `system` is true, because you do not supply that slot's value.\n",
     },
     constraint: {
       type: "string",
       minLength: 1,
       readOnly: true,
       description:
-        "A plain-language description of what values this variable accepts.",
+        "A plain-language description of what values this variable accepts. When `system` is true it names where Bird takes the value from instead, because there is no value for you to send.\n",
     },
     sensitive: {
       type: "boolean",
@@ -6170,6 +6170,13 @@ export const TemplateVariableSchema = {
       default: false,
       description:
         "Whether this slot's value is redacted from stored message content. A placeholder replaces the sensitive value in message history; transport queues can still carry the text needed for delivery.\n",
+    },
+    system: {
+      type: "boolean",
+      readOnly: true,
+      default: false,
+      description:
+        "Whether the value comes from Bird rather than from the send. Absent means false. Only email templates have system slots, identified by the reserved `bird` key or a dotted path beneath it; every SMS and WhatsApp slot is yours to fill. A draft can also name a reserved key no Bird value fills, including `bird` itself: `constraint` says so, and publishing that draft is rejected.\n",
     },
   },
 } as const;
@@ -17698,12 +17705,38 @@ export const AMBRoutingRuleCreateSchema = {
 export const AMBRoutingRuleUpdateSchema = {
   type: "object",
   additionalProperties: false,
+  description:
+    "Changes to a routing rule. Send `business_account_id` to move the rule to another Apple Messages for Business brand in the workspace. Send `match_kind` to replace what the rule matches, with the ids that kind requires, as on create; a stored id the new kind does not use is cleared. `match_intent_id` and `match_group_id` require `match_kind`. The update returns a `409` when it would leave this rule as the default of a business that already has a different default rule.\n",
   properties: {
+    business_account_id: {
+      $ref: "#/components/schemas/AMBBusinessID",
+      description:
+        "Move this rule to another Apple Messages for Business brand in the workspace.",
+    },
+    match_kind: {
+      $ref: "#/components/schemas/AMBRoutingRuleMatchKind",
+      description:
+        "Replace what this rule matches. Send it with the ids the new kind requires, validated as on create. A stored id the new kind does not use is cleared.\n",
+    },
+    match_intent_id: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The entry point intent to match, as sent in Apple's `intentID`. Requires `match_kind`: required when it is `intent` or `both`, and rejected when it is `group`.\n",
+      example: "order_status",
+    },
+    match_group_id: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The entry point group to match, as sent in Apple's `groupID`. Requires `match_kind`: required when it is `group` or `both`, and rejected when it is `intent`.\n",
+      example: "support",
+    },
     queue: {
       $ref: "#/components/schemas/AMBQueue",
       minLength: 1,
       description:
-        "Change the queue this rule files a matching conversation into. What the rule matches is fixed once created; to change that, delete this rule and create another.\n",
+        "Change the queue this rule files a matching conversation into.",
       example: "billing",
     },
     precedence: {
@@ -17716,10 +17749,107 @@ export const AMBRoutingRuleUpdateSchema = {
     is_default: {
       type: "boolean",
       description:
-        "Set to true to make this the rule that catches a conversation matching nothing else, or to false to stop it from being the default. Setting it true while the business already has a different default rule returns a `409`.\n",
+        "Set to true to make this the rule that catches a conversation matching nothing else, or to false to stop it from being the default.\n",
       example: false,
     },
   },
+  oneOf: [
+    {
+      title: "Keep the match",
+      not: {
+        anyOf: [
+          {
+            properties: {
+              match_kind: {
+                type: "string",
+                minLength: 1,
+              },
+            },
+            required: ["match_kind"],
+          },
+          {
+            properties: {
+              match_intent_id: {
+                type: "string",
+                minLength: 1,
+              },
+            },
+            required: ["match_intent_id"],
+          },
+          {
+            properties: {
+              match_group_id: {
+                type: "string",
+                minLength: 1,
+              },
+            },
+            required: ["match_group_id"],
+          },
+        ],
+      },
+    },
+    {
+      title: "Match on intent",
+      properties: {
+        match_kind: {
+          const: "intent",
+        },
+        match_intent_id: {
+          type: "string",
+          minLength: 1,
+        },
+      },
+      required: ["match_kind", "match_intent_id"],
+      not: {
+        properties: {
+          match_group_id: {
+            type: "string",
+            minLength: 1,
+          },
+        },
+        required: ["match_group_id"],
+      },
+    },
+    {
+      title: "Match on group",
+      properties: {
+        match_kind: {
+          const: "group",
+        },
+        match_group_id: {
+          type: "string",
+          minLength: 1,
+        },
+      },
+      required: ["match_kind", "match_group_id"],
+      not: {
+        properties: {
+          match_intent_id: {
+            type: "string",
+            minLength: 1,
+          },
+        },
+        required: ["match_intent_id"],
+      },
+    },
+    {
+      title: "Match on intent and group",
+      properties: {
+        match_kind: {
+          const: "both",
+        },
+        match_intent_id: {
+          type: "string",
+          minLength: 1,
+        },
+        match_group_id: {
+          type: "string",
+          minLength: 1,
+        },
+      },
+      required: ["match_kind", "match_intent_id", "match_group_id"],
+    },
+  ],
 } as const;
 
 export const AMBConversationIDSchema = {
@@ -30844,6 +30974,40 @@ export const EmailTemplateSchema = {
   },
 } as const;
 
+export const EmailTemplatePreviewContentSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Unsaved email template content. Preview renders these fields instead of a stored draft; input analysis identifies their references without rendering.\n",
+  properties: {
+    subject: {
+      type: "string",
+      maxLength: 998,
+      description: "The subject line, including any template expressions.",
+      example: "Welcome to Acme, {{ bird.contact.first_name }}!",
+    },
+    preview_text: {
+      type: "string",
+      maxLength: 255,
+      description:
+        "Inbox preview text. Preview and publication fold it into the top of the HTML as a hidden preheader. Input analysis includes its references.\n",
+      example: "{{ bird.contact.first_name }}, your order is on its way",
+    },
+    html: {
+      type: "string",
+      maxLength: 524288,
+      description: "The HTML body, including any template expressions.",
+      example: "<h1>Hi {{ bird.contact.first_name }}</h1>",
+    },
+    text: {
+      type: "string",
+      maxLength: 524288,
+      description:
+        "The plain-text body. When omitted, a plain-text alternative is derived from the HTML for preview, input analysis, and publication.\n",
+    },
+  },
+} as const;
+
 export const EmailTemplateDraftRevisionSchema = {
   type: "integer",
   minimum: 0,
@@ -30911,40 +31075,6 @@ export const EmailTemplateDuplicateSchema = {
       description:
         "The copy's workspace-unique handle, and the stable alternative to the template ID when sending by template. It can contain lowercase letters, numbers, hyphens, and underscores. Omit it to derive one from the source (for example, `welcome-email-copy`), with a numeric suffix if that slug is already taken. Two prefixes are rejected: `bird_`, reserved for our built-in templates, and `emt_`, the template ID format, which a slug could never be distinguished from. If you supply a slug that is already in use in the workspace, the request returns a conflict.\n",
       example: "welcome-email-copy",
-    },
-  },
-} as const;
-
-export const EmailTemplatePreviewContentSchema = {
-  type: "object",
-  additionalProperties: false,
-  description:
-    "Content to render instead of the template's stored draft. Give it the subject and bodies you have in hand and they are rendered exactly as the draft would be, so an editor can show what a change looks like before it is saved.\n",
-  properties: {
-    subject: {
-      type: "string",
-      maxLength: 998,
-      description: "The subject line to render.",
-      example: "Welcome to Acme, {{ bird.contact.first_name }}!",
-    },
-    preview_text: {
-      type: "string",
-      maxLength: 255,
-      description:
-        "The preview text to render. It is folded into the top of the HTML the same way publishing folds it, so the rendered body carries the hidden preheader a recipient's inbox would read.\n",
-      example: "{{ bird.contact.first_name }}, your order is on its way",
-    },
-    html: {
-      type: "string",
-      maxLength: 524288,
-      description: "The HTML body to render.",
-      example: "<h1>Hi {{ bird.contact.first_name }}</h1>",
-    },
-    text: {
-      type: "string",
-      maxLength: 524288,
-      description:
-        "The plain-text body to render. Omit it and a plain-text alternative is derived from the HTML, the same way it is derived when you publish.\n",
     },
   },
 } as const;
@@ -31304,7 +31434,7 @@ export const EmailTemplatePreviewSchema = {
       type: "array",
       readOnly: true,
       description:
-        "The variables you can fill in with `parameters`. This list covers only the\nlanguage named by `language`. A version read combines the variables from\nevery language the version holds. Preview each language separately to see\nits own variables.\n\nVariables under the reserved `bird.` namespace are not listed here. We\nsupply those values, but you can nest sample values under `bird` in\n`parameters` to preview them.\n",
+        "Every input definition this content uses, in one list: the parameters you fill in\nwith `parameters`, and the values Bird fills in for each recipient. Read `system`\nto tell them apart. This list covers only the language named by `language`. A\nversion read combines the inputs from every language the version holds. Preview\neach language separately to see its own. You can nest sample values under `bird`\nin preview `parameters`; sends reject that reserved namespace.\n",
       items: {
         $ref: "#/components/schemas/TemplateVariable",
       },
@@ -31390,7 +31520,7 @@ export const EmailTemplateVersionSummarySchema = {
         $ref: "#/components/schemas/TemplateVariable",
       },
       description:
-        "Every variable this version's content uses. You supply a value for each of them when you send.\n\nThe list combines all the languages, because languages do not have to use the same variables: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. Send a value for every variable in the list rather than only the ones you expect the language you are sending to use. A language that does not use a variable ignores the value you sent for it, and a variable the sent language does use but you left out is rejected with a `422` naming it.\n\nVariables under the reserved `bird.` namespace are not listed here. We fill those in ourselves from the recipient's contact record.\n",
+        "Input definitions this version uses, including caller parameters and reserved Bird inputs. An entry with `system` false is yours to send in `template.parameters`. An entry with `system` true names a reserved Bird key; supported paths receive Bird values. A draft can also report unsupported reserved paths, including bare `bird`, whose `constraint` explains that no Bird value fills them. Correct these paths before publishing. Naming a reserved Bird key in a send is rejected with a `422`.\n\nThe list combines all the languages, because languages do not have to use the same inputs: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. A send requires values only for the caller parameters referenced by its resolved language. Preview each language to see its inputs. Extra parameters are ignored; omitting a caller parameter referenced by the resolved language returns a `422` naming it.\n",
     },
     default_language: {
       $ref: "#/components/schemas/LanguageTag",
@@ -31570,7 +31700,7 @@ export const EmailTemplateVersionSchema = {
         $ref: "#/components/schemas/TemplateVariable",
       },
       description:
-        "Every variable this version's content uses. You supply a value for each of them when you send.\n\nThe list combines all the languages, because languages do not have to use the same variables: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. Send a value for every variable in the list rather than only the ones you expect the language you are sending to use. A language that does not use a variable ignores the value you sent for it, and a variable the sent language does use but you left out is rejected with a `422` naming it.\n\nVariables under the reserved `bird.` namespace are not listed here. We fill those in ourselves from the recipient's contact record.\n",
+        "Input definitions this version uses, including caller parameters and reserved Bird inputs. An entry with `system` false is yours to send in `template.parameters`. An entry with `system` true names a reserved Bird key; supported paths receive Bird values. A draft can also report unsupported reserved paths, including bare `bird`, whose `constraint` explains that no Bird value fills them. Correct these paths before publishing. Naming a reserved Bird key in a send is rejected with a `422`.\n\nThe list combines all the languages, because languages do not have to use the same inputs: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. A send requires values only for the caller parameters referenced by its resolved language. Preview each language to see its inputs. Extra parameters are ignored; omitting a caller parameter referenced by the resolved language returns a `422` naming it.\n",
     },
     languages: {
       type: "object",
@@ -39419,6 +39549,15 @@ export const NumbersOrderCreateSchema = {
   },
 } as const;
 
+export const AutomationPortKeySchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 64,
+  pattern: "^[a-z][a-z0-9_]{0,63}$",
+  description: "Stable named input or output declared by a node-type version.",
+  example: "success",
+} as const;
+
 export const VoiceTrunkSortFieldSchema = {
   type: "string",
   enum: ["created_at"],
@@ -41094,6 +41233,229 @@ export const VoiceLegListSchema = {
   ],
 } as const;
 
+export const VoiceSequenceExpressionEnvironmentSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["bird.cel.v1"],
+  description:
+    "Expression language used by explicitly marked values in a voice sequence definition.",
+} as const;
+
+export const VoiceSequenceDefinitionNodeSchema = {
+  type: "object",
+  additionalProperties: true,
+  description:
+    "An authored node object. Drafts retain incomplete configuration, input and connections for later validation. Connections map output port names to objects with explicit node_id and port fields; validation reports incomplete or invalid targets. Omitted connections or an empty map leaves every output unconnected, with behavior determined by the node contract.",
+} as const;
+
+export const VoiceSequencePortSampleSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["node_id", "port", "output"],
+  properties: {
+    node_id: {
+      $ref: "#/components/schemas/VoiceSequenceNodeID",
+    },
+    port: {
+      $ref: "#/components/schemas/AutomationPortKey",
+    },
+    output: {
+      type: "object",
+      additionalProperties: true,
+      description:
+        "Original hypothetical output matching the resolved port schema, limited to 128 KiB. A webhook sample must also fit its 16 KiB native outcome envelope; business ports use the configured object schema and failure uses a fixed technical error code. Gather digits and reason must match collection constraints and the selected port. Private gather results are checked before removal from returned steps.",
+    },
+  },
+} as const;
+
+export const VoiceSequenceCompletionSampleSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["node_id", "completion"],
+  properties: {
+    node_id: {
+      $ref: "#/components/schemas/VoiceSequenceNodeID",
+    },
+    completion: {
+      type: "string",
+      minLength: 9,
+      maxLength: 9,
+      const: "completed",
+      description:
+        "Hypothetical completion of a managed builtin transfer. No media effects run during preview.",
+    },
+  },
+} as const;
+
+export const VoiceSequencePreviewSampleSchema = {
+  oneOf: [
+    {
+      $ref: "#/components/schemas/VoiceSequencePortSample",
+    },
+    {
+      $ref: "#/components/schemas/VoiceSequenceCompletionSample",
+    },
+  ],
+  description:
+    "A hypothetical node outcome. Managed builtin transfers use explicit completion; nodes with output ports use a port and its output. These forms cannot be combined.",
+} as const;
+
+export const VoiceSequenceSavedExecutionEndpointSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+    },
+  },
+} as const;
+
+export const VoiceSequenceSavedExecutionPartySchema = {
+  type: ["object", "null"],
+  additionalProperties: false,
+  required: ["endpoint"],
+  description:
+    "Saved hypothetical party, or null for an absent observation. Strings may be stale; explicit preview and evaluation validate endpoint types and telephone addresses.",
+  properties: {
+    endpoint: {
+      $ref: "#/components/schemas/VoiceSequenceSavedExecutionEndpoint",
+    },
+    address: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+    },
+  },
+} as const;
+
+export const VoiceSequenceSavedExecutionCallSampleSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "session_id", "orig", "dest"],
+  description:
+    "Saved hypothetical root call identities. Strings may be stale; explicit preview and evaluation require valid typed identifiers.",
+  properties: {
+    id: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+    },
+    session_id: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+    },
+    orig: {
+      $ref: "#/components/schemas/VoiceSequenceSavedExecutionParty",
+    },
+    dest: {
+      $ref: "#/components/schemas/VoiceSequenceSavedExecutionParty",
+    },
+  },
+} as const;
+
+export const VoiceSequenceSavedExecutionSampleSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "started_at", "call"],
+  description:
+    "Saved hypothetical values, which may be stale or incomplete in meaning. Each string is nonempty and limited to 128 bytes. Explicit preview and evaluation require valid typed identifiers and a timestamp.",
+  properties: {
+    id: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+    },
+    started_at: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+    },
+    call: {
+      $ref: "#/components/schemas/VoiceSequenceSavedExecutionCallSample",
+    },
+  },
+} as const;
+
+export const VoiceSequenceSavedPreviewSchema = {
+  type: "object",
+  additionalProperties: false,
+  "x-sensitive": true,
+  required: ["trigger_node_id", "trigger_data"],
+  description:
+    "Saved authoring scenario. Values are checked against node contracts only when explicitly submitted to preview or evaluation.",
+  properties: {
+    trigger_node_id: {
+      $ref: "#/components/schemas/VoiceSequenceNodeID",
+    },
+    trigger_data: {
+      type: "object",
+      additionalProperties: true,
+    },
+    node_samples: {
+      type: "array",
+      maxItems: 50,
+      items: {
+        $ref: "#/components/schemas/VoiceSequencePreviewSample",
+      },
+    },
+    execution_sample: {
+      $ref: "#/components/schemas/VoiceSequenceSavedExecutionSample",
+    },
+  },
+} as const;
+
+export const VoiceSequencePresentationSchema = {
+  type: "object",
+  additionalProperties: true,
+  properties: {
+    preview: {
+      $ref: "#/components/schemas/VoiceSequenceSavedPreview",
+      description:
+        "Saved hypothetical authoring samples. Save checks their shape; preview and evaluation check their meaning only when explicitly submitted. These values never supply live call context or results. They remain part of retained drafts, versions and frozen definitions, including when a gather is private.",
+    },
+  },
+  description:
+    "Optional editor layout, labels and saved authoring samples. These fields do not drive execution. Their bytes still count toward definition and execution size limits.",
+} as const;
+
+export const VoiceSequenceDefinitionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["schema_version", "expression_environment", "nodes"],
+  properties: {
+    schema_version: {
+      type: "integer",
+      enum: [1],
+      description: "Version of the voice graph definition envelope.",
+      example: 1,
+    },
+    expression_environment: {
+      $ref: "#/components/schemas/VoiceSequenceExpressionEnvironment",
+    },
+    nodes: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/VoiceSequenceDefinitionNode",
+      },
+      description:
+        "Nodes keyed by stable IDs. Incomplete node objects may be saved in a draft. Array order has no execution meaning.",
+    },
+    settings: {
+      type: "object",
+      additionalProperties: true,
+      description:
+        "Sequence policies being authored. Omission leaves the definition without explicit settings.",
+    },
+    presentation: {
+      $ref: "#/components/schemas/VoiceSequencePresentation",
+    },
+  },
+} as const;
+
 export const VoiceSequencePhoneNumberSchema = {
   type: "string",
   minLength: 5,
@@ -41117,13 +41479,22 @@ export const VoiceCallSequenceSchema = {
   properties: {
     id: {
       readOnly: true,
-      $ref: "#/components/schemas/VoiceSequenceID",
-      description: "Voice sequence selected for this call.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceSequenceID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Voice sequence selected for this call. Null for a call that ran an inline definition.",
     },
     run_id: {
       readOnly: true,
       $ref: "#/components/schemas/VoiceSequenceRunID",
-      description: "Run created from the sequence's frozen publication.",
+      description:
+        "Run created from the sequence's frozen publication or the call's inline definition.",
     },
   },
 } as const;
@@ -41224,12 +41595,23 @@ export const VoiceCallSchema = {
 export const CreateVoiceCallSequenceRequestSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["id", "entry_node_id", "trigger_data"],
+  description:
+    "Supply exactly one of `id`, to run a saved sequence's active publication, or `definition`, to run a sequence once without saving it.",
+  required: ["entry_node_id", "trigger_data"],
   properties: {
     id: {
       $ref: "#/components/schemas/VoiceSequenceID",
       description:
         "Published voice sequence to run after the recipient answers.",
+    },
+    definition: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceSequenceDefinition",
+        },
+      ],
+      description:
+        "Complete sequence definition to run once after the recipient answers. It must pass the same checks as publishing a sequence, is frozen when the call is accepted, and creates no saved sequence.",
     },
     entry_node_id: {
       $ref: "#/components/schemas/VoiceSequenceNodeID",
@@ -41242,6 +41624,14 @@ export const CreateVoiceCallSequenceRequestSchema = {
         "Data matching the selected entry's configured schema, limited to 16 KiB before and after normalization. Use an empty object when the entry needs no data. Fields remain application data and cannot provide trusted call identity or routing authority.",
     },
   },
+  oneOf: [
+    {
+      required: ["id"],
+    },
+    {
+      required: ["definition"],
+    },
+  ],
 } as const;
 
 export const CreateVoiceCallRequestSchema = {

@@ -209,23 +209,6 @@ export type WebhookEvent =
       type: "whatsapp_suppression.created";
     } & EventWhatsAppSuppressionCreated);
 
-export type WorkspaceId = string;
-
-export type ListEnvelope = {
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
-};
-
 export type ErrorDetail = {
   /**
    * Dotted field path, such as `to[0].email`, `subject`, or `.`. When the request was rejected for a query parameter the endpoint does not declare, this carries that parameter's name instead of a field path.
@@ -345,6 +328,25 @@ export type ErrorBody = {
 
 export type Error = {
   error: ErrorBody;
+};
+
+export type ApiKeyId = string;
+
+export type WorkspaceId = string;
+
+export type ListEnvelope = {
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -488,8 +490,6 @@ export type Workspace = {
    */
   readonly logo_url?: string | null;
 } & Timestamps;
-
-export type ApiKeyId = string;
 
 export type RealtimeRegion = {
   /**
@@ -1156,14 +1156,16 @@ export type EmailTemplateSend = unknown & {
    */
   language?: LanguageTag;
   /**
-   * Values for the template's variables, keyed by the variable name. A variable name is a single word.
+   * Values for caller parameters, keyed by name. A parameter name is a single word.
    *
-   * Every variable in the template's `variables` list needs a value. A send
-   * that omits one is rejected. Languages can use different variables, and a
-   * value unused by the selected language is ignored.
+   * Caller parameters have `system` set to false or absent in the template's
+   * `variables` list. Supply each required caller parameter used by the
+   * resolved send language; omitting one returns `422`. A version's list
+   * covers all its languages, and values unused by the resolved language are
+   * ignored.
    *
-   * The API supplies values under the reserved `bird` key, so a send that sets
-   * it is rejected. `parameters` is capped at 16 KB once serialized.
+   * The `bird` namespace is reserved for values filled by Bird, so a send that
+   * sets it is rejected. `parameters` is capped at 16 KB once serialized.
    *
    */
   parameters?: {
@@ -3476,12 +3478,12 @@ export type SmsTemplate = {
 };
 
 /**
- * A single variable slot a template fills in from the values supplied when sending. The same shape on email, SMS and WhatsApp, so reading what a template needs works the same way whichever channel you are sending on.
+ * A single variable slot a template fills in when it sends. Most slots are filled from the values supplied when sending; on email, a slot with `system` true is filled by Bird itself, per recipient. The same shape on email, SMS and WhatsApp, so reading what a template needs works the same way whichever channel you are sending on.
  *
  */
 export type TemplateVariable = {
   /**
-   * The key this slot is filled by. On email and SMS it is the key you set in the send's `parameters` object. On WhatsApp it is the `name` you repeat on the matching parameter inside `components`, or, for a template whose placeholders are positional, the position itself as `1`, `2` and so on.
+   * The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the `name` you repeat on the matching parameter inside `components`, or, for a template whose placeholders are positional, the position itself as `1`, `2` and so on.
    *
    */
   readonly key: string;
@@ -3491,12 +3493,13 @@ export type TemplateVariable = {
    */
   readonly type: string;
   /**
-   * Whether the send must supply this variable. Omitting a required value returns `422` on email, SMS, and WhatsApp sends.
+   * Whether the send must supply this variable. Omitting a required value returns `422` on email, SMS, and WhatsApp sends. Always false when `system` is true, because you do not supply that slot's value.
    *
    */
   readonly required: boolean;
   /**
-   * A plain-language description of what values this variable accepts.
+   * A plain-language description of what values this variable accepts. When `system` is true it names where Bird takes the value from instead, because there is no value for you to send.
+   *
    */
   readonly constraint: string;
   /**
@@ -3504,6 +3507,11 @@ export type TemplateVariable = {
    *
    */
   readonly sensitive?: boolean;
+  /**
+   * Whether the value comes from Bird rather than from the send. Absent means false. Only email templates have system slots, identified by the reserved `bird` key or a dotted path beneath it; every SMS and WhatsApp slot is yours to fill. A draft can also name a reserved key no Bird value fills, including `bird` itself: `constraint` says so, and publishing that draft is rejected.
+   *
+   */
+  readonly system?: boolean;
 };
 
 /**
@@ -9722,10 +9730,43 @@ export type AmbRoutingRuleCreate = (
   is_default?: boolean;
 };
 
-export type AmbRoutingRuleUpdate = {
+export type AmbRoutingRuleUpdate = (
+  | unknown
+  | {
+      match_kind: "intent";
+      match_intent_id: string;
+    }
+  | {
+      match_kind: "group";
+      match_group_id: string;
+    }
+  | {
+      match_kind: "both";
+      match_intent_id: string;
+      match_group_id: string;
+    }
+) & {
   /**
-   * Change the queue this rule files a matching conversation into. What the rule matches is fixed once created; to change that, delete this rule and create another.
+   * Move this rule to another Apple Messages for Business brand in the workspace.
+   */
+  business_account_id?: AmbBusinessId;
+  /**
+   * Replace what this rule matches. Send it with the ids the new kind requires, validated as on create. A stored id the new kind does not use is cleared.
    *
+   */
+  match_kind?: AmbRoutingRuleMatchKind;
+  /**
+   * The entry point intent to match, as sent in Apple's `intentID`. Requires `match_kind`: required when it is `intent` or `both`, and rejected when it is `group`.
+   *
+   */
+  match_intent_id?: string;
+  /**
+   * The entry point group to match, as sent in Apple's `groupID`. Requires `match_kind`: required when it is `group` or `both`, and rejected when it is `intent`.
+   *
+   */
+  match_group_id?: string;
+  /**
+   * Change the queue this rule files a matching conversation into.
    */
   queue?: AmbQueue;
   /**
@@ -9733,7 +9774,7 @@ export type AmbRoutingRuleUpdate = {
    */
   precedence?: number;
   /**
-   * Set to true to make this the rule that catches a conversation matching nothing else, or to false to stop it from being the default. Setting it true while the business already has a different default rule returns a `409`.
+   * Set to true to make this the rule that catches a conversation matching nothing else, or to false to stop it from being the default.
    *
    */
   is_default?: boolean;
@@ -16990,6 +17031,31 @@ export type EmailTemplate = {
 };
 
 /**
+ * Unsaved email template content. Preview renders these fields instead of a stored draft; input analysis identifies their references without rendering.
+ *
+ */
+export type EmailTemplatePreviewContent = {
+  /**
+   * The subject line, including any template expressions.
+   */
+  subject?: string;
+  /**
+   * Inbox preview text. Preview and publication fold it into the top of the HTML as a hidden preheader. Input analysis includes its references.
+   *
+   */
+  preview_text?: string;
+  /**
+   * The HTML body, including any template expressions.
+   */
+  html?: string;
+  /**
+   * The plain-text body. When omitted, a plain-text alternative is derived from the HTML for preview, input analysis, and publication.
+   *
+   */
+  text?: string;
+};
+
+/**
  * The draft revision you last read (from the template's `revision` field). A stale value returns a conflict so you can reload and retry.
  *
  */
@@ -17037,31 +17103,6 @@ export type EmailTemplateDuplicate = {
    *
    */
   slug?: TemplateSlug;
-};
-
-/**
- * Content to render instead of the template's stored draft. Give it the subject and bodies you have in hand and they are rendered exactly as the draft would be, so an editor can show what a change looks like before it is saved.
- *
- */
-export type EmailTemplatePreviewContent = {
-  /**
-   * The subject line to render.
-   */
-  subject?: string;
-  /**
-   * The preview text to render. It is folded into the top of the HTML the same way publishing folds it, so the rendered body carries the hidden preheader a recipient's inbox would read.
-   *
-   */
-  preview_text?: string;
-  /**
-   * The HTML body to render.
-   */
-  html?: string;
-  /**
-   * The plain-text body to render. Omit it and a plain-text alternative is derived from the HTML, the same way it is derived when you publish.
-   *
-   */
-  text?: string;
 };
 
 /**
@@ -17343,14 +17384,12 @@ export type EmailTemplatePreview = {
    */
   readonly language: LanguageTag;
   /**
-   * The variables you can fill in with `parameters`. This list covers only the
-   * language named by `language`. A version read combines the variables from
-   * every language the version holds. Preview each language separately to see
-   * its own variables.
-   *
-   * Variables under the reserved `bird.` namespace are not listed here. We
-   * supply those values, but you can nest sample values under `bird` in
-   * `parameters` to preview them.
+   * Every input definition this content uses, in one list: the parameters you fill in
+   * with `parameters`, and the values Bird fills in for each recipient. Read `system`
+   * to tell them apart. This list covers only the language named by `language`. A
+   * version read combines the inputs from every language the version holds. Preview
+   * each language separately to see its own. You can nest sample values under `bird`
+   * in preview `parameters`; sends reject that reserved namespace.
    *
    */
   readonly variables: Array<TemplateVariable>;
@@ -17399,11 +17438,9 @@ export type EmailTemplateVersionSummary = {
    */
   readonly revision: number;
   /**
-   * Every variable this version's content uses. You supply a value for each of them when you send.
+   * Input definitions this version uses, including caller parameters and reserved Bird inputs. An entry with `system` false is yours to send in `template.parameters`. An entry with `system` true names a reserved Bird key; supported paths receive Bird values. A draft can also report unsupported reserved paths, including bare `bird`, whose `constraint` explains that no Bird value fills them. Correct these paths before publishing. Naming a reserved Bird key in a send is rejected with a `422`.
    *
-   * The list combines all the languages, because languages do not have to use the same variables: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. Send a value for every variable in the list rather than only the ones you expect the language you are sending to use. A language that does not use a variable ignores the value you sent for it, and a variable the sent language does use but you left out is rejected with a `422` naming it.
-   *
-   * Variables under the reserved `bird.` namespace are not listed here. We fill those in ourselves from the recipient's contact record.
+   * The list combines all the languages, because languages do not have to use the same inputs: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. A send requires values only for the caller parameters referenced by its resolved language. Preview each language to see its inputs. Extra parameters are ignored; omitting a caller parameter referenced by the resolved language returns a `422` naming it.
    *
    */
   readonly variables: Array<TemplateVariable>;
@@ -17489,11 +17526,9 @@ export type EmailTemplateVersion = {
    */
   readonly revision: number;
   /**
-   * Every variable this version's content uses. You supply a value for each of them when you send.
+   * Input definitions this version uses, including caller parameters and reserved Bird inputs. An entry with `system` false is yours to send in `template.parameters`. An entry with `system` true names a reserved Bird key; supported paths receive Bird values. A draft can also report unsupported reserved paths, including bare `bird`, whose `constraint` explains that no Bird value fills them. Correct these paths before publishing. Naming a reserved Bird key in a send is rejected with a `422`.
    *
-   * The list combines all the languages, because languages do not have to use the same variables: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. Send a value for every variable in the list rather than only the ones you expect the language you are sending to use. A language that does not use a variable ignores the value you sent for it, and a variable the sent language does use but you left out is rejected with a `422` naming it.
-   *
-   * Variables under the reserved `bird.` namespace are not listed here. We fill those in ourselves from the recipient's contact record.
+   * The list combines all the languages, because languages do not have to use the same inputs: if the English body uses `discount_code` and the French body uses `shipping_date`, both appear here. A send requires values only for the caller parameters referenced by its resolved language. Preview each language to see its inputs. Extra parameters are ignored; omitting a caller parameter referenced by the resolved language returns a `422` naming it.
    *
    */
   readonly variables: Array<TemplateVariable>;
@@ -21956,6 +21991,11 @@ export type NumbersOrderCreate = {
 };
 
 /**
+ * Stable named input or output declared by a node-type version.
+ */
+export type AutomationPortKey = string;
+
+/**
  * Field used to sort the list.
  */
 export type VoiceTrunkSortField = "created_at";
@@ -22956,6 +22996,116 @@ export type VoiceLegList = {
 } & ListEnvelope;
 
 /**
+ * Expression language used by explicitly marked values in a voice sequence definition.
+ */
+export type VoiceSequenceExpressionEnvironment = "bird.cel.v1";
+
+/**
+ * An authored node object. Drafts retain incomplete configuration, input and connections for later validation. Connections map output port names to objects with explicit node_id and port fields; validation reports incomplete or invalid targets. Omitted connections or an empty map leaves every output unconnected, with behavior determined by the node contract.
+ */
+export type VoiceSequenceDefinitionNode = {
+  [key: string]: unknown;
+};
+
+export type VoiceSequencePortSample = {
+  node_id: VoiceSequenceNodeId;
+  port: AutomationPortKey;
+  /**
+   * Original hypothetical output matching the resolved port schema, limited to 128 KiB. A webhook sample must also fit its 16 KiB native outcome envelope; business ports use the configured object schema and failure uses a fixed technical error code. Gather digits and reason must match collection constraints and the selected port. Private gather results are checked before removal from returned steps.
+   */
+  output: {
+    [key: string]: unknown;
+  };
+};
+
+export type VoiceSequenceCompletionSample = {
+  node_id: VoiceSequenceNodeId;
+  /**
+   * Hypothetical completion of a managed builtin transfer. No media effects run during preview.
+   */
+  completion: "completed";
+};
+
+/**
+ * A hypothetical node outcome. Managed builtin transfers use explicit completion; nodes with output ports use a port and its output. These forms cannot be combined.
+ */
+export type VoiceSequencePreviewSample =
+  VoiceSequencePortSample | VoiceSequenceCompletionSample;
+
+export type VoiceSequenceSavedExecutionEndpoint = {
+  type: string;
+};
+
+/**
+ * Saved hypothetical party, or null for an absent observation. Strings may be stale; explicit preview and evaluation validate endpoint types and telephone addresses.
+ */
+export type VoiceSequenceSavedExecutionParty = {
+  endpoint: VoiceSequenceSavedExecutionEndpoint;
+  address?: string;
+} | null;
+
+/**
+ * Saved hypothetical root call identities. Strings may be stale; explicit preview and evaluation require valid typed identifiers.
+ */
+export type VoiceSequenceSavedExecutionCallSample = {
+  id: string;
+  session_id: string;
+  orig: VoiceSequenceSavedExecutionParty;
+  dest: VoiceSequenceSavedExecutionParty;
+};
+
+/**
+ * Saved hypothetical values, which may be stale or incomplete in meaning. Each string is nonempty and limited to 128 bytes. Explicit preview and evaluation require valid typed identifiers and a timestamp.
+ */
+export type VoiceSequenceSavedExecutionSample = {
+  id: string;
+  started_at: string;
+  call: VoiceSequenceSavedExecutionCallSample;
+};
+
+/**
+ * Saved authoring scenario. Values are checked against node contracts only when explicitly submitted to preview or evaluation.
+ */
+export type VoiceSequenceSavedPreview = {
+  trigger_node_id: VoiceSequenceNodeId;
+  trigger_data: {
+    [key: string]: unknown;
+  };
+  node_samples?: Array<VoiceSequencePreviewSample>;
+  execution_sample?: VoiceSequenceSavedExecutionSample;
+};
+
+/**
+ * Optional editor layout, labels and saved authoring samples. These fields do not drive execution. Their bytes still count toward definition and execution size limits.
+ */
+export type VoiceSequencePresentation = {
+  /**
+   * Saved hypothetical authoring samples. Save checks their shape; preview and evaluation check their meaning only when explicitly submitted. These values never supply live call context or results. They remain part of retained drafts, versions and frozen definitions, including when a gather is private.
+   */
+  preview?: VoiceSequenceSavedPreview;
+  [key: string]: unknown;
+};
+
+export type VoiceSequenceDefinition = {
+  /**
+   * Version of the voice graph definition envelope.
+   */
+  schema_version: 1;
+  expression_environment: VoiceSequenceExpressionEnvironment;
+  /**
+   * Nodes keyed by stable IDs. Incomplete node objects may be saved in a draft. Array order has no execution meaning.
+   */
+  nodes: Array<VoiceSequenceDefinitionNode>;
+  /**
+   * Sequence policies being authored. Omission leaves the definition without explicit settings.
+   */
+  settings?: {
+    [key: string]: unknown;
+  };
+  presentation?: VoiceSequencePresentation;
+};
+
+/**
  * Canonical E.164 phone number, with a leading plus sign and four to fifteen digits.
  */
 export type VoiceSequencePhoneNumber = string;
@@ -22964,11 +23114,11 @@ export type VoiceSequenceRunId = string;
 
 export type VoiceCallSequence = {
   /**
-   * Voice sequence selected for this call.
+   * Voice sequence selected for this call. Null for a call that ran an inline definition.
    */
-  readonly id: VoiceSequenceId;
+  readonly id: VoiceSequenceId | null;
   /**
-   * Run created from the sequence's frozen publication.
+   * Run created from the sequence's frozen publication or the call's inline definition.
    */
   readonly run_id: VoiceSequenceRunId;
 };
@@ -23020,11 +23170,15 @@ export type VoiceCall = {
   readonly sequence?: VoiceCallSequence;
 };
 
-export type CreateVoiceCallSequenceRequest = {
+export type CreateVoiceCallSequenceRequest = unknown & {
   /**
    * Published voice sequence to run after the recipient answers.
    */
-  id: VoiceSequenceId;
+  id?: VoiceSequenceId;
+  /**
+   * Complete sequence definition to run once after the recipient answers. It must pass the same checks as publishing a sequence, is frozen when the call is accepted, and creates no saved sequence.
+   */
+  definition?: VoiceSequenceDefinition;
   /**
    * Voice call entry node to start.
    */
@@ -27544,14 +27698,9 @@ export type VoiceDestinationListWritable = {
 };
 
 /**
- * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+ * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
  */
-export type StartingAfter = string;
-
-/**
- * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
- */
-export type EndingBefore = string;
+export type XWorkspaceId = string;
 
 /**
  * Client-supplied key. On operations supporting request deduplication, a retained
@@ -27579,6 +27728,16 @@ export type EndingBefore = string;
 export type IdempotencyKey = string;
 
 /**
+ * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+ */
+export type StartingAfter = string;
+
+/**
+ * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+ */
+export type EndingBefore = string;
+
+/**
  * Maximum number of items to return per page.
  */
 export type PaginationLimit = number;
@@ -27599,11 +27758,6 @@ export type OrderAsc = SortOrder;
  * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
  */
 export type IncludeTotal = boolean;
-
-/**
- * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
- */
-export type XWorkspaceId = string;
 
 /**
  * Limits the response to resources created at or after this timestamp. Combine it with `created_before` to select a time window. Use an RFC 3339 timestamp with a timezone offset.

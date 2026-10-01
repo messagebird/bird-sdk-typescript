@@ -9,7 +9,7 @@ export type VoiceCallsCreateParams = NonNullable<CreateVoiceCallData["body"]>;
 
 export class VoiceCallsResource extends Resource {
   /**
-   * Proposes a real outbound call for browser confirmation. Requires voice_management:write and voice:write; normal calling charges apply. Supply a stable idempotency_key and reuse it with identical input for retries. The confirmation expires after 90 minutes. After the person places the call, a 202 response reserves call, leg and run IDs; it does not prove connection. Use `voice.legs.get` with `initial_leg_id` to inspect the leg outcome, and inspect the sequence run in the dashboard. Never use a new key merely because an earlier result is missing.
+   * Proposes a real outbound call for browser confirmation. Requires voice_management:write and voice:write; normal calling charges apply. Set `sequence.id` to run a saved sequence's active publication, or `sequence.definition` to run a complete definition once without saving it; never both. An inline definition must pass publication checks; an invalid one is refused with a 422 naming its first problem under `/sequence/definition` only when the person runs the call. An inline run executes at most 16 commands. Supply a stable idempotency_key and reuse it with identical input for retries. The confirmation expires after 90 minutes. After the person places the call, a 202 response reserves call, leg and run IDs; it does not prove connection. Use `voice.legs.get` with `initial_leg_id` to inspect the leg outcome, and inspect the sequence run in the dashboard. Never use a new key merely because an earlier result is missing.
    *
    * @example Start a published sequence call
    * const call = await bird.voice.calls.create({

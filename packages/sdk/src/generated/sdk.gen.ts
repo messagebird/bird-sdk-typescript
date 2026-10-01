@@ -6505,7 +6505,7 @@ export const getAmbRoutingRule = <ThrowOnError extends boolean = false>(
 /**
  * Update an Apple Messages for Business routing rule
  *
- * Changes a routing rule's queue, precedence, or default status. What it matches is fixed once created; to change that, delete this rule and create another. Setting `is_default` to true while the business already has a different default rule returns a `409`.
+ * Changes a routing rule's business, match, queue, precedence, or default status. The match changes as a unit: send `match_kind` with the intent and group ids it requires, as on create. Returns a `409` when the update would leave this rule as the default of a business that already has a different default rule. The change applies to conversations that start or reopen afterwards.
  *
  */
 export const updateAmbRoutingRule = <ThrowOnError extends boolean = false>(
@@ -10164,7 +10164,7 @@ export const deleteEmailTemplateVersion = <
  *
  * - Its lifecycle metadata (`status`, `version_number`, `published_at`).
  * - The content it froze in every language.
- * - The `variables` that content expects at send time.
+ * - Its `variables`: the parameters you supply when sending and the values Bird fills in for each recipient, told apart by `system`.
  *
  * Use [List email template versions](/docs/api/reference/list-email-template-versions) to enumerate the draft and published versions. [Roll back an email template](/docs/api/reference/rollback-email-template) makes an earlier published version live again. Returns a `404 Not Found` error if the template or version does not exist in the workspace.
  *
@@ -12480,19 +12480,27 @@ export const getVoiceLeg = <ThrowOnError extends boolean = false>(
 /**
  * Create a call
  *
- * Accepts a real outbound call using the active publication of a voice
- * sequence. The sequence starts at the selected entry node after the
- * recipient answers. Production availability rules and normal calling
- * charges apply. Requires both voice management write and voice calling
- * write permissions and a permitted calling number. Browser users and API
- * keys are supported. Create and publish the sequence in the dashboard before
- * calling this endpoint; inline definitions and draft/test selectors are not
- * accepted. See the [Create Call guide](https://bird.com/docs/guides/voice/create-calls).
+ * Accepts a real outbound call that runs a voice sequence after the
+ * recipient answers, starting at the selected entry node. Supply exactly one
+ * of `sequence.id`, to run the active publication of a saved sequence, or
+ * `sequence.definition`, to run a complete definition once without saving
+ * it. Production availability rules and normal calling charges apply.
+ * Requires both voice management write and voice calling write permissions
+ * and a permitted calling number. Browser users and API keys are supported.
+ * Draft and test selectors are not accepted. See the
+ * [Create Call guide](https://bird.com/docs/guides/voice/create-calls).
+ *
+ * An inline definition must pass the same checks as publishing a sequence;
+ * the first blocking problem returns 422 with its location under
+ * `/sequence/definition`. Its run executes at most 16 commands, including
+ * gather prompts; a call that needs a 17th ends with the `call_limit`
+ * trace error instead of running it. The accepted call's
+ * `sequence.id` is `null`, because its run belongs to no saved sequence.
  *
  * Supply sequence trigger data as an explicit object matching the selected
  * entry's configured data schema, or an empty object when no data is needed.
- * The active publication, entry node, and trigger data are frozen when the
- * call is accepted. The response contains reserved call and initial-leg IDs.
+ * The active publication or inline definition, entry node, and trigger data
+ * are frozen when the call is accepted. The response contains reserved call and initial-leg IDs.
  * Its `null` `started_at`, `false` `live`, and empty `parties` describe the
  * acceptance snapshot. Acceptance does not guarantee that dialing starts or
  * that call and leg reads become available. A call that fails or is canceled
@@ -12504,7 +12512,7 @@ export const getVoiceLeg = <ThrowOnError extends boolean = false>(
  * Idempotency is optional. Without an `Idempotency-Key` header, each request
  * accepts a new call attempt. To protect retries, supply a key on the first
  * attempt and reuse it for the same intended call.
- * Requests are limited to 20 KiB. The same idempotency key and exact request
+ * Requests are limited to 128 KiB. The same idempotency key and exact request
  * bytes replay the original acceptance snapshot for three hours. Changed
  * requests return 409. Authorization and calling-number permission are
  * checked on every request, including replays. Replays include the
