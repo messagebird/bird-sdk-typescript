@@ -2851,6 +2851,7 @@ export type SmsMessageEffectiveOptions = {
  * - `invalid_destination`: The number is unassigned, ported out, or malformed.
  * - `unreachable`: The handset is off or outside coverage.
  * - `blocked_by_carrier`: The carrier filtered the message.
+ * - `blocked_by_fraud_protection`: Bird fraud protection blocked suspected SMS pumping.
  * - `blocked_by_recipient`: The recipient device blocked the sender.
  * - `landline_unreachable`: The destination is a landline that does not accept SMS.
  * - `content_rejected`: The carrier rejected the content.
@@ -2867,6 +2868,7 @@ export type SmsErrorCode =
   | "invalid_destination"
   | "unreachable"
   | "blocked_by_carrier"
+  | "blocked_by_fraud_protection"
   | "blocked_by_recipient"
   | "landline_unreachable"
   | "content_rejected"
@@ -2883,7 +2885,7 @@ export type SmsErrorCode =
 export type SmsError = {
   code: SmsErrorCode;
   /**
-   * The failure in words, from whatever refused the message: the carrier's own reason text on a delivery receipt, or ours on a message stopped before a carrier saw it. Free-form, so branch on `code` and show this to a human.
+   * The failure in words: the provider's reason text, or Bird's explanation for a fraud protection block or a message refused before submission. Free-form, so branch on `code` and show this to a human.
    */
   description: string;
   /**
@@ -11092,25 +11094,55 @@ export type AmbConversationRecipient = {
 };
 
 /**
- * Routing context from the message that opened or most recently reopened the Apple channel conversation.
+ * Routing context the conversation is filed under. Routing rules set it when the conversation opens or reopens, or when the customer writes after it was resolved. A teammate can move the queue or apply a pending `routing_change`.
  */
 export type AmbConversationRouting = {
   /**
-   * The business's routing group carried by Apple from the entry point. This identifies a routing destination within the business. Null when the opening message carried no group.
+   * The business's routing group carried by Apple from the entry point. This identifies a routing destination within the business. Null when the message that set the current routing carried no group.
    */
   group_id: string | null;
   /**
-   * Intent carried by Apple from the entry point, used with `group_id` to route the conversation. Null when none was supplied.
+   * Intent carried by Apple from the entry point, used with `group_id` to route the conversation. Null when the message that set the current routing carried none.
    */
   intent_id: string | null;
   /**
-   * Configured entry point matching the opening message's group and intent. Null when none matched.
+   * Configured entry point matching the current group and intent. Null when none matched.
    */
   entry_point: string | null;
   /**
-   * Workspace queue selected by routing. Null when the conversation is unrouted.
+   * Workspace queue selected by routing or set by a teammate. Null when the conversation is unrouted.
    */
   queue: string | null;
+};
+
+/**
+ * Routing from the customer's latest message that names a different group or intent than the conversation's current `routing`. `message_id` is that inbound message and `received_at` is when it arrived. Routing rules select its queue when the message arrives, but the conversation keeps its current queue until you apply the change.
+ */
+export type AmbConversationRoutingChange = {
+  /**
+   * Group carried by the message. Null when the message carried only an intent.
+   */
+  group_id: string | null;
+  /**
+   * Intent carried by the message. Null when the message carried only a group.
+   */
+  intent_id: string | null;
+  /**
+   * Configured entry point matching the message's group and intent. Null when none matched.
+   */
+  entry_point: string | null;
+  /**
+   * Queue routing rules selected for the message's group and intent when it arrived. Null when no rule matched.
+   */
+  queue: string | null;
+  /**
+   * Inbound message that carried the new group or intent.
+   */
+  message_id: AmbMessageId;
+  /**
+   * When that message was received.
+   */
+  received_at: string;
 };
 
 /**
@@ -11148,6 +11180,10 @@ export type AmbConversation = {
   inbox_status: ConversationInboxStatus;
   recipient: AmbConversationRecipient;
   routing: AmbConversationRouting;
+  /**
+   * Routing from a later customer message that differs from `routing`, waiting for a teammate to apply or dismiss it. Null when there is none. Only recorded while the inbox status is open; resolving the conversation or moving its queue clears it.
+   */
+  routing_change: AmbConversationRoutingChange | null;
   /**
    * Most recent message, or null when its identity has not been recorded.
    */
@@ -11214,10 +11250,29 @@ export type AmbConversationList = {
 } & ListEnvelope;
 
 /**
- * Assignment, labels, inbox status, and workspace read state. Omit a field to leave it unchanged. Inbox status is independent of the Apple channel's open or closed state.
+ * `apply` adopts the pending change's group, intent, entry point and queue. `dismiss` discards it and leaves group, intent and entry point unchanged.
+ */
+export type AmbConversationRoutingChangeAction = "apply" | "dismiss";
+
+/**
+ * Settles the conversation's pending `routing_change`. `message_id` names the change you reviewed: the request fails with `409` when the pending change has a different message ID, because a newer customer message replaced it or a teammate already settled it. Either action clears `routing_change`.
+ */
+export type AmbConversationRoutingChangeDecision = {
+  action: AmbConversationRoutingChangeAction;
+  message_id: AmbMessageId;
+};
+
+/**
+ * Assignment, labels, inbox status, queue, routing change and workspace read state. Omit a field to leave it unchanged. Inbox status is independent of the Apple channel's open or closed state. `queue` moves the conversation and clears any pending `routing_change`; it can be combined with a `dismiss` decision but not with `apply`, which sets the queue itself.
  *
  */
-export type AmbConversationUpdate = ConversationUpdate;
+export type AmbConversationUpdate = ConversationUpdate & {
+  /**
+   * Queue to move the conversation to, or null to leave it unrouted. Routing rules do not run, and the conversation keeps its group and intent. Moving the queue clears any pending `routing_change`, and cannot be combined with an `apply` decision.
+   */
+  queue?: string | null;
+  routing_change?: AmbConversationRoutingChangeDecision;
+};
 
 /**
  * The typing signal to send. `typing_start` tells the customer's device that an operator is composing a reply. `typing_end` tells it composition stopped without a message following. Apple expects at most one `typing_start` before the reply it precedes; sending it again before that reply is not meaningful and may be dropped. `typing_end`'s behavior against a live conversation is unproven: the legacy platform's implementation was disabled after it caused issues, so treat it as best-effort.
@@ -19195,6 +19250,55 @@ export type WebhookEventType =
   | "whatsapp_suppression.created"
   | (string & {});
 
+/**
+ * Posts the signed event to the endpoint's `url` unchanged.
+ */
+export type WebhookRawDestination = {
+  type: "webhook";
+};
+
+/**
+ * Stable identifier of a connector, such as `claude_managed_agents`.
+ */
+export type ConnectorId = string;
+
+/**
+ * Identifier of an action, unique within its connector.
+ */
+export type ConnectorActionId = string;
+
+export type WebhookConnectorBinding = {
+  connector_id: ConnectorId;
+  /**
+   * Action of the connector that each delivery runs.
+   */
+  action: ConnectorActionId;
+  /**
+   * Label of the credentials the endpoint delivers with.
+   */
+  connection_name: string;
+};
+
+/**
+ * Sends the request a connector action builds, with the credentials stored for this endpoint. The endpoint's URL comes from its connector setup, so updating the endpoint with a `url` returns a `422`.
+ *
+ */
+export type WebhookConnectorDestination = {
+  type: "connector";
+  connector: WebhookConnectorBinding;
+};
+
+/**
+ * How each delivery to the endpoint is built. The type cannot change after the endpoint is created.
+ */
+export type WebhookDestination =
+  | ({
+      type: "webhook";
+    } & WebhookRawDestination)
+  | ({
+      type: "connector";
+    } & WebhookConnectorDestination);
+
 export type WebhookEndpoint = {
   /**
    * Unique identifier for the endpoint (`whk_` prefix). Accepted as `webhook_id` by every `/v1/webhooks/{webhook_id}` operation.
@@ -19231,18 +19335,92 @@ export type WebhookEndpoint = {
    *
    */
   readonly status: "active" | "degraded" | "paused";
+  /**
+   * How each delivery to the endpoint is built.
+   */
+  destination?: WebhookDestination;
 } & Timestamps;
 
 export type WebhookEndpointList = {
   data: Array<WebhookEndpoint>;
 } & ListEnvelopeWithTotal;
 
-export type WebhookEndpointCreate = {
+/**
+ * The connector to deliver through. Each connector, its fields and the setup to do on its
+ * platform first:
+ *
+ * - `claude_managed_agents`: Claude Managed Agents. Send each message you receive to your Claude managed agent.
+ * - `agent_id` (`config`, required): Returned when you create the agent. Sessions use its latest version.
+ * - `environment_id` (`config`, required): Returned when you create the environment.
+ * - `api_key` (secret, in `credentials`, required): From the Claude workspace your agent runs in.
+ * - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.
+ * - Setup 1: First, set up your agent in Claude. In the Claude Console, create the agent, its environment and an API key in the same workspace, then come back here with their IDs and the key. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.
+ * - Setup 2: Create an API key. In the Claude workspace your agent runs in. See https://platform.claude.com/settings/keys.
+ * - Setup 3: Copy the agent and environment IDs. Each create returns its ID. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.
+ * - `grok_bot`: Grok Bot. Send each message you receive to a Grok Bot routine.
+ * - `webhook_url` (`config`, required): The routine's webhook URL.
+ * - `sender_key` (secret, in `credentials`, required): The routine's sender key. Bird sends it only as the Bearer token.
+ * - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.
+ * - Setup 1: First, ask Grok Bot to create a routine. Ask Grok Bot to create a routine with a webhook trigger, then paste the webhook URL and sender key it gives you below. See https://cursor.com/docs/cloud-agent/automations#webhook-triggers.
+ *
+ */
+export type WebhookConnectorId = string;
+
+/**
+ * Values for the connector's secret fields, keyed by field `name`. Every required secret field must be present, after merging with the stored values on an update, and a key the connector does not declare as secret returns a `422`. No response includes these values.
+ *
+ */
+export type ConnectionCredentials = {
+  [key: string]: string;
+};
+
+/**
+ * Values for the connector's nonsecret fields, keyed by field `name`, such as the URL the endpoint's requests go to. A URL must be HTTPS, on one of the connector's `allowed_origins`, and under its `path_prefix` when it has one. It cannot include user info, a fragment, an IP address as its host, dot segments, or encoded slashes.
+ *
+ */
+export type ConnectionConfig = {
+  [key: string]: string;
+};
+
+/**
+ * The connector to deliver through and the values it needs. Omit the endpoint's `url`: Bird builds it from the connector's URL and these `config` values, and a URL given anyway must equal that. The credentials belong to this endpoint alone, and deleting the endpoint erases them.
+ *
+ */
+export type WebhookConnectorSetup = {
+  connector_id: WebhookConnectorId;
   /**
-   * HTTPS URL to deliver events to, at most 2048 characters. The host must be publicly reachable: URLs on private, loopback, or link-local addresses are rejected with a `422`.
+   * Action of the connector that each delivery runs. Omit when the connector has one action. An action the connector does not have, or `events` the action does not accept, returns a `422`.
    *
    */
-  url: string;
+  action?: ConnectorActionId;
+  config?: ConnectionConfig;
+};
+
+/**
+ * Sends the request a connector action builds, with credentials stored for this endpoint.
+ */
+export type WebhookConnectorDestinationCreate = {
+  type: "connector";
+  connector: WebhookConnectorSetup;
+};
+
+/**
+ * How each delivery to the endpoint is built. The type cannot change after the endpoint is created.
+ */
+export type WebhookDestinationCreate =
+  | ({
+      type: "webhook";
+    } & WebhookRawDestination)
+  | ({
+      type: "connector";
+    } & WebhookConnectorDestinationCreate);
+
+export type WebhookEndpointCreate = {
+  /**
+   * HTTPS URL to deliver events to, at most 2048 characters. The host must be publicly reachable: URLs on private, loopback, or link-local addresses are rejected with a `422`. Required unless `destination` is a connector, whose URL comes from the connector and its `config`; a URL given with one must equal it.
+   *
+   */
+  url?: string;
   /**
    * Event types to subscribe to; the endpoint receives only matching events. Types outside the event catalog return a `422`, and an endpoint holds at most 100 entries.
    */
@@ -19251,6 +19429,11 @@ export type WebhookEndpointCreate = {
    * Human-readable label for this endpoint, up to 256 characters.
    */
   description?: string;
+  /**
+   * How each delivery is built. Omit to post the signed event to `url` unchanged, the same as `{"type": "webhook"}`.
+   *
+   */
+  destination?: WebhookDestinationCreate;
 };
 
 export type WebhookEndpointCreated = WebhookEndpoint & {
@@ -19263,7 +19446,7 @@ export type WebhookEndpointCreated = WebhookEndpoint & {
 
 export type WebhookEndpointUpdate = {
   /**
-   * Replacement delivery URL. Same rules as at creation: HTTPS, at most 2048 characters, and the host must be publicly reachable (private, loopback, and link-local addresses return a `422`). Omit to keep the current URL.
+   * Replacement delivery URL. Same rules as at creation: HTTPS, at most 2048 characters, and the host must be publicly reachable (private, loopback, and link-local addresses return a `422`). Omit to keep the current URL. A connector endpoint's URL comes from its connector and cannot be replaced: any value returns a `422`.
    *
    */
   url?: string;
@@ -19276,6 +19459,11 @@ export type WebhookEndpointUpdate = {
    *
    */
   events?: Array<WebhookEventType>;
+  /**
+   * New values for a `connector` destination's secret fields, merged over the stored ones: a key given replaces that field and an omitted key keeps its value. The merged set is checked as at creation, and the next delivery, retries included, uses it. On an endpoint without a `connector` destination this returns a `422`. Omit to keep the current credentials.
+   *
+   */
+  credentials?: unknown;
   /**
    * `paused` stops all deliveries; `active` re-enables a paused endpoint. Omit to leave the status unchanged. Events that fire while paused are not delivered and a replay cannot recover them, because they were never attempted; after re-enabling, [Replay failed deliveries](/docs/api/reference/create-webhook-replay) reaches only the deliveries that failed before the pause. A `degraded` endpoint cannot be reset through this field: it returns to `active` automatically once deliveries succeed again.
    *
@@ -21775,6 +21963,11 @@ export type WebhookAttempt = {
    */
   url: string;
   /**
+   * Why the attempt failed before any request was sent, for example a connector body that could not be rendered or an endpoint whose connection changed after the event was queued. Absent for an attempt that reached the network.
+   *
+   */
+  failure_reason?: string;
+  /**
    * HTTP status returned by the receiver. Null when no response was received (timeout, connection error, DNS failure).
    */
   response_status_code: number | null;
@@ -24098,7 +24291,7 @@ export type AudienceMemberListWritable = {
 export type SmsErrorWritable = {
   code: SmsErrorCode;
   /**
-   * The failure in words, from whatever refused the message: the carrier's own reason text on a delivery receipt, or ours on a message stopped before a carrier saw it. Free-form, so branch on `code` and show this to a human.
+   * The failure in words: the provider's reason text, or Bird's explanation for a fraud protection block or a message refused before submission. Free-form, so branch on `code` and show this to a human.
    */
   description: string;
   /**
@@ -25403,6 +25596,36 @@ export type AmbMessageEventListWritable = {
 };
 
 /**
+ * Routing from the customer's latest message that names a different group or intent than the conversation's current `routing`. `message_id` is that inbound message and `received_at` is when it arrived. Routing rules select its queue when the message arrives, but the conversation keeps its current queue until you apply the change.
+ */
+export type AmbConversationRoutingChangeWritable = {
+  /**
+   * Group carried by the message. Null when the message carried only an intent.
+   */
+  group_id: string | null;
+  /**
+   * Intent carried by the message. Null when the message carried only a group.
+   */
+  intent_id: string | null;
+  /**
+   * Configured entry point matching the message's group and intent. Null when none matched.
+   */
+  entry_point: string | null;
+  /**
+   * Queue routing rules selected for the message's group and intent when it arrived. Null when no rule matched.
+   */
+  queue: string | null;
+  /**
+   * Inbound message that carried the new group or intent.
+   */
+  message_id: AmbMessageId;
+  /**
+   * When that message was received.
+   */
+  received_at: string;
+};
+
+/**
  * A reference to the most recent message in either direction. Read its content through the conversation's message list.
  */
 export type AmbConversationLastMessageWritable = {
@@ -25425,6 +25648,10 @@ export type AmbConversationWritable = {
   inbox_status: ConversationInboxStatus;
   recipient: AmbConversationRecipient;
   routing: AmbConversationRouting;
+  /**
+   * Routing from a later customer message that differs from `routing`, waiting for a teammate to apply or dismiss it. Null when there is none. Only recorded while the inbox status is open; resolving the conversation or moving its queue clears it.
+   */
+  routing_change: AmbConversationRoutingChangeWritable | null;
   /**
    * Most recent message, or null when its identity has not been recorded.
    */
@@ -27018,11 +27245,70 @@ export type WebhookEndpointWritable = {
    *
    */
   events: Array<WebhookEventType>;
+  /**
+   * How each delivery to the endpoint is built.
+   */
+  destination?: WebhookDestination;
 };
 
 export type WebhookEndpointListWritable = {
   data: Array<WebhookEndpointWritable>;
 } & ListEnvelopeWithTotal;
+
+/**
+ * The connector to deliver through and the values it needs. Omit the endpoint's `url`: Bird builds it from the connector's URL and these `config` values, and a URL given anyway must equal that. The credentials belong to this endpoint alone, and deleting the endpoint erases them.
+ *
+ */
+export type WebhookConnectorSetupWritable = {
+  connector_id: WebhookConnectorId;
+  /**
+   * Action of the connector that each delivery runs. Omit when the connector has one action. An action the connector does not have, or `events` the action does not accept, returns a `422`.
+   *
+   */
+  action?: ConnectorActionId;
+  credentials: ConnectionCredentials;
+  config?: ConnectionConfig;
+};
+
+/**
+ * Sends the request a connector action builds, with credentials stored for this endpoint.
+ */
+export type WebhookConnectorDestinationCreateWritable = {
+  type: "connector";
+  connector: WebhookConnectorSetupWritable;
+};
+
+/**
+ * How each delivery to the endpoint is built. The type cannot change after the endpoint is created.
+ */
+export type WebhookDestinationCreateWritable =
+  | ({
+      type: "webhook";
+    } & WebhookRawDestination)
+  | ({
+      type: "connector";
+    } & WebhookConnectorDestinationCreateWritable);
+
+export type WebhookEndpointCreateWritable = {
+  /**
+   * HTTPS URL to deliver events to, at most 2048 characters. The host must be publicly reachable: URLs on private, loopback, or link-local addresses are rejected with a `422`. Required unless `destination` is a connector, whose URL comes from the connector and its `config`; a URL given with one must equal it.
+   *
+   */
+  url?: string;
+  /**
+   * Event types to subscribe to; the endpoint receives only matching events. Types outside the event catalog return a `422`, and an endpoint holds at most 100 entries.
+   */
+  events: Array<WebhookEventType>;
+  /**
+   * Human-readable label for this endpoint, up to 256 characters.
+   */
+  description?: string;
+  /**
+   * How each delivery is built. Omit to post the signed event to `url` unchanged, the same as `{"type": "webhook"}`.
+   *
+   */
+  destination?: WebhookDestinationCreateWritable;
+};
 
 export type WebhookEndpointCreatedWritable = WebhookEndpointWritable & {
   /**
@@ -27030,6 +27316,33 @@ export type WebhookEndpointCreatedWritable = WebhookEndpointWritable & {
    *
    */
   secret: string;
+};
+
+export type WebhookEndpointUpdateWritable = {
+  /**
+   * Replacement delivery URL. Same rules as at creation: HTTPS, at most 2048 characters, and the host must be publicly reachable (private, loopback, and link-local addresses return a `422`). Omit to keep the current URL. A connector endpoint's URL comes from its connector and cannot be replaced: any value returns a `422`.
+   *
+   */
+  url?: string;
+  /**
+   * Human-readable label for this endpoint, up to 256 characters.
+   */
+  description?: string;
+  /**
+   * Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`.
+   *
+   */
+  events?: Array<WebhookEventType>;
+  /**
+   * New values for a `connector` destination's secret fields, merged over the stored ones: a key given replaces that field and an omitted key keeps its value. The merged set is checked as at creation, and the next delivery, retries included, uses it. On an endpoint without a `connector` destination this returns a `422`. Omit to keep the current credentials.
+   *
+   */
+  credentials?: ConnectionCredentials;
+  /**
+   * `paused` stops all deliveries; `active` re-enables a paused endpoint. Omit to leave the status unchanged. Events that fire while paused are not delivered and a replay cannot recover them, because they were never attempted; after re-enabling, [Replay failed deliveries](/docs/api/reference/create-webhook-replay) reaches only the deliveries that failed before the pause. A `degraded` endpoint cannot be reset through this field: it returns to `active` automatically once deliveries succeed again.
+   *
+   */
+  status?: "active" | "paused";
 };
 
 /**
@@ -27545,6 +27858,11 @@ export type WebhookAttemptWritable = {
    */
   url: string;
   /**
+   * Why the attempt failed before any request was sent, for example a connector body that could not be rendered or an endpoint whose connection changed after the event was queued. Absent for an attempt that reached the network.
+   *
+   */
+  failure_reason?: string;
+  /**
    * HTTP status returned by the receiver. Null when no response was received (timeout, connection error, DNS failure).
    */
   response_status_code: number | null;
@@ -27902,11 +28220,6 @@ export type VoiceDestinationListWritable = {
 };
 
 /**
- * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
- */
-export type XWorkspaceId = string;
-
-/**
  * Client-supplied key. On operations supporting request deduplication, a retained
  * response is replayed for duplicate requests with the same key within the
  * idempotency window (3 hours by default). This protection requires a workspace,
@@ -27930,6 +28243,11 @@ export type XWorkspaceId = string;
  *
  */
 export type IdempotencyKey = string;
+
+/**
+ * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+ */
+export type XWorkspaceId = string;
 
 /**
  * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
@@ -31991,7 +32309,7 @@ export type ListSmsMessagesData = {
      */
     status?: Array<string>;
     /**
-     * Keep only messages whose failure reason (`last_error.code`) matches; repeat the parameter to match any of several. One of `invalid_destination`, `unreachable`, `blocked_by_carrier`, `blocked_by_recipient`, `landline_unreachable`, `content_rejected`, `sender_unregistered`, `recipient_opted_out`, `provider_unavailable`, `insufficient_balance`, or `unknown`.
+     * Keep only messages whose failure reason (`last_error.code`) matches; repeat the parameter to match any of several. One of `invalid_destination`, `unreachable`, `blocked_by_carrier`, `blocked_by_fraud_protection`, `blocked_by_recipient`, `landline_unreachable`, `content_rejected`, `sender_unregistered`, `recipient_opted_out`, `provider_unavailable`, `insufficient_balance`, or `unknown`.
      *
      */
     error_code?: Array<string>;
@@ -50821,6 +51139,11 @@ export type ListWebhooksData = {
      * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
      */
     include_total?: boolean;
+    /**
+     * Only endpoints delivering to exactly this URL. Several endpoints can share a URL, so this finds matches for a setup to reuse; it does not prevent a duplicate.
+     *
+     */
+    url?: string;
   };
   url: "/v1/webhooks";
 };
@@ -50862,7 +51185,7 @@ export type ListWebhooksResponse =
   ListWebhooksResponses[keyof ListWebhooksResponses];
 
 export type CreateWebhookData = {
-  body: WebhookEndpointCreate;
+  body: WebhookEndpointCreateWritable;
   headers?: {
     /**
      * Client-supplied key. On operations supporting request deduplication, a retained
@@ -51074,7 +51397,7 @@ export type GetWebhookResponses = {
 export type GetWebhookResponse = GetWebhookResponses[keyof GetWebhookResponses];
 
 export type UpdateWebhookData = {
-  body: WebhookEndpointUpdate;
+  body: WebhookEndpointUpdateWritable;
   headers?: {
     /**
      * Client-supplied key. On operations supporting request deduplication, a retained
@@ -51497,7 +51820,7 @@ export type ListWorkspaceNumbersData = {
   path?: never;
   query?: {
     /**
-     * Matches part of the number, name, or reference, ignoring case. Characters such as percent and underscore match literally.
+     * Matches part of the number, name, or reference, ignoring case. Number matching also ignores phone formatting such as spaces, parentheses, and hyphens. Name and reference matching preserves punctuation. Characters such as percent and underscore match literally.
      */
     search?: string;
     /**

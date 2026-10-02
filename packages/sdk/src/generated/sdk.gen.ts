@@ -6850,7 +6850,7 @@ export const getAmbConversation = <ThrowOnError extends boolean = false>(
 /**
  * Update a conversation
  *
- * Updates assignment, labels, inbox status, or shared workspace read state. Resolving inbox work preserves the conversation and its Apple channel state. A new inbound message reopens the inbox work. To acknowledge messages, pass `read` with a date-time cutoff for their `created_at`. Only inbound messages already received at or before that cutoff are marked read. Messages sharing the timestamp are included together; later arrivals remain unread. Use `assigned_to: me` to assign yourself, a workspace member ID to assign a teammate, or null to unassign. An API key cannot use `me`.
+ * Updates assignment, labels, inbox status, queue, or shared workspace read state, or settles a pending `routing_change`. A routing decision names the change's `message_id` and fails with `409` when a newer change replaced it. Moving the queue does not run routing rules. Resolving inbox work preserves the conversation and its Apple channel state. A new inbound message reopens the inbox work. To acknowledge messages, pass `read` with a date-time cutoff for their `created_at`. Only inbound messages already received at or before that cutoff are marked read. Messages sharing the timestamp are included together; later arrivals remain unread. Use `assigned_to: me` to assign yourself, a workspace member ID to assign a teammate, or null to unassign. An API key cannot use `me`.
  *
  */
 export const updateAmbConversation = <ThrowOnError extends boolean = false>(
@@ -11590,7 +11590,10 @@ export const listWorkspaceNumbers = <ThrowOnError extends boolean = false>(
 /**
  * List available phone numbers
  *
- * Returns phone numbers available for purchase in a country, newest first. Narrow the search with `number_type`, `capabilities`, and `prefix`. Inventory numbers are returned first and support pagination. The final page can include a live snapshot of numbers available from suppliers.
+ * Returns phone numbers available for purchase in a country. Narrow the search with `number_type`, `capabilities`, and `prefix`. Inventory numbers come first and support pagination. The final page can include a live snapshot of numbers available from suppliers.
+ *
+ * Inventory results are newest first by default. When you specify `number_type` and the suppliers on sale in the market are ranked into multiple priority tiers, results follow supplier priority, newest first within each tier. These searches reject `ending_before` and return neither `prev_cursor` nor `refresh_cursor`, so backward and refresh paging are unavailable. Country-only searches and markets with a single tier keep newest-first inventory ordering and support backward and refresh paging.
+ *
  */
 export const listAvailableNumbers = <ThrowOnError extends boolean = false>(
   options: Options<ListAvailableNumbersData, ThrowOnError>,

@@ -532,6 +532,7 @@ export type PreferenceOriginValue = (typeof PreferenceOrigin)[keyof typeof Prefe
  */
 export const SMSErrorCode = {
   BlockedByCarrier: "blocked_by_carrier",
+  BlockedByFraudProtection: "blocked_by_fraud_protection",
   BlockedByRecipient: "blocked_by_recipient",
   ContentRejected: "content_rejected",
   InsufficientBalance: "insufficient_balance",

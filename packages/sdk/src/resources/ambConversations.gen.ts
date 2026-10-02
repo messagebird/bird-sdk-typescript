@@ -27,7 +27,7 @@ export class AmbConversationsResource extends Resource {
   }
 
   /**
-   * Updates assignment, labels, inbox status and shared workspace read state. Omitted fields stay unchanged; null assigned_to unassigns and empty labels clears labels. Pass read as a date-time to acknowledge received inbound messages through that timestamp. Resolving or reopening inbox work preserves the Apple channel state and sending restrictions.
+   * Updates assignment, labels, inbox status, queue and shared workspace read state, or settles a pending routing_change. Omitted fields stay unchanged; null assigned_to unassigns, empty labels clears labels and null queue leaves the conversation unrouted. Pass read as a date-time to acknowledge received inbound messages through that timestamp. Settle a pending change with routing_change {action, message_id}, copying message_id from the conversation's routing_change: apply adopts the newer group, intent and queue, dismiss keeps the current routing, and a 409 means the change was replaced or settled first. Resolving or reopening inbox work preserves the Apple channel state and sending restrictions.
    *
    * @example 
    * const result = await bird.amb.conversations.update(

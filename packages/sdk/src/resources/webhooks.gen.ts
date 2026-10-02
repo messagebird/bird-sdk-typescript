@@ -60,7 +60,7 @@ export class WebhooksResourceBase extends Resource {
   }
 
   /**
-   * Send a signed synthetic event and get the outcome synchronously: whether the endpoint accepted, the HTTP status it returned, and the round-trip latency. An unreachable endpoint comes back as a failed status in the body rather than a request error. The receiver has 10 seconds, the body is a minimal stub carrying only the event type, and a test reaches even a paused endpoint without being recorded in the delivery attempts.
+   * Send a signed synthetic event and get the outcome synchronously: whether the endpoint accepted, the HTTP status it returned, and the round-trip latency. An unreachable endpoint comes back as a failed status in the body rather than a request error. The receiver has 10 seconds, the body is a minimal stub carrying only the event type, and a test reaches even a paused endpoint without being recorded in the delivery attempts. For a connector endpoint, the test goes through the same request builder as a live delivery, with the stub as the event. A status outside 2xx is the receiver's own answer: report it and the response body to the user, who can see why their receiver refused it. An unreachable result means Bird got no response: it could not connect, or the receiver did not answer within 10 seconds.
    *
    * @example Send a test event to an endpoint
    * const result = await bird.webhooks.test("whk_01krdgeqcxet5s7t44vh8rt9mg", {

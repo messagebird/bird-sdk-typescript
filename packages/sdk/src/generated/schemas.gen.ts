@@ -4958,6 +4958,7 @@ export const SMSErrorCodeSchema = {
     "invalid_destination",
     "unreachable",
     "blocked_by_carrier",
+    "blocked_by_fraud_protection",
     "blocked_by_recipient",
     "landline_unreachable",
     "content_rejected",
@@ -4968,7 +4969,7 @@ export const SMSErrorCodeSchema = {
     "unknown",
   ],
   description:
-    "Standardized failure reason:\n\n- `invalid_destination`: The number is unassigned, ported out, or malformed.\n- `unreachable`: The handset is off or outside coverage.\n- `blocked_by_carrier`: The carrier filtered the message.\n- `blocked_by_recipient`: The recipient device blocked the sender.\n- `landline_unreachable`: The destination is a landline that does not accept SMS.\n- `content_rejected`: The carrier rejected the content.\n- `sender_unregistered`: The sender is not registered for the destination.\n- `recipient_opted_out`: The recipient is on a suppression list.\n- `provider_unavailable`: The provider remained unavailable after retries.\n- `insufficient_balance`: The workspace wallet could not fund the send.\n- `unknown`: The failure could not be classified.\n\nThis is an open enum. Accept unrecognized values.\n",
+    "Standardized failure reason:\n\n- `invalid_destination`: The number is unassigned, ported out, or malformed.\n- `unreachable`: The handset is off or outside coverage.\n- `blocked_by_carrier`: The carrier filtered the message.\n- `blocked_by_fraud_protection`: Bird fraud protection blocked suspected SMS pumping.\n- `blocked_by_recipient`: The recipient device blocked the sender.\n- `landline_unreachable`: The destination is a landline that does not accept SMS.\n- `content_rejected`: The carrier rejected the content.\n- `sender_unregistered`: The sender is not registered for the destination.\n- `recipient_opted_out`: The recipient is on a suppression list.\n- `provider_unavailable`: The provider remained unavailable after retries.\n- `insufficient_balance`: The workspace wallet could not fund the send.\n- `unknown`: The failure could not be classified.\n\nThis is an open enum. Accept unrecognized values.\n",
 } as const;
 
 export const SMSErrorSchema = {
@@ -4986,7 +4987,7 @@ export const SMSErrorSchema = {
       type: "string",
       minLength: 1,
       description:
-        "The failure in words, from whatever refused the message: the carrier's own reason text on a delivery receipt, or ours on a message stopped before a carrier saw it. Free-form, so branch on `code` and show this to a human.",
+        "The failure in words: the provider's reason text, or Bird's explanation for a fraud protection block or a message refused before submission. Free-form, so branch on `code` and show this to a human.",
       example: "Carrier filtered as spam",
     },
     carrier_error_code: {
@@ -20612,34 +20613,88 @@ export const AMBConversationRoutingSchema = {
   additionalProperties: false,
   readOnly: true,
   description:
-    "Routing context from the message that opened or most recently reopened the Apple channel conversation.",
+    "Routing context the conversation is filed under. Routing rules set it when the conversation opens or reopens, or when the customer writes after it was resolved. A teammate can move the queue or apply a pending `routing_change`.",
   required: ["group_id", "intent_id", "entry_point", "queue"],
   properties: {
     group_id: {
       type: ["string", "null"],
       minLength: 1,
       description:
-        "The business's routing group carried by Apple from the entry point. This identifies a routing destination within the business. Null when the opening message carried no group.",
+        "The business's routing group carried by Apple from the entry point. This identifies a routing destination within the business. Null when the message that set the current routing carried no group.",
     },
     intent_id: {
       type: ["string", "null"],
       minLength: 1,
       description:
-        "Intent carried by Apple from the entry point, used with `group_id` to route the conversation. Null when none was supplied.",
+        "Intent carried by Apple from the entry point, used with `group_id` to route the conversation. Null when the message that set the current routing carried none.",
     },
     entry_point: {
       type: ["string", "null"],
       minLength: 1,
       description:
-        "Configured entry point matching the opening message's group and intent. Null when none matched.",
+        "Configured entry point matching the current group and intent. Null when none matched.",
       example: "support",
     },
     queue: {
       type: ["string", "null"],
       minLength: 1,
       description:
-        "Workspace queue selected by routing. Null when the conversation is unrouted.",
+        "Workspace queue selected by routing or set by a teammate. Null when the conversation is unrouted.",
       example: "support",
+    },
+  },
+} as const;
+
+export const AMBConversationRoutingChangeSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Routing from the customer's latest message that names a different group or intent than the conversation's current `routing`. `message_id` is that inbound message and `received_at` is when it arrived. Routing rules select its queue when the message arrives, but the conversation keeps its current queue until you apply the change.",
+  required: [
+    "group_id",
+    "intent_id",
+    "entry_point",
+    "queue",
+    "message_id",
+    "received_at",
+  ],
+  properties: {
+    group_id: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Group carried by the message. Null when the message carried only an intent.",
+    },
+    intent_id: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Intent carried by the message. Null when the message carried only a group.",
+    },
+    entry_point: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Configured entry point matching the message's group and intent. Null when none matched.",
+      example: "billing",
+    },
+    queue: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Queue routing rules selected for the message's group and intent when it arrived. Null when no rule matched.",
+      example: "billing",
+    },
+    message_id: {
+      $ref: "#/components/schemas/AMBMessageID",
+      description: "Inbound message that carried the new group or intent.",
+    },
+    received_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When that message was received.",
     },
   },
 } as const;
@@ -20696,6 +20751,7 @@ export const AMBConversationSchema = {
     "inbox_status",
     "recipient",
     "routing",
+    "routing_change",
     "last_message",
     "origin",
     "device_capabilities",
@@ -20718,6 +20774,18 @@ export const AMBConversationSchema = {
     },
     routing: {
       $ref: "#/components/schemas/AMBConversationRouting",
+    },
+    routing_change: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBConversationRoutingChange",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Routing from a later customer message that differs from `routing`, waiting for a teammate to apply or dismiss it. Null when there is none. Only recorded while the inbox status is open; resolving the conversation or moving its queue clears it.",
     },
     last_message: {
       oneOf: [
@@ -20857,14 +20925,76 @@ export const AMBConversationListSchema = {
   ],
 } as const;
 
+export const AMBConversationRoutingChangeActionSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["apply", "dismiss"],
+  description:
+    "`apply` adopts the pending change's group, intent, entry point and queue. `dismiss` discards it and leaves group, intent and entry point unchanged.",
+} as const;
+
+export const AMBConversationRoutingChangeDecisionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Settles the conversation's pending `routing_change`. `message_id` names the change you reviewed: the request fails with `409` when the pending change has a different message ID, because a newer customer message replaced it or a teammate already settled it. Either action clears `routing_change`.",
+  required: ["action", "message_id"],
+  properties: {
+    action: {
+      $ref: "#/components/schemas/AMBConversationRoutingChangeAction",
+    },
+    message_id: {
+      $ref: "#/components/schemas/AMBMessageID",
+    },
+  },
+  example: {
+    action: "dismiss",
+    message_id: "amb_01krdgeqcxet5s7t44vh8rt9mg",
+  },
+} as const;
+
 export const AMBConversationUpdateSchema = {
   description:
-    "Assignment, labels, inbox status, and workspace read state. Omit a field to leave it unchanged. Inbox status is independent of the Apple channel's open or closed state.\n",
+    "Assignment, labels, inbox status, queue, routing change and workspace read state. Omit a field to leave it unchanged. Inbox status is independent of the Apple channel's open or closed state. `queue` moves the conversation and clears any pending `routing_change`; it can be combined with a `dismiss` decision but not with `apply`, which sets the queue itself.\n",
   allOf: [
     {
       $ref: "#/components/schemas/_ConversationUpdate",
     },
+    {
+      type: "object",
+      properties: {
+        queue: {
+          type: ["string", "null"],
+          minLength: 1,
+          maxLength: 64,
+          description:
+            "Queue to move the conversation to, or null to leave it unrouted. Routing rules do not run, and the conversation keeps its group and intent. Moving the queue clears any pending `routing_change`, and cannot be combined with an `apply` decision.",
+          example: "billing",
+        },
+        routing_change: {
+          $ref: "#/components/schemas/AMBConversationRoutingChangeDecision",
+        },
+      },
+    },
   ],
+  not: {
+    anyOf: [
+      {
+        required: ["queue", "routing_change"],
+        properties: {
+          queue: {},
+          routing_change: {
+            required: ["action"],
+            properties: {
+              action: {
+                const: "apply",
+              },
+            },
+          },
+        },
+      },
+    ],
+  },
   unevaluatedProperties: false,
 } as const;
 
@@ -34599,6 +34729,102 @@ export const WebhookEventTypeSchema = {
   ],
 } as const;
 
+export const WebhookRawDestinationSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  description: "Posts the signed event to the endpoint's `url` unchanged.",
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      const: "webhook",
+    },
+  },
+} as const;
+
+export const ConnectorIDSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 64,
+  pattern: "^[a-z][a-z0-9_]{0,63}$",
+  description:
+    "Stable identifier of a connector, such as `claude_managed_agents`.",
+  example: "claude_managed_agents",
+} as const;
+
+export const ConnectorActionIDSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 64,
+  pattern: "^[a-z][a-z0-9_]{0,63}$",
+  description: "Identifier of an action, unique within its connector.",
+  example: "trigger_run",
+} as const;
+
+export const WebhookConnectorBindingSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["connector_id", "action", "connection_name"],
+  properties: {
+    connector_id: {
+      $ref: "#/components/schemas/ConnectorID",
+    },
+    action: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ConnectorActionID",
+        },
+      ],
+      description: "Action of the connector that each delivery runs.",
+    },
+    connection_name: {
+      type: "string",
+      minLength: 1,
+      description: "Label of the credentials the endpoint delivers with.",
+      example: "Support triage agent",
+    },
+  },
+} as const;
+
+export const WebhookConnectorDestinationSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "connector"],
+  description:
+    "Sends the request a connector action builds, with the credentials stored for this endpoint. The endpoint's URL comes from its connector setup, so updating the endpoint with a `url` returns a `422`.\n",
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      const: "connector",
+    },
+    connector: {
+      $ref: "#/components/schemas/WebhookConnectorBinding",
+    },
+  },
+} as const;
+
+export const WebhookDestinationSchema = {
+  description:
+    "How each delivery to the endpoint is built. The type cannot change after the endpoint is created.",
+  oneOf: [
+    {
+      $ref: "#/components/schemas/WebhookRawDestination",
+    },
+    {
+      $ref: "#/components/schemas/WebhookConnectorDestination",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      webhook: "#/components/schemas/WebhookRawDestination",
+      connector: "#/components/schemas/WebhookConnectorDestination",
+    },
+  },
+} as const;
+
 export const WebhookEndpointSchema = {
   allOf: [
     {
@@ -34642,6 +34868,17 @@ export const WebhookEndpointSchema = {
             "Delivery state of the endpoint.\n\n- `active`: The initial state; events are being delivered normally.\n- `degraded`: Recent deliveries are failing. We keep delivering and retrying,\n  and the endpoint returns to `active` automatically once deliveries succeed\n  again.\n- `paused`: All delivery is stopped, either because an update set `status` to\n  `paused` or automatically after sustained delivery failures. A paused endpoint\n  never resumes on its own: re-enable it with\n  [Update a webhook endpoint](/docs/api/reference/update-webhook), then\n  [Replay failed deliveries](/docs/api/reference/create-webhook-replay) to\n  recover the deliveries that failed before the pause. Events that arrived\n  while it was paused were never attempted, so a replay does not reach them.\n",
           enum: ["active", "degraded", "paused"],
         },
+        destination: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WebhookDestination",
+            },
+          ],
+          description: "How each delivery to the endpoint is built.",
+          example: {
+            type: "webhook",
+          },
+        },
       },
     },
     {
@@ -34670,10 +34907,121 @@ export const WebhookEndpointListSchema = {
   ],
 } as const;
 
+export const WebhookConnectorIDSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 64,
+  pattern: "^[a-z][a-z0-9_]{0,63}$",
+  description:
+    "The connector to deliver through. Each connector, its fields and the setup to do on its\nplatform first:\n\n- `claude_managed_agents`: Claude Managed Agents. Send each message you receive to your Claude managed agent.\n  - `agent_id` (`config`, required): Returned when you create the agent. Sessions use its latest version.\n  - `environment_id` (`config`, required): Returned when you create the environment.\n  - `api_key` (secret, in `credentials`, required): From the Claude workspace your agent runs in.\n  - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.\n  - Setup 1: First, set up your agent in Claude. In the Claude Console, create the agent, its environment and an API key in the same workspace, then come back here with their IDs and the key. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.\n  - Setup 2: Create an API key. In the Claude workspace your agent runs in. See https://platform.claude.com/settings/keys.\n  - Setup 3: Copy the agent and environment IDs. Each create returns its ID. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.\n- `grok_bot`: Grok Bot. Send each message you receive to a Grok Bot routine.\n  - `webhook_url` (`config`, required): The routine's webhook URL.\n  - `sender_key` (secret, in `credentials`, required): The routine's sender key. Bird sends it only as the Bearer token.\n  - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.\n  - Setup 1: First, ask Grok Bot to create a routine. Ask Grok Bot to create a routine with a webhook trigger, then paste the webhook URL and sender key it gives you below. See https://cursor.com/docs/cloud-agent/automations#webhook-triggers.\n",
+  example: "claude_managed_agents",
+} as const;
+
+export const ConnectionCredentialsSchema = {
+  type: "object",
+  writeOnly: true,
+  "x-sensitive": true,
+  minProperties: 1,
+  maxProperties: 16,
+  additionalProperties: {
+    type: "string",
+    minLength: 1,
+    maxLength: 4096,
+  },
+  description:
+    "Values for the connector's secret fields, keyed by field `name`. Every required secret field must be present, after merging with the stored values on an update, and a key the connector does not declare as secret returns a `422`. No response includes these values.\n",
+  example: {
+    token: "example-trigger-token",
+  },
+} as const;
+
+export const ConnectionConfigSchema = {
+  type: "object",
+  maxProperties: 16,
+  additionalProperties: {
+    type: "string",
+    minLength: 1,
+    maxLength: 2048,
+  },
+  description:
+    "Values for the connector's nonsecret fields, keyed by field `name`, such as the URL the endpoint's requests go to. A URL must be HTTPS, on one of the connector's `allowed_origins`, and under its `path_prefix` when it has one. It cannot include user info, a fragment, an IP address as its host, dot segments, or encoded slashes.\n",
+  example: {
+    trigger_url: "https://agents.example.com/triggers/support",
+  },
+} as const;
+
+export const WebhookConnectorSetupSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["connector_id"],
+  properties: {
+    connector_id: {
+      $ref: "#/components/schemas/WebhookConnectorID",
+    },
+    action: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ConnectorActionID",
+        },
+      ],
+      description:
+        "Action of the connector that each delivery runs. Omit when the connector has one action. An action the connector does not have, or `events` the action does not accept, returns a `422`.\n",
+    },
+    config: {
+      $ref: "#/components/schemas/ConnectionConfig",
+    },
+  },
+  description:
+    "The connector to deliver through and the values it needs. Omit the endpoint's `url`: Bird builds it from the connector's URL and these `config` values, and a URL given anyway must equal that. The credentials belong to this endpoint alone, and deleting the endpoint erases them.\n",
+} as const;
+
+export const WebhookConnectorDestinationCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "connector"],
+  description:
+    "Sends the request a connector action builds, with credentials stored for this endpoint.",
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      const: "connector",
+    },
+    connector: {
+      "x-sensitive": true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/WebhookConnectorSetup",
+        },
+      ],
+    },
+  },
+} as const;
+
+export const WebhookDestinationCreateSchema = {
+  description:
+    "How each delivery to the endpoint is built. The type cannot change after the endpoint is created.",
+  oneOf: [
+    {
+      $ref: "#/components/schemas/WebhookRawDestination",
+    },
+    {
+      $ref: "#/components/schemas/WebhookConnectorDestinationCreate",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      webhook: "#/components/schemas/WebhookRawDestination",
+      connector: "#/components/schemas/WebhookConnectorDestinationCreate",
+    },
+  },
+} as const;
+
 export const WebhookEndpointCreateSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["url", "events"],
+  required: ["events"],
   properties: {
     url: {
       type: "string",
@@ -34681,7 +35029,7 @@ export const WebhookEndpointCreateSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "HTTPS URL to deliver events to, at most 2048 characters. The host must be publicly reachable: URLs on private, loopback, or link-local addresses are rejected with a `422`.\n",
+        "HTTPS URL to deliver events to, at most 2048 characters. The host must be publicly reachable: URLs on private, loopback, or link-local addresses are rejected with a `422`. Required unless `destination` is a connector, whose URL comes from the connector and its `config`; a URL given with one must equal it.\n",
       example: "https://example.com/webhook",
     },
     events: {
@@ -34700,6 +35048,15 @@ export const WebhookEndpointCreateSchema = {
       description:
         "Human-readable label for this endpoint, up to 256 characters.",
       example: "Production webhook endpoint",
+    },
+    destination: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WebhookDestinationCreate",
+        },
+      ],
+      description:
+        'How each delivery is built. Omit to post the signed event to `url` unchanged, the same as `{"type": "webhook"}`.\n',
     },
   },
   example: {
@@ -34741,7 +35098,7 @@ export const WebhookEndpointUpdateSchema = {
       maxLength: 2048,
       format: "uri",
       description:
-        "Replacement delivery URL. Same rules as at creation: HTTPS, at most 2048 characters, and the host must be publicly reachable (private, loopback, and link-local addresses return a `422`). Omit to keep the current URL.\n",
+        "Replacement delivery URL. Same rules as at creation: HTTPS, at most 2048 characters, and the host must be publicly reachable (private, loopback, and link-local addresses return a `422`). Omit to keep the current URL. A connector endpoint's URL comes from its connector and cannot be replaced: any value returns a `422`.\n",
       example: "https://example.com/webhook",
     },
     description: {
@@ -34760,6 +35117,10 @@ export const WebhookEndpointUpdateSchema = {
       description:
         "Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`.\n",
       example: ["email.delivered", "email.bounced", "email.complained"],
+    },
+    credentials: {
+      description:
+        "New values for a `connector` destination's secret fields, merged over the stored ones: a key given replaces that field and an omitted key keeps its value. The merged set is checked as at creation, and the next delivery, retries included, uses it. On an endpoint without a `connector` destination this returns a `422`. Omit to keep the current credentials.\n",
     },
     status: {
       type: "string",
@@ -39135,6 +39496,14 @@ export const WebhookAttemptSchema = {
         "URL the request was sent to: the endpoint's `url` at the time of the attempt, which can differ from the current configuration after an update.\n",
       example: "https://example.com/webhooks",
     },
+    failure_reason: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Why the attempt failed before any request was sent, for example a connector body that could not be rendered or an endpoint whose connection changed after the event was queued. Absent for an attempt that reached the network.\n",
+      example:
+        "The endpoint's connection changed after this delivery was queued.",
+    },
     response_status_code: {
       type: ["integer", "null"],
       description:
@@ -43252,7 +43621,7 @@ export const SMSErrorWritableSchema = {
       type: "string",
       minLength: 1,
       description:
-        "The failure in words, from whatever refused the message: the carrier's own reason text on a delivery receipt, or ours on a message stopped before a carrier saw it. Free-form, so branch on `code` and show this to a human.",
+        "The failure in words: the provider's reason text, or Bird's explanation for a fraud protection block or a message refused before submission. Free-form, so branch on `code` and show this to a human.",
       example: "Carrier filtered as spam",
     },
     carrier_error_code: {
@@ -45652,6 +46021,60 @@ export const AMBMessageEventListWritableSchema = {
   },
 } as const;
 
+export const AMBConversationRoutingChangeWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Routing from the customer's latest message that names a different group or intent than the conversation's current `routing`. `message_id` is that inbound message and `received_at` is when it arrived. Routing rules select its queue when the message arrives, but the conversation keeps its current queue until you apply the change.",
+  required: [
+    "group_id",
+    "intent_id",
+    "entry_point",
+    "queue",
+    "message_id",
+    "received_at",
+  ],
+  properties: {
+    group_id: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Group carried by the message. Null when the message carried only an intent.",
+    },
+    intent_id: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Intent carried by the message. Null when the message carried only a group.",
+    },
+    entry_point: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Configured entry point matching the message's group and intent. Null when none matched.",
+      example: "billing",
+    },
+    queue: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Queue routing rules selected for the message's group and intent when it arrived. Null when no rule matched.",
+      example: "billing",
+    },
+    message_id: {
+      $ref: "#/components/schemas/AMBMessageID",
+      description: "Inbound message that carried the new group or intent.",
+    },
+    received_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When that message was received.",
+    },
+  },
+} as const;
+
 export const AMBConversationLastMessageWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -45686,6 +46109,7 @@ export const AMBConversationWritableSchema = {
     "inbox_status",
     "recipient",
     "routing",
+    "routing_change",
     "last_message",
     "assigned_to",
     "labels",
@@ -45699,6 +46123,18 @@ export const AMBConversationWritableSchema = {
     },
     routing: {
       $ref: "#/components/schemas/AMBConversationRouting",
+    },
+    routing_change: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBConversationRoutingChangeWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Routing from a later customer message that differs from `routing`, waiting for a teammate to apply or dismiss it. Null when there is none. Only recorded while the inbox status is open; resolving the conversation or moving its queue clears it.",
     },
     last_message: {
       oneOf: [
@@ -48161,6 +48597,17 @@ export const WebhookEndpointWritableSchema = {
             "Event types this endpoint is subscribed to; only matching events are delivered. Change the set with [Update a webhook endpoint](/docs/api/reference/update-webhook).\n",
           example: ["email.delivered", "email.bounced"],
         },
+        destination: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WebhookDestination",
+            },
+          ],
+          description: "How each delivery to the endpoint is built.",
+          example: {
+            type: "webhook",
+          },
+        },
       },
     },
   ],
@@ -48186,6 +48633,126 @@ export const WebhookEndpointListWritableSchema = {
   ],
 } as const;
 
+export const WebhookConnectorSetupWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["connector_id", "credentials"],
+  properties: {
+    connector_id: {
+      $ref: "#/components/schemas/WebhookConnectorID",
+    },
+    action: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ConnectorActionID",
+        },
+      ],
+      description:
+        "Action of the connector that each delivery runs. Omit when the connector has one action. An action the connector does not have, or `events` the action does not accept, returns a `422`.\n",
+    },
+    credentials: {
+      $ref: "#/components/schemas/ConnectionCredentials",
+    },
+    config: {
+      $ref: "#/components/schemas/ConnectionConfig",
+    },
+  },
+  description:
+    "The connector to deliver through and the values it needs. Omit the endpoint's `url`: Bird builds it from the connector's URL and these `config` values, and a URL given anyway must equal that. The credentials belong to this endpoint alone, and deleting the endpoint erases them.\n",
+} as const;
+
+export const WebhookConnectorDestinationCreateWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "connector"],
+  description:
+    "Sends the request a connector action builds, with credentials stored for this endpoint.",
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      const: "connector",
+    },
+    connector: {
+      "x-sensitive": true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/WebhookConnectorSetupWritable",
+        },
+      ],
+    },
+  },
+} as const;
+
+export const WebhookDestinationCreateWritableSchema = {
+  description:
+    "How each delivery to the endpoint is built. The type cannot change after the endpoint is created.",
+  oneOf: [
+    {
+      $ref: "#/components/schemas/WebhookRawDestination",
+    },
+    {
+      $ref: "#/components/schemas/WebhookConnectorDestinationCreateWritable",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      webhook: "#/components/schemas/WebhookRawDestination",
+      connector:
+        "#/components/schemas/WebhookConnectorDestinationCreateWritable",
+    },
+  },
+} as const;
+
+export const WebhookEndpointCreateWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["events"],
+  properties: {
+    url: {
+      type: "string",
+      maxLength: 2048,
+      format: "uri",
+      minLength: 1,
+      description:
+        "HTTPS URL to deliver events to, at most 2048 characters. The host must be publicly reachable: URLs on private, loopback, or link-local addresses are rejected with a `422`. Required unless `destination` is a connector, whose URL comes from the connector and its `config`; a URL given with one must equal it.\n",
+      example: "https://example.com/webhook",
+    },
+    events: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/WebhookEventType",
+      },
+      minItems: 1,
+      description:
+        "Event types to subscribe to; the endpoint receives only matching events. Types outside the event catalog return a `422`, and an endpoint holds at most 100 entries.",
+      example: ["email.delivered", "email.bounced"],
+    },
+    description: {
+      type: "string",
+      maxLength: 256,
+      description:
+        "Human-readable label for this endpoint, up to 256 characters.",
+      example: "Production webhook endpoint",
+    },
+    destination: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WebhookDestinationCreateWritable",
+        },
+      ],
+      description:
+        'How each delivery is built. Omit to post the signed event to `url` unchanged, the same as `{"type": "webhook"}`.\n',
+    },
+  },
+  example: {
+    url: "https://example.com/webhooks/bird",
+    events: ["email.delivered", "email.bounced"],
+    description: "Production delivery + bounce notifications",
+  },
+} as const;
+
 export const WebhookEndpointCreatedWritableSchema = {
   allOf: [
     {
@@ -48206,6 +48773,54 @@ export const WebhookEndpointCreatedWritableSchema = {
       },
     },
   ],
+} as const;
+
+export const WebhookEndpointUpdateWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  "x-sensitive": true,
+  properties: {
+    url: {
+      type: "string",
+      maxLength: 2048,
+      format: "uri",
+      description:
+        "Replacement delivery URL. Same rules as at creation: HTTPS, at most 2048 characters, and the host must be publicly reachable (private, loopback, and link-local addresses return a `422`). Omit to keep the current URL. A connector endpoint's URL comes from its connector and cannot be replaced: any value returns a `422`.\n",
+      example: "https://example.com/webhook",
+    },
+    description: {
+      type: "string",
+      maxLength: 256,
+      description:
+        "Human-readable label for this endpoint, up to 256 characters.",
+      example: "Updated webhook endpoint",
+    },
+    events: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/WebhookEventType",
+      },
+      minItems: 1,
+      description:
+        "Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`.\n",
+      example: ["email.delivered", "email.bounced", "email.complained"],
+    },
+    credentials: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ConnectionCredentials",
+        },
+      ],
+      description:
+        "New values for a `connector` destination's secret fields, merged over the stored ones: a key given replaces that field and an omitted key keeps its value. The merged set is checked as at creation, and the next delivery, retries included, uses it. On an endpoint without a `connector` destination this returns a `422`. Omit to keep the current credentials.\n",
+    },
+    status: {
+      type: "string",
+      enum: ["active", "paused"],
+      description:
+        "`paused` stops all deliveries; `active` re-enables a paused endpoint. Omit to leave the status unchanged. Events that fire while paused are not delivered and a replay cannot recover them, because they were never attempted; after re-enabling, [Replay failed deliveries](/docs/api/reference/create-webhook-replay) reaches only the deliveries that failed before the pause. A `degraded` endpoint cannot be reset through this field: it returns to `active` automatically once deliveries succeed again.\n",
+    },
+  },
 } as const;
 
 export const EventAMBMessageDataWritableSchema = {
@@ -49163,6 +49778,14 @@ export const WebhookAttemptWritableSchema = {
       description:
         "URL the request was sent to: the endpoint's `url` at the time of the attempt, which can differ from the current configuration after an update.\n",
       example: "https://example.com/webhooks",
+    },
+    failure_reason: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Why the attempt failed before any request was sent, for example a connector body that could not be rendered or an endpoint whose connection changed after the event was queued. Absent for an attempt that reached the network.\n",
+      example:
+        "The endpoint's connection changed after this delivery was queued.",
     },
     response_status_code: {
       type: ["integer", "null"],
