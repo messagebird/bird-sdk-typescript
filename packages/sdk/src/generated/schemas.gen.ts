@@ -33073,6 +33073,15 @@ export const MailboxSchema = {
       description:
         "When the mailbox was deleted, or `null` if active. Deletion stops receiving; restore is available for 30 days unless permanent erasure has started.",
     },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next with this mailbox. The response that creates it suggests subscribing to the mail it receives; other reads of one mailbox return an empty list, and lists omit it.",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
   },
 } as const;
 
@@ -35150,6 +35159,15 @@ export const WebhookEndpointCreatedSchema = {
           description:
             "Signing secret for this endpoint (`whsec_` prefix), used to verify every delivery signature. Present in this response only: store it immediately, it cannot be retrieved again. If you lose it, mint a new one with [Rotate webhook signing secret](/docs/api/reference/rotate-webhook-secret).\n",
           example: "whsec_base64encodedvalue",
+        },
+        next: {
+          type: "array",
+          readOnly: true,
+          description:
+            "What to do next with this endpoint. Empty: deliveries start as the events happen, with nothing left to set up.",
+          items: {
+            $ref: "#/components/schemas/NextAction",
+          },
         },
       },
     },

@@ -18305,6 +18305,10 @@ export type Mailbox = {
    * When the mailbox was deleted, or `null` if active. Deletion stops receiving; restore is available for 30 days unless permanent erasure has started.
    */
   readonly deleted_at?: string | null;
+  /**
+   * What to do next with this mailbox. The response that creates it suggests subscribing to the mail it receives; other reads of one mailbox return an empty list, and lists omit it.
+   */
+  readonly next?: Array<NextAction>;
 };
 
 export type MailboxList = {
@@ -19462,6 +19466,10 @@ export type WebhookEndpointCreated = WebhookEndpoint & {
    *
    */
   secret: string;
+  /**
+   * What to do next with this endpoint. Empty: deliveries start as the events happen, with nothing left to set up.
+   */
+  readonly next?: Array<NextAction>;
 };
 
 export type WebhookEndpointUpdate = {
