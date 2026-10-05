@@ -17013,7 +17013,7 @@ export const AMBBusinessAccountSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "Reason for the current operational suspension, when recorded. Review feedback is retained on the submission.",
+        "Reason for the current operational suspension, when recorded. Review feedback is retained on the submission. May contain basic Markdown, such as emphasis and lists.",
     },
     invitations_enabled: {
       type: "boolean",
@@ -17487,6 +17487,8 @@ export const AMBBusinessAccountSubmissionSchema = {
       type: ["string", "null"],
       minLength: 1,
       readOnly: true,
+      description:
+        "Review feedback on this attempt, such as the reason Apple rejected it. May contain basic Markdown, such as emphasis and lists.",
     },
     created_at: {
       type: "string",
@@ -17702,6 +17704,13 @@ export const AMBChannelSettingsUpdateSchema = {
       example: "ast_01krdgeqcxet5s7t44vh8rt9mg",
     },
   },
+} as const;
+
+export const AMBPaymentIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^apay_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "apay_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const AMBRoutingRuleIDSchema = {
@@ -19342,13 +19351,6 @@ export const AMBNativeAuthenticationSchema = {
       $ref: "#/components/schemas/AMBAuthenticationID",
     },
   },
-} as const;
-
-export const AMBPaymentIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^apay_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "apay_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const AMBNativePaymentSchema = {

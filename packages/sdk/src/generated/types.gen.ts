@@ -9434,7 +9434,7 @@ export type AmbBusinessAccount = {
    */
   readonly status: AmbBusinessAccountStatus;
   /**
-   * Reason for the current operational suspension, when recorded. Review feedback is retained on the submission.
+   * Reason for the current operational suspension, when recorded. Review feedback is retained on the submission. May contain basic Markdown, such as emphasis and lists.
    */
   readonly status_reason?: string;
   /**
@@ -9630,6 +9630,9 @@ export type AmbBusinessAccountSubmission = {
    * The review outcome of this attempt. Earlier attempts retain their outcome when a new attempt is submitted.
    */
   readonly status: AmbBusinessAccountSubmissionStatus;
+  /**
+   * Review feedback on this attempt, such as the reason Apple rejected it. May contain basic Markdown, such as emphasis and lists.
+   */
   readonly status_reason: string | null;
   readonly created_at: string;
   /**
@@ -9727,6 +9730,8 @@ export type AmbChannelSettingsUpdate = {
    */
   logo_asset_id?: AssetId | null;
 };
+
+export type AmbPaymentId = string;
 
 export type AmbRoutingRuleId = string;
 
@@ -10551,8 +10556,6 @@ export type AmbAuthenticationId = string;
 export type AmbNativeAuthentication = {
   readonly authentication_id: AmbAuthenticationId;
 };
-
-export type AmbPaymentId = string;
 
 /**
  * Apple Pay request created through the conversation payment endpoint. Contains no payment token or provider credentials.
