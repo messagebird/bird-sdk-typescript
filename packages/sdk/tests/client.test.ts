@@ -87,6 +87,7 @@ describe("region resolution", () => {
   it("extracts the region from a key prefix", () => {
     expect(regionFromApiKey("bk_eu1_abc123")).toBe("eu1");
     expect(regionFromApiKey("bk_us1_abc123")).toBe("us1");
+    expect(regionFromApiKey("bm_eu1_abc123")).toBe("eu1");
   });
 
   it("returns undefined for keys without a region segment", () => {

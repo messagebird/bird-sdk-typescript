@@ -2520,6 +2520,7 @@ export const EmailRecipientSchema = {
       format: "email",
       minLength: 5,
       description: "Recipient email address.",
+      example: "delivered@messagebird.dev",
     },
     name: {
       type: ["string", "null"],
@@ -2628,12 +2629,14 @@ export const EmailRecipientSchema = {
       readOnly: true,
       default: 0,
       description: "Number of open events for this recipient.",
+      example: 0,
     },
     click_count: {
       type: "integer",
       readOnly: true,
       default: 0,
       description: "Number of click events for this recipient.",
+      example: 0,
     },
   },
 } as const;
@@ -2715,6 +2718,7 @@ export const EmailEventSchema = {
       format: "date-time",
       minLength: 1,
       description: "When this event occurred.",
+      example: "2026-07-01T12:00:03Z",
     },
     recipient_id: {
       $ref: "#/components/schemas/RecipientID",
@@ -2853,12 +2857,15 @@ export const EmailMessageContentSchema = {
       minLength: 1,
       description:
         "The HTML body of the message as delivered, if it was stored.",
+      example:
+        "<p>Hi Jane,</p><p>Your order #1234 has shipped and is on its way.</p>",
     },
     text: {
       type: "string",
       minLength: 1,
       description:
         "The plain-text body of the message as delivered, if it was stored.",
+      example: "Hi Jane,\n\nYour order #1234 has shipped and is on its way.",
     },
   },
 } as const;
@@ -3755,6 +3762,7 @@ export const AudienceRefSchema = {
       minLength: 1,
       maxLength: 100,
       description: "The audience's display name.",
+      example: "Newsletter subscribers",
     },
   },
 } as const;
@@ -3777,6 +3785,7 @@ export const ContactSchema = {
           maxLength: 254,
           description:
             "The contact's email address, in its stored form, trimmed and lowercased before uniqueness is checked. Unique within the workspace. `null` when the contact has no email address.",
+          example: "alice@acme.com",
         },
         phone_number: {
           type: ["string", "null"],
@@ -3784,6 +3793,7 @@ export const ContactSchema = {
           maxLength: 16,
           description:
             "The contact's phone number in normalized international form: a leading `+` and four to 15 digits. We normalize formatting but do not verify the number against numbering-plan metadata. The number is unique within the workspace. Because carriers recycle disconnected numbers, use `external_id` as the durable key for your own records. `null` when the contact has no phone number.",
+          example: "+31612345678",
         },
         first_name: {
           type: ["string", "null"],
@@ -4006,16 +4016,19 @@ export const ContactUpsertEntrySchema = {
       type: ["string", "null"],
       description:
         "Email address this entry carried, trimmed and lowercased. `null` when the entry carried none.",
+      example: "alice@acme.com",
     },
     phone_number: {
       type: ["string", "null"],
       description:
         "Phone number this entry carried, in its normalized international form. `null` when the entry carried none. A row rejected for an invalid phone echoes the value as sent, trimmed, since no normalized form exists.",
+      example: null,
     },
     external_id: {
       type: ["string", "null"],
       description:
         "Your own identifier for this entry, when the entry supplied one.",
+      example: null,
     },
   },
 } as const;
@@ -4163,6 +4176,7 @@ export const AudienceSchema = {
           minLength: 1,
           maxLength: 100,
           description: "Display name for the audience.",
+          example: "Newsletter subscribers",
         },
         description: {
           type: ["string", "null"],
@@ -4558,6 +4572,7 @@ export const ContactPropertySchema = {
           pattern: "^[a-z][a-z0-9_]*$",
           description:
             "The property key, used as the key in contact data and as the attribute in the `bird.contact.<key>` broadcast template variable. Lowercase letters, digits, and underscores, starting with a letter. Cannot be changed after creation.",
+          example: "plan",
         },
         type: {
           $ref: "#/components/schemas/ContactPropertyType",
@@ -4715,6 +4730,7 @@ export const AudienceMemberSchema = {
       readOnly: true,
       description:
         "When this contact joined the audience. Members are listed in join order, most recent first.",
+      example: "2026-05-21T10:30:00Z",
     },
     audiences: {
       type: "array",
@@ -4870,6 +4886,7 @@ export const SMSSegmentsSchema = {
       readOnly: true,
       description:
         "Number of segments the body is split into. Each segment is a billable unit.",
+      example: 1,
     },
     encoding: {
       type: "string",
@@ -4885,6 +4902,7 @@ export const SMSSegmentsSchema = {
       readOnly: true,
       description:
         "Character count of the body, counted in Unicode code points under either encoding. This is not the segment measure: a `GSM_7BIT` extended-table character counts once here but costs two septets, and a `UCS2` emoji outside the Basic Multilingual Plane counts once here but costs two of the segment's 70 code units.\n",
+      example: 41,
     },
   },
 } as const;
@@ -5207,6 +5225,7 @@ export const SMSMessageSchema = {
       readOnly: true,
       description:
         "When the message was accepted (outbound) or received (inbound).",
+      example: "2026-05-21T12:00:00Z",
     },
     sent_at: {
       type: ["string", "null"],
@@ -5549,6 +5568,7 @@ export const SMSBatchSummarySchema = {
       minimum: 0,
       description:
         "Number of messages accepted in the batch. Acceptance is all-or-nothing, so this equals the number of messages submitted.\n",
+      example: 2,
     },
   },
 } as const;
@@ -5609,6 +5629,7 @@ export const SMSEventSchema = {
       minLength: 1,
       readOnly: true,
       description: "When this event occurred.",
+      example: "2026-05-21T12:00:04Z",
     },
     carrier: {
       type: "string",
@@ -34655,6 +34676,28 @@ export const WebhookEndpointIDSchema = {
   example: "whk_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const WebhookFilterSchema = {
+  type: "object",
+  required: ["mailbox_id"],
+  additionalProperties: false,
+  properties: {
+    mailbox_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/MailboxID",
+        },
+      ],
+      description:
+        "Mailbox to receive events for. Must belong to this workspace; a mailbox outside it returns `422`.\n",
+    },
+  },
+  description:
+    "Exact match on `mailbox_id`, for `email_mailbox.*` events only; the mailbox must belong to this workspace. Cannot be combined with Realtime app scope. Omit on create for all resources; on update omit to keep, send `null` to clear.\n",
+  example: {
+    mailbox_id: "mbx_01kr97a6rje4wbe5z40wxdfcy9",
+  },
+} as const;
+
 export const WebhookEventTypeSchema = {
   type: "string",
   minLength: 1,
@@ -34829,7 +34872,15 @@ export const WebhookEndpointSchema = {
   allOf: [
     {
       type: "object",
-      required: ["id", "url", "events", "status", "created_at", "updated_at"],
+      required: [
+        "id",
+        "url",
+        "events",
+        "filter",
+        "status",
+        "created_at",
+        "updated_at",
+      ],
       properties: {
         id: {
           readOnly: true,
@@ -34850,6 +34901,18 @@ export const WebhookEndpointSchema = {
           minLength: 1,
           description: "Human-readable label for the endpoint.",
           example: "Production webhook endpoint",
+        },
+        filter: {
+          description: "Mailbox scope configured through filter, or null.",
+          example: null,
+          oneOf: [
+            {
+              $ref: "#/components/schemas/WebhookFilter",
+            },
+            {
+              type: "null",
+            },
+          ],
         },
         events: {
           type: "array",
@@ -35032,6 +35095,11 @@ export const WebhookEndpointCreateSchema = {
         "HTTPS URL to deliver events to, at most 2048 characters. The host must be publicly reachable: URLs on private, loopback, or link-local addresses are rejected with a `422`. Required unless `destination` is a connector, whose URL comes from the connector and its `config`; a URL given with one must equal it.\n",
       example: "https://example.com/webhook",
     },
+    filter: {
+      description:
+        "Limit delivery to one mailbox and only email_mailbox events. Omit to include all resources.",
+      $ref: "#/components/schemas/WebhookFilter",
+    },
     events: {
       type: "array",
       items: {
@@ -35107,6 +35175,18 @@ export const WebhookEndpointUpdateSchema = {
       description:
         "Human-readable label for this endpoint, up to 256 characters.",
       example: "Updated webhook endpoint",
+    },
+    filter: {
+      description:
+        "Replace the mailbox scope. Omit to keep it, or send null to include all resources. Scoped endpoints accept only email_mailbox events.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WebhookFilter",
+        },
+        {
+          type: "null",
+        },
+      ],
     },
     events: {
       type: "array",
@@ -40143,6 +40223,14 @@ export const VoiceLegSchema = {
       description:
         "Identifier of the SIP trunk that originated this leg. `null` when no trunk is associated.",
     },
+    sip_call_id: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The SIP `Call-ID` of this leg's signalling. We relay it unchanged, so it matches what the carrier and your own equipment logged for the same leg: the carrier's value on an incoming leg, and your system's value on a leg you place through a SIP trunk. Use it to match this leg against a carrier's records or your PBX logs. Legs recorded before this field existed carry it only if they were answered.",
+      example: "3f9a1c8e7b2d4a5f@sip.example.net",
+    },
     status: {
       readOnly: true,
       allOf: [
@@ -40499,6 +40587,12 @@ export const AvailableNumberSchema = {
       type: "boolean",
       description:
         "Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any setup fee is charged during purchase. Monthly billing starts at assignment even while approval is pending; assignment may follow completion of a pending supplier order.",
+    },
+    ownership_address_scope: {
+      type: "string",
+      "x-extensible-enum": ["anywhere", "country", "number_area"],
+      description:
+        "Where the carrier requires the business address on this number's ownership registration\nto be. Present only when the carrier itself registers the number before it carries\ntraffic and states a rule; omitted otherwise. An address that does not meet the rule\nis refused after purchase, and only an address that meets it can fix the registration.\n\n- `anywhere`: any business address.\n- `country`: a business address in the number's country.\n- `number_area`: a business address inside the number's own area code, for example in\n  Amsterdam for an Amsterdam (020) number.\n",
     },
   },
 } as const;
@@ -42157,6 +42251,7 @@ export const VoiceCallSchema = {
       format: "date-time",
       description:
         "When the initial leg started. `null` in the acceptance snapshot returned by call creation.",
+      example: "2026-05-21T12:00:00Z",
     },
     ended_at: {
       readOnly: true,
@@ -42170,18 +42265,21 @@ export const VoiceCallSchema = {
       type: "boolean",
       description:
         "Whether any leg in the call is still held live. A leg stays live until its end is recorded or, when no end is observed, until its liveness window expires, so this can remain `true` briefly after a disconnect. `false` covers the interval between a leg ending and its settlement being confirmed, and says nothing about whether transcription has finished.",
+      example: false,
     },
     has_recording: {
       readOnly: true,
       type: "boolean",
       description:
         "Whether the call ever produced a recording. It stays `true` for the life of the call, so it records that a recording was made rather than promising one can still be fetched.",
+      example: false,
     },
     has_transcript: {
       readOnly: true,
       type: "boolean",
       description:
         "Whether the call ever produced a transcript. A failed transcription attempt does not set it, and a later failure does not clear it.",
+      example: false,
     },
     parties: {
       readOnly: true,
@@ -43054,6 +43152,7 @@ export const EmailRecipientWritableSchema = {
       format: "email",
       minLength: 5,
       description: "Recipient email address.",
+      example: "delivered@messagebird.dev",
     },
     name: {
       type: ["string", "null"],
@@ -43099,6 +43198,7 @@ export const EmailEventWritableSchema = {
       format: "date-time",
       minLength: 1,
       description: "When this event occurred.",
+      example: "2026-07-01T12:00:03Z",
     },
     recipient_id: {
       $ref: "#/components/schemas/RecipientID",
@@ -43381,6 +43481,7 @@ export const AudienceRefWritableSchema = {
       minLength: 1,
       maxLength: 100,
       description: "The audience's display name.",
+      example: "Newsletter subscribers",
     },
   },
 } as const;
@@ -43397,6 +43498,7 @@ export const ContactWritableSchema = {
           maxLength: 254,
           description:
             "The contact's email address, in its stored form, trimmed and lowercased before uniqueness is checked. Unique within the workspace. `null` when the contact has no email address.",
+          example: "alice@acme.com",
         },
         phone_number: {
           type: ["string", "null"],
@@ -43404,6 +43506,7 @@ export const ContactWritableSchema = {
           maxLength: 16,
           description:
             "The contact's phone number in normalized international form: a leading `+` and four to 15 digits. We normalize formatting but do not verify the number against numbering-plan metadata. The number is unique within the workspace. Because carriers recycle disconnected numbers, use `external_id` as the durable key for your own records. `null` when the contact has no phone number.",
+          example: "+31612345678",
         },
         first_name: {
           type: ["string", "null"],
@@ -43466,6 +43569,7 @@ export const AudienceWritableSchema = {
           minLength: 1,
           maxLength: 100,
           description: "Display name for the audience.",
+          example: "Newsletter subscribers",
         },
         description: {
           type: ["string", "null"],
@@ -43538,6 +43642,7 @@ export const ContactPropertyWritableSchema = {
           pattern: "^[a-z][a-z0-9_]*$",
           description:
             "The property key, used as the key in contact data and as the attribute in the `bird.contact.<key>` broadcast template variable. Lowercase letters, digits, and underscores, starting with a letter. Cannot be changed after creation.",
+          example: "plan",
         },
         type: {
           $ref: "#/components/schemas/ContactPropertyType",
@@ -48572,7 +48677,7 @@ export const WebhookEndpointWritableSchema = {
   allOf: [
     {
       type: "object",
-      required: ["url", "events", "created_at", "updated_at"],
+      required: ["url", "events", "filter", "created_at", "updated_at"],
       properties: {
         url: {
           type: "string",
@@ -48587,6 +48692,18 @@ export const WebhookEndpointWritableSchema = {
           minLength: 1,
           description: "Human-readable label for the endpoint.",
           example: "Production webhook endpoint",
+        },
+        filter: {
+          description: "Mailbox scope configured through filter, or null.",
+          example: null,
+          oneOf: [
+            {
+              $ref: "#/components/schemas/WebhookFilter",
+            },
+            {
+              type: "null",
+            },
+          ],
         },
         events: {
           type: "array",
@@ -48719,6 +48836,11 @@ export const WebhookEndpointCreateWritableSchema = {
         "HTTPS URL to deliver events to, at most 2048 characters. The host must be publicly reachable: URLs on private, loopback, or link-local addresses are rejected with a `422`. Required unless `destination` is a connector, whose URL comes from the connector and its `config`; a URL given with one must equal it.\n",
       example: "https://example.com/webhook",
     },
+    filter: {
+      description:
+        "Limit delivery to one mailbox and only email_mailbox events. Omit to include all resources.",
+      $ref: "#/components/schemas/WebhookFilter",
+    },
     events: {
       type: "array",
       items: {
@@ -48794,6 +48916,18 @@ export const WebhookEndpointUpdateWritableSchema = {
       description:
         "Human-readable label for this endpoint, up to 256 characters.",
       example: "Updated webhook endpoint",
+    },
+    filter: {
+      description:
+        "Replace the mailbox scope. Omit to keep it, or send null to include all resources. Scoped endpoints accept only email_mailbox events.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WebhookFilter",
+        },
+        {
+          type: "null",
+        },
+      ],
     },
     events: {
       type: "array",
@@ -50095,6 +50229,12 @@ export const AvailableNumberWritableSchema = {
       type: "boolean",
       description:
         "Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any setup fee is charged during purchase. Monthly billing starts at assignment even while approval is pending; assignment may follow completion of a pending supplier order.",
+    },
+    ownership_address_scope: {
+      type: "string",
+      "x-extensible-enum": ["anywhere", "country", "number_area"],
+      description:
+        "Where the carrier requires the business address on this number's ownership registration\nto be. Present only when the carrier itself registers the number before it carries\ntraffic and states a rule; omitted otherwise. An address that does not meet the rule\nis refused after purchase, and only an address that meets it can fix the registration.\n\n- `anywhere`: any business address.\n- `country`: a business address in the number's country.\n- `number_area`: a business address inside the number's own area code, for example in\n  Amsterdam for an Amsterdam (020) number.\n",
     },
   },
 } as const;

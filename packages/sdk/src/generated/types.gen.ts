@@ -19179,6 +19179,18 @@ export type WebhookSortField = "created_at" | "url";
 export type WebhookEndpointId = string;
 
 /**
+ * Exact match on `mailbox_id`, for `email_mailbox.*` events only; the mailbox must belong to this workspace. Cannot be combined with Realtime app scope. Omit on create for all resources; on update omit to keep, send `null` to clear.
+ *
+ */
+export type WebhookFilter = {
+  /**
+   * Mailbox to receive events for. Must belong to this workspace; a mailbox outside it returns `422`.
+   *
+   */
+  mailbox_id: MailboxId;
+};
+
+/**
  * Webhook event type. This is an open enum, so accept unrecognized values in deliveries. Subscribing to a type outside the event catalog returns a `422`.
  *
  */
@@ -19314,6 +19326,10 @@ export type WebhookEndpoint = {
    */
   description?: string;
   /**
+   * Mailbox scope configured through filter, or null.
+   */
+  filter: WebhookFilter | null;
+  /**
    * Event types this endpoint is subscribed to; only matching events are delivered. Change the set with [Update a webhook endpoint](/docs/api/reference/update-webhook).
    *
    */
@@ -19422,6 +19438,10 @@ export type WebhookEndpointCreate = {
    */
   url?: string;
   /**
+   * Limit delivery to one mailbox and only email_mailbox events. Omit to include all resources.
+   */
+  filter?: WebhookFilter;
+  /**
    * Event types to subscribe to; the endpoint receives only matching events. Types outside the event catalog return a `422`, and an endpoint holds at most 100 entries.
    */
   events: Array<WebhookEventType>;
@@ -19454,6 +19474,10 @@ export type WebhookEndpointUpdate = {
    * Human-readable label for this endpoint, up to 256 characters.
    */
   description?: string;
+  /**
+   * Replace the mailbox scope. Omit to keep it, or send null to include all resources. Scoped endpoints accept only email_mailbox events.
+   */
+  filter?: WebhookFilter | null;
   /**
    * Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`.
    *
@@ -22349,6 +22373,10 @@ export type VoiceLeg = {
    * Identifier of the SIP trunk that originated this leg. `null` when no trunk is associated.
    */
   readonly sip_trunk_id?: SipTrunkId | null;
+  /**
+   * The SIP `Call-ID` of this leg's signalling. We relay it unchanged, so it matches what the carrier and your own equipment logged for the same leg: the carrier's value on an incoming leg, and your system's value on a leg you place through a SIP trunk. Use it to match this leg against a carrier's records or your PBX logs. Legs recorded before this field existed carry it only if they were answered.
+   */
+  readonly sip_call_id?: string;
   readonly status: VoiceCallStatus;
   /**
    * Final SIP response code received from the carrier. `null` when no SIP response was received, for example on timeout or DNS failure.
@@ -22557,6 +22585,19 @@ export type AvailableNumber = {
    * Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any setup fee is charged during purchase. Monthly billing starts at assignment even while approval is pending; assignment may follow completion of a pending supplier order.
    */
   ownership_registration_required: boolean;
+  /**
+   * Where the carrier requires the business address on this number's ownership registration
+   * to be. Present only when the carrier itself registers the number before it carries
+   * traffic and states a rule; omitted otherwise. An address that does not meet the rule
+   * is refused after purchase, and only an address that meets it can fix the registration.
+   *
+   * - `anywhere`: any business address.
+   * - `country`: a business address in the number's country.
+   * - `number_area`: a business address inside the number's own area code, for example in
+   * Amsterdam for an Amsterdam (020) number.
+   *
+   */
+  ownership_address_scope?: string;
 };
 
 export type AvailableNumberList = {
@@ -27241,6 +27282,10 @@ export type WebhookEndpointWritable = {
    */
   description?: string;
   /**
+   * Mailbox scope configured through filter, or null.
+   */
+  filter: WebhookFilter | null;
+  /**
    * Event types this endpoint is subscribed to; only matching events are delivered. Change the set with [Update a webhook endpoint](/docs/api/reference/update-webhook).
    *
    */
@@ -27296,6 +27341,10 @@ export type WebhookEndpointCreateWritable = {
    */
   url?: string;
   /**
+   * Limit delivery to one mailbox and only email_mailbox events. Omit to include all resources.
+   */
+  filter?: WebhookFilter;
+  /**
    * Event types to subscribe to; the endpoint receives only matching events. Types outside the event catalog return a `422`, and an endpoint holds at most 100 entries.
    */
   events: Array<WebhookEventType>;
@@ -27328,6 +27377,10 @@ export type WebhookEndpointUpdateWritable = {
    * Human-readable label for this endpoint, up to 256 characters.
    */
   description?: string;
+  /**
+   * Replace the mailbox scope. Omit to keep it, or send null to include all resources. Scoped endpoints accept only email_mailbox events.
+   */
+  filter?: WebhookFilter | null;
   /**
    * Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`.
    *
@@ -28034,6 +28087,19 @@ export type AvailableNumberWritable = {
    * Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any setup fee is charged during purchase. Monthly billing starts at assignment even while approval is pending; assignment may follow completion of a pending supplier order.
    */
   ownership_registration_required: boolean;
+  /**
+   * Where the carrier requires the business address on this number's ownership registration
+   * to be. Present only when the carrier itself registers the number before it carries
+   * traffic and states a rule; omitted otherwise. An address that does not meet the rule
+   * is refused after purchase, and only an address that meets it can fix the registration.
+   *
+   * - `anywhere`: any business address.
+   * - `country`: a business address in the number's country.
+   * - `number_area`: a business address inside the number's own area code, for example in
+   * Amsterdam for an Amsterdam (020) number.
+   *
+   */
+  ownership_address_scope?: string;
 };
 
 export type AvailableNumberListWritable = {
@@ -28245,9 +28311,14 @@ export type VoiceDestinationListWritable = {
 export type IdempotencyKey = string;
 
 /**
- * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+ * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
  */
 export type XWorkspaceId = string;
+
+/**
+ * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+ */
+export type XOrganizationId = string;
 
 /**
  * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
@@ -28367,12 +28438,26 @@ export type EmailCompetitiveTimezone = Timezone;
 
 export type GetCurrentWorkspaceData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: never;
   url: "/v1/workspace";
 };
 
 export type GetCurrentWorkspaceErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -28417,10 +28502,6 @@ export type PublishRealtimeAppEventData = {
   body: RealtimePublish;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -28444,6 +28525,14 @@ export type PublishRealtimeAppEventData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -28509,10 +28598,6 @@ export type PublishRealtimeAppBatchData = {
   body: RealtimeBatchPublish;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -28536,6 +28621,14 @@ export type PublishRealtimeAppBatchData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -28601,9 +28694,13 @@ export type ListRealtimeAppChannelsData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -28673,9 +28770,13 @@ export type GetRealtimeAppChannelData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -28745,9 +28846,13 @@ export type ListRealtimeAppChannelMembersData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -28812,10 +28917,6 @@ export type DisconnectRealtimeAppMemberData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -28839,6 +28940,14 @@ export type DisconnectRealtimeAppMemberData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -28908,10 +29017,6 @@ export type SendRealtimeAppMemberEventData = {
   body: RealtimeMemberPublish;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -28935,6 +29040,14 @@ export type SendRealtimeAppMemberEventData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -29002,6 +29115,16 @@ export type SendRealtimeAppMemberEventResponse =
 
 export type ListEmailMessagesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -29053,6 +29176,10 @@ export type ListEmailMessagesData = {
 
 export type ListEmailMessagesErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -29060,6 +29187,10 @@ export type ListEmailMessagesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -29115,6 +29246,14 @@ export type CreateEmailMessageData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -29138,6 +29277,10 @@ export type CreateEmailMessageErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Request body or message size exceeds the allowed limit
    */
@@ -29202,6 +29345,14 @@ export type CreateEmailMessageBatchData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -29225,6 +29376,10 @@ export type CreateEmailMessageBatchErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Request body or message size exceeds the allowed limit
    */
@@ -29264,6 +29419,16 @@ export type CreateEmailMessageBatchResponse =
 
 export type GetEmailMessageData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the message to fetch. A broadcast records one message per recipient, and [List email messages](/docs/api/reference/list-email-messages) returns those copies alongside ordinary sends. For a single send, this is the message's own ID, from the send response's `id` field.
@@ -29275,6 +29440,10 @@ export type GetEmailMessageData = {
 };
 
 export type GetEmailMessageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -29342,6 +29511,14 @@ export type CancelEmailMessageData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -29354,6 +29531,10 @@ export type CancelEmailMessageData = {
 };
 
 export type CancelEmailMessageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -29405,6 +29586,16 @@ export type CancelEmailMessageResponse =
 
 export type ListEmailBroadcastsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -29452,6 +29643,10 @@ export type ListEmailBroadcastsData = {
 
 export type ListEmailBroadcastsErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -29459,6 +29654,10 @@ export type ListEmailBroadcastsErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -29514,6 +29713,14 @@ export type CreateEmailBroadcastData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -29537,6 +29744,10 @@ export type CreateEmailBroadcastErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -29601,6 +29812,14 @@ export type DeleteEmailBroadcastData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -29613,6 +29832,10 @@ export type DeleteEmailBroadcastData = {
 };
 
 export type DeleteEmailBroadcastErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -29664,6 +29887,16 @@ export type DeleteEmailBroadcastResponse =
 
 export type GetEmailBroadcastData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Broadcast identifier. Starts with `eb_`.
@@ -29675,6 +29908,10 @@ export type GetEmailBroadcastData = {
 };
 
 export type GetEmailBroadcastErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -29742,6 +29979,14 @@ export type UpdateEmailBroadcastData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -29809,6 +30054,16 @@ export type UpdateEmailBroadcastResponse =
 
 export type GetEmailBroadcastCountsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Broadcast identifier. Starts with `eb_`.
@@ -29820,6 +30075,10 @@ export type GetEmailBroadcastCountsData = {
 };
 
 export type GetEmailBroadcastCountsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -29862,6 +30121,16 @@ export type GetEmailBroadcastCountsResponse =
 
 export type GetEmailBroadcastSendQuotaData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the broadcast whose send allowance to check.
@@ -29873,6 +30142,10 @@ export type GetEmailBroadcastSendQuotaData = {
 };
 
 export type GetEmailBroadcastSendQuotaErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -29915,6 +30188,16 @@ export type GetEmailBroadcastSendQuotaResponse =
 
 export type ListEmailBroadcastRecipientsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the broadcast whose recipients to read.
@@ -29943,6 +30226,10 @@ export type ListEmailBroadcastRecipientsData = {
 };
 
 export type ListEmailBroadcastRecipientsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -29985,6 +30272,16 @@ export type ListEmailBroadcastRecipientsResponse =
 
 export type ListEmailBroadcastEventsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the broadcast whose event timeline to read.
@@ -30013,6 +30310,10 @@ export type ListEmailBroadcastEventsData = {
 };
 
 export type ListEmailBroadcastEventsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -30055,6 +30356,16 @@ export type ListEmailBroadcastEventsResponse =
 
 export type ListEmailBroadcastClickedLinksData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the broadcast whose clicked links to read.
@@ -30066,6 +30377,10 @@ export type ListEmailBroadcastClickedLinksData = {
 };
 
 export type ListEmailBroadcastClickedLinksErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -30133,6 +30448,14 @@ export type SendEmailBroadcastData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -30229,6 +30552,14 @@ export type CancelEmailBroadcastData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -30241,6 +30572,10 @@ export type CancelEmailBroadcastData = {
 };
 
 export type CancelEmailBroadcastErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -30292,6 +30627,16 @@ export type CancelEmailBroadcastResponse =
 
 export type ListContactsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -30336,6 +30681,10 @@ export type ListContactsData = {
 
 export type ListContactsErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -30343,6 +30692,10 @@ export type ListContactsErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -30397,6 +30750,14 @@ export type CreateContactData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -30416,6 +30777,10 @@ export type CreateContactErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */
@@ -30479,6 +30844,14 @@ export type CreateContactBatchData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -30498,6 +30871,10 @@ export type CreateContactBatchErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Request body or message size exceeds the allowed limit
    */
@@ -30562,6 +30939,14 @@ export type DeleteContactData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -30574,6 +30959,10 @@ export type DeleteContactData = {
 };
 
 export type DeleteContactErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -30624,6 +31013,16 @@ export type DeleteContactResponse =
 
 export type GetContactData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the contact to fetch.
@@ -30635,6 +31034,10 @@ export type GetContactData = {
 };
 
 export type GetContactErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -30700,6 +31103,14 @@ export type UpdateContactData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -30766,6 +31177,16 @@ export type UpdateContactResponse =
 
 export type ListContactPreferencesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the contact.
@@ -30790,6 +31211,10 @@ export type ListContactPreferencesData = {
 };
 
 export type ListContactPreferencesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -30832,6 +31257,16 @@ export type ListContactPreferencesResponse =
 
 export type ListPreferencesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -30861,6 +31296,10 @@ export type ListPreferencesData = {
 
 export type ListPreferencesErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -30868,6 +31307,10 @@ export type ListPreferencesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -30923,6 +31366,14 @@ export type CreatePreferenceData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -30942,6 +31393,10 @@ export type CreatePreferenceErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -31006,6 +31461,14 @@ export type DeletePreferenceData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -31019,6 +31482,10 @@ export type DeletePreferenceData = {
 };
 
 export type DeletePreferenceErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -31066,6 +31533,16 @@ export type DeletePreferenceResponse =
 
 export type GetPreferenceData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the preference, as returned when it was recorded or listed. The ID stays stable while the key holds a record; deleting and re-recording the same key mints a new one.
@@ -31078,6 +31555,10 @@ export type GetPreferenceData = {
 };
 
 export type GetPreferenceErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -31119,6 +31600,16 @@ export type GetPreferenceResponse =
 
 export type ListContactPropertiesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -31139,6 +31630,10 @@ export type ListContactPropertiesData = {
 
 export type ListContactPropertiesErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -31146,6 +31641,10 @@ export type ListContactPropertiesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -31201,6 +31700,14 @@ export type CreateContactPropertyData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -31220,6 +31727,10 @@ export type CreateContactPropertyErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */
@@ -31259,6 +31770,16 @@ export type CreateContactPropertyResponse =
 
 export type GetContactPropertyData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the contact property to fetch.
@@ -31270,6 +31791,10 @@ export type GetContactPropertyData = {
 };
 
 export type GetContactPropertyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -31337,6 +31862,14 @@ export type UpdateContactPropertyData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -31425,6 +31958,14 @@ export type ArchiveContactPropertyData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -31437,6 +31978,10 @@ export type ArchiveContactPropertyData = {
 };
 
 export type ArchiveContactPropertyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -31513,6 +32058,14 @@ export type UnarchiveContactPropertyData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -31525,6 +32078,10 @@ export type UnarchiveContactPropertyData = {
 };
 
 export type UnarchiveContactPropertyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -31576,6 +32133,16 @@ export type UnarchiveContactPropertyResponse =
 
 export type ListAudiencesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -31600,6 +32167,10 @@ export type ListAudiencesData = {
 
 export type ListAudiencesErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -31607,6 +32178,10 @@ export type ListAudiencesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -31661,6 +32236,14 @@ export type CreateAudienceData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -31680,6 +32263,10 @@ export type CreateAudienceErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -31740,6 +32327,14 @@ export type DeleteAudienceData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -31752,6 +32347,10 @@ export type DeleteAudienceData = {
 };
 
 export type DeleteAudienceErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -31803,6 +32402,16 @@ export type DeleteAudienceResponse =
 
 export type GetAudienceData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the audience to fetch.
@@ -31814,6 +32423,10 @@ export type GetAudienceData = {
 };
 
 export type GetAudienceErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -31880,6 +32493,14 @@ export type UpdateAudienceData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -31943,6 +32564,16 @@ export type UpdateAudienceResponse =
 
 export type ListAudienceContactsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the audience whose contacts to list.
@@ -31971,6 +32602,10 @@ export type ListAudienceContactsData = {
 };
 
 export type ListAudienceContactsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -32038,6 +32673,14 @@ export type AssignAudienceContactsData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -32126,6 +32769,14 @@ export type UnassignAudienceContactsData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -32214,6 +32865,14 @@ export type UnassignAudienceContactData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -32230,6 +32889,10 @@ export type UnassignAudienceContactData = {
 };
 
 export type UnassignAudienceContactErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -32277,6 +32940,16 @@ export type UnassignAudienceContactResponse =
 
 export type ListSmsMessagesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -32336,6 +33009,10 @@ export type ListSmsMessagesData = {
 
 export type ListSmsMessagesErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -32343,6 +33020,10 @@ export type ListSmsMessagesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -32403,6 +33084,14 @@ export type CreateSmsMessageData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -32426,6 +33115,10 @@ export type CreateSmsMessageErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -32486,6 +33179,14 @@ export type CreateSmsMessageBatchData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -32509,6 +33210,10 @@ export type CreateSmsMessageBatchErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -32544,6 +33249,16 @@ export type CreateSmsMessageBatchResponse =
 
 export type GetSmsMessageData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the message, as returned in the send response's `id` field.
@@ -32555,6 +33270,10 @@ export type GetSmsMessageData = {
 };
 
 export type GetSmsMessageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -32601,6 +33320,16 @@ export type GetSmsMessageResponse =
 
 export type ListSmsMessageEventsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the SMS message (`sms_` prefix), as returned when the message was accepted.
@@ -32617,6 +33346,10 @@ export type ListSmsMessageEventsData = {
 };
 
 export type ListSmsMessageEventsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -32664,6 +33397,16 @@ export type ListSmsMessageEventsResponse =
 
 export type ListSmsTemplatesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -32713,6 +33456,10 @@ export type ListSmsTemplatesData = {
 
 export type ListSmsTemplatesErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -32720,6 +33467,10 @@ export type ListSmsTemplatesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -32750,6 +33501,16 @@ export type ListSmsTemplatesResponse =
 
 export type GetSmsTemplateData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The template's ID (`smt_…`) or slug. Built-in templates use a `bird_` slug. Write operations accept workspace templates because built-in templates are read-only.
@@ -32762,6 +33523,10 @@ export type GetSmsTemplateData = {
 };
 
 export type GetSmsTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -32804,6 +33569,16 @@ export type GetSmsTemplateResponse =
 
 export type ListSmsTemplateVersionsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The template's ID (`smt_…`) or slug.
@@ -32837,6 +33612,10 @@ export type ListSmsTemplateVersionsData = {
 };
 
 export type ListSmsTemplateVersionsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -32879,6 +33658,16 @@ export type ListSmsTemplateVersionsResponse =
 
 export type GetSmsTemplateVersionData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The template's ID (`smt_…`) or slug.
@@ -32894,6 +33683,10 @@ export type GetSmsTemplateVersionData = {
 };
 
 export type GetSmsTemplateVersionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -32936,6 +33729,16 @@ export type GetSmsTemplateVersionResponse =
 
 export type ListSmsTemplateVersionLanguagesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The template's ID (`smt_…`) or slug.
@@ -32951,6 +33754,10 @@ export type ListSmsTemplateVersionLanguagesData = {
 };
 
 export type ListSmsTemplateVersionLanguagesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -32993,6 +33800,16 @@ export type ListSmsTemplateVersionLanguagesResponse =
 
 export type GetSmsTemplateVersionLanguageData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The template's ID (`smt_…`) or slug.
@@ -33012,6 +33829,10 @@ export type GetSmsTemplateVersionLanguageData = {
 };
 
 export type GetSmsTemplateVersionLanguageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -33054,6 +33875,16 @@ export type GetSmsTemplateVersionLanguageResponse =
 
 export type ListSmsSuppressionsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -33092,6 +33923,10 @@ export type ListSmsSuppressionsData = {
 
 export type ListSmsSuppressionsErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -33099,6 +33934,10 @@ export type ListSmsSuppressionsErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -33154,6 +33993,14 @@ export type CreateSmsSuppressionData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -33173,6 +34020,10 @@ export type CreateSmsSuppressionErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -33237,6 +34088,14 @@ export type DeleteSmsSuppressionData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -33250,6 +34109,10 @@ export type DeleteSmsSuppressionData = {
 };
 
 export type DeleteSmsSuppressionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -33297,6 +34160,16 @@ export type DeleteSmsSuppressionResponse =
 
 export type GetSmsSuppressionData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the suppression, as returned when it was created or listed.
@@ -33309,6 +34182,10 @@ export type GetSmsSuppressionData = {
 };
 
 export type GetSmsSuppressionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -33353,9 +34230,13 @@ export type ListSmsKeywordRulesData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -33389,6 +34270,10 @@ export type ListSmsKeywordRulesData = {
 
 export type ListSmsKeywordRulesErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -33396,6 +34281,10 @@ export type ListSmsKeywordRulesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -33428,10 +34317,6 @@ export type CreateSmsKeywordRuleData = {
   body: SmsKeywordRuleCreate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -33455,6 +34340,14 @@ export type CreateSmsKeywordRuleData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -33474,6 +34367,10 @@ export type CreateSmsKeywordRuleErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */
@@ -33515,10 +34412,6 @@ export type DeleteSmsKeywordRuleData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -33542,6 +34435,14 @@ export type DeleteSmsKeywordRuleData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -33554,6 +34455,10 @@ export type DeleteSmsKeywordRuleData = {
 };
 
 export type DeleteSmsKeywordRuleErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -33603,9 +34508,13 @@ export type GetSmsKeywordRuleData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -33618,6 +34527,10 @@ export type GetSmsKeywordRuleData = {
 };
 
 export type GetSmsKeywordRuleErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -33662,10 +34575,6 @@ export type UpdateSmsKeywordRuleData = {
   body: SmsKeywordRuleUpdate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -33689,6 +34598,14 @@ export type UpdateSmsKeywordRuleData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -33756,6 +34673,16 @@ export type UpdateSmsKeywordRuleResponse =
 
 export type GetSmsStatsSummaryData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -33816,6 +34743,10 @@ export type GetSmsStatsSummaryErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -33850,6 +34781,16 @@ export type GetSmsStatsSummaryResponse =
 
 export type GetSmsStatsDailyData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -33903,6 +34844,10 @@ export type GetSmsStatsDailyErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -33937,6 +34882,16 @@ export type GetSmsStatsDailyResponse =
 
 export type GetSmsStatsHourlyData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -33990,6 +34945,10 @@ export type GetSmsStatsHourlyErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -34024,6 +34983,16 @@ export type GetSmsStatsHourlyResponse =
 
 export type GetSmsStatsByOriginatorData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -34075,6 +35044,10 @@ export type GetSmsStatsByOriginatorErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -34109,6 +35082,16 @@ export type GetSmsStatsByOriginatorResponse =
 
 export type GetSmsStatsByCountryData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -34160,6 +35143,10 @@ export type GetSmsStatsByCountryErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -34194,6 +35181,16 @@ export type GetSmsStatsByCountryResponse =
 
 export type GetSmsStatsByCategoryData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -34245,6 +35242,10 @@ export type GetSmsStatsByCategoryErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -34279,6 +35280,16 @@ export type GetSmsStatsByCategoryResponse =
 
 export type GetSmsStatsByErrorCodeData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -34330,6 +35341,10 @@ export type GetSmsStatsByErrorCodeErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -34364,6 +35379,16 @@ export type GetSmsStatsByErrorCodeResponse =
 
 export type GetSmsStatsByCarrierData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -34415,6 +35440,10 @@ export type GetSmsStatsByCarrierErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -34449,6 +35478,16 @@ export type GetSmsStatsByCarrierResponse =
 
 export type GetSmsStatsByTagData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -34500,6 +35539,10 @@ export type GetSmsStatsByTagErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -34534,6 +35577,16 @@ export type GetSmsStatsByTagResponse =
 
 export type GetSmsStatsByStatusData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -34566,6 +35619,10 @@ export type GetSmsStatsByStatusErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -34601,6 +35658,16 @@ export type GetSmsStatsByStatusResponse =
 
 export type GetSmsInboundStatsSummaryData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -34641,6 +35708,10 @@ export type GetSmsInboundStatsSummaryErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -34675,6 +35746,16 @@ export type GetSmsInboundStatsSummaryResponse =
 
 export type GetSmsInboundStatsDailyData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -34707,6 +35788,10 @@ export type GetSmsInboundStatsDailyErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -34742,6 +35827,16 @@ export type GetSmsInboundStatsDailyResponse =
 
 export type GetSmsInboundStatsHourlyData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -34774,6 +35869,10 @@ export type GetSmsInboundStatsHourlyErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -34809,6 +35908,16 @@ export type GetSmsInboundStatsHourlyResponse =
 
 export type GetSmsInboundStatsByCountryData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -34846,6 +35955,10 @@ export type GetSmsInboundStatsByCountryErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -34880,6 +35993,16 @@ export type GetSmsInboundStatsByCountryResponse =
 
 export type GetSmsInboundStatsByOperatorData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -34917,6 +36040,10 @@ export type GetSmsInboundStatsByOperatorErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -34951,6 +36078,16 @@ export type GetSmsInboundStatsByOperatorResponse =
 
 export type GetSmsInboundStatsByNumberData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -34988,6 +36125,10 @@ export type GetSmsInboundStatsByNumberErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -35024,10 +36165,6 @@ export type CreatePhoneNumberLookupData = {
   body: PhoneNumberLookupRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -35051,6 +36188,14 @@ export type CreatePhoneNumberLookupData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -35074,6 +36219,10 @@ export type CreatePhoneNumberLookupErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -35111,10 +36260,6 @@ export type CreateEmailLookupData = {
   body: EmailLookupRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -35138,6 +36283,14 @@ export type CreateEmailLookupData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -35161,6 +36314,10 @@ export type CreateEmailLookupErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -35198,10 +36355,6 @@ export type CreateEmailLookupBatchData = {
   body: EmailLookupBatchRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -35225,6 +36378,14 @@ export type CreateEmailLookupBatchData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -35248,6 +36409,10 @@ export type CreateEmailLookupBatchErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */
@@ -35293,10 +36458,6 @@ export type CreateVerificationData = {
   body: VerificationCreateRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -35320,6 +36481,14 @@ export type CreateVerificationData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -35343,6 +36512,10 @@ export type CreateVerificationErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -35380,10 +36553,6 @@ export type CreateVerificationCheckData = {
   body: VerificationCheckRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -35407,6 +36576,14 @@ export type CreateVerificationCheckData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -35467,10 +36644,6 @@ export type CreateVerificationNextChannelData = {
   body: VerificationNextChannelRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -35494,6 +36667,14 @@ export type CreateVerificationNextChannelData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -35556,6 +36737,16 @@ export type CreateVerificationNextChannelResponse =
 
 export type ListWhatsAppMessagesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -35629,6 +36820,10 @@ export type ListWhatsAppMessagesData = {
 
 export type ListWhatsAppMessagesErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -35636,6 +36831,10 @@ export type ListWhatsAppMessagesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -35696,6 +36895,14 @@ export type CreateWhatsAppMessageData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -35762,6 +36969,16 @@ export type CreateWhatsAppMessageResponse =
 
 export type GetWhatsAppMessageData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the message, as returned in the send response's `id` field.
@@ -35773,6 +36990,10 @@ export type GetWhatsAppMessageData = {
 };
 
 export type GetWhatsAppMessageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -35845,6 +37066,14 @@ export type SendWhatsAppReadReceiptData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -35908,6 +37137,16 @@ export type SendWhatsAppReadReceiptResponse =
 
 export type ListWhatsAppMessageEventsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the message, as returned in the send response's `id` field.
@@ -35925,6 +37164,10 @@ export type ListWhatsAppMessageEventsData = {
 };
 
 export type ListWhatsAppMessageEventsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -35972,6 +37215,16 @@ export type ListWhatsAppMessageEventsResponse =
 
 export type GetWhatsAppMessageMediaData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * WhatsApp message ID.
@@ -35987,6 +37240,10 @@ export type GetWhatsAppMessageMediaData = {
 };
 
 export type GetWhatsAppMessageMediaErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -36048,6 +37305,14 @@ export type DeleteWhatsAppMessageReactionData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -36061,6 +37326,10 @@ export type DeleteWhatsAppMessageReactionData = {
 };
 
 export type DeleteWhatsAppMessageReactionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -36135,6 +37404,14 @@ export type UpsertWhatsAppMessageReactionData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -36203,6 +37480,16 @@ export type UpsertWhatsAppMessageReactionResponse =
 
 export type ListWhatsAppMessageReactionEventsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the message whose reactions to read, as returned in the `id` field of the message.
@@ -36228,6 +37515,10 @@ export type ListWhatsAppMessageReactionEventsData = {
 };
 
 export type ListWhatsAppMessageReactionEventsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -36275,6 +37566,16 @@ export type ListWhatsAppMessageReactionEventsResponse =
 
 export type ListWhatsAppGroupsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -36330,6 +37631,10 @@ export type ListWhatsAppGroupsData = {
 
 export type ListWhatsAppGroupsErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -36337,6 +37642,10 @@ export type ListWhatsAppGroupsErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -36392,6 +37701,14 @@ export type CreateWhatsAppGroupData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -36411,6 +37728,10 @@ export type CreateWhatsAppGroupErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */
@@ -36479,6 +37800,14 @@ export type DeleteWhatsAppGroupData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -36491,6 +37820,10 @@ export type DeleteWhatsAppGroupData = {
 };
 
 export type DeleteWhatsAppGroupErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -36542,6 +37875,16 @@ export type DeleteWhatsAppGroupResponse =
 
 export type GetWhatsAppGroupData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the group, as returned when it was created.
@@ -36553,6 +37896,10 @@ export type GetWhatsAppGroupData = {
 };
 
 export type GetWhatsAppGroupErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -36620,6 +37967,14 @@ export type UpdateWhatsAppGroupData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -36712,6 +38067,14 @@ export type RotateWhatsAppGroupInviteLinkData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -36724,6 +38087,10 @@ export type RotateWhatsAppGroupInviteLinkData = {
 };
 
 export type RotateWhatsAppGroupInviteLinkErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -36800,6 +38167,14 @@ export type DeleteWhatsAppGroupParticipantData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -36817,6 +38192,10 @@ export type DeleteWhatsAppGroupParticipantData = {
 };
 
 export type DeleteWhatsAppGroupParticipantErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -36893,6 +38272,14 @@ export type CreateWhatsAppGroupPinnedMessageData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -36985,6 +38372,14 @@ export type DeleteWhatsAppGroupPinnedMessageData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -37001,6 +38396,10 @@ export type DeleteWhatsAppGroupPinnedMessageData = {
 };
 
 export type DeleteWhatsAppGroupPinnedMessageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -37052,6 +38451,16 @@ export type DeleteWhatsAppGroupPinnedMessageResponse =
 
 export type ListWhatsAppGroupJoinRequestsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the group whose join requests are being listed.
@@ -37085,6 +38494,10 @@ export type ListWhatsAppGroupJoinRequestsData = {
 };
 
 export type ListWhatsAppGroupJoinRequestsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -37152,6 +38565,14 @@ export type ApproveWhatsAppGroupJoinRequestsData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -37244,6 +38665,14 @@ export type RejectWhatsAppGroupJoinRequestsData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -37311,6 +38740,16 @@ export type RejectWhatsAppGroupJoinRequestsResponse =
 
 export type ListWhatsAppTemplatesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -37351,6 +38790,10 @@ export type ListWhatsAppTemplatesData = {
 
 export type ListWhatsAppTemplatesErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -37358,6 +38801,10 @@ export type ListWhatsAppTemplatesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -37388,6 +38835,16 @@ export type ListWhatsAppTemplatesResponse =
 
 export type GetWhatsAppTemplateData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
@@ -37400,6 +38857,10 @@ export type GetWhatsAppTemplateData = {
 };
 
 export type GetWhatsAppTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -37442,6 +38903,16 @@ export type GetWhatsAppTemplateResponse =
 
 export type ListWhatsAppTemplateVersionsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
@@ -37467,6 +38938,10 @@ export type ListWhatsAppTemplateVersionsData = {
 };
 
 export type ListWhatsAppTemplateVersionsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -37509,6 +38984,16 @@ export type ListWhatsAppTemplateVersionsResponse =
 
 export type GetWhatsAppTemplateVersionData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
@@ -37525,6 +39010,10 @@ export type GetWhatsAppTemplateVersionData = {
 };
 
 export type GetWhatsAppTemplateVersionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -37567,6 +39056,16 @@ export type GetWhatsAppTemplateVersionResponse =
 
 export type ListWhatsAppTemplateVersionLanguagesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
@@ -37583,6 +39082,10 @@ export type ListWhatsAppTemplateVersionLanguagesData = {
 };
 
 export type ListWhatsAppTemplateVersionLanguagesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -37625,6 +39128,16 @@ export type ListWhatsAppTemplateVersionLanguagesResponse =
 
 export type GetWhatsAppTemplateVersionLanguageData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
@@ -37646,6 +39159,10 @@ export type GetWhatsAppTemplateVersionLanguageData = {
 };
 
 export type GetWhatsAppTemplateVersionLanguageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -37688,6 +39205,16 @@ export type GetWhatsAppTemplateVersionLanguageResponse =
 
 export type GetWhatsAppStatsSummaryData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -37748,6 +39275,10 @@ export type GetWhatsAppStatsSummaryErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -37782,6 +39313,16 @@ export type GetWhatsAppStatsSummaryResponse =
 
 export type GetWhatsAppStatsDailyData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -37835,6 +39376,10 @@ export type GetWhatsAppStatsDailyErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -37869,6 +39414,16 @@ export type GetWhatsAppStatsDailyResponse =
 
 export type GetWhatsAppStatsHourlyData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -37922,6 +39477,10 @@ export type GetWhatsAppStatsHourlyErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -37956,6 +39515,16 @@ export type GetWhatsAppStatsHourlyResponse =
 
 export type GetWhatsAppStatsByErrorCodeData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -37993,6 +39562,10 @@ export type GetWhatsAppStatsByErrorCodeErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -38027,6 +39600,16 @@ export type GetWhatsAppStatsByErrorCodeResponse =
 
 export type GetWhatsAppStatsByTemplateData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -38064,6 +39647,10 @@ export type GetWhatsAppStatsByTemplateErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -38098,6 +39685,16 @@ export type GetWhatsAppStatsByTemplateResponse =
 
 export type GetWhatsAppStatsByTemplateCategoryData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -38135,6 +39732,10 @@ export type GetWhatsAppStatsByTemplateCategoryErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -38169,6 +39770,16 @@ export type GetWhatsAppStatsByTemplateCategoryResponse =
 
 export type GetWhatsAppStatsByTagData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -38206,6 +39817,10 @@ export type GetWhatsAppStatsByTagErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -38240,6 +39855,16 @@ export type GetWhatsAppStatsByTagResponse =
 
 export type GetWhatsAppStatsByPhoneNumberData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -38277,6 +39902,10 @@ export type GetWhatsAppStatsByPhoneNumberErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -38311,6 +39940,16 @@ export type GetWhatsAppStatsByPhoneNumberResponse =
 
 export type GetWhatsAppStatsByCountryData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -38348,6 +39987,10 @@ export type GetWhatsAppStatsByCountryErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -38382,6 +40025,16 @@ export type GetWhatsAppStatsByCountryResponse =
 
 export type GetWhatsAppInboundStatsSummaryData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -38422,6 +40075,10 @@ export type GetWhatsAppInboundStatsSummaryErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -38456,6 +40113,16 @@ export type GetWhatsAppInboundStatsSummaryResponse =
 
 export type GetWhatsAppInboundStatsDailyData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -38488,6 +40155,10 @@ export type GetWhatsAppInboundStatsDailyErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -38523,6 +40194,16 @@ export type GetWhatsAppInboundStatsDailyResponse =
 
 export type GetWhatsAppInboundStatsHourlyData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -38555,6 +40236,10 @@ export type GetWhatsAppInboundStatsHourlyErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -38590,6 +40275,16 @@ export type GetWhatsAppInboundStatsHourlyResponse =
 
 export type GetWhatsAppInboundStatsByPhoneNumberData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -38627,6 +40322,10 @@ export type GetWhatsAppInboundStatsByPhoneNumberErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -38661,6 +40360,16 @@ export type GetWhatsAppInboundStatsByPhoneNumberResponse =
 
 export type ListWhatsAppNumbersData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -38706,6 +40415,10 @@ export type ListWhatsAppNumbersData = {
 
 export type ListWhatsAppNumbersErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -38713,6 +40426,10 @@ export type ListWhatsAppNumbersErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -38743,6 +40460,16 @@ export type ListWhatsAppNumbersResponse =
 
 export type GetWhatsAppNumberData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the WhatsApp number (`wan_` prefix), as returned by the number list.
@@ -38754,6 +40481,10 @@ export type GetWhatsAppNumberData = {
 };
 
 export type GetWhatsAppNumberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -38796,6 +40527,16 @@ export type GetWhatsAppNumberResponse =
 
 export type ListWhatsAppAgentNotificationsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the WhatsApp number (`wan_` prefix), as returned by the number list.
@@ -38828,6 +40569,10 @@ export type ListWhatsAppAgentNotificationsData = {
 };
 
 export type ListWhatsAppAgentNotificationsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -38895,6 +40640,14 @@ export type CreateWhatsAppAgentNotificationData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -38962,6 +40715,16 @@ export type CreateWhatsAppAgentNotificationResponse =
 
 export type GetWhatsAppAgentNotificationData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the WhatsApp number (`wan_` prefix), as returned by the number list.
@@ -38977,6 +40740,10 @@ export type GetWhatsAppAgentNotificationData = {
 };
 
 export type GetWhatsAppAgentNotificationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -39019,6 +40786,16 @@ export type GetWhatsAppAgentNotificationResponse =
 
 export type ListWhatsAppNumberEventsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the WhatsApp number whose events to list.
@@ -39052,6 +40829,10 @@ export type ListWhatsAppNumberEventsData = {
 };
 
 export type ListWhatsAppNumberEventsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -39094,6 +40875,16 @@ export type ListWhatsAppNumberEventsResponse =
 
 export type GetWhatsAppNumberProfileData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the WhatsApp number (`wan_` prefix), as returned by the number list.
@@ -39105,6 +40896,10 @@ export type GetWhatsAppNumberProfileData = {
 };
 
 export type GetWhatsAppNumberProfileErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -39158,10 +40953,6 @@ export type RestoreAmbBusinessAccountData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -39185,6 +40976,14 @@ export type RestoreAmbBusinessAccountData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     business_account_id: AmbBusinessId;
@@ -39251,9 +41050,13 @@ export type ListAmbBusinessAccountEventsData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     business_account_id: AmbBusinessId;
@@ -39337,9 +41140,13 @@ export type ListAmbBusinessAccountsData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -39421,10 +41228,6 @@ export type CreateAmbBusinessAccountData = {
   body: AmbBusinessAccountCreate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -39448,6 +41251,14 @@ export type CreateAmbBusinessAccountData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -39512,10 +41323,6 @@ export type DeleteAmbBusinessAccountData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -39539,6 +41346,14 @@ export type DeleteAmbBusinessAccountData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     business_account_id: AmbBusinessId;
@@ -39605,9 +41420,13 @@ export type GetAmbBusinessAccountData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -39668,10 +41487,6 @@ export type UpdateAmbBusinessAccountData = {
   body: AmbBusinessAccountUpdate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -39695,6 +41510,14 @@ export type UpdateAmbBusinessAccountData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -39764,9 +41587,13 @@ export type ListAmbBusinessAccountSubmissionsData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     business_account_id: AmbBusinessId;
@@ -39850,10 +41677,6 @@ export type CreateAmbBusinessAccountSubmissionData = {
   body: AmbBusinessAccountSubmissionCreate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -39877,6 +41700,14 @@ export type CreateAmbBusinessAccountSubmissionData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     business_account_id: AmbBusinessId;
@@ -39943,9 +41774,13 @@ export type GetAmbChannelSettingsData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -40006,10 +41841,6 @@ export type UpdateAmbChannelSettingsData = {
   body: AmbChannelSettingsUpdate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -40033,6 +41864,14 @@ export type UpdateAmbChannelSettingsData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -40102,9 +41941,13 @@ export type ListAmbRoutingRulesData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -40166,10 +42009,6 @@ export type CreateAmbRoutingRuleData = {
   body: AmbRoutingRuleCreate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -40193,6 +42032,14 @@ export type CreateAmbRoutingRuleData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -40257,10 +42104,6 @@ export type DeleteAmbRoutingRuleData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -40284,6 +42127,14 @@ export type DeleteAmbRoutingRuleData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     routing_rule_id: AmbRoutingRuleId;
@@ -40348,6 +42199,16 @@ export type DeleteAmbRoutingRuleResponse =
 
 export type GetAmbRoutingRuleData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     routing_rule_id: AmbRoutingRuleId;
   };
@@ -40404,10 +42265,6 @@ export type UpdateAmbRoutingRuleData = {
   body: AmbRoutingRuleUpdate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -40431,6 +42288,14 @@ export type UpdateAmbRoutingRuleData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     routing_rule_id: AmbRoutingRuleId;
@@ -40497,9 +42362,13 @@ export type ListAmbMessagesData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -40610,7 +42479,7 @@ export type CreateAmbMessageData = {
   body: AmbMessageSendRequestWritable;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
     /**
@@ -40637,6 +42506,10 @@ export type CreateAmbMessageData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -40699,6 +42572,16 @@ export type CreateAmbMessageResponse =
 
 export type GetAmbMessageData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Message identifier. Starts with `amb_`.
@@ -40762,9 +42645,13 @@ export type ListAmbMessageEventsData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -40836,9 +42723,13 @@ export type ListAmbConversationsData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -40938,6 +42829,16 @@ export type ListAmbConversationsResponse =
 
 export type GetAmbConversationData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Conversation identifier. Starts with `acv_`.
@@ -40997,10 +42898,6 @@ export type UpdateAmbConversationData = {
   body: AmbConversationUpdate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -41024,6 +42921,14 @@ export type UpdateAmbConversationData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -41093,9 +42998,13 @@ export type ListAmbConversationMessagesData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -41178,10 +43087,6 @@ export type CreateAmbConversationTypingData = {
   body: AmbConversationTypingRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -41205,6 +43110,14 @@ export type CreateAmbConversationTypingData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -41274,9 +43187,13 @@ export type ListAmbSuppressionsData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -41363,10 +43280,6 @@ export type CreateAmbSuppressionData = {
   body: AmbSuppressionCreate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -41390,6 +43303,14 @@ export type CreateAmbSuppressionData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -41458,10 +43379,6 @@ export type DeleteAmbSuppressionData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -41485,6 +43402,14 @@ export type DeleteAmbSuppressionData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     suppression_id: AmbSuppressionId;
@@ -41549,6 +43474,16 @@ export type DeleteAmbSuppressionResponse =
 
 export type GetAmbSuppressionData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     suppression_id: AmbSuppressionId;
   };
@@ -41605,9 +43540,13 @@ export type GetAmbStatsSummaryData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -41719,9 +43658,13 @@ export type GetAmbStatsDailyData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -41826,9 +43769,13 @@ export type GetAmbStatsHourlyData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -41933,9 +43880,13 @@ export type GetAmbStatsByBusinessData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -42014,9 +43965,13 @@ export type GetAmbStatsByMessageKindData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -42095,9 +44050,13 @@ export type GetAmbStatsByIntentData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -42176,9 +44135,13 @@ export type GetAmbStatsByGroupData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -42257,9 +44220,13 @@ export type GetAmbStatsByCategoryData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -42338,9 +44305,13 @@ export type GetAmbStatsByTagData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -42419,9 +44390,13 @@ export type GetAmbStatsByErrorCodeData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -42500,9 +44475,13 @@ export type GetAmbInboundStatsSummaryData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -42584,9 +44563,13 @@ export type GetAmbInboundStatsDailyData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -42661,9 +44644,13 @@ export type GetAmbInboundStatsHourlyData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -42738,9 +44725,13 @@ export type GetAmbInboundStatsByBusinessData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -42819,9 +44810,13 @@ export type GetAmbInboundStatsByIntentData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -42900,9 +44895,13 @@ export type GetAmbConversationStatsSummaryData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -42984,9 +44983,13 @@ export type GetAmbConversationStatsDailyData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -43061,9 +45064,13 @@ export type GetAmbConversationStatsHourlyData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -43136,6 +45143,16 @@ export type GetAmbConversationStatsHourlyResponse =
 
 export type ListWhatsAppBusinessAccountsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -43165,6 +45182,10 @@ export type ListWhatsAppBusinessAccountsData = {
 
 export type ListWhatsAppBusinessAccountsErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -43172,6 +45193,10 @@ export type ListWhatsAppBusinessAccountsErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -43202,6 +45227,16 @@ export type ListWhatsAppBusinessAccountsResponse =
 
 export type GetWhatsAppBusinessAccountData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * WhatsApp Business Account ID (`waa_` prefix) or the WhatsApp Business Account ID Meta reports in `waba`. A value that parses as a valid ID resolves by ID; any other value resolves as Meta's ID.
@@ -43214,6 +45249,10 @@ export type GetWhatsAppBusinessAccountData = {
 };
 
 export type GetWhatsAppBusinessAccountErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -43256,6 +45295,16 @@ export type GetWhatsAppBusinessAccountResponse =
 
 export type ListWhatsAppSuppressionsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -43288,6 +45337,10 @@ export type ListWhatsAppSuppressionsData = {
 
 export type ListWhatsAppSuppressionsErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -43295,6 +45348,10 @@ export type ListWhatsAppSuppressionsErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -43350,6 +45407,14 @@ export type CreateWhatsAppSuppressionData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -43369,6 +45434,10 @@ export type CreateWhatsAppSuppressionErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -43433,6 +45502,14 @@ export type DeleteWhatsAppSuppressionData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     suppression_id: WhatsAppSuppressionId;
@@ -43442,6 +45519,10 @@ export type DeleteWhatsAppSuppressionData = {
 };
 
 export type DeleteWhatsAppSuppressionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -43489,6 +45570,16 @@ export type DeleteWhatsAppSuppressionResponse =
 
 export type GetWhatsAppSuppressionData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     suppression_id: WhatsAppSuppressionId;
   };
@@ -43497,6 +45588,10 @@ export type GetWhatsAppSuppressionData = {
 };
 
 export type GetWhatsAppSuppressionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -43541,9 +45636,13 @@ export type ListWhatsAppKeywordRulesData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -43585,6 +45684,10 @@ export type ListWhatsAppKeywordRulesErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -43621,10 +45724,6 @@ export type CreateWhatsAppKeywordRuleData = {
   body: WhatsAppKeywordRuleCreate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -43648,6 +45747,14 @@ export type CreateWhatsAppKeywordRuleData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -43667,6 +45774,10 @@ export type CreateWhatsAppKeywordRuleErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */
@@ -43708,10 +45819,6 @@ export type DeleteWhatsAppKeywordRuleData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -43735,6 +45842,14 @@ export type DeleteWhatsAppKeywordRuleData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -43800,9 +45915,13 @@ export type GetWhatsAppKeywordRuleData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -43868,10 +45987,6 @@ export type UpdateWhatsAppKeywordRuleData = {
   body: WhatsAppKeywordRuleUpdate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -43895,6 +46010,14 @@ export type UpdateWhatsAppKeywordRuleData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -43962,6 +46085,16 @@ export type UpdateWhatsAppKeywordRuleResponse =
 
 export type GetEmailInboxInsightsPlacementData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query: {
     /**
@@ -44065,6 +46198,16 @@ export type GetEmailInboxInsightsPlacementResponse =
 
 export type GetEmailInboxInsightsAuthenticationData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query: {
     /**
@@ -44153,6 +46296,16 @@ export type GetEmailInboxInsightsAuthenticationResponse =
 
 export type GetEmailInboxInsightsComplaintsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query: {
     /**
@@ -44246,6 +46399,16 @@ export type GetEmailInboxInsightsComplaintsResponse =
 
 export type GetEmailInboxInsightsSpamTrapsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query: {
     /**
@@ -44335,6 +46498,16 @@ export type GetEmailInboxInsightsSpamTrapsResponse =
 
 export type GetEmailInboxInsightsBlocklistsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query: {
     /**
@@ -44402,6 +46575,16 @@ export type GetEmailInboxInsightsBlocklistsResponse =
 
 export type GetEmailInboxInsightsIndustryBenchmarkData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query: {
     /**
@@ -44469,6 +46652,16 @@ export type GetEmailInboxInsightsIndustryBenchmarkResponse =
 
 export type GetEmailInboxInsightsDomainsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -44581,6 +46774,14 @@ export type UpdateEmailInboxInsightsDomainData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -44674,6 +46875,14 @@ export type UpsertEmailInboxInsightsDomainMonitoringData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -44737,6 +46946,16 @@ export type UpsertEmailInboxInsightsDomainMonitoringResponse =
 
 export type GetEmailStatsDailyData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -44799,6 +47018,10 @@ export type GetEmailStatsDailyErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -44833,6 +47056,16 @@ export type GetEmailStatsDailyResponse =
 
 export type GetEmailStatsHourlyData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -44895,6 +47128,10 @@ export type GetEmailStatsHourlyErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -44929,6 +47166,16 @@ export type GetEmailStatsHourlyResponse =
 
 export type GetEmailStatsByTagData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -44996,6 +47243,10 @@ export type GetEmailStatsByTagErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -45055,6 +47306,14 @@ export type GetEmailStatsQueryData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -45074,6 +47333,10 @@ export type GetEmailStatsQueryErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */
@@ -45113,6 +47376,16 @@ export type GetEmailStatsQueryResponse =
 
 export type GetEmailStatsSummaryData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -45182,6 +47455,10 @@ export type GetEmailStatsSummaryErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -45216,6 +47493,16 @@ export type GetEmailStatsSummaryResponse =
 
 export type GetEmailStatsBySendingIpData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -45296,6 +47583,10 @@ export type GetEmailStatsBySendingIpErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -45330,6 +47621,16 @@ export type GetEmailStatsBySendingIpResponse =
 
 export type GetEmailStatsBySendingDomainData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -45393,6 +47694,10 @@ export type GetEmailStatsBySendingDomainErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -45427,6 +47732,16 @@ export type GetEmailStatsBySendingDomainResponse =
 
 export type GetEmailStatsByCategoryData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -45486,6 +47801,10 @@ export type GetEmailStatsByCategoryErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -45520,6 +47839,16 @@ export type GetEmailStatsByCategoryResponse =
 
 export type GetEmailStatsByMailboxProviderData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -45583,6 +47912,10 @@ export type GetEmailStatsByMailboxProviderErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -45617,6 +47950,16 @@ export type GetEmailStatsByMailboxProviderResponse =
 
 export type GetEmailStatsByMailboxProviderRegionData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -45680,6 +48023,10 @@ export type GetEmailStatsByMailboxProviderRegionErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -45714,6 +48061,16 @@ export type GetEmailStatsByMailboxProviderRegionResponse =
 
 export type GetEmailStatsByRecipientDomainData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -45777,6 +48134,10 @@ export type GetEmailStatsByRecipientDomainErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -45811,6 +48172,16 @@ export type GetEmailStatsByRecipientDomainResponse =
 
 export type GetEmailStatsByTemplateData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -45874,6 +48245,10 @@ export type GetEmailStatsByTemplateErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -45908,6 +48283,16 @@ export type GetEmailStatsByTemplateResponse =
 
 export type GetEmailStatsByLocationData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -45967,6 +48352,10 @@ export type GetEmailStatsByLocationErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -46001,6 +48390,16 @@ export type GetEmailStatsByLocationResponse =
 
 export type GetEmailStatsByClientData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -46060,6 +48459,10 @@ export type GetEmailStatsByClientErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -46094,6 +48497,16 @@ export type GetEmailStatsByClientResponse =
 
 export type GetEmailStatsByBounceCodeData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -46154,6 +48567,10 @@ export type GetEmailStatsByBounceCodeErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -46188,6 +48605,16 @@ export type GetEmailStatsByBounceCodeResponse =
 
 export type GetEmailStatsByComplaintTypeData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -46242,6 +48669,10 @@ export type GetEmailStatsByComplaintTypeErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -46276,6 +48707,16 @@ export type GetEmailStatsByComplaintTypeResponse =
 
 export type GetEmailStatsByBroadcastData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -46330,6 +48771,10 @@ export type GetEmailStatsByBroadcastErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -46364,6 +48809,16 @@ export type GetEmailStatsByBroadcastResponse =
 
 export type GetEmailHealthData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -46391,6 +48846,10 @@ export type GetEmailHealthErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -46426,6 +48885,16 @@ export type GetEmailHealthResponse =
 
 export type ListDomainsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -46463,6 +48932,10 @@ export type ListDomainsData = {
 
 export type ListDomainsErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -46470,6 +48943,10 @@ export type ListDomainsErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -46524,6 +49001,14 @@ export type CreateDomainData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -46543,6 +49028,10 @@ export type CreateDomainErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */
@@ -46606,6 +49095,14 @@ export type DeleteDomainData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -46618,6 +49115,10 @@ export type DeleteDomainData = {
 };
 
 export type DeleteDomainErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -46668,6 +49169,16 @@ export type DeleteDomainResponse =
 
 export type GetDomainData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the domain to fetch.
@@ -46679,6 +49190,10 @@ export type GetDomainData = {
 };
 
 export type GetDomainErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -46744,6 +49259,14 @@ export type UpdateDomainData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -46835,6 +49358,14 @@ export type VerifyDomainData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -46847,6 +49378,10 @@ export type VerifyDomainData = {
 };
 
 export type VerifyDomainErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -46893,6 +49428,16 @@ export type VerifyDomainResponse =
 
 export type ListSuppressionsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -46941,6 +49486,10 @@ export type ListSuppressionsData = {
 
 export type ListSuppressionsErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -46948,6 +49497,10 @@ export type ListSuppressionsErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -47003,6 +49556,14 @@ export type CreateSuppressionData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -47022,6 +49583,10 @@ export type CreateSuppressionErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -47086,6 +49651,14 @@ export type DeleteSuppressionData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -47099,6 +49672,10 @@ export type DeleteSuppressionData = {
 };
 
 export type DeleteSuppressionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -47146,6 +49723,16 @@ export type DeleteSuppressionResponse =
 
 export type GetSuppressionData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the suppression record, as returned when the suppression was created or listed.
@@ -47158,6 +49745,10 @@ export type GetSuppressionData = {
 };
 
 export type GetSuppressionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -47200,6 +49791,16 @@ export type GetSuppressionResponse =
 
 export type GetEmailCompetitiveWatchlistData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -47263,6 +49864,16 @@ export type GetEmailCompetitiveWatchlistResponse =
 
 export type GetEmailCompetitiveNotableCampaignsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -47351,6 +49962,14 @@ export type CreateEmailCompetitiveWatchlistBrandData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -47438,6 +50057,14 @@ export type DeleteEmailCompetitiveWatchlistBrandData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -47450,6 +50077,10 @@ export type DeleteEmailCompetitiveWatchlistBrandData = {
 };
 
 export type DeleteEmailCompetitiveWatchlistBrandErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -47497,6 +50128,16 @@ export type DeleteEmailCompetitiveWatchlistBrandResponse =
 
 export type GetEmailCompetitiveBrandData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The watchlist entry to act on.
@@ -47565,6 +50206,16 @@ export type GetEmailCompetitiveBrandResponse =
 
 export type GetEmailCompetitiveBrandCampaignsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The watchlist entry whose campaigns to return.
@@ -47654,6 +50305,16 @@ export type GetEmailCompetitiveBrandCampaignsResponse =
 
 export type GetEmailCompetitiveBrandCampaignData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The watched brand that sent the campaign.
@@ -47720,6 +50381,16 @@ export type GetEmailCompetitiveBrandCampaignResponse =
 
 export type GetEmailCompetitiveBrandSendTimeData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The watchlist entry whose sending pattern to return.
@@ -47788,6 +50459,16 @@ export type GetEmailCompetitiveBrandSendTimeResponse =
 
 export type SearchEmailCompetitiveBrandsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query: {
     /**
@@ -47850,6 +50531,16 @@ export type SearchEmailCompetitiveBrandsResponse =
 
 export type GetEmailCompetitiveVolumeSeriesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -47918,6 +50609,16 @@ export type GetEmailCompetitiveVolumeSeriesResponse =
 
 export type ListEmailTemplatesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -47958,6 +50659,10 @@ export type ListEmailTemplatesData = {
 
 export type ListEmailTemplatesErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -47965,6 +50670,10 @@ export type ListEmailTemplatesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -48020,6 +50729,14 @@ export type CreateEmailTemplateData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -48039,6 +50756,10 @@ export type CreateEmailTemplateErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */
@@ -48103,6 +50824,14 @@ export type DeleteEmailTemplateData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -48116,6 +50845,10 @@ export type DeleteEmailTemplateData = {
 };
 
 export type DeleteEmailTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -48167,6 +50900,16 @@ export type DeleteEmailTemplateResponse =
 
 export type GetEmailTemplateData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The template's id (`emt_…`) or slug. On read, a built-in `system` template's `bird_` slug also resolves here. Write operations (update, delete) accept a workspace template only, because a `system` template is immutable.
@@ -48179,6 +50922,10 @@ export type GetEmailTemplateData = {
 };
 
 export type GetEmailTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -48246,6 +50993,14 @@ export type UpdateEmailTemplateData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -48339,6 +51094,14 @@ export type DuplicateEmailTemplateData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -48432,6 +51195,14 @@ export type GetEmailTemplatePreviewData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -48496,6 +51267,16 @@ export type GetEmailTemplatePreviewResponse =
 
 export type ListEmailTemplateVersionsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The template's id (`emt_…`) or slug. A built-in `system` template's `bird_` slug also resolves here, to its one permanently published version.
@@ -48521,6 +51302,10 @@ export type ListEmailTemplateVersionsData = {
 };
 
 export type ListEmailTemplateVersionsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -48563,6 +51348,16 @@ export type ListEmailTemplateVersionsResponse =
 
 export type ListEmailTemplateBroadcastsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The template's id (`emt_…`) or slug. A built-in `system` template's `bird_` slug also resolves here, but a system template can never be referenced by a broadcast, so this always returns an empty page for one.
@@ -48588,6 +51383,10 @@ export type ListEmailTemplateBroadcastsData = {
 };
 
 export type ListEmailTemplateBroadcastsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -48655,6 +51454,14 @@ export type DeleteEmailTemplateVersionData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -48669,6 +51476,10 @@ export type DeleteEmailTemplateVersionData = {
 };
 
 export type DeleteEmailTemplateVersionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -48720,6 +51531,16 @@ export type DeleteEmailTemplateVersionResponse =
 
 export type GetEmailTemplateVersionData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The template's id (`emt_…`) or slug. On read, a built-in `system` template's `bird_` slug also resolves here, to its one permanently published version. Discarding a draft requires a workspace template, because a `system` template has no draft and returns `404` `not_found_error`.
@@ -48733,6 +51554,10 @@ export type GetEmailTemplateVersionData = {
 };
 
 export type GetEmailTemplateVersionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -48775,6 +51600,16 @@ export type GetEmailTemplateVersionResponse =
 
 export type ListEmailTemplateVersionLanguagesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The template's id (`emt_…`) or slug. A built-in `system` template's `bird_` slug also resolves here, to its one permanently published version.
@@ -48788,6 +51623,10 @@ export type ListEmailTemplateVersionLanguagesData = {
 };
 
 export type ListEmailTemplateVersionLanguagesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -48855,6 +51694,14 @@ export type DeleteEmailTemplateLanguageData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -48870,6 +51717,10 @@ export type DeleteEmailTemplateLanguageData = {
 };
 
 export type DeleteEmailTemplateLanguageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -48921,6 +51772,16 @@ export type DeleteEmailTemplateLanguageResponse =
 
 export type GetEmailTemplateLanguageData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * The template's id (`emt_…`) or slug. On read, a built-in `system` template's `bird_` slug also resolves here. Writing or removing a language requires a workspace template, because a `system` template has no draft to edit and returns `404` `not_found_error`.
@@ -48935,6 +51796,10 @@ export type GetEmailTemplateLanguageData = {
 };
 
 export type GetEmailTemplateLanguageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -49002,6 +51867,14 @@ export type UpdateEmailTemplateLanguageData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -49097,6 +51970,14 @@ export type UpsertEmailTemplateLanguageData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -49192,6 +52073,14 @@ export type RollbackEmailTemplateData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -49286,6 +52175,14 @@ export type SubmitEmailTemplateVersionData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -49355,6 +52252,16 @@ export type SubmitEmailTemplateVersionResponse =
 
 export type ListMailboxesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -49395,6 +52302,10 @@ export type ListMailboxesData = {
 
 export type ListMailboxesErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -49402,6 +52313,10 @@ export type ListMailboxesErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -49456,6 +52371,14 @@ export type CreateMailboxData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -49479,6 +52402,10 @@ export type CreateMailboxErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */
@@ -49542,6 +52469,14 @@ export type DeleteMailboxData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -49554,6 +52489,10 @@ export type DeleteMailboxData = {
 };
 
 export type DeleteMailboxErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -49604,6 +52543,16 @@ export type DeleteMailboxResponse =
 
 export type GetMailboxData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Mailbox identifier. Starts with `mbx_`.
@@ -49615,6 +52564,10 @@ export type GetMailboxData = {
 };
 
 export type GetMailboxErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -49680,6 +52633,14 @@ export type UpdateMailboxData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -49780,6 +52741,14 @@ export type RestoreMailboxData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -49792,6 +52761,10 @@ export type RestoreMailboxData = {
 };
 
 export type RestoreMailboxErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -49843,6 +52816,16 @@ export type RestoreMailboxResponse =
 
 export type GetMailboxStatsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Mailbox identifier. Starts with `mbx_`.
@@ -49951,6 +52934,14 @@ export type ResumeMailboxData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -49963,6 +52954,10 @@ export type ResumeMailboxData = {
 };
 
 export type ResumeMailboxErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -50013,6 +53008,16 @@ export type ResumeMailboxResponse =
 
 export type ListMailboxReceiveRulesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Mailbox identifier. Starts with `mbx_`.
@@ -50041,6 +53046,10 @@ export type ListMailboxReceiveRulesData = {
 };
 
 export type ListMailboxReceiveRulesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -50108,6 +53117,14 @@ export type CreateMailboxReceiveRuleData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -50200,6 +53217,14 @@ export type DeleteMailboxReceiveRuleData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -50216,6 +53241,10 @@ export type DeleteMailboxReceiveRuleData = {
 };
 
 export type DeleteMailboxReceiveRuleErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -50263,6 +53292,16 @@ export type DeleteMailboxReceiveRuleResponse =
 
 export type ListEmailThreadsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -50317,6 +53356,10 @@ export type ListEmailThreadsData = {
 
 export type ListEmailThreadsErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -50324,6 +53367,10 @@ export type ListEmailThreadsErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -50379,6 +53426,14 @@ export type DeleteEmailThreadData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -50396,6 +53451,10 @@ export type DeleteEmailThreadData = {
 };
 
 export type DeleteEmailThreadErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -50447,6 +53506,16 @@ export type DeleteEmailThreadResponse =
 
 export type GetEmailThreadData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Thread identifier. Starts with `thr_`.
@@ -50458,6 +53527,10 @@ export type GetEmailThreadData = {
 };
 
 export type GetEmailThreadErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -50529,6 +53602,14 @@ export type UpdateEmailThreadData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -50596,6 +53677,16 @@ export type UpdateEmailThreadResponse =
 
 export type ListEmailThreadMessagesData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Thread identifier. Starts with `thr_`.
@@ -50633,6 +53724,10 @@ export type ListEmailThreadMessagesData = {
 };
 
 export type ListEmailThreadMessagesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -50679,6 +53774,16 @@ export type ListEmailThreadMessagesResponse =
 
 export type GetEmailThreadMessageData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Thread identifier. Starts with `thr_`.
@@ -50694,6 +53799,10 @@ export type GetEmailThreadMessageData = {
 };
 
 export type GetEmailThreadMessageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -50740,6 +53849,16 @@ export type GetEmailThreadMessageResponse =
 
 export type GetEmailThreadMessageBodyData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Thread identifier. Starts with `thr_`.
@@ -50755,6 +53874,10 @@ export type GetEmailThreadMessageBodyData = {
 };
 
 export type GetEmailThreadMessageBodyErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -50801,6 +53924,16 @@ export type GetEmailThreadMessageBodyResponse =
 
 export type ListEmailThreadMessageAttachmentsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Thread identifier. Starts with `thr_`.
@@ -50816,6 +53949,10 @@ export type ListEmailThreadMessageAttachmentsData = {
 };
 
 export type ListEmailThreadMessageAttachmentsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -50887,6 +54024,14 @@ export type ReplyEmailThreadMessageData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -50991,6 +54136,14 @@ export type CreateMailboxMessageData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -51062,6 +54215,16 @@ export type CreateMailboxMessageResponse =
 
 export type ListMailboxLabelsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * Mailbox identifier. Starts with `mbx_`.
@@ -51073,6 +54236,10 @@ export type ListMailboxLabelsData = {
 };
 
 export type ListMailboxLabelsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -51115,6 +54282,16 @@ export type ListMailboxLabelsResponse =
 
 export type ListWebhooksData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     sort?: WebhookSortField;
@@ -51150,6 +54327,10 @@ export type ListWebhooksData = {
 
 export type ListWebhooksErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -51157,6 +54338,10 @@ export type ListWebhooksErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -51211,6 +54396,14 @@ export type CreateWebhookData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -51230,6 +54423,10 @@ export type CreateWebhookErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -51289,6 +54486,14 @@ export type DeleteWebhookData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -51301,6 +54506,10 @@ export type DeleteWebhookData = {
 };
 
 export type DeleteWebhookErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -51347,6 +54556,16 @@ export type DeleteWebhookResponse =
 
 export type GetWebhookData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the webhook endpoint (`whk_` prefix), as returned when it was created.
@@ -51358,6 +54577,10 @@ export type GetWebhookData = {
 };
 
 export type GetWebhookErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -51423,6 +54646,14 @@ export type UpdateWebhookData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -51510,6 +54741,14 @@ export type RotateWebhookSecretData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -51522,6 +54761,10 @@ export type RotateWebhookSecretData = {
 };
 
 export type RotateWebhookSecretErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -51594,6 +54837,14 @@ export type TestWebhookData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -51685,6 +54936,14 @@ export type CreateWebhookReplayData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -51745,6 +55004,16 @@ export type CreateWebhookReplayResponses = {
 
 export type ListWebhookAttemptsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     /**
      * ID of the webhook endpoint (`whk_` prefix), as returned when it was created.
@@ -51769,6 +55038,10 @@ export type ListWebhookAttemptsData = {
 };
 
 export type ListWebhookAttemptsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -51813,9 +55086,13 @@ export type ListWorkspaceNumbersData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -51865,6 +55142,10 @@ export type ListWorkspaceNumbersData = {
 
 export type ListWorkspaceNumbersErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -51872,6 +55153,10 @@ export type ListWorkspaceNumbersErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -51904,9 +55189,13 @@ export type ListAvailableNumbersData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query: {
@@ -51944,6 +55233,10 @@ export type ListAvailableNumbersData = {
 
 export type ListAvailableNumbersErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -51951,6 +55244,10 @@ export type ListAvailableNumbersErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -51983,9 +55280,13 @@ export type GetAvailableNumberData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -51998,6 +55299,10 @@ export type GetAvailableNumberData = {
 };
 
 export type GetAvailableNumberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -52042,9 +55347,13 @@ export type ListNumbersOrdersData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -52070,6 +55379,10 @@ export type ListNumbersOrdersData = {
 
 export type ListNumbersOrdersErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -52077,6 +55390,10 @@ export type ListNumbersOrdersErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -52109,10 +55426,6 @@ export type CreateNumbersOrderData = {
   body: NumbersOrderCreate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -52136,6 +55449,14 @@ export type CreateNumbersOrderData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -52159,6 +55480,10 @@ export type CreateNumbersOrderErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */
@@ -52208,9 +55533,13 @@ export type GetNumbersOrderData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -52223,6 +55552,10 @@ export type GetNumbersOrderData = {
 };
 
 export type GetNumbersOrderErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -52267,10 +55600,6 @@ export type ReleaseWorkspaceNumberData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -52294,6 +55623,14 @@ export type ReleaseWorkspaceNumberData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -52306,6 +55643,10 @@ export type ReleaseWorkspaceNumberData = {
 };
 
 export type ReleaseWorkspaceNumberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -52359,9 +55700,13 @@ export type GetWorkspaceNumberData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -52374,6 +55719,10 @@ export type GetWorkspaceNumberData = {
 };
 
 export type GetWorkspaceNumberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -52418,10 +55767,6 @@ export type UpdateWorkspaceNumberData = {
   body: NumberUpdate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -52445,6 +55790,14 @@ export type UpdateWorkspaceNumberData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     /**
@@ -52514,9 +55867,13 @@ export type ListVoiceTrunksData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -52559,6 +55916,10 @@ export type ListVoiceTrunksErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -52590,10 +55951,6 @@ export type CreateVoiceTrunkData = {
   body: VoiceTrunkCreate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -52617,6 +55974,14 @@ export type CreateVoiceTrunkData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -52636,6 +56001,10 @@ export type CreateVoiceTrunkErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */
@@ -52681,10 +56050,6 @@ export type DeleteVoiceTrunkData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -52708,6 +56073,14 @@ export type DeleteVoiceTrunkData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     trunk_id: SipTrunkId;
@@ -52774,9 +56147,13 @@ export type GetVoiceTrunkData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     trunk_id: SipTrunkId;
@@ -52833,10 +56210,6 @@ export type UpdateVoiceTrunkData = {
   body: VoiceTrunkUpdate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -52860,6 +56233,14 @@ export type UpdateVoiceTrunkData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     trunk_id: SipTrunkId;
@@ -52930,13 +56311,17 @@ export type CreateVoiceSessionCredentialData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Does not deduplicate this operation. Every successful attempt creates a fresh credential.
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -52956,6 +56341,10 @@ export type CreateVoiceSessionCredentialErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -52994,9 +56383,13 @@ export type ListVoiceTrunkGatewaysData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     trunk_id: SipTrunkId;
@@ -53054,10 +56447,6 @@ export type CreateVoiceTrunkGatewayData = {
   body: VoiceTrunkGatewayCreate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -53081,6 +56470,14 @@ export type CreateVoiceTrunkGatewayData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     trunk_id: SipTrunkId;
@@ -53151,10 +56548,6 @@ export type DeleteVoiceTrunkGatewayData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -53178,6 +56571,14 @@ export type DeleteVoiceTrunkGatewayData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     trunk_id: SipTrunkId;
@@ -53249,9 +56650,13 @@ export type GetVoiceTrunkGatewayData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     trunk_id: SipTrunkId;
@@ -53310,10 +56715,6 @@ export type UpdateVoiceTrunkGatewayData = {
   body: VoiceTrunkGatewayUpdate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -53337,6 +56738,14 @@ export type UpdateVoiceTrunkGatewayData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     trunk_id: SipTrunkId;
@@ -53408,9 +56817,13 @@ export type ListVoiceNumbersData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -53473,6 +56886,10 @@ export type ListVoiceNumbersErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -53504,9 +56921,13 @@ export type GetVoiceNumberData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     number_id: VoiceNumberId;
@@ -53564,10 +56985,6 @@ export type UpdateVoiceNumberData = {
   body: VoiceNumberUpdate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -53591,6 +57008,14 @@ export type UpdateVoiceNumberData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     number_id: VoiceNumberId;
@@ -53657,9 +57082,13 @@ export type ListVoiceVerifiedNumbersData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: {
@@ -53702,6 +57131,10 @@ export type ListVoiceVerifiedNumbersErrors = {
    */
   403: Error;
   /**
+   * Resource not found
+   */
+  404: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -53733,10 +57166,6 @@ export type CreateVoiceVerifiedNumberData = {
   body: VoiceVerifiedNumberCreate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -53760,6 +57189,14 @@ export type CreateVoiceVerifiedNumberData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -53779,6 +57216,10 @@ export type CreateVoiceVerifiedNumberErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */
@@ -53824,10 +57265,6 @@ export type DeleteVoiceVerifiedNumberData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -53851,6 +57288,14 @@ export type DeleteVoiceVerifiedNumberData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     verified_number_id: VoiceVerifiedNumberId;
@@ -53917,9 +57362,13 @@ export type GetVoiceVerifiedNumberData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     verified_number_id: VoiceVerifiedNumberId;
@@ -53977,10 +57426,6 @@ export type UpdateVoiceVerifiedNumberData = {
   body: VoiceVerifiedNumberUpdate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -54004,6 +57449,14 @@ export type UpdateVoiceVerifiedNumberData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     verified_number_id: VoiceVerifiedNumberId;
@@ -54070,10 +57523,6 @@ export type VerifyVoiceVerifiedNumberData = {
   body: VoiceVerifiedNumberVerifyRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -54097,6 +57546,14 @@ export type VerifyVoiceVerifiedNumberData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path: {
     verified_number_id: VoiceVerifiedNumberId;
@@ -54165,6 +57622,16 @@ export type VerifyVoiceVerifiedNumberResponse =
 
 export type ListVoiceLegsData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path?: never;
   query?: {
     /**
@@ -54230,6 +57697,10 @@ export type ListVoiceLegsData = {
 
 export type ListVoiceLegsErrors = {
   /**
+   * Bad request
+   */
+  400: Error;
+  /**
    * Authentication required
    */
   401: Error;
@@ -54237,6 +57708,10 @@ export type ListVoiceLegsErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -54266,6 +57741,16 @@ export type ListVoiceLegsResponse =
 
 export type GetVoiceLegData = {
   body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
   path: {
     leg_id: VoiceCallId;
   };
@@ -54274,6 +57759,10 @@ export type GetVoiceLegData = {
 };
 
 export type GetVoiceLegErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
   /**
    * Authentication required
    */
@@ -54317,10 +57806,6 @@ export type CreateVoiceCallData = {
   body: CreateVoiceCallRequest;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -54344,6 +57829,14 @@ export type CreateVoiceCallData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -54408,9 +57901,13 @@ export type ListVoiceDestinationsData = {
   body?: never;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
      */
     "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -54430,6 +57927,10 @@ export type ListVoiceDestinationsErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -54462,10 +57963,6 @@ export type UpdateVoiceDestinationsData = {
   body: VoiceDestinationsUpdate;
   headers?: {
     /**
-     * Workspace context for the request. Required for dashboard authentication. An API key or access token carries its own workspace, so send either that workspace or no header at all; a different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
      * Client-supplied key. On operations supporting request deduplication, a retained
      * response is replayed for duplicate requests with the same key within the
      * idempotency window (3 hours by default). This protection requires a workspace,
@@ -54489,6 +57986,14 @@ export type UpdateVoiceDestinationsData = {
      *
      */
     "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
   };
   path?: never;
   query?: never;
@@ -54508,6 +58013,10 @@ export type UpdateVoiceDestinationsErrors = {
    * Insufficient permissions
    */
   403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
   /**
    * Resource conflict
    */

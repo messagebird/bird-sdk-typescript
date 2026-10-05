@@ -3261,6 +3261,7 @@ export type {
   WebhookEventId,
   WebhookEventType,
   WebhookEventWritable,
+  WebhookFilter,
   WebhookRawDestination,
   WebhookReplayRequest,
   WebhookRotateSecretResponse,
@@ -3567,5 +3568,6 @@ export type {
   WorkspaceId,
   WorkspaceNotificationEmails,
   WorkspaceWritable,
+  XOrganizationId,
   XWorkspaceId,
 } from "./types.gen";

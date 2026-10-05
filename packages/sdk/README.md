@@ -36,7 +36,7 @@ const msg = await bird.email.send({
 console.log(msg.id, msg.status);
 ```
 
-The region is inferred from the API key prefix (`bk_{region}_…`). For a local or self-hosted server, pass `baseUrl` (which overrides region resolution).
+The region is inferred from the API key prefix (`bk_{region}_…` or `bm_{region}_…`). For a local or self-hosted server, pass `baseUrl` (which overrides region resolution).
 
 ## Client defaults
 

@@ -136,7 +136,7 @@ function resolveBaseUrl(options: BirdClientOptions): string | undefined {
     if (!options.apiKey) return undefined;
     throw new Error(
       "Unable to determine region: API key is not in the expected " +
-        "bk_{region}_{token} format. Pass an explicit `region` or `baseUrl`.",
+        "bk_{region}_{token} or bm_{region}_{token} format. Pass an explicit `region` or `baseUrl`.",
     );
   }
   return baseUrlForRegion(region);
@@ -163,7 +163,7 @@ function resolveRawRequestUrl(baseUrl: string, path: string): URL {
 
 /**
  * The Bird API client. Construct it with an API key. The region comes from the
- * key's prefix (`bk_{region}_…`). Pass `baseUrl` or `region` to override it.
+ * key's prefix (`bk_{region}_…` or `bm_{region}_…`). Pass `baseUrl` or `region` to override it.
  *
  * @example Construct and send
  * const bird = new BirdClient({ apiKey: process.env.BIRD_API_KEY! });
