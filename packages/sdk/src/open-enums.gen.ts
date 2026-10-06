@@ -420,6 +420,41 @@ export const EmailTemplateTheme = {
 export type EmailTemplateThemeValue = (typeof EmailTemplateTheme)[keyof typeof EmailTemplateTheme];
 
 /**
+ * Values of EsimActionName known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EsimActionName = {
+  Assign: "assign",
+  Install: "install",
+  Release: "release",
+  Resume: "resume",
+  Suspend: "suspend",
+  TopUp: "top_up",
+} as const;
+
+/** A known EsimActionName value. */
+export type EsimActionNameValue = (typeof EsimActionName)[keyof typeof EsimActionName];
+
+/**
+ * Values of EsimActionUnavailableReason known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EsimActionUnavailableReason = {
+  EsimState: "esim_state",
+  IdentificationRequired: "identification_required",
+  NetworkUnconfirmed: "network_unconfirmed",
+  NetworkUnsupported: "network_unsupported",
+  OperationInProgress: "operation_in_progress",
+  PackageLimitReached: "package_limit_reached",
+  PermissionDenied: "permission_denied",
+} as const;
+
+/** A known EsimActionUnavailableReason value. */
+export type EsimActionUnavailableReasonValue = (typeof EsimActionUnavailableReason)[keyof typeof EsimActionUnavailableReason];
+
+/**
  * Values of LookupFlag known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.

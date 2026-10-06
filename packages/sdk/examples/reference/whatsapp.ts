@@ -381,7 +381,8 @@ export async function whatsappSuppressionsRemove() {
 export async function whatsappAgentsNotificationsCreate() {
   // The agent decides whether and how to tell the contact. The answer reads
   // accepted; read it back to see whether the agent acted on it.
-  const notification = await bird.whatsapp.agents.notifications.create("wan_01krdgeqcxet5s7t44vh8rt9mg", {
+  const notification = await bird.whatsapp.agents.notifications.create({
+    from: "+13124495648",
     to: "+14155551234",
     name: "order_shipped",
     description: "Order 88213 left the warehouse and arrives on Thursday.",
@@ -391,7 +392,8 @@ export async function whatsappAgentsNotificationsCreate() {
 }
 
 export async function whatsappAgentsNotificationsList() {
-  const notifications = await bird.whatsapp.agents.notifications.list("wan_01krdgeqcxet5s7t44vh8rt9mg", {
+  const notifications = await bird.whatsapp.agents.notifications.list({
+    from: "+13124495648",
     status: "skipped",
   });
   for (const notification of notifications.data ?? []) {
@@ -402,9 +404,6 @@ export async function whatsappAgentsNotificationsList() {
 export async function whatsappAgentsNotificationsGet() {
   // A notification still on its way to WhatsApp is not readable yet, so a read
   // straight after create can throw a not-found error.
-  const notification = await bird.whatsapp.agents.notifications.get(
-    "wan_01krdgeqcxet5s7t44vh8rt9mg",
-    "waan_01krdgeqcxet5s7t44vh8rt9m7",
-  );
+  const notification = await bird.whatsapp.agents.notifications.get("waan_01krdgeqcxet5s7t44vh8rt9m7");
   console.log(notification.status, notification.skipped_reason ?? notification.error?.description);
 }

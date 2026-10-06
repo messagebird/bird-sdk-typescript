@@ -70,6 +70,13 @@ export async function numbersRelease() {
   await bird.numbers.release("nda_01krdgeqcxet5s7t44vh8rt9mg");
 }
 
+export async function numbersCancel() {
+  // A billed number stays yours until its paid period ends, then is released;
+  // releases_at says when. One with no subscription is released now.
+  const allocated = await bird.numbers.cancel("nda_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(allocated.releases_at);
+}
+
 export async function numbersUpdate() {
   const allocated = await bird.numbers.update("nda_01krdgeqcxet5s7t44vh8rt9mg", {
     name: "Support line",

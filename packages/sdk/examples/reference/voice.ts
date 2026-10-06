@@ -110,6 +110,18 @@ export async function voiceNumbersUpdate() {
   console.log(number.id, number.name);
 }
 
+export async function voiceSettingsGet() {
+  const settings = await bird.voice.settings.get();
+  console.log(settings.inbound_configuration.route.type);
+}
+
+export async function voiceSettingsUpdate() {
+  const settings = await bird.voice.settings.update({
+    inbound_configuration: { route: { type: "trunk", trunk_id: "spt_01krdgeqcxet5s7t44vh8rt9mg" } },
+  });
+  console.log(settings.inbound_configuration.route.type);
+}
+
 export async function voiceVerifiedNumbersList() {
   for await (const verifiedNumber of bird.voice.verifiedNumbers.list()) {
     console.log(verifiedNumber.id, verifiedNumber.phone_number, verifiedNumber.status);

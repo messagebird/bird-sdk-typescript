@@ -24,6 +24,15 @@ import type {
   CancelEmailMessageData,
   CancelEmailMessageErrors,
   CancelEmailMessageResponses,
+  CancelEsimOrderData,
+  CancelEsimOrderErrors,
+  CancelEsimOrderResponses,
+  CancelEsimRecurringSubscriptionData,
+  CancelEsimRecurringSubscriptionErrors,
+  CancelEsimRecurringSubscriptionResponses,
+  CancelWorkspaceNumberData,
+  CancelWorkspaceNumberErrors,
+  CancelWorkspaceNumberResponses,
   CreateAmbBusinessAccountData,
   CreateAmbBusinessAccountErrors,
   CreateAmbBusinessAccountResponses,
@@ -78,6 +87,21 @@ import type {
   CreateEmailTemplateData,
   CreateEmailTemplateErrors,
   CreateEmailTemplateResponses,
+  CreateEsimAssignmentData,
+  CreateEsimAssignmentErrors,
+  CreateEsimAssignmentResponses,
+  CreateEsimInstallLinkData,
+  CreateEsimInstallLinkErrors,
+  CreateEsimInstallLinkResponses,
+  CreateEsimOrderData,
+  CreateEsimOrderErrors,
+  CreateEsimOrderResponses,
+  CreateEsimRecurringSubscriptionData,
+  CreateEsimRecurringSubscriptionErrors,
+  CreateEsimRecurringSubscriptionResponses,
+  CreateEsimSubscriberData,
+  CreateEsimSubscriberErrors,
+  CreateEsimSubscriberResponses,
   CreateMailboxData,
   CreateMailboxErrors,
   CreateMailboxMessageData,
@@ -195,6 +219,12 @@ import type {
   DeleteEmailThreadData,
   DeleteEmailThreadErrors,
   DeleteEmailThreadResponses,
+  DeleteEsimInstallLinkData,
+  DeleteEsimInstallLinkErrors,
+  DeleteEsimInstallLinkResponses,
+  DeleteEsimPackageData,
+  DeleteEsimPackageErrors,
+  DeleteEsimPackageResponses,
   DeleteMailboxData,
   DeleteMailboxErrors,
   DeleteMailboxReceiveRuleData,
@@ -243,6 +273,9 @@ import type {
   DeleteWhatsAppSuppressionData,
   DeleteWhatsAppSuppressionErrors,
   DeleteWhatsAppSuppressionResponses,
+  DeliverEsimCredentialsData,
+  DeliverEsimCredentialsErrors,
+  DeliverEsimCredentialsResponses,
   DisconnectRealtimeAppMemberData,
   DisconnectRealtimeAppMemberErrors,
   DisconnectRealtimeAppMemberResponses,
@@ -468,6 +501,45 @@ import type {
   GetEmailThreadMessageErrors,
   GetEmailThreadMessageResponses,
   GetEmailThreadResponses,
+  GetEsimAssignmentData,
+  GetEsimAssignmentErrors,
+  GetEsimAssignmentResponses,
+  GetEsimCredentialsData,
+  GetEsimCredentialsErrors,
+  GetEsimCredentialsResponses,
+  GetEsimData,
+  GetEsimErrors,
+  GetEsimOfferCheckoutOptionsData,
+  GetEsimOfferCheckoutOptionsErrors,
+  GetEsimOfferCheckoutOptionsResponses,
+  GetEsimOfferData,
+  GetEsimOfferErrors,
+  GetEsimOfferRecurrenceData,
+  GetEsimOfferRecurrenceErrors,
+  GetEsimOfferRecurrenceResponses,
+  GetEsimOfferRequirementsData,
+  GetEsimOfferRequirementsErrors,
+  GetEsimOfferRequirementsResponses,
+  GetEsimOfferResponses,
+  GetEsimOrderData,
+  GetEsimOrderErrors,
+  GetEsimOrderResponses,
+  GetEsimPackageData,
+  GetEsimPackageErrors,
+  GetEsimPackageResponses,
+  GetEsimRecurringSubscriptionData,
+  GetEsimRecurringSubscriptionErrors,
+  GetEsimRecurringSubscriptionResponses,
+  GetEsimResponses,
+  GetEsimSettingsData,
+  GetEsimSettingsErrors,
+  GetEsimSettingsResponses,
+  GetEsimSubscriberData,
+  GetEsimSubscriberErrors,
+  GetEsimSubscriberResponses,
+  GetEsimZoneData,
+  GetEsimZoneErrors,
+  GetEsimZoneResponses,
   GetMailboxData,
   GetMailboxErrors,
   GetMailboxResponses,
@@ -558,6 +630,9 @@ import type {
   GetVoiceNumberData,
   GetVoiceNumberErrors,
   GetVoiceNumberResponses,
+  GetVoiceSettingsData,
+  GetVoiceSettingsErrors,
+  GetVoiceSettingsResponses,
   GetVoiceTrunkData,
   GetVoiceTrunkErrors,
   GetVoiceTrunkGatewayData,
@@ -731,6 +806,36 @@ import type {
   ListEmailThreadsData,
   ListEmailThreadsErrors,
   ListEmailThreadsResponses,
+  ListEsimCompatibleOffersData,
+  ListEsimCompatibleOffersErrors,
+  ListEsimCompatibleOffersResponses,
+  ListEsimDeliveriesData,
+  ListEsimDeliveriesErrors,
+  ListEsimDeliveriesResponses,
+  ListEsimOffersData,
+  ListEsimOffersErrors,
+  ListEsimOffersResponses,
+  ListEsimOrdersData,
+  ListEsimOrdersErrors,
+  ListEsimOrdersResponses,
+  ListEsimPackagesData,
+  ListEsimPackagesErrors,
+  ListEsimPackagesResponses,
+  ListEsimRecurringPeriodsData,
+  ListEsimRecurringPeriodsErrors,
+  ListEsimRecurringPeriodsResponses,
+  ListEsimRecurringSubscriptionsData,
+  ListEsimRecurringSubscriptionsErrors,
+  ListEsimRecurringSubscriptionsResponses,
+  ListEsimsData,
+  ListEsimsErrors,
+  ListEsimsResponses,
+  ListEsimSubscribersData,
+  ListEsimSubscribersErrors,
+  ListEsimSubscribersResponses,
+  ListEsimZonesData,
+  ListEsimZonesErrors,
+  ListEsimZonesResponses,
   ListMailboxesData,
   ListMailboxesErrors,
   ListMailboxesResponses,
@@ -854,6 +959,9 @@ import type {
   RejectWhatsAppGroupJoinRequestsData,
   RejectWhatsAppGroupJoinRequestsErrors,
   RejectWhatsAppGroupJoinRequestsResponses,
+  ReleaseEsimData,
+  ReleaseEsimErrors,
+  ReleaseEsimResponses,
   ReleaseWorkspaceNumberData,
   ReleaseWorkspaceNumberErrors,
   ReleaseWorkspaceNumberResponses,
@@ -866,6 +974,9 @@ import type {
   RestoreMailboxData,
   RestoreMailboxErrors,
   RestoreMailboxResponses,
+  ResumeEsimData,
+  ResumeEsimErrors,
+  ResumeEsimResponses,
   ResumeMailboxData,
   ResumeMailboxErrors,
   ResumeMailboxResponses,
@@ -893,6 +1004,9 @@ import type {
   SubmitEmailTemplateVersionData,
   SubmitEmailTemplateVersionErrors,
   SubmitEmailTemplateVersionResponses,
+  SuspendEsimData,
+  SuspendEsimErrors,
+  SuspendEsimResponses,
   TestWebhookData,
   TestWebhookErrors,
   TestWebhookResponses,
@@ -944,6 +1058,12 @@ import type {
   UpdateEmailThreadData,
   UpdateEmailThreadErrors,
   UpdateEmailThreadResponses,
+  UpdateEsimData,
+  UpdateEsimErrors,
+  UpdateEsimResponses,
+  UpdateEsimSettingsData,
+  UpdateEsimSettingsErrors,
+  UpdateEsimSettingsResponses,
   UpdateMailboxData,
   UpdateMailboxErrors,
   UpdateMailboxResponses,
@@ -956,6 +1076,9 @@ import type {
   UpdateVoiceNumberData,
   UpdateVoiceNumberErrors,
   UpdateVoiceNumberResponses,
+  UpdateVoiceSettingsData,
+  UpdateVoiceSettingsErrors,
+  UpdateVoiceSettingsResponses,
   UpdateVoiceTrunkData,
   UpdateVoiceTrunkErrors,
   UpdateVoiceTrunkGatewayData,
@@ -1293,6 +1416,7 @@ export const sendRealtimeAppMemberEvent = <
  * - Delivery status.
  * - Category.
  * - Tag.
+ * - The broadcast that sent the messages.
  * - An exact `to` or `from` address.
  * - A `created_after` or `created_before` time window.
  *
@@ -5887,6 +6011,110 @@ export const getWhatsAppInboundStatsByPhoneNumber = <
   });
 
 /**
+ * List the notifications sent to your agents
+ *
+ * Returns the notifications you have sent your agents, newest first, each with what came of it. Filter by `from` for the agent on one business number, by `status` to find the ones the agent skipped or WhatsApp refused, or by `to` to follow one contact. A notification still in flight to WhatsApp is not listed yet.
+ *
+ * Page through the full set with the response cursors.
+ *
+ */
+export const listWhatsAppAgentNotifications = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<ListWhatsAppAgentNotificationsData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppAgentNotificationsResponses,
+  ListWhatsAppAgentNotificationsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListWhatsAppAgentNotificationsResponses,
+    ListWhatsAppAgentNotificationsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/agents/notifications",
+    ...options,
+  });
+
+/**
+ * Send an agent a notification
+ *
+ * Tells the agent on the `from` business number that something happened in your systems for one contact, such as a payment landing, an order shipping or an identity check passing. The agent decides whether and how to tell the contact, drawing on `description` and `payload`, and may write to them without waiting for their next message.
+ *
+ * Bird takes the notification, hands it to WhatsApp in the background and keeps asking WhatsApp what became of it, so this answers `202` with the notification as you sent it at `status: accepted`. A read in the first moments after the `202` can answer `404` while the hand-off is still in flight. Read it back, or list the notifications, to see it settle: `success` when the agent acted on it, `skipped` with WhatsApp's reason when the agent chose to say nothing, or `failed` with what went wrong. The notification records whether the agent acted on it, not what the agent said to the contact. A `from` number this workspace has not connected returns `422`, one without an agent returns `404`, and one whose agent WhatsApp is still preparing returns `409`.
+ *
+ */
+export const createWhatsAppAgentNotification = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateWhatsAppAgentNotificationData, ThrowOnError>,
+): RequestResult<
+  CreateWhatsAppAgentNotificationResponses,
+  CreateWhatsAppAgentNotificationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateWhatsAppAgentNotificationResponses,
+    CreateWhatsAppAgentNotificationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/agents/notifications",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get a notification sent to an agent
+ *
+ * Returns one notification you sent the agent, with what came of it: `accepted` while WhatsApp is still working on it, then `success`, `skipped` with WhatsApp's reason, or `failed` with what went wrong. A notification still in flight to WhatsApp is not readable yet, and an id this workspace does not hold returns `404`. A notification stays readable after its agent is deleted.
+ *
+ */
+export const getWhatsAppAgentNotification = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetWhatsAppAgentNotificationData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppAgentNotificationResponses,
+  GetWhatsAppAgentNotificationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWhatsAppAgentNotificationResponses,
+    GetWhatsAppAgentNotificationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/agents/notifications/{notification_id}",
+    ...options,
+  });
+
+/**
  * List WhatsApp numbers
  *
  * Returns a paginated list of the WhatsApp numbers your workspace can send
@@ -5955,110 +6183,6 @@ export const getWhatsAppNumber = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/whatsapp/numbers/{number_id}",
-    ...options,
-  });
-
-/**
- * List the notifications sent to an agent
- *
- * Returns the notifications you have sent the agent, newest first, each with what came of it. Filter by `status` to find the ones the agent skipped or WhatsApp refused, or by `to` to follow one contact. A notification still in flight to WhatsApp is not listed yet.
- *
- * A number without an agent returns `404`. Page through the full set with the response cursors.
- *
- */
-export const listWhatsAppAgentNotifications = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<ListWhatsAppAgentNotificationsData, ThrowOnError>,
-): RequestResult<
-  ListWhatsAppAgentNotificationsResponses,
-  ListWhatsAppAgentNotificationsErrors,
-  ThrowOnError
-> =>
-  (options.client ?? client).get<
-    ListWhatsAppAgentNotificationsResponses,
-    ListWhatsAppAgentNotificationsErrors,
-    ThrowOnError
-  >({
-    security: [
-      { scheme: "bearer", type: "http" },
-      {
-        in: "cookie",
-        name: "bird_session",
-        type: "apiKey",
-      },
-    ],
-    url: "/v1/whatsapp/numbers/{number_id}/agent/notifications",
-    ...options,
-  });
-
-/**
- * Send an agent a notification
- *
- * Tells the agent that something happened in your systems for one contact, such as a payment landing, an order shipping or an identity check passing. The agent decides whether and how to tell the contact, drawing on `description` and `payload`, and may write to them without waiting for their next message.
- *
- * Bird takes the notification, hands it to WhatsApp in the background and keeps asking WhatsApp what became of it, so this answers `202` with the notification as you sent it at `status: accepted`. A read in the first moments after the `202` can answer `404` while the hand-off is still in flight. Read it back, or list the notifications, to see it settle: `success` when the agent acted on it, `skipped` with WhatsApp's reason when the agent chose to say nothing, or `failed` with what went wrong. The notification records whether the agent acted on it, not what the agent said to the contact. A number without an agent returns `404`, and one whose agent WhatsApp is still preparing returns `409`.
- *
- */
-export const createWhatsAppAgentNotification = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<CreateWhatsAppAgentNotificationData, ThrowOnError>,
-): RequestResult<
-  CreateWhatsAppAgentNotificationResponses,
-  CreateWhatsAppAgentNotificationErrors,
-  ThrowOnError
-> =>
-  (options.client ?? client).post<
-    CreateWhatsAppAgentNotificationResponses,
-    CreateWhatsAppAgentNotificationErrors,
-    ThrowOnError
-  >({
-    security: [
-      { scheme: "bearer", type: "http" },
-      {
-        in: "cookie",
-        name: "bird_session",
-        type: "apiKey",
-      },
-    ],
-    url: "/v1/whatsapp/numbers/{number_id}/agent/notifications",
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-  });
-
-/**
- * Get a notification sent to an agent
- *
- * Returns one notification you sent the agent, with what came of it: `accepted` while WhatsApp is still working on it, then `success`, `skipped` with WhatsApp's reason, or `failed` with what went wrong. A notification still in flight to WhatsApp is not readable yet. A number without an agent, and an id the agent does not hold, both return `404`.
- *
- */
-export const getWhatsAppAgentNotification = <
-  ThrowOnError extends boolean = false,
->(
-  options: Options<GetWhatsAppAgentNotificationData, ThrowOnError>,
-): RequestResult<
-  GetWhatsAppAgentNotificationResponses,
-  GetWhatsAppAgentNotificationErrors,
-  ThrowOnError
-> =>
-  (options.client ?? client).get<
-    GetWhatsAppAgentNotificationResponses,
-    GetWhatsAppAgentNotificationErrors,
-    ThrowOnError
-  >({
-    security: [
-      { scheme: "bearer", type: "http" },
-      {
-        in: "cookie",
-        name: "bird_session",
-        type: "apiKey",
-      },
-    ],
-    url: "/v1/whatsapp/numbers/{number_id}/agent/notifications/{notification_id}",
     ...options,
   });
 
@@ -11754,20 +11878,20 @@ export const getNumbersOrder = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Release a dedicated number
+ * Cancel a dedicated number
  *
- * Releases one of your workspace's dedicated numbers and stops its monthly charge. Your workspace can no longer use the number after release. Shared numbers belong to Bird-managed shared infrastructure and cannot be released from your workspace.
+ * Cancels one of your workspace's dedicated numbers at the end of its current billing period. The number is not charged for another period, keeps its current status until the period ends, and is then released. The `202` response returns the number with `releases_at` set to that time, and cancelling a number that is already scheduled returns the same schedule. A number with no subscription behind it, such as one allocated to you without a charge, is released immediately and answers `200` with the number as released. While a renewal payment for the number is overdue, the request answers `409` until it is paid. To release a number now, use `POST /v1/numbers/{number_id}/release`. Shared numbers belong to Bird-managed shared infrastructure and cannot be cancelled from your workspace.
  */
-export const releaseWorkspaceNumber = <ThrowOnError extends boolean = false>(
-  options: Options<ReleaseWorkspaceNumberData, ThrowOnError>,
+export const cancelWorkspaceNumber = <ThrowOnError extends boolean = false>(
+  options: Options<CancelWorkspaceNumberData, ThrowOnError>,
 ): RequestResult<
-  ReleaseWorkspaceNumberResponses,
-  ReleaseWorkspaceNumberErrors,
+  CancelWorkspaceNumberResponses,
+  CancelWorkspaceNumberErrors,
   ThrowOnError
 > =>
   (options.client ?? client).delete<
-    ReleaseWorkspaceNumberResponses,
-    ReleaseWorkspaceNumberErrors,
+    CancelWorkspaceNumberResponses,
+    CancelWorkspaceNumberErrors,
     ThrowOnError
   >({
     security: [
@@ -11842,6 +11966,35 @@ export const updateWorkspaceNumber = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Release a dedicated number
+ *
+ * Releases one of your workspace's dedicated numbers now and stops its monthly charge. Your workspace can no longer use the number after release, and the rest of the current billing period is not refunded. This also releases a number already scheduled for cancellation. While a renewal payment for the number is overdue, the request answers `409` until it is paid. To keep the number until the end of the period you paid for, use `DELETE /v1/numbers/{number_id}` instead. Shared numbers belong to Bird-managed shared infrastructure and cannot be released from your workspace.
+ */
+export const releaseWorkspaceNumber = <ThrowOnError extends boolean = false>(
+  options: Options<ReleaseWorkspaceNumberData, ThrowOnError>,
+): RequestResult<
+  ReleaseWorkspaceNumberResponses,
+  ReleaseWorkspaceNumberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    ReleaseWorkspaceNumberResponses,
+    ReleaseWorkspaceNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/numbers/{number_id}/release",
+    ...options,
   });
 
 /**
@@ -12254,8 +12407,9 @@ export const listVoiceNumbers = <ThrowOnError extends boolean = false>(
  *
  * Returns one of the numbers your workspace can use for voice.
  *
- * A number nobody has configured reads back with its inbound route set to
- * "reject", which is where every number starts rather than an absence.
+ * A number with no route of its own reads back with a null route and follows
+ * your workspace's default inbound route, which
+ * [Get the voice settings](/docs/api/reference/get-voice-settings) returns.
  *
  */
 export const getVoiceNumber = <ThrowOnError extends boolean = false>(
@@ -12285,8 +12439,10 @@ export const getVoiceNumber = <ThrowOnError extends boolean = false>(
  * happens when a call arrives for it. Omit a field to leave it as it is.
  *
  * The route replaces whatever was set before, because a number has exactly one
- * answer at a time. Type "reject" refuses calls and is where every number
- * starts, so sending it clears a trunk or forward you set earlier.
+ * answer at a time. A null route returns the number to your workspace's
+ * default inbound route, set with
+ * [Update the voice settings](/docs/api/reference/update-voice-settings).
+ * Type "reject" refuses calls whatever the default is.
  * "trunk" needs a trunk_id: the trunk must be yours and must have inbound
  * calling enabled. "forward" needs a forward_to, which has to be one of your
  * verified caller IDs. That is checked when you set it, and again on every call
@@ -12327,6 +12483,83 @@ export const updateVoiceNumber = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/voice/numbers/{number_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get the voice settings
+ *
+ * Returns the voice settings for your workspace.
+ *
+ * `inbound_configuration.route` is what happens to calls for every Bird number that has no
+ * inbound route of its own. Verified caller IDs receive no calls, so it never applies to them.
+ * It is "reject" until you change it.
+ *
+ */
+export const getVoiceSettings = <ThrowOnError extends boolean = false>(
+  options?: Options<GetVoiceSettingsData, ThrowOnError>,
+): RequestResult<
+  GetVoiceSettingsResponses,
+  GetVoiceSettingsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetVoiceSettingsResponses,
+    GetVoiceSettingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/settings",
+    ...options,
+  });
+
+/**
+ * Update the voice settings
+ *
+ * Changes your workspace's voice settings. Omit a field to leave it as it is.
+ *
+ * `inbound_configuration.route` applies to every Bird number that has no inbound route of its
+ * own, from the next call it receives. A number with its own route keeps it, and verified
+ * caller IDs receive no calls.
+ * The route is checked the same way as a number's: a trunk must be yours and
+ * have inbound calling enabled, and a forward target must be one of your
+ * verified caller IDs, otherwise the update returns 412. A trunk_id that is not
+ * one of your trunks returns 404. Deleting the trunk, or
+ * turning off its inbound calling, sets the default back to "reject".
+ *
+ */
+export const updateVoiceSettings = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateVoiceSettingsData, ThrowOnError>,
+): RequestResult<
+  UpdateVoiceSettingsResponses,
+  UpdateVoiceSettingsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateVoiceSettingsResponses,
+    UpdateVoiceSettingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/settings",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -12756,6 +12989,1162 @@ export const updateVoiceDestinations = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/voice/destinations",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List eSIM coverage zones
+ *
+ * Returns the coverage zones behind the offer catalog as a cursor-paginated list. A zone's `countries` list is authoritative for every offer that references it. Filter by `country` to find zones covering a destination.
+ *
+ */
+export const listEsimZones = <ThrowOnError extends boolean = false>(
+  options?: Options<ListEsimZonesData, ThrowOnError>,
+): RequestResult<ListEsimZonesResponses, ListEsimZonesErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListEsimZonesResponses,
+    ListEsimZonesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/zones",
+    ...options,
+  });
+
+/**
+ * Get an eSIM coverage zone
+ *
+ * Returns one coverage zone with its authoritative country list.
+ */
+export const getEsimZone = <ThrowOnError extends boolean = false>(
+  options: Options<GetEsimZoneData, ThrowOnError>,
+): RequestResult<GetEsimZoneResponses, GetEsimZoneErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetEsimZoneResponses,
+    GetEsimZoneErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/zones/{zone_id}",
+    ...options,
+  });
+
+/**
+ * List eSIM offers
+ *
+ * Returns the eSIM offers your workspace can order as a cursor-paginated list. Filter by `country` to find offers covering a destination (the zone's country list is the guarantee), or by `zone_id` for one coverage footprint. Retired offers are excluded unless requested via `status`.
+ *
+ */
+export const listEsimOffers = <ThrowOnError extends boolean = false>(
+  options?: Options<ListEsimOffersData, ThrowOnError>,
+): RequestResult<ListEsimOffersResponses, ListEsimOffersErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListEsimOffersResponses,
+    ListEsimOffersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/offers",
+    ...options,
+  });
+
+/**
+ * Get an eSIM offer
+ *
+ * Returns one eSIM offer with its pricing and embedded coverage zone.
+ */
+export const getEsimOffer = <ThrowOnError extends boolean = false>(
+  options: Options<GetEsimOfferData, ThrowOnError>,
+): RequestResult<GetEsimOfferResponses, GetEsimOfferErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetEsimOfferResponses,
+    GetEsimOfferErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/offers/{offer_id}",
+    ...options,
+  });
+
+/**
+ * Get country identification requirements for an eSIM offer
+ *
+ * Returns identification guidance as a JSON Schema for each country in the offer's coverage zone. The schemas require `first_name`, `last_name`, and `email`, including countries with no additional requirements. Enable format assertions in your validator for email addresses and dates.
+ *
+ * You collect and validate the information. Bird does not receive or verify the answers, and fetching or satisfying these schemas does not authorize a purchase or assignment.
+ *
+ */
+export const getEsimOfferRequirements = <ThrowOnError extends boolean = false>(
+  options: Options<GetEsimOfferRequirementsData, ThrowOnError>,
+): RequestResult<
+  GetEsimOfferRequirementsResponses,
+  GetEsimOfferRequirementsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEsimOfferRequirementsResponses,
+    GetEsimOfferRequirementsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/offers/{offer_id}/requirements",
+    ...options,
+  });
+
+/**
+ * List orders
+ *
+ * Returns the workspace's orders as a cursor-paginated list, newest first. Filter by `status` to find in-flight or failed purchases, by `esim_id` for one eSIM's purchase history, or by `mode` to separate test purchases from real ones. Test orders are listed alongside real ones by default, each carrying its own `mode`.
+ *
+ */
+export const listEsimOrders = <ThrowOnError extends boolean = false>(
+  options?: Options<ListEsimOrdersData, ThrowOnError>,
+): RequestResult<ListEsimOrdersResponses, ListEsimOrdersErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListEsimOrdersResponses,
+    ListEsimOrdersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/orders",
+    ...options,
+  });
+
+/**
+ * Order a data package
+ *
+ * Purchases a data package at the quoted price. Omit `esim_id` to create an eSIM, or provide it to add a compatible package to an existing eSIM. Use [List compatible offers](/docs/api/reference/list-esim-compatible-offers) before ordering a top-up. After purchase, use [Send install credentials](/docs/api/reference/deliver-esim-credentials) to deliver installation details separately.
+ *
+ * Inspect `status` even when the response is `201`: the order can be `completed` or `failed`. A `202` response means processing continues; use [Get an order](/docs/api/reference/get-esim-order) to follow the outcome. Failed orders receive an automatic credit for any charge; `refund_transaction_id` identifies the credit once issued.
+ *
+ * An order awaiting funds stays in `charging`. For a one-time purchase, funding retries automatically; for an initial recurring purchase, retry the same create request with the same `Idempotency-Key` after adding funds. For one-time purchases, pass `offer_revision` and `expected_price` to reject changed terms with `409`. Recurring purchases accept their quote through `recurrence`. An incompatible top-up or shortened package validity returns `409`; use `acknowledge_shortened_validity` to accept the latter. After a `503` or a lost response, retry the same request with the same `Idempotency-Key`.
+ *
+ */
+export const createEsimOrder = <ThrowOnError extends boolean = false>(
+  options: Options<CreateEsimOrderData, ThrowOnError>,
+): RequestResult<
+  CreateEsimOrderResponses,
+  CreateEsimOrderErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateEsimOrderResponses,
+    CreateEsimOrderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/orders",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get an order
+ *
+ * Returns one order. Poll until `status` is `completed` or `failed`; a completed order names the eSIM and package it produced.
+ *
+ */
+export const getEsimOrder = <ThrowOnError extends boolean = false>(
+  options: Options<GetEsimOrderData, ThrowOnError>,
+): RequestResult<GetEsimOrderResponses, GetEsimOrderErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetEsimOrderResponses,
+    GetEsimOrderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/orders/{order_id}",
+    ...options,
+  });
+
+/**
+ * Cancel an unfunded order
+ *
+ * Cancels an order waiting for funds in `charging`. A canceled unfunded order returns `status: failed` with `failure_code: canceled`. If a charge is confirmed after cancellation, it is credited back automatically.
+ *
+ * For a one-time order, payment confirmed before cancellation returns `409`, and the purchase continues. For an initial recurring purchase, payment recovered during cancellation instead stops future renewal and returns the current order successfully. The paid package continues to delivery without an automatic refund. Inspect the returned order and its subscription to determine the outcome.
+ *
+ * Orders already completed, failed, or past the funding stage cannot be canceled through this operation and return `409`.
+ *
+ */
+export const cancelEsimOrder = <ThrowOnError extends boolean = false>(
+  options: Options<CancelEsimOrderData, ThrowOnError>,
+): RequestResult<
+  CancelEsimOrderResponses,
+  CancelEsimOrderErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CancelEsimOrderResponses,
+    CancelEsimOrderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/orders/{order_id}/cancel",
+    ...options,
+  });
+
+/**
+ * Get eSIM checkout options
+ *
+ * Returns published one-time terms and automatic renewal availability for a new eSIM. Automatic renewal includes its own price and cadence when an eligible mobile network is available. Availability is checked again when purchasing; this read does not reserve a package.
+ */
+export const getEsimOfferCheckoutOptions = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEsimOfferCheckoutOptionsData, ThrowOnError>,
+): RequestResult<
+  GetEsimOfferCheckoutOptionsResponses,
+  GetEsimOfferCheckoutOptionsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEsimOfferCheckoutOptionsResponses,
+    GetEsimOfferCheckoutOptionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/offers/{offer_id}/checkout",
+    ...options,
+  });
+
+/**
+ * Get recurring eSIM offer terms
+ *
+ * Returns the published whole-package recurring price and calendar-month or fixed-day cadence. Enrollment additionally checks that the assigned eSIM mobile network supports these terms.
+ */
+export const getEsimOfferRecurrence = <ThrowOnError extends boolean = false>(
+  options: Options<GetEsimOfferRecurrenceData, ThrowOnError>,
+): RequestResult<
+  GetEsimOfferRecurrenceResponses,
+  GetEsimOfferRecurrenceErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEsimOfferRecurrenceResponses,
+    GetEsimOfferRecurrenceErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/offers/{offer_id}/recurrence",
+    ...options,
+  });
+
+/**
+ * List recurring eSIM subscriptions
+ *
+ * Returns recurring services for assigned eSIMs in this workspace.
+ */
+export const listEsimRecurringSubscriptions = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<ListEsimRecurringSubscriptionsData, ThrowOnError>,
+): RequestResult<
+  ListEsimRecurringSubscriptionsResponses,
+  ListEsimRecurringSubscriptionsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListEsimRecurringSubscriptionsResponses,
+    ListEsimRecurringSubscriptionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/subscriptions",
+    ...options,
+  });
+
+/**
+ * Create a recurring eSIM subscription
+ *
+ * Starts a recurring package on an assigned eSIM and purchases the first period. Each accepted period is funded from your organization's wallet. A changed price requires new acceptance; an unfunded renewal or confirmed delivery failure stops future renewal.
+ *
+ * An `Idempotency-Key` is required. Reuse the same key and request to recover the enrollment, including after the original response is no longer retained. Reusing the key with different enrollment details returns `409`. Read the subscription and its period history to check payment and package delivery separately.
+ *
+ */
+export const createEsimRecurringSubscription = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateEsimRecurringSubscriptionData, ThrowOnError>,
+): RequestResult<
+  CreateEsimRecurringSubscriptionResponses,
+  CreateEsimRecurringSubscriptionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateEsimRecurringSubscriptionResponses,
+    CreateEsimRecurringSubscriptionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/subscriptions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get a recurring eSIM subscription
+ *
+ * Returns the current paid period separately from package delivery and cancellation state.
+ */
+export const getEsimRecurringSubscription = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEsimRecurringSubscriptionData, ThrowOnError>,
+): RequestResult<
+  GetEsimRecurringSubscriptionResponses,
+  GetEsimRecurringSubscriptionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEsimRecurringSubscriptionResponses,
+    GetEsimRecurringSubscriptionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/subscriptions/{subscription_id}",
+    ...options,
+  });
+
+/**
+ * List recurring eSIM periods
+ *
+ * Returns funded periods with their original charges, confirmed credits, and delivery orders. Unfunded renewals do not create a paid period.
+ */
+export const listEsimRecurringPeriods = <ThrowOnError extends boolean = false>(
+  options: Options<ListEsimRecurringPeriodsData, ThrowOnError>,
+): RequestResult<
+  ListEsimRecurringPeriodsResponses,
+  ListEsimRecurringPeriodsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListEsimRecurringPeriodsResponses,
+    ListEsimRecurringPeriodsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/subscriptions/{subscription_id}/periods",
+    ...options,
+  });
+
+/**
+ * Cancel recurring eSIM renewal
+ *
+ * Stops future package renewal at the current paid boundary. A period already committed remains payable. The installed profile and separately purchased packages are preserved.
+ */
+export const cancelEsimRecurringSubscription = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CancelEsimRecurringSubscriptionData, ThrowOnError>,
+): RequestResult<
+  CancelEsimRecurringSubscriptionResponses,
+  CancelEsimRecurringSubscriptionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CancelEsimRecurringSubscriptionResponses,
+    CancelEsimRecurringSubscriptionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/subscriptions/{subscription_id}/cancel",
+    ...options,
+  });
+
+/**
+ * List eSIM subscribers
+ *
+ * Returns person references in this workspace, newest first. Filter by contact_id to find an existing subscriber.
+ */
+export const listEsimSubscribers = <ThrowOnError extends boolean = false>(
+  options?: Options<ListEsimSubscribersData, ThrowOnError>,
+): RequestResult<
+  ListEsimSubscribersResponses,
+  ListEsimSubscribersErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListEsimSubscribersResponses,
+    ListEsimSubscribersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/subscribers",
+    ...options,
+  });
+
+/**
+ * Create an eSIM subscriber
+ *
+ * Creates or returns the subscriber associated with a contact in this workspace. A subscriber identifies the person using the service. This request does not buy an eSIM, assign a profile, or grant workspace access. It requires `email_marketing:read` and `esim:write`.
+ *
+ * Creating this association prevents deletion of the contact, including after the assigned eSIM ends. Subscriber associations cannot currently be removed, detached, or anonymized. Releasing an eSIM does not restore contact deletion.
+ *
+ */
+export const createEsimSubscriber = <ThrowOnError extends boolean = false>(
+  options: Options<CreateEsimSubscriberData, ThrowOnError>,
+): RequestResult<
+  CreateEsimSubscriberResponses,
+  CreateEsimSubscriberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateEsimSubscriberResponses,
+    CreateEsimSubscriberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/subscribers",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get an eSIM subscriber
+ *
+ * Returns the contact reference for a subscriber in this workspace. Contact details remain available through Contacts with its separate permissions.
+ */
+export const getEsimSubscriber = <ThrowOnError extends boolean = false>(
+  options: Options<GetEsimSubscriberData, ThrowOnError>,
+): RequestResult<
+  GetEsimSubscriberResponses,
+  GetEsimSubscriberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEsimSubscriberResponses,
+    GetEsimSubscriberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/subscribers/{subscriber_id}",
+    ...options,
+  });
+
+/**
+ * Get an eSIM assignment
+ *
+ * Returns the assigned person. An unassigned eSIM or a resource outside this workspace returns 404.
+ */
+export const getEsimAssignment = <ThrowOnError extends boolean = false>(
+  options: Options<GetEsimAssignmentData, ThrowOnError>,
+): RequestResult<
+  GetEsimAssignmentResponses,
+  GetEsimAssignmentErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEsimAssignmentResponses,
+    GetEsimAssignmentErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}/assignment",
+    ...options,
+  });
+
+/**
+ * Assign an eSIM to a person
+ *
+ * Assigns an existing, allocated eSIM to a subscriber in the same workspace. Unavailable profile states return 409. Identification guidance does not gate assignment; customers handle identification collection and compliance. Repeating the same assignment returns its existing record; assigning a different person returns 409. This does not change paid packages, deliver credentials, or grant access to them.
+ */
+export const createEsimAssignment = <ThrowOnError extends boolean = false>(
+  options: Options<CreateEsimAssignmentData, ThrowOnError>,
+): RequestResult<
+  CreateEsimAssignmentResponses,
+  CreateEsimAssignmentErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateEsimAssignmentResponses,
+    CreateEsimAssignmentErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}/assignment",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List eSIMs
+ *
+ * Returns your workspace's eSIMs as a cursor-paginated list, newest first.
+ * Filter by lifecycle `status`, exact `iccid`, tag, or creation time;
+ * pass the response's `next_cursor` back as `starting_after` to fetch the
+ * next page.
+ *
+ * To find an eSIM you cannot name by its full ICCID, search on
+ * `iccid_prefix`, `display_name`, or `phone_number`. Each searches a
+ * different identifier and each combines with the filters above, narrowing
+ * the list rather than widening it. Searching never reaches outside the
+ * workspace the request is scoped to, so an eSIM belonging to another
+ * workspace is absent from the results rather than reported as forbidden.
+ *
+ */
+export const listEsims = <ThrowOnError extends boolean = false>(
+  options?: Options<ListEsimsData, ThrowOnError>,
+): RequestResult<ListEsimsResponses, ListEsimsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListEsimsResponses,
+    ListEsimsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims",
+    ...options,
+  });
+
+/**
+ * Release an eSIM
+ *
+ * Permanently releases an eSIM. This is irreversible: the eSIM can never be
+ * installed or used again, any remaining package data balance is forfeited,
+ * and release never credits anything back. Use release when responding to
+ * fraud or closing out a trip; to pause service temporarily, use
+ * [Suspend an eSIM](/docs/api/reference/suspend-esim) instead.
+ *
+ * Release completes asynchronously: the `202` response returns the eSIM in
+ * `releasing`, and the `esim.released` webhook event confirms completion.
+ * An eSIM with an order still in flight cannot be released: wait for the
+ * order to reach a terminal status first. When unexpired balance remains,
+ * the request fails with a conflict unless `acknowledge_balance_forfeit=true`.
+ *
+ */
+export const releaseEsim = <ThrowOnError extends boolean = false>(
+  options: Options<ReleaseEsimData, ThrowOnError>,
+): RequestResult<ReleaseEsimResponses, ReleaseEsimErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    ReleaseEsimResponses,
+    ReleaseEsimErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}",
+    ...options,
+  });
+
+/**
+ * Get an eSIM
+ *
+ * Returns one eSIM: lifecycle status, device installation state, current data packages with balances, service-period timestamps, and the most recent network attachment. Balances update as mobile networks report usage: each package's `balance.as_of` tells you how fresh they are.
+ *
+ */
+export const getEsim = <ThrowOnError extends boolean = false>(
+  options: Options<GetEsimData, ThrowOnError>,
+): RequestResult<GetEsimResponses, GetEsimErrors, ThrowOnError> =>
+  (options.client ?? client).get<GetEsimResponses, GetEsimErrors, ThrowOnError>(
+    {
+      security: [
+        { scheme: "bearer", type: "http" },
+        {
+          in: "cookie",
+          name: "bird_session",
+          type: "apiKey",
+        },
+      ],
+      url: "/v1/esim/sims/{esim_id}",
+      ...options,
+    },
+  );
+
+/**
+ * Update an eSIM
+ *
+ * Updates the eSIM's display name, tags, or metadata. Lifecycle and connectivity are managed through the dedicated endpoints.
+ */
+export const updateEsim = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateEsimData, ThrowOnError>,
+): RequestResult<UpdateEsimResponses, UpdateEsimErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    UpdateEsimResponses,
+    UpdateEsimErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get eSIM install credentials
+ *
+ * Returns installation details for an eSIM, including an iOS installation link, an activation code, and manual setup components. Android installation links and hosted QR image URLs are currently unavailable and return null. Read `instructions` for device-specific steps in the returned language.
+ *
+ * Keep installation details private: they can grant access to the profile. A null `apn`, `confirmation_code`, or `data_roaming_required` means the requirement is unknown; it does not mean the setting is unnecessary. Returns `409` when the profile cannot be installed and `503` when credentials are temporarily unavailable.
+ *
+ */
+export const getEsimCredentials = <ThrowOnError extends boolean = false>(
+  options: Options<GetEsimCredentialsData, ThrowOnError>,
+): RequestResult<
+  GetEsimCredentialsResponses,
+  GetEsimCredentialsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEsimCredentialsResponses,
+    GetEsimCredentialsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}/credentials",
+    ...options,
+  });
+
+/**
+ * Send install credentials to the traveler
+ *
+ * Sends a hosted installation link by email or SMS. The eSIM must be installable. Email includes the link expiry time; SMS includes the link. The recipient opens the page to view the QR code and manual installation details. Links expire after seven days; resending leaves earlier links valid until expiry or explicit revocation.
+ *
+ * A `202` response confirms acceptance for sending. Check [List credential deliveries](/docs/api/reference/list-esim-deliveries) for the delivery outcome and any failure code. Reuse the same `Idempotency-Key` to recover an accepted send while its response is retained.
+ *
+ * Returns `409` with `E26012` when the selected channel is unavailable; choose another configured channel. New deliveries return `501` while hosted links are unavailable. A retained successful response can still be replayed during that time.
+ *
+ */
+export const deliverEsimCredentials = <ThrowOnError extends boolean = false>(
+  options: Options<DeliverEsimCredentialsData, ThrowOnError>,
+): RequestResult<
+  DeliverEsimCredentialsResponses,
+  DeliverEsimCredentialsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    DeliverEsimCredentialsResponses,
+    DeliverEsimCredentialsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}/credentials/deliver",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List an eSIM's credential deliveries
+ *
+ * Returns the credential deliveries sent for this eSIM, newest first (the most recent 50), each with its outcome. A delivery settles to `delivered` or `failed` and is also reported by the `esim.credentials.delivered` and `esim.credentials.delivery_failed` events carrying the same delivery id.
+ *
+ */
+export const listEsimDeliveries = <ThrowOnError extends boolean = false>(
+  options: Options<ListEsimDeliveriesData, ThrowOnError>,
+): RequestResult<
+  ListEsimDeliveriesResponses,
+  ListEsimDeliveriesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListEsimDeliveriesResponses,
+    ListEsimDeliveriesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}/deliveries",
+    ...options,
+  });
+
+/**
+ * Create a hosted install link
+ *
+ * Creates a link to a hosted installation page for one eSIM. The recipient can open the page without a Bird account. The returned `url` grants access to installation details: share it privately and retain it securely if needed, because later reads do not return it.
+ *
+ * The link expires after seven days. Creating another link leaves earlier links valid. Use [Revoke a hosted install link](/docs/api/reference/delete-esim-install-link) to disable a link before expiry. A matching retry with the same `Idempotency-Key` returns the original response while it is retained; after that, a retry creates a new link.
+ *
+ * The eSIM must be installable. Returns `409` when the profile cannot be installed, `503` when credentials are temporarily unavailable, or `501` when new hosted links are unavailable. A retained successful response can still be replayed while new links are unavailable.
+ *
+ */
+export const createEsimInstallLink = <ThrowOnError extends boolean = false>(
+  options: Options<CreateEsimInstallLinkData, ThrowOnError>,
+): RequestResult<
+  CreateEsimInstallLinkResponses,
+  CreateEsimInstallLinkErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateEsimInstallLinkResponses,
+    CreateEsimInstallLinkErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}/install-links",
+    ...options,
+  });
+
+/**
+ * Revoke a hosted install link
+ *
+ * Revokes a hosted installation link so it no longer grants access to installation details. Revoking an expired or already revoked link also succeeds.
+ *
+ * Revocation does not remove an installed profile or stop its service. Use [Suspend an eSIM](/docs/api/reference/suspend-esim) to pause data service. A link belonging to another eSIM returns `404`. Returns `501` when hosted installation is unavailable in the region.
+ *
+ */
+export const deleteEsimInstallLink = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteEsimInstallLinkData, ThrowOnError>,
+): RequestResult<
+  DeleteEsimInstallLinkResponses,
+  DeleteEsimInstallLinkErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteEsimInstallLinkResponses,
+    DeleteEsimInstallLinkErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}/install-links/{install_link_id}",
+    ...options,
+  });
+
+/**
+ * List an eSIM's data packages
+ *
+ * Returns the eSIM's data packages with per-zone balances, validity, and status, newest first and in full: an eSIM holds at most package_limit concurrent packages. Balances update as mobile networks report usage; `balance.as_of` tells you how fresh they are.
+ *
+ */
+export const listEsimPackages = <ThrowOnError extends boolean = false>(
+  options: Options<ListEsimPackagesData, ThrowOnError>,
+): RequestResult<
+  ListEsimPackagesResponses,
+  ListEsimPackagesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListEsimPackagesResponses,
+    ListEsimPackagesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}/packages",
+    ...options,
+  });
+
+/**
+ * Remove a data package
+ *
+ * Removes a data package and frees capacity under the eSIM's `package_limit`. Remaining data is forfeited without a refund. If usable balance remains, the request returns `409` unless `acknowledge_balance_forfeit=true`.
+ *
+ * A `202` response returns the package in `removing`. Use [Get a data package](/docs/api/reference/get-esim-package) to confirm `removed`. If the network rejects removal, the package returns to its previous status.
+ *
+ */
+export const deleteEsimPackage = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteEsimPackageData, ThrowOnError>,
+): RequestResult<
+  DeleteEsimPackageResponses,
+  DeleteEsimPackageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteEsimPackageResponses,
+    DeleteEsimPackageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}/packages/{package_id}",
+    ...options,
+  });
+
+/**
+ * Get a data package
+ *
+ * Returns one data package with its balance, validity, speed class, and status.
+ */
+export const getEsimPackage = <ThrowOnError extends boolean = false>(
+  options: Options<GetEsimPackageData, ThrowOnError>,
+): RequestResult<GetEsimPackageResponses, GetEsimPackageErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetEsimPackageResponses,
+    GetEsimPackageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}/packages/{package_id}",
+    ...options,
+  });
+
+/**
+ * List offers an eSIM can take
+ *
+ * Returns offers currently compatible with this eSIM’s network, package capacity, and existing packages. Use these offers for top-ups. Availability can change before purchase; refresh the list before ordering. An incompatible top-up returns `409`.
+ */
+export const listEsimCompatibleOffers = <ThrowOnError extends boolean = false>(
+  options: Options<ListEsimCompatibleOffersData, ThrowOnError>,
+): RequestResult<
+  ListEsimCompatibleOffersResponses,
+  ListEsimCompatibleOffersErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListEsimCompatibleOffersResponses,
+    ListEsimCompatibleOffersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}/compatible-offers",
+    ...options,
+  });
+
+/**
+ * Suspend an eSIM
+ *
+ * Suspends the eSIM's data service, for example during a payment dispute or a suspected-fraud hold. Suspension is reversible: use [Resume an eSIM](/docs/api/reference/resume-esim) to restore service. The suspension does not pause validity: package expiry and the eSIM's service period keep running while suspended. Completes asynchronously; the `esim.suspended` webhook event confirms it.
+ *
+ */
+export const suspendEsim = <ThrowOnError extends boolean = false>(
+  options: Options<SuspendEsimData, ThrowOnError>,
+): RequestResult<SuspendEsimResponses, SuspendEsimErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    SuspendEsimResponses,
+    SuspendEsimErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}/suspend",
+    ...options,
+  });
+
+/**
+ * Resume an eSIM
+ *
+ * Resumes a suspended eSIM so it can use data again. Completes asynchronously; the `esim.resumed` webhook event confirms it. Resuming an eSIM that is not suspended returns a conflict.
+ *
+ */
+export const resumeEsim = <ThrowOnError extends boolean = false>(
+  options: Options<ResumeEsimData, ThrowOnError>,
+): RequestResult<ResumeEsimResponses, ResumeEsimErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    ResumeEsimResponses,
+    ResumeEsimErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/sims/{esim_id}/resume",
+    ...options,
+  });
+
+/**
+ * Get the eSIM settings
+ *
+ * Returns your workspace’s eSIM settings, including defaults for fields you have not changed. Use the update operation to change them.
+ */
+export const getEsimSettings = <ThrowOnError extends boolean = false>(
+  options?: Options<GetEsimSettingsData, ThrowOnError>,
+): RequestResult<
+  GetEsimSettingsResponses,
+  GetEsimSettingsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetEsimSettingsResponses,
+    GetEsimSettingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/settings",
+    ...options,
+  });
+
+/**
+ * Update the eSIM settings
+ *
+ * Applies partial changes to your workspace's eSIM settings and returns the effective result. Omit a field to leave it as it is. The change applies to the next send immediately.
+ *
+ */
+export const updateEsimSettings = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateEsimSettingsData, ThrowOnError>,
+): RequestResult<
+  UpdateEsimSettingsResponses,
+  UpdateEsimSettingsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateEsimSettingsResponses,
+    UpdateEsimSettingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/esim/settings",
     ...options,
     headers: {
       "Content-Type": "application/json",

@@ -10,28 +10,30 @@ export type WhatsappAgentsNotificationsCreateParams = NonNullable<CreateWhatsApp
 
 export class WhatsappAgentsNotificationsResource extends Resource {
   /**
-   * List the notifications sent to the agent on this WhatsApp number, newest first, each with what came of it, as a cursor page.
+   * List the notifications sent to the agents on your WhatsApp numbers, newest first, each with what came of it, as a cursor page. Filter by `from` for one number's agent.
    *
    * @example Find what an agent skipped
-   * const notifications = await bird.whatsapp.agents.notifications.list("wan_01krdgeqcxet5s7t44vh8rt9mg", {
+   * const notifications = await bird.whatsapp.agents.notifications.list({
+   *   from: "+13124495648",
    *   status: "skipped",
    * });
    * for (const notification of notifications.data ?? []) {
    *   console.log(notification.name, notification.skipped_reason);
    * }
    */
-  list(numberId: string, query?: WhatsappAgentsNotificationsListQuery, options?: RequestOptions): PaginatedPromise<WhatsAppAgentNotification> {
+  list(query?: WhatsappAgentsNotificationsListQuery, options?: RequestOptions): PaginatedPromise<WhatsAppAgentNotification> {
     return this.paginated<WhatsAppAgentNotification>("GET", options, ({ signal, headers }, cursor) =>
-      listWhatsAppAgentNotifications({ client: this.client, path: { number_id: numberId }, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
+      listWhatsAppAgentNotifications({ client: this.client, query: { ...query, starting_after: cursor ?? query?.starting_after, ending_before: cursor === undefined ? query?.ending_before : undefined }, headers, signal }));
   }
 
   /**
-   * Tell the agent on this WhatsApp number that something happened in your systems for one contact, such as a payment landing or an order shipping, so it can write to them about it. The notification is handed to WhatsApp in the background; read it back with `whatsapp.agents.notifications.get` to see whether the agent acted on it.
+   * Tell the agent on the `from` business number that something happened in your systems for one contact, such as a payment landing or an order shipping, so it can write to them about it. The notification is handed to WhatsApp in the background; read it back with `whatsapp.agents.notifications.get` to see whether the agent acted on it.
    *
    * @example Tell an agent something happened
    * // The agent decides whether and how to tell the contact. The answer reads
    * // accepted; read it back to see whether the agent acted on it.
-   * const notification = await bird.whatsapp.agents.notifications.create("wan_01krdgeqcxet5s7t44vh8rt9mg", {
+   * const notification = await bird.whatsapp.agents.notifications.create({
+   *   from: "+13124495648",
    *   to: "+14155551234",
    *   name: "order_shipped",
    *   description: "Order 88213 left the warehouse and arrives on Thursday.",
@@ -39,25 +41,22 @@ export class WhatsappAgentsNotificationsResource extends Resource {
    * });
    * console.log(notification.id, notification.status);
    */
-  create(numberId: string, params: WhatsappAgentsNotificationsCreateParams, options?: RequestOptions): APIPromise<WhatsAppAgentNotification> {
+  create(params: WhatsappAgentsNotificationsCreateParams, options?: RequestOptions): APIPromise<WhatsAppAgentNotification> {
     return this.call<WhatsAppAgentNotification>("POST", options, ({ signal, headers }) =>
-      createWhatsAppAgentNotification({ client: this.client, path: { number_id: numberId }, body: params, headers, signal }));
+      createWhatsAppAgentNotification({ client: this.client, body: params, headers, signal }));
   }
 
   /**
-   * Read one notification sent to the agent on this WhatsApp number, with what came of it.
+   * Read one notification sent to one of your agents, with what came of it.
    *
    * @example Read what came of a notification
    * // A notification still on its way to WhatsApp is not readable yet, so a read
    * // straight after create can throw a not-found error.
-   * const notification = await bird.whatsapp.agents.notifications.get(
-   *   "wan_01krdgeqcxet5s7t44vh8rt9mg",
-   *   "waan_01krdgeqcxet5s7t44vh8rt9m7",
-   * );
+   * const notification = await bird.whatsapp.agents.notifications.get("waan_01krdgeqcxet5s7t44vh8rt9m7");
    * console.log(notification.status, notification.skipped_reason ?? notification.error?.description);
    */
-  get(numberId: string, notificationId: string, options?: RequestOptions): APIPromise<WhatsAppAgentNotification> {
+  get(notificationId: string, options?: RequestOptions): APIPromise<WhatsAppAgentNotification> {
     return this.call<WhatsAppAgentNotification>("GET", options, ({ signal, headers }) =>
-      getWhatsAppAgentNotification({ client: this.client, path: { number_id: numberId, notification_id: notificationId }, headers, signal }));
+      getWhatsAppAgentNotification({ client: this.client, path: { notification_id: notificationId }, headers, signal }));
   }
 }

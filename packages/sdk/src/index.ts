@@ -419,6 +419,8 @@ export type {
 export { WebhookEventType } from "./event-types.gen.js";
 export type { WebhookEventTypeValue } from "./event-types.gen.js";
 export {
+  EsimActionName,
+  EsimActionUnavailableReason,
   AMBBusinessAccountReviewStatus,
   AMBMessageEventType,
   AMBFormKeyboardType,
@@ -489,6 +491,8 @@ export {
   WhatsAppUsernameStatus,
 } from "./open-enums.gen.js";
 export type {
+  EsimActionNameValue,
+  EsimActionUnavailableReasonValue,
   AMBBusinessAccountReviewStatusValue,
   AMBMessageEventTypeValue,
   AMBFormKeyboardTypeValue,
@@ -768,3 +772,61 @@ export type {
   AmbSuppressionsCreateParams,
   AmbSuppression,
 } from "./resources/ambSuppressions.gen.js";
+
+export type {
+  EsimSummary,
+  Esim,
+  EsimCompatibleOfferList,
+  EsimListQuery,
+  EsimUpdateParams,
+  EsimReleaseQuery,
+} from "./resources/esim.gen.js";
+export type {
+  EsimAssignment,
+  EsimAssignmentCreateParams,
+} from "./resources/esimAssignment.gen.js";
+export type {
+  EsimCredentials,
+  EsimCredentialsDelivery,
+  EsimCredentialsDeliverParams,
+} from "./resources/esimCredentials.gen.js";
+export type { EsimDeliveryList } from "./resources/esimDeliveries.gen.js";
+export type { EsimInstallLink } from "./resources/esimInstallLinks.gen.js";
+export type {
+  EsimOfferSummary,
+  EsimOffer,
+  EsimOfferRequirements,
+  EsimCheckoutOptions,
+  EsimRecurringOffer,
+  EsimOffersListQuery,
+} from "./resources/esimOffers.gen.js";
+export type {
+  EsimOrder,
+  EsimOrdersCreateParams,
+  EsimOrdersListQuery,
+} from "./resources/esimOrders.gen.js";
+export type {
+  EsimPackageList,
+  EsimPackage,
+  EsimPackagesDeleteQuery,
+} from "./resources/esimPackages.gen.js";
+export type {
+  EsimRecurringSubscription,
+  EsimRecurringPeriod,
+  EsimRecurringSubscriptionsCreateParams,
+  EsimRecurringSubscriptionsListQuery,
+  EsimRecurringSubscriptionsPeriodsQuery,
+} from "./resources/esimRecurringSubscriptions.gen.js";
+export type {
+  EsimSettings,
+  EsimSettingsUpdateParams,
+} from "./resources/esimSettings.gen.js";
+export type {
+  EsimSubscriber,
+  EsimSubscribersCreateParams,
+  EsimSubscribersListQuery,
+} from "./resources/esimSubscribers.gen.js";
+export type {
+  EsimZone,
+  EsimZonesListQuery,
+} from "./resources/esimZones.gen.js";

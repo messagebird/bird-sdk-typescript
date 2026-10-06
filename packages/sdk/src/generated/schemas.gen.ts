@@ -1512,6 +1512,13 @@ export const RealtimeAppKeyListSchema = {
   },
 } as const;
 
+export const EmailBroadcastIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^eb_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "eb_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const EmailMessageStatusSchema = {
   type: "string",
   minLength: 1,
@@ -1590,13 +1597,6 @@ export const EmailTemplateVersionIDSchema = {
   minLength: 1,
   pattern: "^emv_[0-9a-hjkmnp-tv-z]{26}$",
   example: "emv_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const EmailBroadcastIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^eb_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "eb_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const TagSchema = {
@@ -2870,6 +2870,25 @@ export const EmailMessageContentSchema = {
   },
 } as const;
 
+export const MoneySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["amount", "currency_code"],
+  properties: {
+    amount: {
+      type: "string",
+      minLength: 1,
+      description: "Decimal amount as a string, in major currency units.",
+      example: "0.00995",
+    },
+    currency_code: {
+      $ref: "#/components/schemas/CurrencyCode",
+      description: "ISO 4217 currency code.",
+      example: "USD",
+    },
+  },
+} as const;
+
 export const EmailBroadcastStatusSchema = {
   type: "string",
   minLength: 1,
@@ -2955,6 +2974,13 @@ export const EmailBroadcastSchema = {
       pattern: "^eb_[0-9a-hjkmnp-tv-z]{26}$",
       description: "Broadcast ID.",
       example: "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    display_label: {
+      type: "string",
+      readOnly: true,
+      example: "Weekly news",
+      description:
+        "Label for selecting this broadcast on list and single-broadcast reads. With `email_management` read access, uses the retained subject from the template version resolved when execution starts, then its non-generated name. Draft and scheduled broadcasts use the name. Omitted when no authoritative label is available; clients can show a localized Untitled broadcast fallback. Without that access, uses the canonical broadcast ID. Absent from mutation responses.",
     },
     from: {
       $ref: "#/components/schemas/EmailAddress",
@@ -16179,6 +16205,221 @@ export const WhatsAppNumberStatusSchema = {
   example: "connected",
 } as const;
 
+export const WhatsAppAgentNotificationStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["accepted", "success", "skipped", "failed"],
+  description:
+    "Where a notification you sent the agent stands. One state is transient and three are final.\n\n- `accepted` means Bird holds the notification: it is on its way to WhatsApp, or WhatsApp is still working on it. Nothing is charged for a notification, unlike a message that reads `accepted`.\n- `success` means the agent acted on it.\n- `skipped` means the agent read it and chose to say nothing; `skipped_reason` says why.\n- `failed` means WhatsApp refused it or reported a failure, or no outcome arrived within a day; `error` says why.\n",
+  example: "success",
+} as const;
+
+export const WhatsAppAgentNotificationIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^waan_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "waan_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppAgentNotificationErrorSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["description", "meta_error_code"],
+  description: "Why a notification sent to the agent failed.",
+  properties: {
+    description: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "WhatsApp's own explanation, passed through: what it said when it refused the notification, or its failure summary once it had worked on it. Show it to the person who sent the notification; never match on its text. Carries Bird's own words instead when the failure was Bird's verdict, such as no outcome arriving within a day.\n",
+      example: "Event payload exceeds the maximum size.",
+    },
+    meta_error_code: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "WhatsApp's most specific code when it refused the notification outright: its error subcode where it sent one, otherwise its top-level code. Treat it as an opaque string. Null when WhatsApp took the notification and reported the failure later, which carries no code, and when the failure was Bird's own verdict.\n",
+      example: "100",
+    },
+  },
+} as const;
+
+export const WhatsAppAgentNotificationSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A notification you sent the agent about one contact, and what came of it. The agent decides whether to write to the contact about it; that message, if any, shows up on the contact's conversation.\n",
+  required: [
+    "id",
+    "from",
+    "to",
+    "name",
+    "description",
+    "payload",
+    "status",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppAgentNotificationID",
+        },
+      ],
+      readOnly: true,
+      description: "Unique identifier for the notification.",
+    },
+    from: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The business number whose agent the notification was sent to, in E.164 format.",
+      example: "+13124495648",
+    },
+    to: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The contact the notification was about, as you addressed it: a phone number in E.164 format, or a business-scoped user ID.\n",
+      example: "+14155551234",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 256,
+      readOnly: true,
+      description: "Your own name for what happened, as you sent it.",
+      example: "order_shipped",
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      maxLength: 1024,
+      readOnly: true,
+      description: "What happened, as you sent it.",
+      example: "Order 88213 left the warehouse and arrives on Thursday.",
+    },
+    payload: {
+      type: "string",
+      minLength: 1,
+      maxLength: 4096,
+      readOnly: true,
+      description: "The data you attached, as you sent it.",
+      example: '{"order_id":"88213","carrier":"ACME Courier"}',
+    },
+    status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppAgentNotificationStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Where the notification stands. `accepted` from the moment Bird takes it, then one of the three final states once WhatsApp has answered.\n",
+    },
+    skipped_reason: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "WhatsApp's own account of why the agent chose to say nothing, passed through. Present only when `status` is `skipped`. Show it to the person who sent the notification; never match on its text.\n",
+      example: "The contact's conversation is currently held by the business.",
+    },
+    error: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppAgentNotificationError",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Why the notification failed. Present only when `status` is `failed`.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When Bird accepted the notification.",
+      example: "2026-10-02T08:00:00Z",
+    },
+  },
+} as const;
+
+export const WhatsAppAgentNotificationListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "A page of the notifications sent to the agent.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppAgentNotification",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppAgentNotificationCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["from", "to", "name", "description", "payload"],
+  properties: {
+    from: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The business phone number whose agent should act on the notification, in E.164 format (for example `+13124495648`), the same form a message's `from` takes. It must be a number this workspace has connected and that runs an agent.\n",
+      example: "+13124495648",
+    },
+    to: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The contact the notification is about: a phone number in E.164 format (for example `+14155551234`), or the contact's business-scoped user ID (for example `US.13491208655302741918`), the same forms a message's `to` accepts. A phone number is normalized before the call reaches WhatsApp, so spacing does not matter. WhatsApp documents a phone number for this call; a business-scoped user ID is passed through as given.\n",
+      example: "+14155551234",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 256,
+      description:
+        "Your own name for what happened, such as `payment_received` or `order_shipped`. The agent reads it as the kind of thing that happened, so keep one name per kind. WhatsApp calls this the event type.\n",
+      example: "order_shipped",
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      maxLength: 1024,
+      description:
+        "What happened, in a sentence the agent can tell the contact.",
+      example: "Order 88213 left the warehouse and arrives on Thursday.",
+    },
+    payload: {
+      type: "string",
+      minLength: 1,
+      maxLength: 4096,
+      description:
+        "Details the agent may draw on when it writes to the contact, as one JSON string. WhatsApp passes it to the agent unchanged and does not read it itself.\n",
+      example:
+        '{"order_id":"88213","carrier":"ACME Courier","eta":"2026-10-02"}',
+    },
+  },
+  description:
+    "Something that happened in your systems that the agent should tell the contact about, such as a payment landing or an order shipping. WhatsApp processes it in the background, so read the notification back for what came of it.\n",
+} as const;
+
 export const WhatsAppNumberScopeSchema = {
   type: "string",
   minLength: 1,
@@ -16498,207 +16739,6 @@ export const NumbersDedicatedAllocationIDSchema = {
   minLength: 1,
   pattern: "^nda_[0-9a-hjkmnp-tv-z]{26}$",
   example: "nda_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const WhatsAppAgentNotificationStatusSchema = {
-  type: "string",
-  minLength: 1,
-  enum: ["accepted", "success", "skipped", "failed"],
-  description:
-    "Where a notification you sent the agent stands. One state is transient and three are final.\n\n- `accepted` means Bird holds the notification: it is on its way to WhatsApp, or WhatsApp is still working on it. Nothing is charged for a notification, unlike a message that reads `accepted`.\n- `success` means the agent acted on it.\n- `skipped` means the agent read it and chose to say nothing; `skipped_reason` says why.\n- `failed` means WhatsApp refused it or reported a failure, or no outcome arrived within a day; `error` says why.\n",
-  example: "success",
-} as const;
-
-export const WhatsAppAgentNotificationIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^waan_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "waan_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const WhatsAppAgentNotificationErrorSchema = {
-  type: "object",
-  additionalProperties: false,
-  readOnly: true,
-  required: ["description", "meta_error_code"],
-  description: "Why a notification sent to the agent failed.",
-  properties: {
-    description: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "WhatsApp's own explanation, passed through: what it said when it refused the notification, or its failure summary once it had worked on it. Show it to the person who sent the notification; never match on its text. Carries Bird's own words instead when the failure was Bird's verdict, such as no outcome arriving within a day.\n",
-      example: "Event payload exceeds the maximum size.",
-    },
-    meta_error_code: {
-      type: ["string", "null"],
-      readOnly: true,
-      description:
-        "WhatsApp's most specific code when it refused the notification outright: its error subcode where it sent one, otherwise its top-level code. Treat it as an opaque string. Null when WhatsApp took the notification and reported the failure later, which carries no code, and when the failure was Bird's own verdict.\n",
-      example: "100",
-    },
-  },
-} as const;
-
-export const WhatsAppAgentNotificationSchema = {
-  type: "object",
-  additionalProperties: false,
-  description:
-    "A notification you sent the agent about one contact, and what came of it. The agent decides whether to write to the contact about it; that message, if any, shows up on the contact's conversation.\n",
-  required: [
-    "id",
-    "to",
-    "name",
-    "description",
-    "payload",
-    "status",
-    "created_at",
-  ],
-  properties: {
-    id: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppAgentNotificationID",
-        },
-      ],
-      readOnly: true,
-      description: "Unique identifier for the notification.",
-    },
-    to: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppAddress",
-        },
-      ],
-      readOnly: true,
-      description:
-        "The contact the notification was about: the phone number or business-scoped user ID you addressed it to, in the same shape a message's `to` uses.\n",
-    },
-    name: {
-      type: "string",
-      minLength: 1,
-      maxLength: 256,
-      readOnly: true,
-      description: "Your own name for what happened, as you sent it.",
-      example: "order_shipped",
-    },
-    description: {
-      type: "string",
-      minLength: 1,
-      maxLength: 1024,
-      readOnly: true,
-      description: "What happened, as you sent it.",
-      example: "Order 88213 left the warehouse and arrives on Thursday.",
-    },
-    payload: {
-      type: "string",
-      minLength: 1,
-      maxLength: 4096,
-      readOnly: true,
-      description: "The data you attached, as you sent it.",
-      example: '{"order_id":"88213","carrier":"ACME Courier"}',
-    },
-    status: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppAgentNotificationStatus",
-        },
-      ],
-      readOnly: true,
-      description:
-        "Where the notification stands. `accepted` from the moment Bird takes it, then one of the three final states once WhatsApp has answered.\n",
-    },
-    skipped_reason: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "WhatsApp's own account of why the agent chose to say nothing, passed through. Present only when `status` is `skipped`. Show it to the person who sent the notification; never match on its text.\n",
-      example: "The contact's conversation is currently held by the business.",
-    },
-    error: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppAgentNotificationError",
-        },
-      ],
-      readOnly: true,
-      description:
-        "Why the notification failed. Present only when `status` is `failed`.",
-    },
-    created_at: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      readOnly: true,
-      description: "When Bird accepted the notification.",
-      example: "2026-10-02T08:00:00Z",
-    },
-  },
-} as const;
-
-export const WhatsAppAgentNotificationListSchema = {
-  allOf: [
-    {
-      type: "object",
-      required: ["data"],
-      properties: {
-        data: {
-          type: "array",
-          description: "A page of the notifications sent to the agent.",
-          items: {
-            $ref: "#/components/schemas/WhatsAppAgentNotification",
-          },
-        },
-      },
-    },
-    {
-      $ref: "#/components/schemas/_ListEnvelope",
-    },
-  ],
-} as const;
-
-export const WhatsAppAgentNotificationCreateSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["to", "name", "description", "payload"],
-  properties: {
-    to: {
-      type: "string",
-      minLength: 1,
-      description:
-        "The contact the notification is about: a phone number in E.164 format (for example `+14155551234`), or the contact's business-scoped user ID (for example `US.13491208655302741918`), the same forms a message's `to` accepts. A phone number is normalized before the call reaches WhatsApp, so spacing does not matter. WhatsApp documents a phone number for this call; a business-scoped user ID is passed through as given.\n",
-      example: "+14155551234",
-    },
-    name: {
-      type: "string",
-      minLength: 1,
-      maxLength: 256,
-      description:
-        "Your own name for what happened, such as `payment_received` or `order_shipped`. The agent reads it as the kind of thing that happened, so keep one name per kind. WhatsApp calls this the event type.\n",
-      example: "order_shipped",
-    },
-    description: {
-      type: "string",
-      minLength: 1,
-      maxLength: 1024,
-      description:
-        "What happened, in a sentence the agent can tell the contact.",
-      example: "Order 88213 left the warehouse and arrives on Thursday.",
-    },
-    payload: {
-      type: "string",
-      minLength: 1,
-      maxLength: 4096,
-      description:
-        "Details the agent may draw on when it writes to the contact, as one JSON string. WhatsApp passes it to the agent unchanged and does not read it itself.\n",
-      example:
-        '{"order_id":"88213","carrier":"ACME Courier","eta":"2026-10-02"}',
-    },
-  },
-  description:
-    "Something that happened in your systems that the agent should tell the contact about, such as a payment landing or an order shipping. WhatsApp processes it in the background, so read the notification back for what came of it.\n",
 } as const;
 
 export const WhatsAppNumberEventSortFieldSchema = {
@@ -37194,6 +37234,69 @@ export const EventEmailSuppressionCreatedSchema = {
   },
 } as const;
 
+export const EsimIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^esm_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "esm_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EsimDeliveryChannelSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["email", "sms"],
+  description: "Channel the install credentials are delivered over.",
+} as const;
+
+export const EsimDeliveryIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^edv_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "edv_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EsimPackageIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^epk_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "epk_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EsimOrderIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^eor_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "eor_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EsimOfferIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^eof_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "eof_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EsimRecurringSubscriptionIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^ers_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "ers_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EsimRecurringStopReasonSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Reason future package renewal stopped.\n\n- `canceled`: cancellation was requested.\n- `funding_unavailable`: the next period could not be funded.\n- `price_changed`: the published price changed and requires new acceptance.\n- `delivery_failed`: a paid package could not be delivered.\n- `delivery_unresolved`: the previous period’s delivery remains unresolved.\n\nCheck period history for delivery and credit outcomes before starting another subscription.\n",
+  enum: [
+    "canceled",
+    "funding_unavailable",
+    "price_changed",
+    "delivery_failed",
+    "delivery_unresolved",
+  ],
+} as const;
+
 export const PreferenceDeletedEventTypeSchema = {
   type: "string",
   minLength: 1,
@@ -39913,7 +40016,7 @@ export const VoiceLegInboundRouteRejectSchema = {
       ],
       const: "reject",
       description:
-        "The number turned the leg away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.\n",
+        "The number turned the leg away, either because its own route is reject or because it has none and the workspace default inbound route is reject.\n",
     },
   },
 } as const;
@@ -40357,6 +40460,22 @@ export const VoiceLegSchema = {
   },
 } as const;
 
+export const WalletTransactionIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^wtx_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "wtx_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const BillingProductSlugSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$",
+  description:
+    "URL-safe identifier for a billing product. Lowercase letters and digits, separated by underscores. Must start with a letter.",
+  example: "email_sends",
+} as const;
+
 export const NumberTypeSchema = {
   type: "string",
   minLength: 1,
@@ -40455,6 +40574,7 @@ export const NumberSchema = {
     "capabilities",
     "status",
     "allocated_at",
+    "releases_at",
   ],
   properties: {
     name: {
@@ -40526,6 +40646,12 @@ export const NumberSchema = {
       format: "date-time",
       minLength: 1,
       description: "When this number was allocated to your workspace.",
+    },
+    releases_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When a scheduled release of this number takes effect, at the end of its current billing period. The number stays allocated, with its current `status`, until then. `null` when no release is scheduled.",
     },
     released_at: {
       type: ["string", "null"],
@@ -41344,7 +41470,7 @@ export const VoiceCallRouteTypeSchema = {
   minLength: 1,
   enum: ["reject", "trunk", "forward", "sequence"],
   description:
-    "Which answer a number carries.\n\n- `reject`: refuses the call. This is where every number starts.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n- `sequence`: runs the configured sequence from its selected voice-call entry.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
+    "Which answer a number carries.\n\n- `reject`: refuses the call.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n- `sequence`: runs the configured sequence from its selected voice-call entry.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
   example: "reject",
 } as const;
 
@@ -41463,12 +41589,6 @@ export const VoiceNumberDirectionsSchema = {
   },
 } as const;
 
-export const VoiceInboundConfigurationErrorSchema = {
-  type: "string",
-  minLength: 1,
-  enum: ["unsupported_route_type"],
-} as const;
-
 export const VoiceCallRouteRejectSchema = {
   type: "object",
   additionalProperties: false,
@@ -41478,7 +41598,7 @@ export const VoiceCallRouteRejectSchema = {
       $ref: "#/components/schemas/VoiceCallRouteType",
       const: "reject",
       description:
-        "Refuses the call. Every number starts here, and setting it again is how you stop a number answering without giving it up.\n",
+        "Refuses the call. Setting it is how you stop a number answering without giving it up. It is also the default inbound route of a new workspace.\n",
     },
   },
 } as const;
@@ -41496,7 +41616,7 @@ export const VoiceCallRouteTrunkSchema = {
     trunk_id: {
       $ref: "#/components/schemas/SIPTrunkID",
       description:
-        'The SIP trunk that answers calls to this number. It must be one of yours and must have inbound calling enabled. Turning that trunk\'s inbound calling off, or deleting it, puts this number back on "reject".\n',
+        "The SIP trunk that answers these calls. It must be one of yours and must have inbound calling enabled. Turning that trunk's inbound calling off, or deleting it, removes this route: a number returns to your workspace's default inbound route, and a workspace default becomes \"reject\".\n",
     },
   },
 } as const;
@@ -41551,7 +41671,7 @@ export const VoiceCallRouteSequenceSchema = {
 
 export const VoiceCallRouteSchema = {
   description:
-    'What happens to a call arriving for this number, as it is configured now. Its `type` selects the shape, and each answer carries its own fields. An unconfigured number answers with "reject". Setting a route is a separate shape, and it does not offer every variant reported here.\n',
+    "What happens to a call arriving for this number, as it is configured now. Its `type` selects the shape, and each answer carries its own fields. Setting a route is a separate shape, and it does not offer every variant reported here.\n",
   oneOf: [
     {
       $ref: "#/components/schemas/VoiceCallRouteReject",
@@ -41577,6 +41697,12 @@ export const VoiceCallRouteSchema = {
   },
 } as const;
 
+export const VoiceInboundConfigurationErrorSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["unsupported_route_type"],
+} as const;
+
 export const VoiceInboundConfigurationSchema = {
   type: "object",
   additionalProperties: false,
@@ -41592,7 +41718,7 @@ export const VoiceInboundConfigurationSchema = {
         },
       ],
       description:
-        "Null when the stored route type is unsupported; inspect configuration_error before changing it.",
+        "Null when the number has no route of its own and follows your workspace's default inbound route from the voice settings. Also null when the stored route type is unsupported, in which case configuration_error says so; inspect it before changing the route.\n",
     },
     configuration_error: {
       $ref: "#/components/schemas/VoiceInboundConfigurationError",
@@ -41612,20 +41738,14 @@ export const VoiceInboundConfigurationSchema = {
   if: {
     properties: {
       route: {
-        type: "null",
+        not: {
+          type: "null",
+        },
       },
     },
     required: ["route"],
   },
   then: {
-    properties: {
-      configuration_error: {
-        $ref: "#/components/schemas/VoiceInboundConfigurationError",
-      },
-    },
-    required: ["configuration_error"],
-  },
-  else: {
     properties: {
       configuration_error: {
         not: {},
@@ -41731,7 +41851,7 @@ export const VoiceNumberListSchema = {
 
 export const VoiceCallRouteWritableSchema = {
   description:
-    'What happens to a call arriving for this number. Its `type` selects the shape, and each answer carries its own fields; the variants below are the full set you can set. An unconfigured number uses "reject".\n',
+    "What happens to a call arriving for this number. Its `type` selects the shape, and each answer carries its own fields; the variants below are the full set you can set.\n",
   oneOf: [
     {
       $ref: "#/components/schemas/VoiceCallRouteReject",
@@ -41759,7 +41879,16 @@ export const VoiceInboundConfigurationPutSchema = {
   required: ["route"],
   properties: {
     route: {
-      $ref: "#/components/schemas/VoiceCallRouteWritable",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceCallRouteWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The number's own route, or null to have it follow your workspace's default inbound route from the voice settings.\n",
     },
   },
 } as const;
@@ -41780,7 +41909,61 @@ export const VoiceNumberUpdateSchema = {
     inbound_configuration: {
       $ref: "#/components/schemas/VoiceInboundConfigurationPut",
       description:
-        'What should happen to calls arriving for this number. The route replaces\nwhatever was set before, because a number has exactly one answer at a time,\nand type "reject" is how you stop it answering. Omit the field to leave the\nanswer alone.\n\nOnly a number that can receive calls carries a route, so it is refused on\none whose directions do not include inbound.\n',
+        'What should happen to calls arriving for this number. The route replaces\nwhatever was set before, because a number has exactly one answer at a time.\nType "reject" stops it answering, and a null route returns it to your\nworkspace\'s default inbound route. Omit the field to leave the answer alone.\n\nOnly a number that can receive calls carries a route, so it is refused on\none whose directions do not include inbound.\n',
+    },
+  },
+} as const;
+
+export const VoiceSettingsInboundConfigurationSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "What happens to a call arriving for any of your Bird numbers that has no inbound route of its own.\n",
+  required: ["route"],
+  properties: {
+    route: {
+      $ref: "#/components/schemas/VoiceCallRoute",
+      description:
+        'The workspace\'s default inbound route. Defaults to "reject".',
+    },
+  },
+} as const;
+
+export const VoiceSettingsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The voice settings your workspace controls. Every field carries its effective value, whether or not the workspace has ever changed it.\n",
+  required: ["inbound_configuration"],
+  properties: {
+    inbound_configuration: {
+      $ref: "#/components/schemas/VoiceSettingsInboundConfiguration",
+    },
+  },
+} as const;
+
+export const VoiceSettingsInboundConfigurationPutSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The route for calls arriving on any of your Bird numbers that has no inbound route of its own; verified caller IDs receive no calls. It takes effect on the next call to each of those numbers. Numbers with their own route keep it.\n",
+  required: ["route"],
+  properties: {
+    route: {
+      $ref: "#/components/schemas/VoiceCallRouteWritable",
+    },
+  },
+} as const;
+
+export const VoiceSettingsUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  description:
+    "Changes to your workspace's voice settings. Omit a field to leave it as it is.\n",
+  properties: {
+    inbound_configuration: {
+      $ref: "#/components/schemas/VoiceSettingsInboundConfigurationPut",
     },
   },
 } as const;
@@ -41934,6 +42117,1126 @@ export const VoiceVerifiedNumberVerifyRequestSchema = {
       example: "123456",
     },
   },
+} as const;
+
+export const EsimZoneIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^ezn_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "ezn_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EsimSchemaRevisionSchema = {
+  type: "string",
+  minLength: 64,
+  maxLength: 64,
+  pattern: "^[a-f0-9]{64}$",
+  description:
+    "Revision identifying the returned identification schema. A changed revision means the requirements or guidance changed. It does not indicate an expiry time or purchase authorization.",
+} as const;
+
+export const EsimIdentificationSchemaSchema = {
+  type: "object",
+  additionalProperties: true,
+  description:
+    "Complete JSON Schema draft 2020-12 document for customer-side identification validation. It declares $schema, type, title, description, properties, required, and additionalProperties. Property definitions use string or object types, standard format, pattern, minLength, maxLength, enum, and nested object keywords. Enable format assertions in your validator for email addresses and dates. Every country requires first_name, last_name, and email. Other customer-owned properties are allowed, so one details object can satisfy several countries. Bird does not receive or verify the values. Document references are opaque identifiers in customer-managed storage, not Bird upload IDs or required URLs.\n",
+} as const;
+
+export const EsimZoneTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["local", "regional", "global"],
+  description:
+    "Zone breadth: a single country, a multi-country region, or worldwide.",
+} as const;
+
+export const EsimSpeedSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["full", "reduced"],
+  description:
+    "Speed class. full: data flows at full network speed until the allowance is used; reduced: speed is limited, typically after the full-speed allowance. Full-speed and reduced-speed packages cannot be combined on one eSIM.\n",
+} as const;
+
+export const EsimOfferStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["draft", "active", "retired"],
+  description:
+    "Availability of an offer.\n\n- `draft`: being curated; never returned on the customer surface and not purchasable.\n- `active`: purchasable.\n- `retired`: no longer purchasable; packages already sold are unaffected.\n",
+} as const;
+
+export const EsimZoneSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A group of countries covered by an offer. Use `countries` to check a destination rather than inferring coverage from the zone name. Purchased packages retain their coverage details from the time of purchase.",
+  required: ["id", "name", "revision", "type", "countries", "created_at"],
+  properties: {
+    id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimZoneID",
+        },
+      ],
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "Human-readable zone name.",
+      example: "Europe",
+    },
+    revision: {
+      type: "integer",
+      minimum: 1,
+      readOnly: true,
+      description: "Increments whenever the country list changes.",
+    },
+    type: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimZoneType",
+        },
+      ],
+    },
+    countries: {
+      type: "array",
+      minItems: 1,
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/CountryCode",
+      },
+      description:
+        "Countries covered by the zone, as ISO 3166-1 alpha-2 codes.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EsimStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: [
+    "provisioning",
+    "ready",
+    "activating",
+    "active",
+    "suspending",
+    "suspended",
+    "resuming",
+    "releasing",
+    "released",
+    "expired",
+    "failed",
+  ],
+  description:
+    "Lifecycle state of an eSIM. A pending state always settles: to its target on\nsuccess, or back to the prior status when the network definitively rejects\nthe change, reported by the `esim.operation_failed` event.\n\n- `provisioning`: the initial data package is being applied; install credentials may already be available.\n- `ready`: installable and usable, waiting for first network use; allows top-up orders and release. Activate before `ready_until` or the eSIM expires.\n- `activating`: an activation is being applied.\n- `active`: in service; the service period ends at `active_until`. Allows top-up orders, suspend, resync, and release.\n- `suspending`: a suspension was requested and is being applied.\n- `suspended`: data service is paused; allows resume and release.\n- `resuming`: a resume was requested and is being applied.\n- `releasing`: a permanent release is in progress.\n- `released`: permanently released; terminal.\n- `expired`: dormant. No data package has been live (each one depleted, expired, removed, or failed) for the expiry window. Not terminal: a completed top-up returns the eSIM to `active`, and release remains available. Balances and the installed profile are untouched.\n- `failed`: provisioning failed; any charge on the owning order is credited back automatically, reported by that order. Terminal.\n",
+} as const;
+
+export const EsimSubscriberIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^esub_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "esub_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EsimModeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["live", "test"],
+  description:
+    "Whether a purchase or eSIM is live or simulated. The mode is fixed when the order is created; the resulting eSIM retains it.\n\n- `live`: purchases service for use on a device and charges the wallet.\n- `test`: simulates a purchase without a charge or usable mobile service.\n\nList responses can include both modes. Filter by `mode` when separating test activity from live purchases.\n",
+} as const;
+
+export const EsimServiceCapabilitySchema = {
+  type: "string",
+  minLength: 2,
+  readOnly: true,
+  enum: ["yes", "no", "unknown"],
+  description:
+    "Whether a service is supported. `yes` confirms support, `no` confirms it is not supported, and `unknown` means support has not been established.\n",
+  example: "yes",
+} as const;
+
+export const EsimServiceCapabilitiesSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Supported services for the eSIM. These values describe capabilities; package balances and current eSIM status determine whether service can be used now. Optional phone service can remain `unknown` until a number is assigned. Data packages do not establish call or SMS allowances.",
+  required: [
+    "data",
+    "sms_inbound",
+    "sms_outbound",
+    "voice_inbound",
+    "voice_outbound",
+  ],
+  properties: {
+    data: {
+      $ref: "#/components/schemas/EsimServiceCapability",
+    },
+    sms_inbound: {
+      $ref: "#/components/schemas/EsimServiceCapability",
+    },
+    sms_outbound: {
+      $ref: "#/components/schemas/EsimServiceCapability",
+    },
+    voice_inbound: {
+      $ref: "#/components/schemas/EsimServiceCapability",
+    },
+    voice_outbound: {
+      $ref: "#/components/schemas/EsimServiceCapability",
+    },
+  },
+} as const;
+
+export const EsimInstallationSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Device-side installation state of the eSIM profile.",
+  required: ["state"],
+  properties: {
+    state: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": [
+        "pending",
+        "downloaded",
+        "installed",
+        "removed",
+        "error",
+      ],
+      description:
+        "pending: not yet downloaded by a device; downloaded: downloaded but not installed; installed: installed on the device; removed: deleted from the device; whether the profile can be installed again depends on the carrier profile, so treat removal as final; error: download or installation failed, see error_reason. Open enum: installation state is reported by the device, so additional states may be added over time. Treat an unrecognized value as a future state, not an error.\n",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the installation state last changed. Null before the first device interaction.",
+    },
+    error_reason: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "Human-readable reason installation failed, for example an ineligible device or an exhausted download limit. Null unless state is error.\n",
+    },
+  },
+} as const;
+
+export const EsimPackageStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: [
+    "provisioning",
+    "pending_first_use",
+    "active",
+    "depleted",
+    "expired",
+    "removing",
+    "removed",
+    "failed",
+  ],
+  description:
+    "Lifecycle state of a data package.\n\n- `provisioning`: being applied to the eSIM.\n- `pending_first_use`: confirmed; activates on first use in its coverage zone.\n- `active`: consuming data; validity is running.\n- `depleted`: balance fully used.\n- `expired`: validity ended; unused balance is gone.\n- `removing`: a removal was requested and is being applied. On definitive rejection the package returns to its prior status, reported by `esim.operation_failed`.\n- `removed`: taken off the eSIM at your request; remaining balance forfeited.\n- `failed`: could not be applied; any charge is credited back automatically through the owning order, which reports this through its `failed` status and the `esim.order.failed` event.\n",
+} as const;
+
+export const EsimPackageBalanceSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Package allowance and reported consumption. `total_bytes` is the purchased allowance. `used_bytes`, `remaining_bytes`, and `used_percent` are null until usage is reported. Reports can lag device usage; use `as_of` to show when the balance was updated.",
+  required: [
+    "total_bytes",
+    "used_bytes",
+    "remaining_bytes",
+    "used_percent",
+    "as_of",
+    "observed_at",
+  ],
+  properties: {
+    total_bytes: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total data in bytes, as purchased. Known from the order, so never null.",
+    },
+    used_bytes: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Data used in bytes, or null while no network has reported on this package.",
+    },
+    remaining_bytes: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Data remaining in bytes, or null while no network has reported on this package.",
+    },
+    used_percent: {
+      type: ["number", "null"],
+      minimum: 0,
+      maximum: 100,
+      readOnly: true,
+      description:
+        "Share of the total data already used, as a percentage. Null while no network has reported on this package.",
+    },
+    as_of: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When the balance was last established. Before consumption is reported, this is the package delivery time. Check whether the consumption fields are null before treating this timestamp as a usage update.",
+    },
+    observed_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "Measurement time supplied by the mobile network. Null when no measurement or measurement time is available. Use `as_of` for the balance update time.",
+    },
+  },
+} as const;
+
+export const EsimPackageSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One data package held by an eSIM: a single purchase with its own balance, validity, and coverage zone. Every order that completes creates exactly one package, so a package is always traceable to the order that bought it. An eSIM can hold several packages per zone; the right one is consumed automatically based on the device's location, and zone_balances on the eSIM carries the combined remainder per zone.\n",
+  required: [
+    "id",
+    "order_id",
+    "offer_id",
+    "zone_id",
+    "zone_name",
+    "countries",
+    "status",
+    "speed",
+    "balance",
+    "price",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimPackageID",
+        },
+      ],
+    },
+    order_id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimOrderID",
+        },
+      ],
+      description: "The order that purchased this package.",
+    },
+    offer_id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferID",
+        },
+      ],
+      description: "Offer this package was purchased from.",
+    },
+    zone_id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimZoneID",
+        },
+      ],
+      description:
+        "Coverage zone the package draws on. The name and countries below are captured at purchase time; the zone resource carries the live footprint.",
+    },
+    zone_name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "Coverage zone name, from the offer.",
+      example: "Europe",
+    },
+    countries: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/CountryCode",
+      },
+      description:
+        "Countries the package's zone covers, captured at purchase time so the package is meaningful without fetching the offer.\n",
+    },
+    status: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimPackageStatus",
+        },
+      ],
+    },
+    speed: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimSpeed",
+        },
+      ],
+      description: "Speed class, from the offer.",
+    },
+    balance: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimPackageBalance",
+        },
+      ],
+    },
+    activated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the package started consuming data (first use in its zone). Null until then.",
+    },
+    expires_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the package's validity ends and unused balance expires. Already capped by the eSIM's service period, so this is always the effective expiry. Null until the package activates.\n",
+    },
+    price: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+      ],
+      description: "What your workspace was billed for this package.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EsimZoneBalanceSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Reported balance across packages in one coverage zone. Zones can overlap; check each package’s countries before using these totals to estimate allowance for a destination. The mobile network selects which eligible package serves a connection.",
+  required: [
+    "zone_id",
+    "total_bytes",
+    "used_bytes",
+    "remaining_bytes",
+    "as_of",
+    "observed_at",
+  ],
+  properties: {
+    zone_id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimZoneID",
+        },
+      ],
+    },
+    total_bytes: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total purchased data for the zone, in bytes. Known from the orders, so never null.",
+    },
+    used_bytes: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Reported data used in this zone, in bytes. Null if any contributing package lacks a usage report. Read individual package balances for available measurements.",
+    },
+    remaining_bytes: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Data remaining, in bytes. Null under the same condition as `used_bytes`.",
+    },
+    as_of: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      readOnly: true,
+      description:
+        "Freshness of this combined figure - the oldest balance read among the zone's contributing packages. Each package's own balance.as_of can be newer.",
+    },
+    observed_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "Oldest network measurement time among the contributing packages. Null if any package lacks a report or a measurement time. Use `as_of` for the balance update time.",
+    },
+  },
+} as const;
+
+export const EsimActionNameSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "suspend",
+    "resume",
+    "release",
+    "install",
+    "top_up",
+    "assign",
+  ],
+  description:
+    "An operation you can attempt on an eSIM.\n\n- `suspend`: pause data service, keeping packages and their validity running.\n- `resume`: restore service to a suspended eSIM.\n- `release`: permanently retire the eSIM.\n- `install`: read the install credentials for a device.\n- `top_up`: order another data package onto this eSIM.\n- `assign`: assign an unassigned profile to a person, or read back the same assignment.\n\nTolerate a value you do not recognize: we report on more actions over time.\n",
+} as const;
+
+export const EsimActionUnavailableReasonSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "permission_denied",
+    "network_unsupported",
+    "network_unconfirmed",
+    "esim_state",
+    "operation_in_progress",
+    "package_limit_reached",
+    "identification_required",
+  ],
+  description:
+    "Reason an action is unavailable.\n\n- `permission_denied`: your credentials lack the required permission. Update permissions and check availability again; another restriction may still apply.\n- `network_unsupported`: the serving mobile network does not support the action for this eSIM.\n- `network_unconfirmed`: support for the action has not been confirmed. Contact support if you need it.\n- `esim_state`: the profile is not in a state that permits the action. Check the eSIM status.\n- `operation_in_progress`: an existing order must finish before this action can proceed.\n- `package_limit_reached`: the eSIM has reached its concurrent package limit. A depleted package still occupies a slot until it expires or is removed.\n- `identification_required`: retained for compatibility; subscriber assignment no longer returns this reason.\n\nTreat an unrecognized reason as unavailable and avoid automatically retrying the action.\n",
+} as const;
+
+export const EsimAvailableActionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One action, and whether this eSIM permits it for you right now.\n",
+  required: ["action", "operation", "available", "reason"],
+  properties: {
+    action: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimActionName",
+        },
+      ],
+    },
+    operation: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Operation to call for this action. Consult that operation’s reference for its request and response.",
+      example: "suspendEsim",
+    },
+    available: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether the action is available given your permissions and the current eSIM state. The action checks these again when submitted; a later request can be refused if conditions change.",
+    },
+    reason: {
+      readOnly: true,
+      description:
+        "Why the action is unavailable. Null while `available` is true.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimActionUnavailableReason",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    requires: {
+      type: "array",
+      readOnly: true,
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      description:
+        "Additional parameters required by the current state, such as `acknowledge_balance_forfeit` when releasing an eSIM with remaining data. Absent when no additional parameters apply or when permissions, network support, or profile state prevent the action.",
+      example: ["acknowledge_balance_forfeit"],
+    },
+  },
+} as const;
+
+export const EsimBalanceReportingSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  enum: ["available", "unavailable"],
+  description:
+    "Whether package consumption can be reported for this eSIM.\n\n- `available`: consumption reporting has not been ruled out. A null package balance means no measurement is available yet.\n- `unavailable`: ongoing consumption reporting is unavailable. Display the purchased `total_bytes` as allowance; do not present it as measured remaining data.\n\nThis field is separate from daily usage history. Reporting availability can change as network support is confirmed.\n",
+} as const;
+
+export const EsimNetworkAttachmentSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "The most recent mobile network the device attached to.",
+  required: ["country_code", "attached_at"],
+  properties: {
+    country_code: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/CountryCode",
+        },
+      ],
+      description: "Country of the network.",
+    },
+    country_name: {
+      type: ["string", "null"],
+      readOnly: true,
+      description: "English name of the country, or null when not known.",
+    },
+    network_name: {
+      type: ["string", "null"],
+      readOnly: true,
+      description: "Name of the mobile network, or null when not known.",
+    },
+    attached_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the device attached.",
+    },
+  },
+} as const;
+
+export const EsimSchema = {
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "id",
+        "subscriber_id",
+        "status",
+        "mode",
+        "iccid",
+        "phone_number",
+        "installation",
+        "packages",
+        "zone_balances",
+        "package_limit",
+        "usage_available",
+        "balance_reporting",
+        "order_id",
+      ],
+      properties: {
+        subscriber_id: {
+          readOnly: true,
+          oneOf: [
+            {
+              $ref: "#/components/schemas/EsimSubscriberID",
+            },
+            {
+              type: "null",
+            },
+          ],
+          description:
+            "The assigned service user, or null when the eSIM has no person assignment.",
+        },
+        id: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimID",
+            },
+          ],
+        },
+        status: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimStatus",
+            },
+          ],
+        },
+        mode: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimMode",
+            },
+          ],
+        },
+        iccid: {
+          type: ["string", "null"],
+          readOnly: true,
+          description:
+            "ICCID of the eSIM profile. Null while no profile is allocated yet, for example when provisioning failed before allocation.",
+          example: "8944500212345678912",
+        },
+        phone_number: {
+          type: ["string", "null"],
+          readOnly: true,
+          description:
+            "Phone number attached to this eSIM, in E.164 format, as the supplier reports it. Null while none is on record: a data-only plan comes with no number, and a plan that includes one reports it after provisioning.\n",
+          example: "+31612345678",
+        },
+        capabilities: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimServiceCapabilities",
+            },
+          ],
+        },
+        order_id: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimOrderID",
+            },
+          ],
+          description: "The order that created this eSIM.",
+        },
+        display_name: {
+          type: ["string", "null"],
+          maxLength: 120,
+          description:
+            "Free-text label for your own reference, for example a traveler or order reference.",
+          example: "Amsterdam trip, order 8812",
+        },
+        installation: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimInstallation",
+            },
+          ],
+        },
+        packages: {
+          type: "array",
+          readOnly: true,
+          items: {
+            $ref: "#/components/schemas/EsimPackage",
+          },
+          description: "Current data packages, one per purchase.",
+        },
+        zone_balances: {
+          type: "array",
+          readOnly: true,
+          items: {
+            $ref: "#/components/schemas/EsimZoneBalance",
+          },
+          description:
+            "Remaining data per coverage zone, combined across the zone's packages. Derived; the packages are the source of truth.",
+        },
+        available_actions: {
+          type: "array",
+          readOnly: true,
+          items: {
+            $ref: "#/components/schemas/EsimAvailableAction",
+          },
+          description:
+            "Actions currently available to you on this eSIM, with reasons for unavailable actions. Returned by the individual eSIM read. Use this to display controls and explain restrictions. Each action rechecks permissions and state when submitted, so availability is not a guarantee of success.",
+        },
+        package_limit: {
+          type: "integer",
+          minimum: 1,
+          readOnly: true,
+          example: 3,
+          description:
+            "Maximum number of concurrent data packages this eSIM can hold, counted across all zones; several packages may share one zone. Enforced when packages are added.\n",
+        },
+        usage_available: {
+          type: "boolean",
+          readOnly: true,
+          example: true,
+          description:
+            "Whether daily usage history is supported for this eSIM. The daily usage endpoint is currently unavailable; read package balances for reported consumption.",
+        },
+        balance_reporting: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimBalanceReporting",
+            },
+          ],
+          description:
+            "Whether ongoing package consumption reporting is available. Separate from daily usage history. Null package consumption values mean no measurement is available.",
+        },
+        ready_until: {
+          type: ["string", "null"],
+          format: "date-time",
+          readOnly: true,
+          description:
+            "Activate (first network use) before this moment or the eSIM expires. Null once activated.",
+        },
+        activated_at: {
+          type: ["string", "null"],
+          format: "date-time",
+          readOnly: true,
+          description:
+            "When the eSIM first used a mobile network. Null until then.",
+        },
+        active_until: {
+          type: ["string", "null"],
+          format: "date-time",
+          readOnly: true,
+          description:
+            "When the eSIM's service period ends. The period starts at activation and data packages cannot outlive it. Null until activated.\n",
+        },
+        last_attachment: {
+          readOnly: true,
+          description:
+            "Most recent network attachment, or null before first attach.",
+          oneOf: [
+            {
+              $ref: "#/components/schemas/EsimNetworkAttachment",
+            },
+            {
+              type: "null",
+            },
+          ],
+        },
+        tags: {
+          type: "array",
+          maxItems: 20,
+          items: {
+            $ref: "#/components/schemas/Tag",
+          },
+          description:
+            "Tags for routing, filtering, and stats grouping, echoed on webhook events for the eSIM.",
+        },
+        metadata: {
+          type: "object",
+          additionalProperties: true,
+          description:
+            "Your own key-value data, echoed on webhook events for the eSIM. Maximum 2 KB serialized.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+} as const;
+
+export const EsimOrderStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: [
+    "scheduled",
+    "charging",
+    "provisioning",
+    "pending",
+    "completed",
+    "failed",
+    "canceled",
+  ],
+  description:
+    "Order state.\n\n- `scheduled`: reserved for a future scheduled purchase; no charge has been made.\n- `charging`: payment is being obtained. If funds are insufficient, inspect `funding` and your wallet balance. One-time orders retry automatically; an initial recurring purchase requires an explicit retry after adding funds.\n- `provisioning`: the package is being provisioned during the request.\n- `pending`: the purchase continues after the request returns. Read the order again to check its outcome.\n- `completed`: delivery completed and the eSIM and package IDs are available. This does not confirm device installation. Terminal.\n- `failed`: delivery failed. Any charge is credited automatically; `refund_transaction_id` identifies an issued credit. Terminal.\n- `canceled`: reserved for a scheduled purchase withdrawn before execution. Canceling an unfunded order currently returns `failed` with `failure_code: canceled`.\n",
+} as const;
+
+export const EsimDeliverySchema = {
+  type: "object",
+  "x-sensitive": true,
+  additionalProperties: false,
+  description:
+    "Where and how install credentials reach the traveler. The recipient is a raw address, so delivery works for travelers who are not stored anywhere: an email address for email, an E.164 phone number for sms.\n",
+  required: ["to", "channel"],
+  properties: {
+    to: {
+      type: "string",
+      minLength: 3,
+      description:
+        "Recipient address. An email address for the email channel, an E.164 phone number for the sms channel.",
+      example: "traveler@example.com",
+    },
+    channel: {
+      $ref: "#/components/schemas/EsimDeliveryChannel",
+    },
+    locale: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+      ],
+      description:
+        "Language for the message. Falls back to the closest available language, then English.",
+    },
+  },
+} as const;
+
+export const EsimOrderFundingSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Funding needed for an order in `charging`. Add funds to the wallet and retry the existing order. One-time orders also retry automatically. A funded order proceeds to delivery; a failed order receives an automatic credit for any charge.",
+  required: ["required_amount", "lapses_at"],
+  properties: {
+    required_amount: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+      ],
+      description:
+        "Total wallet balance required for the charge, including tax. This is the required balance rather than the amount to add. Compare it with your current wallet balance.",
+    },
+    lapses_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      example: "2026-09-08T14:51:01Z",
+      description:
+        "Earliest time a further insufficient-funds attempt can fail the order. Adding funds after this time can still complete the purchase before that attempt. Check the order status to determine whether it remains payable.",
+    },
+  },
+} as const;
+
+export const EsimOrderSchema = {
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+    {
+      type: "object",
+      description:
+        "One purchase: a new eSIM with its first package, or an additional package on an existing eSIM. The order locks the quote at creation (the offer revision and the exact price) and is the durable record of the purchase: poll it until a terminal status when it does not complete inline. Orders that can be served immediately complete within the request.\n",
+      required: [
+        "id",
+        "status",
+        "mode",
+        "offer_id",
+        "offer_revision",
+        "zone_id",
+        "esim_id",
+        "subscriber_id",
+        "package_id",
+        "price",
+        "wallet_transaction_id",
+        "refund_transaction_id",
+        "funding",
+        "failure_code",
+        "failure_reason",
+        "completed_at",
+      ],
+      properties: {
+        id: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimOrderID",
+            },
+          ],
+        },
+        status: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimOrderStatus",
+            },
+          ],
+        },
+        mode: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimMode",
+            },
+          ],
+        },
+        offer_id: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimOfferID",
+            },
+          ],
+          description: "Offer purchased.",
+        },
+        offer_revision: {
+          type: "integer",
+          minimum: 1,
+          readOnly: true,
+          description:
+            "Revision of the offer this order locked at creation. The quoted price stays that of this revision even if the offer changes later. The produced package snapshots its coverage at purchase; the zone's live country list governs new sales only.",
+        },
+        zone_id: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimZoneID",
+            },
+          ],
+          description:
+            "Coverage zone of the purchased offer, captured at creation.",
+        },
+        esim_id: {
+          readOnly: true,
+          description:
+            "The eSIM the package lands on. Set at creation when adding to an existing eSIM; set when provisioning starts for a new-eSIM order; null before that.",
+          oneOf: [
+            {
+              $ref: "#/components/schemas/EsimID",
+            },
+            {
+              type: "null",
+            },
+          ],
+        },
+        subscriber_id: {
+          readOnly: true,
+          description:
+            "Subscriber to assign when the new eSIM is delivered. Null when none was requested, including top-up orders, which retain the existing assignment.",
+          oneOf: [
+            {
+              $ref: "#/components/schemas/EsimSubscriberID",
+            },
+            {
+              type: "null",
+            },
+          ],
+        },
+        recurring_subscription_id: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimRecurringSubscriptionID",
+            },
+          ],
+          description:
+            "The recurring service associated with this purchase. Absent for one-time orders.",
+        },
+        package_id: {
+          readOnly: true,
+          description:
+            "The purchased data package, set when the order completes; null before that.",
+          oneOf: [
+            {
+              $ref: "#/components/schemas/EsimPackageID",
+            },
+            {
+              type: "null",
+            },
+          ],
+        },
+        price: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/Money",
+            },
+          ],
+          description:
+            "The quoted price, locked at creation in your billing currency. A `mode: test` order quotes this price and is never charged it, so its `wallet_transaction_id` stays null.",
+        },
+        wallet_transaction_id: {
+          readOnly: true,
+          description:
+            "The wallet transaction that paid for this order, for reconciling against your billing transactions. Null until the charge lands, and always null for a `mode: test` order, which is never charged.",
+          oneOf: [
+            {
+              $ref: "#/components/schemas/WalletTransactionID",
+            },
+            {
+              type: "null",
+            },
+          ],
+        },
+        refund_transaction_id: {
+          readOnly: true,
+          description:
+            "The wallet transaction that credited the charge back after a failure. Null unless the order failed after charging.",
+          oneOf: [
+            {
+              $ref: "#/components/schemas/WalletTransactionID",
+            },
+            {
+              type: "null",
+            },
+          ],
+        },
+        delivery: {
+          readOnly: true,
+          allOf: [
+            {
+              $ref: "#/components/schemas/EsimDelivery",
+            },
+          ],
+          description:
+            "Where install credentials are delivered once available. Present when requested at creation.",
+        },
+        funding: {
+          readOnly: true,
+          description:
+            "Details of an insufficient-funds attempt while the order is in `charging`. May be null even while the order is awaiting funds; a null value does not confirm payment. Check the order status and your wallet balance.",
+          oneOf: [
+            {
+              $ref: "#/components/schemas/EsimOrderFunding",
+            },
+            {
+              type: "null",
+            },
+          ],
+        },
+        failure_code: {
+          type: ["string", "null"],
+          readOnly: true,
+          "x-extensible-enum": [
+            "insufficient_balance",
+            "carrier_error",
+            "capacity_exhausted",
+            "offer_unavailable",
+            "internal_error",
+            "canceled",
+            "resolved_by_support",
+            "esim_released",
+            "mode_mismatch",
+          ],
+          description:
+            "Reason the order failed. Null unless `status` is `failed`. Handle unrecognized codes without assuming the purchase succeeded.\n\n- `canceled`: canceled while awaiting funds.\n- `resolved_by_support`: support closed an unresolved order as failed.\n- `esim_released`: the target profile became unavailable before delivery.\n- `mode_mismatch`: the purchase could not be fulfilled in its original live or test mode.\n\nAny charge is credited automatically. Check `refund_transaction_id` to confirm an issued credit.\n",
+        },
+        failure_reason: {
+          type: ["string", "null"],
+          readOnly: true,
+          description:
+            "Why the order failed, in plain terms. Null unless status is failed.",
+        },
+        completed_at: {
+          type: ["string", "null"],
+          format: "date-time",
+          readOnly: true,
+          description: "When the order reached completed. Null before that.",
+        },
+      },
+    },
+  ],
 } as const;
 
 export const VoiceLegListSchema = {
@@ -42504,6 +43807,1913 @@ export const VoiceDestinationsUpdateSchema = {
           enabled: false,
         },
       ],
+    },
+  },
+} as const;
+
+export const EsimZoneSortFieldSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Field to sort zones by. Only `created_at` is supported.",
+} as const;
+
+export const EsimZoneListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EsimZone",
+          },
+          description: "Zones, newest first.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const EsimOfferSortFieldSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Field to sort offers by. Only `created_at` is supported.",
+} as const;
+
+export const EsimOfferPhoneInclusionSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["always", "on_request"],
+  description:
+    "How the plan provides a phone number.\n\n- `always`: a phone number is included with each eSIM purchased from the offer.\n- `on_request`: reserved for offers with an optional phone number; currently unavailable.\n",
+  example: "always",
+} as const;
+
+export const EsimOfferPhoneSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Phone service included with the plan. Every eSIM sold from the offer gets its own phone number; each flag states one direction of service on that number. A false flag means the plan does not include that service.\n",
+  required: [
+    "included",
+    "voice_inbound",
+    "voice_outbound",
+    "sms_inbound",
+    "sms_outbound",
+  ],
+  properties: {
+    included: {
+      $ref: "#/components/schemas/EsimOfferPhoneInclusion",
+    },
+    voice_inbound: {
+      type: "boolean",
+      description: "The eSIM can receive calls on its phone number.",
+      example: false,
+    },
+    voice_outbound: {
+      type: "boolean",
+      description: "The eSIM can place calls.",
+      example: false,
+    },
+    sms_inbound: {
+      type: "boolean",
+      description: "The eSIM can receive text messages on its phone number.",
+      example: true,
+    },
+    sms_outbound: {
+      type: "boolean",
+      description: "The eSIM can send text messages.",
+      example: false,
+    },
+  },
+  example: {
+    included: "always",
+    voice_inbound: false,
+    voice_outbound: false,
+    sms_inbound: true,
+    sms_outbound: false,
+  },
+} as const;
+
+export const EsimOfferDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Data allowance of a bundle.",
+  required: ["amount_bytes"],
+  properties: {
+    amount_bytes: {
+      type: "integer",
+      minimum: 1,
+      readOnly: true,
+      description: "Total data allowance in bytes.",
+      example: 10737418240,
+    },
+    throttled_after_bytes: {
+      type: ["integer", "null"],
+      minimum: 1,
+      readOnly: true,
+      description:
+        "Data amount in bytes after which speed is reduced instead of cut off. Null when the allowance is a hard cap.\n",
+    },
+  },
+} as const;
+
+export const EsimOfferValidityTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["one_time", "recurring"],
+  description:
+    "How the validity period behaves. one_time runs once and expires; recurring renews for a further period each time it lapses.",
+} as const;
+
+export const EsimOfferValidityUnitSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["day", "month"],
+  description: "Unit of the validity period.",
+} as const;
+
+export const EsimOfferValiditySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "How long a package from this offer stays usable. one_time offers run once for the given period after activation; recurring offers renew for a further period each time it lapses. Match on type and treat an unrecognized value as an offer your integration cannot order.\n",
+  required: ["type", "unit", "value"],
+  properties: {
+    type: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferValidityType",
+        },
+      ],
+    },
+    unit: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferValidityUnit",
+        },
+      ],
+    },
+    value: {
+      type: "integer",
+      minimum: 1,
+      readOnly: true,
+      description: "Number of units per period.",
+      example: 30,
+    },
+    minimum_periods: {
+      type: ["integer", "null"],
+      minimum: 1,
+      readOnly: true,
+      description:
+        "For recurring offers, the minimum number of periods committed. Null when there is no minimum, and for one_time offers.",
+    },
+  },
+} as const;
+
+export const EsimOfferBundlePricingSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Fixed-allowance terms: a data allowance with a validity period, charged once per provisioned package.\n",
+  required: ["type", "data", "validity", "price"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      const: "bundle",
+      readOnly: true,
+      description: "Pricing type.",
+    },
+    data: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferData",
+        },
+      ],
+    },
+    validity: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferValidity",
+        },
+      ],
+      description:
+        "Validity of packages created from this offer. The period starts at activation, which happens on first use in the coverage zone. The effective validity is capped by the eSIM's service period: see the package's expires_at for the real expiry.\n",
+    },
+    price: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+      ],
+      description:
+        "What your workspace is billed per package provisioned from this offer.",
+    },
+  },
+} as const;
+
+export const EsimOfferSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Compact offer row for lists: the full offer minus the embedded zone. Fetch the offer or its zone for the country list.\n",
+  required: [
+    "id",
+    "name",
+    "revision",
+    "zone_id",
+    "speed",
+    "stackable",
+    "phone",
+    "pricing",
+    "product",
+    "status",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferID",
+        },
+      ],
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "Display name of the offer.",
+      example: "Europe 10 GB / 30 days",
+    },
+    revision: {
+      type: "integer",
+      minimum: 1,
+      readOnly: true,
+      description:
+        "Increments whenever the offer's terms change. Orders lock the revision they were quoted at.",
+    },
+    zone_id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimZoneID",
+        },
+      ],
+      description:
+        "Coverage zone the offer sells. Offers for the same footprint share one zone.",
+    },
+    speed: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimSpeed",
+        },
+      ],
+      description:
+        "Speed class. For reduced-speed offers, the bundle's data.throttled_after_bytes carries the full-speed allowance.",
+    },
+    stackable: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether packages from this offer can be held alongside packages from other zones on the same eSIM, subject to the eSIM's package_limit.",
+    },
+    phone: {
+      readOnly: true,
+      description:
+        "Phone service that comes with the plan, or null when the plan includes no phone number. When present, `included` says how the number is provided and the flags state which call and text directions work.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferPhone",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    pricing: {
+      readOnly: true,
+      description:
+        "Commercial terms of the offer. Every offer in the current catalog is a bundle: a fixed allowance with a validity period for a fixed price. Match on the pricing type; treat an unrecognized type as an offer your integration cannot order yet.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferBundlePricing",
+        },
+      ],
+    },
+    product: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/BillingProductSlug",
+        },
+      ],
+      description:
+        "Billing product the offer's charges post under, as it appears on your invoice line items.",
+    },
+    status: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferStatus",
+        },
+      ],
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EsimOfferListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EsimOfferSummary",
+          },
+          description: "Offers, newest first.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const EsimOfferSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A purchasable offer from the curated catalog: the commercial terms for prepaid data in one coverage zone, priced as your workspace is billed. The coverage itself lives on the referenced zone, shared by every offer selling the same footprint.\n",
+  required: [
+    "id",
+    "name",
+    "revision",
+    "zone_id",
+    "zone",
+    "speed",
+    "stackable",
+    "phone",
+    "pricing",
+    "product",
+    "status",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferID",
+        },
+      ],
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "Display name of the offer.",
+      example: "Europe 10 GB / 30 days",
+    },
+    revision: {
+      type: "integer",
+      minimum: 1,
+      readOnly: true,
+      description:
+        "Increments whenever the offer's terms change. Orders lock the revision they were quoted at.",
+    },
+    zone_id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimZoneID",
+        },
+      ],
+      description:
+        "Coverage zone the offer sells. Offers for the same footprint share one zone.",
+    },
+    zone: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimZone",
+        },
+      ],
+      description:
+        'The offer\'s coverage zone, embedded so one read answers "where does this work". The zone resource is authoritative.',
+    },
+    speed: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimSpeed",
+        },
+      ],
+      description:
+        "Speed class. For reduced-speed offers, the bundle's data.throttled_after_bytes carries the full-speed allowance.",
+    },
+    stackable: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether packages from this offer can be held alongside packages from other zones on the same eSIM, subject to the eSIM's package_limit.",
+    },
+    phone: {
+      readOnly: true,
+      description:
+        "Phone service that comes with the plan, or null when the plan includes no phone number. When present, `included` says how the number is provided and the flags state which call and text directions work.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferPhone",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    pricing: {
+      readOnly: true,
+      description:
+        "Commercial terms of the offer. Every offer in the current catalog is a bundle: a fixed allowance with a validity period for a fixed price. Match on the pricing type; treat an unrecognized type as an offer your integration cannot order yet.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferBundlePricing",
+        },
+      ],
+    },
+    product: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/BillingProductSlug",
+        },
+      ],
+      description:
+        "Billing product the offer's charges post under, as it appears on your invoice line items.",
+    },
+    status: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferStatus",
+        },
+      ],
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EsimCountryRequirementsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["country_code", "schema_revision", "schema"],
+  properties: {
+    country_code: {
+      $ref: "#/components/schemas/CountryCode",
+    },
+    schema_revision: {
+      $ref: "#/components/schemas/EsimSchemaRevision",
+    },
+    schema: {
+      $ref: "#/components/schemas/EsimIdentificationSchema",
+    },
+  },
+  description:
+    "Complete identification schema for one covered country. A country without maintained extra requirements returns the baseline schema requiring first_name, last_name, and email. Customers handle collection, validation, and compliance; Bird does not receive or verify these values.",
+} as const;
+
+export const EsimOfferRequirementsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["countries"],
+  properties: {
+    countries: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EsimCountryRequirements",
+      },
+    },
+  },
+  description:
+    "Identification guidance for the countries covered by the offer. You collect and validate the information; this response does not verify a person or authorize a purchase.",
+} as const;
+
+export const EsimOrderListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EsimOrder",
+          },
+          description: "Orders, newest first.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EsimOrderRecurrenceSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Buy the first package and enable automatic renewal in one purchase. Requires subscriber_id, offer_revision and Idempotency-Key. Omit esim_id and expected_price.\n",
+  required: ["recurrence_revision", "accepted_price"],
+  properties: {
+    recurrence_revision: {
+      type: "integer",
+      minimum: 1,
+      description: "The accepted recurring configuration revision.",
+    },
+    accepted_price: {
+      $ref: "#/components/schemas/Money",
+    },
+  },
+} as const;
+
+export const EsimOrderCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Request to purchase a data package. Without esim_id, a new eSIM is provisioned carrying the package. With esim_id, the package is added to that eSIM: a new coverage zone stacks alongside existing packages, the same zone adds a further package for it, subject to the eSIM's package_limit and speed class.\n",
+  not: {
+    required: ["esim_id", "subscriber_id"],
+    properties: {
+      esim_id: {},
+      subscriber_id: {},
+    },
+  },
+  required: ["offer_id"],
+  properties: {
+    offer_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimOfferID",
+        },
+      ],
+      description: "Offer to purchase.",
+    },
+    esim_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimID",
+        },
+      ],
+      description:
+        "Existing eSIM to add the package to. Omit to provision a new eSIM.",
+    },
+    subscriber_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimSubscriberID",
+        },
+      ],
+      description:
+        "Person to assign the new eSIM to when delivery completes. Must be a subscriber in this workspace. Omit to leave it unassigned. Supplying it with esim_id returns 422; top-ups retain the existing assignment. An unknown subscriber or one outside this workspace returns 404 before charging. Identification guidance does not gate purchase.",
+    },
+    offer_revision: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "The offer revision you are quoting from. When set and the offer has since moved to a newer revision, the order is refused with a conflict instead of charging a price you did not see. Omitted, the current revision is used.",
+    },
+    recurrence: {
+      $ref: "#/components/schemas/EsimOrderRecurrence",
+    },
+    expected_price: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+      ],
+      description:
+        "The price you displayed to the buyer. When set and the workspace's current resolved price differs, the order is refused with a conflict instead of charging a different amount. Catches billing-rate changes, which move independently of the offer revision.",
+    },
+    display_name: {
+      type: "string",
+      maxLength: 120,
+      description:
+        "Free-text label for the new eSIM, for your own reference. Ignored when esim_id is set.",
+      example: "Amsterdam trip, order 8812",
+    },
+    tags: {
+      type: "array",
+      maxItems: 20,
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      description:
+        "Tags for the new eSIM, echoed on its lifecycle webhook events. Ignored when esim_id is set.",
+    },
+    metadata: {
+      type: "object",
+      additionalProperties: true,
+      description:
+        "Your own key-value data for the new eSIM, echoed on its lifecycle webhook events. Maximum 2 KB serialized. Ignored when esim_id is set.",
+    },
+    acknowledge_shortened_validity: {
+      type: "boolean",
+      description:
+        "Set to true to accept a validity cut short by the eSIM's service period. Without it, an order whose package would expire early is refused with a conflict that states the effective validity.",
+    },
+  },
+  oneOf: [
+    {
+      not: {
+        required: ["recurrence"],
+        properties: {
+          recurrence: {},
+        },
+      },
+    },
+    {
+      required: ["recurrence", "subscriber_id", "offer_revision"],
+      not: {
+        anyOf: [
+          {
+            required: ["esim_id"],
+            properties: {
+              esim_id: {},
+            },
+          },
+          {
+            required: ["expected_price"],
+            properties: {
+              expected_price: {},
+            },
+          },
+        ],
+      },
+    },
+  ],
+} as const;
+
+export const EsimRecurrenceDeliveryModeSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Relationship between the paid period and package delivery.\n\n- `exact_period`: the package covers the accepted paid interval.\n- `recurring_top_up`: each funded period purchases a standard package. Activation, expiry, and accumulation follow that package’s terms.\n",
+  enum: ["exact_period", "recurring_top_up"],
+} as const;
+
+export const EsimRecurrenceModelSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Billing cadence for recurring packages.\n\n- `calendar_month`: periods follow calendar months from the billing anchor.\n- `fixed_days`: each period lasts the stated number of 24-hour days.\n",
+  enum: ["calendar_month", "fixed_days"],
+} as const;
+
+export const EsimCheckoutOneTimeSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Published one-time purchase terms before tax.",
+  required: ["offer_revision", "price"],
+  properties: {
+    offer_revision: {
+      type: "integer",
+      minimum: 1,
+      description: "The offer revision to accept when purchasing.",
+    },
+    price: {
+      $ref: "#/components/schemas/Money",
+    },
+  },
+} as const;
+
+export const EsimCheckoutRecurringQuoteSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Published recurring terms before tax. The first period starts when payment is funded, and cancellation stops future renewal while preserving paid packages.",
+  required: [
+    "delivery_mode",
+    "offer_revision",
+    "recurrence_revision",
+    "price",
+    "model",
+    "interval_count",
+  ],
+  properties: {
+    delivery_mode: {
+      $ref: "#/components/schemas/EsimRecurrenceDeliveryMode",
+    },
+    offer_revision: {
+      type: "integer",
+      minimum: 1,
+      description: "The offer revision to accept when purchasing.",
+    },
+    recurrence_revision: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "The recurring configuration revision to accept when purchasing.",
+    },
+    price: {
+      $ref: "#/components/schemas/Money",
+    },
+    model: {
+      $ref: "#/components/schemas/EsimRecurrenceModel",
+    },
+    interval_count: {
+      type: "integer",
+      minimum: 1,
+      maximum: 366,
+      description:
+        "The number of calendar months or fixed 24-hour days per period.",
+    },
+  },
+} as const;
+
+export const EsimCheckoutUnavailableReasonSchema = {
+  type: "string",
+  enum: ["not_configured", "price_unavailable", "no_eligible_route"],
+  description:
+    "Renewal is not configured, has no published price, or has no eligible mobile network. A failed lookup returns an error instead.",
+} as const;
+
+export const EsimCheckoutRecurrenceSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "When available is true, quote contains the recurring terms and unavailable_reason is null. Otherwise quote is null and unavailable_reason explains why renewal is unavailable.",
+  required: ["available", "quote", "unavailable_reason"],
+  properties: {
+    available: {
+      type: "boolean",
+      description:
+        "Whether automatic renewal is currently available for a new eSIM.",
+    },
+    quote: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimCheckoutRecurringQuote",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    unavailable_reason: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimCheckoutUnavailableReason",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+  },
+  oneOf: [
+    {
+      properties: {
+        available: {
+          enum: [true],
+        },
+        quote: {
+          $ref: "#/components/schemas/EsimCheckoutRecurringQuote",
+        },
+        unavailable_reason: {
+          not: {
+            type: "string",
+          },
+        },
+      },
+    },
+    {
+      properties: {
+        available: {
+          enum: [false],
+        },
+        quote: {
+          not: {
+            type: "object",
+          },
+        },
+        unavailable_reason: {
+          $ref: "#/components/schemas/EsimCheckoutUnavailableReason",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EsimCheckoutOptionsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Published purchase terms. Renewal availability is a preview and does not reserve stock.",
+  required: ["offer_id", "one_time", "recurrence"],
+  properties: {
+    offer_id: {
+      $ref: "#/components/schemas/EsimOfferID",
+    },
+    one_time: {
+      $ref: "#/components/schemas/EsimCheckoutOneTime",
+    },
+    recurrence: {
+      $ref: "#/components/schemas/EsimCheckoutRecurrence",
+    },
+  },
+} as const;
+
+export const EsimRecurringOfferSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The published recurring package price and cadence. Calendar months follow the billing anchor; fixed days use the stated number of 24-hour days.",
+  required: [
+    "delivery_mode",
+    "offer_id",
+    "model",
+    "interval_count",
+    "revision",
+    "price",
+  ],
+  properties: {
+    delivery_mode: {
+      $ref: "#/components/schemas/EsimRecurrenceDeliveryMode",
+    },
+    offer_id: {
+      $ref: "#/components/schemas/EsimOfferID",
+    },
+    model: {
+      $ref: "#/components/schemas/EsimRecurrenceModel",
+    },
+    interval_count: {
+      type: "integer",
+      minimum: 1,
+      maximum: 366,
+      description:
+        "The number of calendar months or fixed days in each period.",
+    },
+    revision: {
+      type: "integer",
+      minimum: 1,
+      description: "The recurring configuration revision to accept.",
+    },
+    price: {
+      $ref: "#/components/schemas/Money",
+    },
+  },
+} as const;
+
+export const EsimRecurringSubscriptionStatusSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Delivery state of the recurring service. Check payment and renewal fields separately.\n\n- `pending`: enrollment or the initial purchase is still being processed.\n- `active`: the service has delivered a package and remains active.\n- `needs_attention`: delivery or a related credit remains unresolved. Check period history and the associated order before purchasing a replacement.\n- `ended`: recurrence has ended. Previously delivered packages keep their own validity.\n",
+  enum: ["pending", "active", "needs_attention", "ended"],
+} as const;
+
+export const EsimRecurringSubscriptionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Recurring service for an assigned eSIM or a pending initial purchase. Paid periods and delivered connectivity have separate states. Ending recurrence preserves the profile and separately purchased packages.",
+  required: [
+    "delivery_mode",
+    "id",
+    "esim_id",
+    "initial_order_id",
+    "subscriber_id",
+    "offer_id",
+    "status",
+    "billing_status",
+    "current_period_start",
+    "current_period_end",
+    "cancel_at_period_end",
+    "latest_order_id",
+    "created_at",
+    "price",
+    "model",
+    "interval_count",
+    "next_renewal_at",
+    "cancellation_effective_at",
+    "stop_reason",
+  ],
+  properties: {
+    delivery_mode: {
+      $ref: "#/components/schemas/EsimRecurrenceDeliveryMode",
+    },
+    id: {
+      $ref: "#/components/schemas/EsimRecurringSubscriptionID",
+    },
+    esim_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The provisioned eSIM, or null while the initial purchase is pending.",
+    },
+    initial_order_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimOrderID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The initial purchase order, or null when recurrence was enrolled on an existing eSIM.",
+    },
+    subscriber_id: {
+      $ref: "#/components/schemas/EsimSubscriberID",
+    },
+    offer_id: {
+      $ref: "#/components/schemas/EsimOfferID",
+    },
+    status: {
+      $ref: "#/components/schemas/EsimRecurringSubscriptionStatus",
+    },
+    billing_status: {
+      type: ["string", "null"],
+      description:
+        "The financial subscription state, or null while acceptance is pending.",
+    },
+    current_period_start: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "The authoritative billing period boundary, or null while acceptance is pending.",
+    },
+    current_period_end: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "The authoritative billing period boundary, or null while acceptance is pending.",
+    },
+    cancel_at_period_end: {
+      type: "boolean",
+      description:
+        "Whether future renewal is stopped at the current paid boundary.",
+    },
+    latest_order_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimOrderID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The order for the current billing period, or null before fulfillment starts.",
+    },
+    created_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "When the recurring service was requested.",
+    },
+    price: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Accepted package price before tax, in its published currency. Null before Billing accepts enrollment.",
+    },
+    model: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimRecurrenceModel",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Accepted cadence, or null before Billing accepts enrollment.",
+    },
+    interval_count: {
+      type: ["integer", "null"],
+      minimum: 1,
+      maximum: 366,
+      description:
+        "Number of calendar months or fixed 24-hour days in each accepted period. Null before acceptance.",
+    },
+    next_renewal_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "Next scheduled renewal boundary. Null when enrollment is pending or future renewals have stopped.",
+    },
+    cancellation_effective_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When canceled recurrence ends: the paid boundary for scheduled cancellation, or the recorded cancellation time for an immediate stop. Null when renewal has not been stopped or no period was accepted. Paid packages remain available under their own validity.",
+    },
+    stop_reason: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimRecurringStopReason",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "First recorded reason future renewal stopped. Null when no reason has been recorded. Delivery outcomes are available separately in period history.",
+    },
+  },
+  anyOf: [
+    {
+      properties: {
+        esim_id: {
+          $ref: "#/components/schemas/EsimID",
+        },
+      },
+    },
+    {
+      properties: {
+        initial_order_id: {
+          $ref: "#/components/schemas/EsimOrderID",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EsimRecurringSubscriptionListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EsimRecurringSubscription",
+          },
+          description: "Recurring services in this workspace.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EsimRecurringSubscriptionCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Starts a new paid package period on an existing assigned eSIM. The workspace organization pays; the subscriber has no personal wallet.",
+  required: [
+    "esim_id",
+    "offer_id",
+    "offer_revision",
+    "recurrence_revision",
+    "accepted_price",
+  ],
+  properties: {
+    esim_id: {
+      $ref: "#/components/schemas/EsimID",
+      description: "Assigned eSIM receiving the recurring package.",
+    },
+    offer_id: {
+      $ref: "#/components/schemas/EsimOfferID",
+      description: "Offer whose recurring terms the buyer accepted.",
+    },
+    offer_revision: {
+      type: "integer",
+      minimum: 1,
+      example: 1,
+      description: "The accepted offer revision.",
+    },
+    recurrence_revision: {
+      type: "integer",
+      minimum: 1,
+      example: 1,
+      description: "The accepted recurring configuration revision.",
+    },
+    accepted_price: {
+      $ref: "#/components/schemas/Money",
+    },
+  },
+} as const;
+
+export const EsimRecurringPeriodStatusSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Delivery outcome of a paid period.\n\n- `pending`: package delivery has not been confirmed, including an uncertain network outcome.\n- `completed`: the package was delivered.\n- `failing`: delivery failed and the credit is being processed.\n- `failed`: failure processing is complete. Check `refund_transaction_id` for an issued credit.\n",
+  enum: ["pending", "completed", "failing", "failed"],
+} as const;
+
+export const EsimRecurringPeriodSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A funded period and its delivery outcome. Amounts retain the original charged currency and tax; free periods have no wallet transaction.",
+  required: [
+    "delivery_mode",
+    "period_start",
+    "period_end",
+    "status",
+    "net_amount",
+    "tax_amount",
+    "total_amount",
+    "wallet_transaction_id",
+    "refund_transaction_id",
+    "order_id",
+    "order_status",
+  ],
+  properties: {
+    delivery_mode: {
+      $ref: "#/components/schemas/EsimRecurrenceDeliveryMode",
+    },
+    period_start: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "Start of the funded billing period. Package activation follows the accepted delivery mode.",
+    },
+    period_end: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "End of the paid billing period. A recurring top-up package can expire at a different time; check the package’s expiry.",
+    },
+    status: {
+      $ref: "#/components/schemas/EsimRecurringPeriodStatus",
+    },
+    net_amount: {
+      $ref: "#/components/schemas/Money",
+    },
+    tax_amount: {
+      $ref: "#/components/schemas/Money",
+    },
+    total_amount: {
+      $ref: "#/components/schemas/Money",
+    },
+    wallet_transaction_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WalletTransactionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description: "Original wallet charge, or null for a free period.",
+    },
+    refund_transaction_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WalletTransactionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Confirmed wallet credit after definitive failure, or null when no credit was issued.",
+    },
+    order_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimOrderID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description: "Delivery order, or null before fulfillment starts.",
+    },
+    order_status: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimOrderStatus",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description: "Delivery order state, or null before fulfillment starts.",
+    },
+  },
+} as const;
+
+export const EsimRecurringPeriodListSchema = {
+  allOf: [
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EsimRecurringPeriod",
+          },
+        },
+      },
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EsimSubscriberSchema = {
+  readOnly: true,
+  unevaluatedProperties: false,
+  description:
+    "A stable person reference for eSIM service in this workspace. Editing contact details does not change this identity.",
+  allOf: [
+    {
+      type: "object",
+      required: ["id", "contact_id"],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/EsimSubscriberID",
+        },
+        contact_id: {
+          $ref: "#/components/schemas/ContactID",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+} as const;
+
+export const EsimSubscriberListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EsimSubscriber",
+          },
+          description: "Subscribers in creation order, newest first.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EsimSubscriberCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Select an existing contact in this workspace. One subscriber is kept per contact. Creating the link requires Contacts read permission and prevents Contact deletion, including after any assigned eSIM ends. Subscriber links cannot currently be removed.",
+  required: ["contact_id"],
+  properties: {
+    contact_id: {
+      $ref: "#/components/schemas/ContactID",
+      description:
+        "Existing contact in this workspace; requires Contacts read permission.",
+    },
+  },
+} as const;
+
+export const EsimAssignmentIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^eas_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "eas_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EsimAssignmentSchema = {
+  readOnly: true,
+  unevaluatedProperties: false,
+  description:
+    "The person assigned to one eSIM. Assignment grants no workspace membership or permission to read installation credentials.",
+  allOf: [
+    {
+      type: "object",
+      required: ["id", "subscriber_id", "esim_id"],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/EsimAssignmentID",
+        },
+        subscriber_id: {
+          $ref: "#/components/schemas/EsimSubscriberID",
+        },
+        esim_id: {
+          $ref: "#/components/schemas/EsimID",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+} as const;
+
+export const EsimAssignmentCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Assign an unassigned eSIM to this person. The profile must be allocated and ready, active, or suspended. Customers handle identification collection and compliance.",
+  required: ["subscriber_id"],
+  properties: {
+    subscriber_id: {
+      $ref: "#/components/schemas/EsimSubscriberID",
+      description: "Subscriber in this workspace to assign to the eSIM.",
+    },
+  },
+} as const;
+
+export const EsimSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Compact eSIM representation used in lists. Fetch the eSIM by id for the full aggregate with packages, balances, and installation state.\n",
+  required: [
+    "id",
+    "subscriber_id",
+    "status",
+    "mode",
+    "iccid",
+    "phone_number",
+    "display_name",
+    "created_at",
+  ],
+  properties: {
+    subscriber_id: {
+      readOnly: true,
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimSubscriberID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The assigned service user, or null when the eSIM has no person assignment.",
+    },
+    id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimID",
+        },
+      ],
+    },
+    status: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimStatus",
+        },
+      ],
+    },
+    mode: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimMode",
+        },
+      ],
+    },
+    iccid: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "ICCID of the eSIM profile, or null while none is allocated.",
+      example: "8944500212345678912",
+    },
+    phone_number: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "Phone number attached to this eSIM, in E.164 format, as the supplier reports it. Null while none is on record.\n",
+      example: "+31612345678",
+    },
+    display_name: {
+      type: ["string", "null"],
+      maxLength: 120,
+      readOnly: true,
+      description: "Free-text label for your own reference.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EsimListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EsimSummary",
+          },
+          description:
+            "eSIMs, newest first, in compact form; fetch one by id for the full aggregate.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EsimUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Fields that can be updated on an eSIM.",
+  properties: {
+    display_name: {
+      type: ["string", "null"],
+      maxLength: 120,
+      description: "Free-text label for your own reference. Null clears it.",
+    },
+    tags: {
+      type: "array",
+      maxItems: 20,
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      description: "Replaces the eSIM's tags.",
+    },
+    metadata: {
+      type: "object",
+      additionalProperties: true,
+      description: "Replaces the eSIM's metadata. Maximum 2 KB serialized.",
+    },
+  },
+} as const;
+
+export const EsimInstallationInstructionsSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Device installation steps based on the available credentials. Follow the list for the recipient’s device.",
+  required: ["language", "ios", "android"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description:
+        "BCP-47 tag of the language `ios` and `android` are written in. This is the language served, which is the closest match to Accept-Language, or English when nothing closer is available. One list never mixes two languages.\n",
+      example: "en",
+    },
+    ios: {
+      type: "array",
+      minItems: 1,
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      description: "Ordered steps for iOS devices.",
+    },
+    android: {
+      type: "array",
+      minItems: 1,
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      description: "Ordered steps for Android devices.",
+    },
+  },
+} as const;
+
+export const EsimCredentialsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Installation details for an eSIM. Keep activation codes, installation links, QR images, and manual setup credentials private because they can grant access to the profile. Use fields with a value and follow the returned device instructions.",
+  required: [
+    "esim_id",
+    "ios_install_url",
+    "android_install_url",
+    "qr_code_url",
+    "activation_code",
+    "smdp_address",
+    "matching_id",
+    "apn",
+    "data_roaming_required",
+    "instructions",
+  ],
+  properties: {
+    esim_id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimID",
+        },
+      ],
+    },
+    ios_install_url: {
+      type: ["string", "null"],
+      format: "uri",
+      readOnly: true,
+      "x-sensitive": true,
+      description:
+        "One-tap install link for iOS 17.4 and later, derived from the activation code. Null when a valid link cannot be derived for this eSIM.",
+    },
+    android_install_url: {
+      type: ["string", "null"],
+      format: "uri",
+      readOnly: true,
+      "x-sensitive": true,
+      description:
+        "Android installation link. Currently unavailable; returns null. Use the returned Android instructions for manual setup.",
+    },
+    qr_code_url: {
+      type: ["string", "null"],
+      format: "uri",
+      readOnly: true,
+      "x-sensitive": true,
+      description:
+        "Hosted QR image URL. Currently unavailable; returns null. Use the activation code in your own installation flow or provide a hosted installation page.",
+    },
+    activation_code: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-sensitive": true,
+      description: "Raw activation string for manual entry in device settings.",
+      example: "LPA:1$smdp.example.com$K2-1AbCdE-2FgHiJ",
+    },
+    smdp_address: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-sensitive": true,
+      description: "SM-DP+ server address, for building a custom install flow.",
+      example: "smdp.example.com",
+    },
+    matching_id: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-sensitive": true,
+      description:
+        "Matching ID component of the activation code, for building a custom install flow.",
+    },
+    confirmation_code: {
+      type: ["string", "null"],
+      readOnly: true,
+      "x-sensitive": true,
+      description:
+        "Confirmation code requested during installation, when available. Null means the requirement is unknown; it does not confirm that a code is unnecessary.",
+    },
+    apn: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "Access point name for mobile data, when available. Null means no APN information is available; it does not confirm automatic configuration.",
+      example: "internet",
+    },
+    data_roaming_required: {
+      type: ["boolean", "null"],
+      readOnly: true,
+      description:
+        "Whether data roaming must be enabled. Null means the requirement is unknown. When true, `instructions` includes a step to enable roaming.",
+    },
+    instructions: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimInstallationInstructions",
+        },
+      ],
+      description:
+        "Step-by-step install instructions, covering whichever of the fields in this response carry a value, in the closest language available for the Accept-Language request header. Its `language` field names the one served.\n",
+    },
+  },
+} as const;
+
+export const EsimDeliveryStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["pending", "delivered", "failed"],
+  description:
+    "Outcome of a credential delivery.\n\n- `pending`: accepted; the outcome has not settled.\n- `delivered`: the message reached the recipient's provider; terminal.\n- `failed`: the message could not be delivered; `failure_code` says why. Terminal.\n",
+} as const;
+
+export const EsimInstallLinkIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^eil_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "eil_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EsimInstallLinkMetadataSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "Non-secret link details for identifying and revoking a delivered installation link. Contains no token or installation credentials.",
+  required: ["id", "expires_at", "revoked_at"],
+  properties: {
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimInstallLinkID",
+        },
+      ],
+    },
+    expires_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When the installation link expires.",
+    },
+    revoked_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description: "When the link was revoked, or null while not revoked.",
+    },
+  },
+} as const;
+
+export const EsimCredentialsDeliverySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One credential delivery to a traveler. Returned when a delivery is accepted and listed on the eSIM's delivery history; the id reappears on the event that settles it.",
+  required: [
+    "id",
+    "channel",
+    "to",
+    "status",
+    "failure_code",
+    "created_at",
+    "settled_at",
+    "install_link",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimDeliveryID",
+        },
+      ],
+    },
+    channel: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimDeliveryChannel",
+        },
+      ],
+    },
+    to: {
+      type: "string",
+      minLength: 3,
+      readOnly: true,
+      description: "Recipient address the message goes to.",
+      example: "traveler@example.com",
+    },
+    status: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimDeliveryStatus",
+        },
+      ],
+    },
+    failure_code: {
+      type: ["string", "null"],
+      readOnly: true,
+      "x-extensible-enum": [
+        "invalid_recipient",
+        "suppressed",
+        "blocked",
+        "bounced",
+        "channel_unavailable",
+        "send_failed",
+      ],
+      description:
+        "Why the delivery failed. Null unless status is failed. Open enum: treat unrecognized values as future failure kinds.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the delivery was accepted.",
+    },
+    settled_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description: "When the outcome became known. Null while pending.",
+    },
+    install_link: {
+      readOnly: true,
+      description:
+        "Link metadata for explicit revocation. Null for deliveries created before hosted links were enabled.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimInstallLinkMetadata",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+  },
+} as const;
+
+export const EsimDeliveryListSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The eSIM's credential deliveries, newest first, most recent 50.",
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EsimCredentialsDelivery",
+      },
+    },
+  },
+} as const;
+
+export const EsimInstallLinkSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A hosted installation page for one eSIM. The recipient does not need a Bird account. The secret URL is returned at creation and cannot be retrieved through later reads.",
+  required: ["id", "esim_id", "url", "expires_at", "created_at"],
+  properties: {
+    id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimInstallLinkID",
+        },
+      ],
+    },
+    esim_id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimID",
+        },
+      ],
+    },
+    url: {
+      type: "string",
+      format: "uri",
+      minLength: 1,
+      readOnly: true,
+      "x-sensitive": true,
+      description:
+        "Private installation URL. Anyone holding it can access installation details until expiry or revocation. Store or share it securely when created; later reads do not return it.",
+    },
+    expires_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When the link stops granting access to installation details.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the link was created.",
+    },
+  },
+} as const;
+
+export const EsimPackageListSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The eSIM's data packages. Bounded: an eSIM holds at most package_limit concurrent packages, so the list is returned in full.",
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EsimPackage",
+      },
+      description: "Packages, newest first.",
+    },
+  },
+} as const;
+
+export const EsimCompatibleOfferListSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Offers this eSIM can take as a top-up right now, given its mobile network, current packages, and package_limit. A point-in-time answer; re-fetch rather than caching.",
+  required: ["data", "as_of"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EsimOfferSummary",
+      },
+      description: "Orderable top-up offers for this eSIM.",
+    },
+    as_of: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      readOnly: true,
+      description: "When this answer was computed.",
+    },
+  },
+} as const;
+
+export const EsimSettingsSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The eSIM settings your workspace controls. Every field carries its effective value, whether or not the workspace has ever changed it.\n",
+  required: ["credential_delivery_enabled"],
+  properties: {
+    credential_delivery_enabled: {
+      type: "boolean",
+      description:
+        "Whether Bird sends eSIM install credentials to travelers for this workspace. When `false`, sending an eSIM's credentials by email or SMS is refused; reading them from the API still works, so you can deliver them yourself. This governs the install message only. Your workspace's other email and SMS sending is unaffected. Defaults to `true`.\n",
+      example: true,
+    },
+  },
+} as const;
+
+export const EsimSettingsUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Changes to your workspace's eSIM settings. Omit a field to leave it as it is.\n",
+  properties: {
+    credential_delivery_enabled: {
+      type: "boolean",
+      description:
+        "Send `false` to stop Bird sending eSIM install credentials to travelers for this workspace, or `true` to allow it again. Credentials stay readable from the API either way.\n",
+      example: false,
     },
   },
 } as const;
@@ -45182,6 +48392,24 @@ export const WhatsAppInboundStatsByPhoneNumberResponseWritableSchema = {
     "Per-phone-number breakdown of received messages for the requested period, ranked by volume descending and capped at the requested `limit` (default 50, max 200).",
 } as const;
 
+export const WhatsAppAgentNotificationListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "A page of the notifications sent to the agent.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
 export const WhatsAppNumberWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -45198,34 +48426,6 @@ export const WhatsAppNumberListWritableSchema = {
           description: "The WhatsApp numbers your workspace can send from.",
           items: {
             $ref: "#/components/schemas/WhatsAppNumberWritable",
-          },
-        },
-      },
-    },
-    {
-      $ref: "#/components/schemas/_ListEnvelope",
-    },
-  ],
-} as const;
-
-export const WhatsAppAgentNotificationWritableSchema = {
-  type: "object",
-  additionalProperties: false,
-  description:
-    "A notification you sent the agent about one contact, and what came of it. The agent decides whether to write to the contact about it; that message, if any, shows up on the contact's conversation.\n",
-} as const;
-
-export const WhatsAppAgentNotificationListWritableSchema = {
-  allOf: [
-    {
-      type: "object",
-      required: ["data"],
-      properties: {
-        data: {
-          type: "array",
-          description: "A page of the notifications sent to the agent.",
-          items: {
-            $ref: "#/components/schemas/WhatsAppAgentNotificationWritable",
           },
         },
       },
@@ -50097,6 +53297,7 @@ export const NumberWritableSchema = {
     "capabilities",
     "status",
     "allocated_at",
+    "releases_at",
   ],
   properties: {
     name: {
@@ -50168,6 +53369,12 @@ export const NumberWritableSchema = {
       format: "date-time",
       minLength: 1,
       description: "When this number was allocated to your workspace.",
+    },
+    releases_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When a scheduled release of this number takes effect, at the end of its current billing period. The number stays allocated, with its current `status`, until then. `null` when no release is scheduled.",
     },
     released_at: {
       type: ["string", "null"],
@@ -50481,26 +53688,20 @@ export const VoiceInboundConfigurationWritableSchema = {
         },
       ],
       description:
-        "Null when the stored route type is unsupported; inspect configuration_error before changing it.",
+        "Null when the number has no route of its own and follows your workspace's default inbound route from the voice settings. Also null when the stored route type is unsupported, in which case configuration_error says so; inspect it before changing the route.\n",
     },
   },
   if: {
     properties: {
       route: {
-        type: "null",
+        not: {
+          type: "null",
+        },
       },
     },
     required: ["route"],
   },
   then: {
-    properties: {
-      configuration_error: {
-        $ref: "#/components/schemas/VoiceInboundConfigurationError",
-      },
-    },
-    required: ["configuration_error"],
-  },
-  else: {
     properties: {
       configuration_error: {
         not: {},
@@ -50610,6 +53811,86 @@ export const VoiceVerifiedNumberListWritableSchema = {
   ],
 } as const;
 
+export const EsimServiceCapabilitiesWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Supported services for the eSIM. These values describe capabilities; package balances and current eSIM status determine whether service can be used now. Optional phone service can remain `unknown` until a number is assigned. Data packages do not establish call or SMS allowances.",
+} as const;
+
+export const EsimPackageWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One data package held by an eSIM: a single purchase with its own balance, validity, and coverage zone. Every order that completes creates exactly one package, so a package is always traceable to the order that bought it. An eSIM can hold several packages per zone; the right one is consumed automatically based on the device's location, and zone_balances on the eSIM carries the combined remainder per zone.\n",
+} as const;
+
+export const EsimWritableSchema = {
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      properties: {
+        display_name: {
+          type: ["string", "null"],
+          maxLength: 120,
+          description:
+            "Free-text label for your own reference, for example a traveler or order reference.",
+          example: "Amsterdam trip, order 8812",
+        },
+        tags: {
+          type: "array",
+          maxItems: 20,
+          items: {
+            $ref: "#/components/schemas/Tag",
+          },
+          description:
+            "Tags for routing, filtering, and stats grouping, echoed on webhook events for the eSIM.",
+        },
+        metadata: {
+          type: "object",
+          additionalProperties: true,
+          description:
+            "Your own key-value data, echoed on webhook events for the eSIM. Maximum 2 KB serialized.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EsimOrderFundingWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Funding needed for an order in `charging`. Add funds to the wallet and retry the existing order. One-time orders also retry automatically. A funded order proceeds to delivery; a failed order receives an automatic credit for any charge.",
+  required: ["required_amount", "lapses_at"],
+  properties: {
+    required_amount: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+      ],
+      description:
+        "Total wallet balance required for the charge, including tax. This is the required balance rather than the amount to add. Compare it with your current wallet balance.",
+    },
+    lapses_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      example: "2026-09-08T14:51:01Z",
+      description:
+        "Earliest time a further insufficient-funds attempt can fail the order. Adding funds after this time can still complete the purchase before that attempt. Check the order status to determine whether it remains payable.",
+    },
+  },
+} as const;
+
+export const EsimOrderWritableSchema = {
+  unevaluatedProperties: false,
+} as const;
+
 export const VoiceLegListWritableSchema = {
   allOf: [
     {
@@ -50667,6 +53948,347 @@ export const VoiceDestinationListWritableSchema = {
       type: "integer",
       format: "int64",
       description: "Total number of destination countries.",
+    },
+  },
+} as const;
+
+export const EsimZoneListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Zones, newest first.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const EsimOfferPhoneWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Phone service included with the plan. Every eSIM sold from the offer gets its own phone number; each flag states one direction of service on that number. A false flag means the plan does not include that service.\n",
+  required: [
+    "included",
+    "voice_inbound",
+    "voice_outbound",
+    "sms_inbound",
+    "sms_outbound",
+  ],
+  properties: {
+    included: {
+      $ref: "#/components/schemas/EsimOfferPhoneInclusion",
+    },
+    voice_inbound: {
+      type: "boolean",
+      description: "The eSIM can receive calls on its phone number.",
+      example: false,
+    },
+    voice_outbound: {
+      type: "boolean",
+      description: "The eSIM can place calls.",
+      example: false,
+    },
+    sms_inbound: {
+      type: "boolean",
+      description: "The eSIM can receive text messages on its phone number.",
+      example: true,
+    },
+    sms_outbound: {
+      type: "boolean",
+      description: "The eSIM can send text messages.",
+      example: false,
+    },
+  },
+  example: {
+    included: "always",
+    voice_inbound: false,
+    voice_outbound: false,
+    sms_inbound: true,
+    sms_outbound: false,
+  },
+} as const;
+
+export const EsimOfferBundlePricingWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Fixed-allowance terms: a data allowance with a validity period, charged once per provisioned package.\n",
+} as const;
+
+export const EsimOfferSummaryWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Compact offer row for lists: the full offer minus the embedded zone. Fetch the offer or its zone for the country list.\n",
+} as const;
+
+export const EsimOfferListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EsimOfferSummaryWritable",
+          },
+          description: "Offers, newest first.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const EsimOfferWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A purchasable offer from the curated catalog: the commercial terms for prepaid data in one coverage zone, priced as your workspace is billed. The coverage itself lives on the referenced zone, shared by every offer selling the same footprint.\n",
+} as const;
+
+export const EsimOrderListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EsimOrderWritable",
+          },
+          description: "Orders, newest first.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EsimSubscriberWritableSchema = {
+  readOnly: true,
+  unevaluatedProperties: false,
+  description:
+    "A stable person reference for eSIM service in this workspace. Editing contact details does not change this identity.",
+  allOf: [
+    {
+      type: "object",
+      required: ["id", "contact_id"],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/EsimSubscriberID",
+        },
+        contact_id: {
+          $ref: "#/components/schemas/ContactID",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EsimSubscriberListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EsimSubscriberWritable",
+          },
+          description: "Subscribers in creation order, newest first.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EsimAssignmentWritableSchema = {
+  readOnly: true,
+  unevaluatedProperties: false,
+  description:
+    "The person assigned to one eSIM. Assignment grants no workspace membership or permission to read installation credentials.",
+  allOf: [
+    {
+      type: "object",
+      required: ["id", "subscriber_id", "esim_id"],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/EsimAssignmentID",
+        },
+        subscriber_id: {
+          $ref: "#/components/schemas/EsimSubscriberID",
+        },
+        esim_id: {
+          $ref: "#/components/schemas/EsimID",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EsimListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "eSIMs, newest first, in compact form; fetch one by id for the full aggregate.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const EsimInstallationInstructionsWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Device installation steps based on the available credentials. Follow the list for the recipient’s device.",
+  required: ["language", "ios", "android"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description:
+        "BCP-47 tag of the language `ios` and `android` are written in. This is the language served, which is the closest match to Accept-Language, or English when nothing closer is available. One list never mixes two languages.\n",
+      example: "en",
+    },
+    ios: {
+      type: "array",
+      minItems: 1,
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      description: "Ordered steps for iOS devices.",
+    },
+    android: {
+      type: "array",
+      minItems: 1,
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      description: "Ordered steps for Android devices.",
+    },
+  },
+} as const;
+
+export const EsimCredentialsWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Installation details for an eSIM. Keep activation codes, installation links, QR images, and manual setup credentials private because they can grant access to the profile. Use fields with a value and follow the returned device instructions.",
+} as const;
+
+export const EsimInstallLinkMetadataWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "Non-secret link details for identifying and revoking a delivered installation link. Contains no token or installation credentials.",
+  required: ["id", "expires_at", "revoked_at"],
+  properties: {
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/EsimInstallLinkID",
+        },
+      ],
+    },
+    expires_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When the installation link expires.",
+    },
+    revoked_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description: "When the link was revoked, or null while not revoked.",
+    },
+  },
+} as const;
+
+export const EsimCredentialsDeliveryWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One credential delivery to a traveler. Returned when a delivery is accepted and listed on the eSIM's delivery history; the id reappears on the event that settles it.",
+} as const;
+
+export const EsimDeliveryListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The eSIM's credential deliveries, newest first, most recent 50.",
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EsimCredentialsDeliveryWritable",
+      },
+    },
+  },
+} as const;
+
+export const EsimPackageListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The eSIM's data packages. Bounded: an eSIM holds at most package_limit concurrent packages, so the list is returned in full.",
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EsimPackageWritable",
+      },
+      description: "Packages, newest first.",
+    },
+  },
+} as const;
+
+export const EsimCompatibleOfferListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Offers this eSIM can take as a top-up right now, given its mobile network, current packages, and package_limit. A point-in-time answer; re-fetch rather than caching.",
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EsimOfferSummaryWritable",
+      },
+      description: "Orderable top-up offers for this eSIM.",
     },
   },
 } as const;

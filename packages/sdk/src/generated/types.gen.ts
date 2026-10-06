@@ -833,6 +833,8 @@ export type RealtimeAppKeyList = {
   data: Array<RealtimeAppKey>;
 };
 
+export type EmailBroadcastId = string;
+
 /**
  * Aggregate delivery status of an email, derived from its recipients' states.
  *
@@ -900,8 +902,6 @@ export type LanguageTag = string;
 export type EmailTemplateId = string;
 
 export type EmailTemplateVersionId = string;
-
-export type EmailBroadcastId = string;
 
 /**
  * Structured key/value label attached to a message or a call. Use tags for low-cardinality filtering dimensions (category, experiment ID, template ID); they surface in the list filter of whatever carries them.
@@ -1680,6 +1680,17 @@ export type EmailMessageContent = {
   text?: string;
 };
 
+export type Money = {
+  /**
+   * Decimal amount as a string, in major currency units.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency code.
+   */
+  currency_code: CurrencyCode;
+};
+
 /**
  * Where the broadcast itself has got to. This is separate from what happened to individual recipients, which the broadcast's own `sent_count`, `delivered_count`, `bounced_count` and `complained_count` tell you. Those four are fields on the broadcast, not on everything that carries this status, and reading the broadcast's recipients or its events gives the same outcomes one recipient at a time.
  *
@@ -1734,6 +1745,10 @@ export type EmailBroadcast = {
    * Broadcast ID.
    */
   readonly id: string;
+  /**
+   * Label for selecting this broadcast on list and single-broadcast reads. With `email_management` read access, uses the retained subject from the template version resolved when execution starts, then its non-generated name. Draft and scheduled broadcasts use the name. Omitted when no authoritative label is available; clients can show a localized Untitled broadcast fallback. Without that access, uses the canonical broadcast ID. Absent from mutation responses.
+   */
+  readonly display_label?: string;
   /**
    * The address this broadcast sends from. `name` is filled in when the broadcast was given a display name to send under. Left out on a draft that has not picked a sender yet.
    */
@@ -8953,6 +8968,124 @@ export type WhatsAppNumberStatus =
   | "restricted"
   | (string & {});
 
+/**
+ * Where a notification you sent the agent stands. One state is transient and three are final.
+ *
+ * - `accepted` means Bird holds the notification: it is on its way to WhatsApp, or WhatsApp is still working on it. Nothing is charged for a notification, unlike a message that reads `accepted`.
+ * - `success` means the agent acted on it.
+ * - `skipped` means the agent read it and chose to say nothing; `skipped_reason` says why.
+ * - `failed` means WhatsApp refused it or reported a failure, or no outcome arrived within a day; `error` says why.
+ *
+ */
+export type WhatsAppAgentNotificationStatus =
+  "accepted" | "success" | "skipped" | "failed";
+
+export type WhatsAppAgentNotificationId = string;
+
+/**
+ * Why a notification sent to the agent failed.
+ */
+export type WhatsAppAgentNotificationError = {
+  /**
+   * WhatsApp's own explanation, passed through: what it said when it refused the notification, or its failure summary once it had worked on it. Show it to the person who sent the notification; never match on its text. Carries Bird's own words instead when the failure was Bird's verdict, such as no outcome arriving within a day.
+   *
+   */
+  readonly description: string;
+  /**
+   * WhatsApp's most specific code when it refused the notification outright: its error subcode where it sent one, otherwise its top-level code. Treat it as an opaque string. Null when WhatsApp took the notification and reported the failure later, which carries no code, and when the failure was Bird's own verdict.
+   *
+   */
+  readonly meta_error_code: string | null;
+};
+
+/**
+ * A notification you sent the agent about one contact, and what came of it. The agent decides whether to write to the contact about it; that message, if any, shows up on the contact's conversation.
+ *
+ */
+export type WhatsAppAgentNotification = {
+  /**
+   * Unique identifier for the notification.
+   */
+  readonly id: WhatsAppAgentNotificationId;
+  /**
+   * The business number whose agent the notification was sent to, in E.164 format.
+   */
+  readonly from: string;
+  /**
+   * The contact the notification was about, as you addressed it: a phone number in E.164 format, or a business-scoped user ID.
+   *
+   */
+  readonly to: string;
+  /**
+   * Your own name for what happened, as you sent it.
+   */
+  readonly name: string;
+  /**
+   * What happened, as you sent it.
+   */
+  readonly description: string;
+  /**
+   * The data you attached, as you sent it.
+   */
+  readonly payload: string;
+  /**
+   * Where the notification stands. `accepted` from the moment Bird takes it, then one of the three final states once WhatsApp has answered.
+   *
+   */
+  readonly status: WhatsAppAgentNotificationStatus;
+  /**
+   * WhatsApp's own account of why the agent chose to say nothing, passed through. Present only when `status` is `skipped`. Show it to the person who sent the notification; never match on its text.
+   *
+   */
+  readonly skipped_reason?: string;
+  /**
+   * Why the notification failed. Present only when `status` is `failed`.
+   */
+  readonly error?: WhatsAppAgentNotificationError;
+  /**
+   * When Bird accepted the notification.
+   */
+  readonly created_at: string;
+};
+
+export type WhatsAppAgentNotificationList = {
+  /**
+   * A page of the notifications sent to the agent.
+   */
+  data: Array<WhatsAppAgentNotification>;
+} & ListEnvelope;
+
+/**
+ * Something that happened in your systems that the agent should tell the contact about, such as a payment landing or an order shipping. WhatsApp processes it in the background, so read the notification back for what came of it.
+ *
+ */
+export type WhatsAppAgentNotificationCreate = {
+  /**
+   * The business phone number whose agent should act on the notification, in E.164 format (for example `+13124495648`), the same form a message's `from` takes. It must be a number this workspace has connected and that runs an agent.
+   *
+   */
+  from: string;
+  /**
+   * The contact the notification is about: a phone number in E.164 format (for example `+14155551234`), or the contact's business-scoped user ID (for example `US.13491208655302741918`), the same forms a message's `to` accepts. A phone number is normalized before the call reaches WhatsApp, so spacing does not matter. WhatsApp documents a phone number for this call; a business-scoped user ID is passed through as given.
+   *
+   */
+  to: string;
+  /**
+   * Your own name for what happened, such as `payment_received` or `order_shipped`. The agent reads it as the kind of thing that happened, so keep one name per kind. WhatsApp calls this the event type.
+   *
+   */
+  name: string;
+  /**
+   * What happened, in a sentence the agent can tell the contact.
+   */
+  description: string;
+  /**
+   * Details the agent may draw on when it writes to the contact, as one JSON string. WhatsApp passes it to the agent unchanged and does not read it itself.
+   *
+   */
+  payload: string;
+};
+
 export type WhatsAppNumberScope = "system" | "workspace";
 
 /**
@@ -9143,115 +9276,6 @@ export type WhatsAppNumberList = {
 } & ListEnvelope;
 
 export type NumbersDedicatedAllocationId = string;
-
-/**
- * Where a notification you sent the agent stands. One state is transient and three are final.
- *
- * - `accepted` means Bird holds the notification: it is on its way to WhatsApp, or WhatsApp is still working on it. Nothing is charged for a notification, unlike a message that reads `accepted`.
- * - `success` means the agent acted on it.
- * - `skipped` means the agent read it and chose to say nothing; `skipped_reason` says why.
- * - `failed` means WhatsApp refused it or reported a failure, or no outcome arrived within a day; `error` says why.
- *
- */
-export type WhatsAppAgentNotificationStatus =
-  "accepted" | "success" | "skipped" | "failed";
-
-export type WhatsAppAgentNotificationId = string;
-
-/**
- * Why a notification sent to the agent failed.
- */
-export type WhatsAppAgentNotificationError = {
-  /**
-   * WhatsApp's own explanation, passed through: what it said when it refused the notification, or its failure summary once it had worked on it. Show it to the person who sent the notification; never match on its text. Carries Bird's own words instead when the failure was Bird's verdict, such as no outcome arriving within a day.
-   *
-   */
-  readonly description: string;
-  /**
-   * WhatsApp's most specific code when it refused the notification outright: its error subcode where it sent one, otherwise its top-level code. Treat it as an opaque string. Null when WhatsApp took the notification and reported the failure later, which carries no code, and when the failure was Bird's own verdict.
-   *
-   */
-  readonly meta_error_code: string | null;
-};
-
-/**
- * A notification you sent the agent about one contact, and what came of it. The agent decides whether to write to the contact about it; that message, if any, shows up on the contact's conversation.
- *
- */
-export type WhatsAppAgentNotification = {
-  /**
-   * Unique identifier for the notification.
-   */
-  readonly id: WhatsAppAgentNotificationId;
-  /**
-   * The contact the notification was about: the phone number or business-scoped user ID you addressed it to, in the same shape a message's `to` uses.
-   *
-   */
-  readonly to: WhatsAppAddress;
-  /**
-   * Your own name for what happened, as you sent it.
-   */
-  readonly name: string;
-  /**
-   * What happened, as you sent it.
-   */
-  readonly description: string;
-  /**
-   * The data you attached, as you sent it.
-   */
-  readonly payload: string;
-  /**
-   * Where the notification stands. `accepted` from the moment Bird takes it, then one of the three final states once WhatsApp has answered.
-   *
-   */
-  readonly status: WhatsAppAgentNotificationStatus;
-  /**
-   * WhatsApp's own account of why the agent chose to say nothing, passed through. Present only when `status` is `skipped`. Show it to the person who sent the notification; never match on its text.
-   *
-   */
-  readonly skipped_reason?: string;
-  /**
-   * Why the notification failed. Present only when `status` is `failed`.
-   */
-  readonly error?: WhatsAppAgentNotificationError;
-  /**
-   * When Bird accepted the notification.
-   */
-  readonly created_at: string;
-};
-
-export type WhatsAppAgentNotificationList = {
-  /**
-   * A page of the notifications sent to the agent.
-   */
-  data: Array<WhatsAppAgentNotification>;
-} & ListEnvelope;
-
-/**
- * Something that happened in your systems that the agent should tell the contact about, such as a payment landing or an order shipping. WhatsApp processes it in the background, so read the notification back for what came of it.
- *
- */
-export type WhatsAppAgentNotificationCreate = {
-  /**
-   * The contact the notification is about: a phone number in E.164 format (for example `+14155551234`), or the contact's business-scoped user ID (for example `US.13491208655302741918`), the same forms a message's `to` accepts. A phone number is normalized before the call reaches WhatsApp, so spacing does not matter. WhatsApp documents a phone number for this call; a business-scoped user ID is passed through as given.
-   *
-   */
-  to: string;
-  /**
-   * Your own name for what happened, such as `payment_received` or `order_shipped`. The agent reads it as the kind of thing that happened, so keep one name per kind. WhatsApp calls this the event type.
-   *
-   */
-  name: string;
-  /**
-   * What happened, in a sentence the agent can tell the contact.
-   */
-  description: string;
-  /**
-   * Details the agent may draw on when it writes to the contact, as one JSON string. WhatsApp passes it to the agent unchanged and does not read it itself.
-   *
-   */
-  payload: string;
-};
 
 /**
  * Sortable fields for a WhatsApp number's event list.
@@ -20662,6 +20686,42 @@ export type EventEmailSuppressionCreated = {
   data: EventEmailSuppressionCreatedData;
 };
 
+export type EsimId = string;
+
+/**
+ * Channel the install credentials are delivered over.
+ */
+export type EsimDeliveryChannel = "email" | "sms";
+
+export type EsimDeliveryId = string;
+
+export type EsimPackageId = string;
+
+export type EsimOrderId = string;
+
+export type EsimOfferId = string;
+
+export type EsimRecurringSubscriptionId = string;
+
+/**
+ * Reason future package renewal stopped.
+ *
+ * - `canceled`: cancellation was requested.
+ * - `funding_unavailable`: the next period could not be funded.
+ * - `price_changed`: the published price changed and requires new acceptance.
+ * - `delivery_failed`: a paid package could not be delivered.
+ * - `delivery_unresolved`: the previous period’s delivery remains unresolved.
+ *
+ * Check period history for delivery and credit outcomes before starting another subscription.
+ *
+ */
+export type EsimRecurringStopReason =
+  | "canceled"
+  | "funding_unavailable"
+  | "price_changed"
+  | "delivery_failed"
+  | "delivery_unresolved";
+
 /**
  * Always `preference.deleted` for this event.
  */
@@ -22217,7 +22277,7 @@ export type VoiceLegInboundRouteType =
 
 export type VoiceLegInboundRouteReject = {
   /**
-   * The number turned the leg away. This is where every number starts, so it covers a number nobody has configured as well as one set to reject.
+   * The number turned the leg away, either because its own route is reject or because it has none and the workspace default inbound route is reject.
    *
    */
   type: VoiceLegInboundRouteType;
@@ -22447,6 +22507,13 @@ export type VoiceLeg = {
   readonly cost?: VoiceLegCost;
 };
 
+export type WalletTransactionId = string;
+
+/**
+ * URL-safe identifier for a billing product. Lowercase letters and digits, separated by underscores. Must start with a letter.
+ */
+export type BillingProductSlug = string;
+
 /**
  * Physical type of a phone number. New number types may be added over time, so treat unrecognized values as supported types rather than errors.
  */
@@ -22563,6 +22630,10 @@ export type Number = {
    * When this number was allocated to your workspace.
    */
   allocated_at: string;
+  /**
+   * When a scheduled release of this number takes effect, at the end of its current billing period. The number stays allocated, with its current `status`, until then. `null` when no release is scheduled.
+   */
+  releases_at: string | null;
   /**
    * When this number was released. `null` while it is still allocated to your workspace.
    */
@@ -23046,7 +23117,7 @@ export type VoiceNumberProviderType = "allocation" | "verified_number";
 /**
  * Which answer a number carries.
  *
- * - `reject`: refuses the call. This is where every number starts.
+ * - `reject`: refuses the call.
  * - `trunk`: delivers the call to one of your SIP trunks.
  * - `forward`: places a call to one of your verified caller IDs and connects the two.
  * - `sequence`: runs the configured sequence from its selected voice-call entry.
@@ -23133,11 +23204,9 @@ export type VoiceNumberDirections = {
   readonly outbound: boolean;
 };
 
-export type VoiceInboundConfigurationError = "unsupported_route_type";
-
 export type VoiceCallRouteReject = {
   /**
-   * Refuses the call. Every number starts here, and setting it again is how you stop a number answering without giving it up.
+   * Refuses the call. Setting it is how you stop a number answering without giving it up. It is also the default inbound route of a new workspace.
    *
    */
   type: VoiceCallRouteType;
@@ -23149,7 +23218,7 @@ export type VoiceCallRouteTrunk = {
    */
   type: VoiceCallRouteType;
   /**
-   * The SIP trunk that answers calls to this number. It must be one of yours and must have inbound calling enabled. Turning that trunk's inbound calling off, or deleting it, puts this number back on "reject".
+   * The SIP trunk that answers these calls. It must be one of yours and must have inbound calling enabled. Turning that trunk's inbound calling off, or deleting it, removes this route: a number returns to your workspace's default inbound route, and a workspace default becomes "reject".
    *
    */
   trunk_id: SipTrunkId;
@@ -23190,7 +23259,7 @@ export type VoiceCallRouteSequence = {
 };
 
 /**
- * What happens to a call arriving for this number, as it is configured now. Its `type` selects the shape, and each answer carries its own fields. An unconfigured number answers with "reject". Setting a route is a separate shape, and it does not offer every variant reported here.
+ * What happens to a call arriving for this number, as it is configured now. Its `type` selects the shape, and each answer carries its own fields. Setting a route is a separate shape, and it does not offer every variant reported here.
  *
  */
 export type VoiceCallRoute =
@@ -23207,9 +23276,12 @@ export type VoiceCallRoute =
       type: "sequence";
     } & VoiceCallRouteSequence);
 
+export type VoiceInboundConfigurationError = "unsupported_route_type";
+
 export type VoiceInboundConfiguration = {
   /**
-   * Null when the stored route type is unsupported; inspect configuration_error before changing it.
+   * Null when the number has no route of its own and follows your workspace's default inbound route from the voice settings. Also null when the stored route type is unsupported, in which case configuration_error says so; inspect it before changing the route.
+   *
    */
   route: VoiceCallRoute | null;
   readonly configuration_error?: VoiceInboundConfigurationError;
@@ -23262,7 +23334,7 @@ export type VoiceNumberList = {
 } & ListEnvelope;
 
 /**
- * What happens to a call arriving for this number. Its `type` selects the shape, and each answer carries its own fields; the variants below are the full set you can set. An unconfigured number uses "reject".
+ * What happens to a call arriving for this number. Its `type` selects the shape, and each answer carries its own fields; the variants below are the full set you can set.
  *
  */
 export type VoiceCallRouteWritable =
@@ -23277,7 +23349,11 @@ export type VoiceCallRouteWritable =
     } & VoiceCallRouteForward);
 
 export type VoiceInboundConfigurationPut = {
-  route: VoiceCallRouteWritable;
+  /**
+   * The number's own route, or null to have it follow your workspace's default inbound route from the voice settings.
+   *
+   */
+  route: VoiceCallRouteWritable | null;
 };
 
 export type VoiceNumberUpdate = {
@@ -23288,15 +23364,50 @@ export type VoiceNumberUpdate = {
   name?: string | null;
   /**
    * What should happen to calls arriving for this number. The route replaces
-   * whatever was set before, because a number has exactly one answer at a time,
-   * and type "reject" is how you stop it answering. Omit the field to leave the
-   * answer alone.
+   * whatever was set before, because a number has exactly one answer at a time.
+   * Type "reject" stops it answering, and a null route returns it to your
+   * workspace's default inbound route. Omit the field to leave the answer alone.
    *
    * Only a number that can receive calls carries a route, so it is refused on
    * one whose directions do not include inbound.
    *
    */
   inbound_configuration?: VoiceInboundConfigurationPut;
+};
+
+/**
+ * What happens to a call arriving for any of your Bird numbers that has no inbound route of its own.
+ *
+ */
+export type VoiceSettingsInboundConfiguration = {
+  /**
+   * The workspace's default inbound route. Defaults to "reject".
+   */
+  route: VoiceCallRoute;
+};
+
+/**
+ * The voice settings your workspace controls. Every field carries its effective value, whether or not the workspace has ever changed it.
+ *
+ */
+export type VoiceSettings = {
+  inbound_configuration: VoiceSettingsInboundConfiguration;
+};
+
+/**
+ * The route for calls arriving on any of your Bird numbers that has no inbound route of its own; verified caller IDs receive no calls. It takes effect on the next call to each of those numbers. Numbers with their own route keep it.
+ *
+ */
+export type VoiceSettingsInboundConfigurationPut = {
+  route: VoiceCallRouteWritable;
+};
+
+/**
+ * Changes to your workspace's voice settings. Omit a field to leave it as it is.
+ *
+ */
+export type VoiceSettingsUpdate = {
+  inbound_configuration?: VoiceSettingsInboundConfigurationPut;
 };
 
 /**
@@ -23366,6 +23477,582 @@ export type VoiceVerifiedNumberVerifyRequest = {
    * The 6-digit verification code read out by the verification call. Required until ownership is verified. Omit it when retrying activation of an already verified number.
    */
   code?: string;
+};
+
+export type EsimZoneId = string;
+
+/**
+ * Revision identifying the returned identification schema. A changed revision means the requirements or guidance changed. It does not indicate an expiry time or purchase authorization.
+ */
+export type EsimSchemaRevision = string;
+
+/**
+ * Complete JSON Schema draft 2020-12 document for customer-side identification validation. It declares $schema, type, title, description, properties, required, and additionalProperties. Property definitions use string or object types, standard format, pattern, minLength, maxLength, enum, and nested object keywords. Enable format assertions in your validator for email addresses and dates. Every country requires first_name, last_name, and email. Other customer-owned properties are allowed, so one details object can satisfy several countries. Bird does not receive or verify the values. Document references are opaque identifiers in customer-managed storage, not Bird upload IDs or required URLs.
+ *
+ */
+export type EsimIdentificationSchema = {
+  [key: string]: unknown;
+};
+
+/**
+ * Zone breadth: a single country, a multi-country region, or worldwide.
+ */
+export type EsimZoneType = "local" | "regional" | "global";
+
+/**
+ * Speed class. full: data flows at full network speed until the allowance is used; reduced: speed is limited, typically after the full-speed allowance. Full-speed and reduced-speed packages cannot be combined on one eSIM.
+ *
+ */
+export type EsimSpeed = "full" | "reduced";
+
+/**
+ * Availability of an offer.
+ *
+ * - `draft`: being curated; never returned on the customer surface and not purchasable.
+ * - `active`: purchasable.
+ * - `retired`: no longer purchasable; packages already sold are unaffected.
+ *
+ */
+export type EsimOfferStatus = "draft" | "active" | "retired";
+
+/**
+ * A group of countries covered by an offer. Use `countries` to check a destination rather than inferring coverage from the zone name. Purchased packages retain their coverage details from the time of purchase.
+ */
+export type EsimZone = {
+  readonly id: EsimZoneId;
+  /**
+   * Human-readable zone name.
+   */
+  readonly name: string;
+  /**
+   * Increments whenever the country list changes.
+   */
+  readonly revision: number;
+  readonly type: EsimZoneType;
+  /**
+   * Countries covered by the zone, as ISO 3166-1 alpha-2 codes.
+   */
+  readonly countries: Array<CountryCode>;
+  readonly created_at: string;
+};
+
+/**
+ * Lifecycle state of an eSIM. A pending state always settles: to its target on
+ * success, or back to the prior status when the network definitively rejects
+ * the change, reported by the `esim.operation_failed` event.
+ *
+ * - `provisioning`: the initial data package is being applied; install credentials may already be available.
+ * - `ready`: installable and usable, waiting for first network use; allows top-up orders and release. Activate before `ready_until` or the eSIM expires.
+ * - `activating`: an activation is being applied.
+ * - `active`: in service; the service period ends at `active_until`. Allows top-up orders, suspend, resync, and release.
+ * - `suspending`: a suspension was requested and is being applied.
+ * - `suspended`: data service is paused; allows resume and release.
+ * - `resuming`: a resume was requested and is being applied.
+ * - `releasing`: a permanent release is in progress.
+ * - `released`: permanently released; terminal.
+ * - `expired`: dormant. No data package has been live (each one depleted, expired, removed, or failed) for the expiry window. Not terminal: a completed top-up returns the eSIM to `active`, and release remains available. Balances and the installed profile are untouched.
+ * - `failed`: provisioning failed; any charge on the owning order is credited back automatically, reported by that order. Terminal.
+ *
+ */
+export type EsimStatus =
+  | "provisioning"
+  | "ready"
+  | "activating"
+  | "active"
+  | "suspending"
+  | "suspended"
+  | "resuming"
+  | "releasing"
+  | "released"
+  | "expired"
+  | "failed";
+
+export type EsimSubscriberId = string;
+
+/**
+ * Whether a purchase or eSIM is live or simulated. The mode is fixed when the order is created; the resulting eSIM retains it.
+ *
+ * - `live`: purchases service for use on a device and charges the wallet.
+ * - `test`: simulates a purchase without a charge or usable mobile service.
+ *
+ * List responses can include both modes. Filter by `mode` when separating test activity from live purchases.
+ *
+ */
+export type EsimMode = "live" | "test";
+
+/**
+ * Whether a service is supported. `yes` confirms support, `no` confirms it is not supported, and `unknown` means support has not been established.
+ *
+ */
+export type EsimServiceCapability = "yes" | "no" | "unknown";
+
+/**
+ * Supported services for the eSIM. These values describe capabilities; package balances and current eSIM status determine whether service can be used now. Optional phone service can remain `unknown` until a number is assigned. Data packages do not establish call or SMS allowances.
+ */
+export type EsimServiceCapabilities = {
+  data: EsimServiceCapability;
+  sms_inbound: EsimServiceCapability;
+  sms_outbound: EsimServiceCapability;
+  voice_inbound: EsimServiceCapability;
+  voice_outbound: EsimServiceCapability;
+};
+
+/**
+ * Device-side installation state of the eSIM profile.
+ */
+export type EsimInstallation = {
+  /**
+   * pending: not yet downloaded by a device; downloaded: downloaded but not installed; installed: installed on the device; removed: deleted from the device; whether the profile can be installed again depends on the carrier profile, so treat removal as final; error: download or installation failed, see error_reason. Open enum: installation state is reported by the device, so additional states may be added over time. Treat an unrecognized value as a future state, not an error.
+   *
+   */
+  readonly state: string;
+  /**
+   * When the installation state last changed. Null before the first device interaction.
+   */
+  readonly updated_at?: string | null;
+  /**
+   * Human-readable reason installation failed, for example an ineligible device or an exhausted download limit. Null unless state is error.
+   *
+   */
+  readonly error_reason?: string | null;
+};
+
+/**
+ * Lifecycle state of a data package.
+ *
+ * - `provisioning`: being applied to the eSIM.
+ * - `pending_first_use`: confirmed; activates on first use in its coverage zone.
+ * - `active`: consuming data; validity is running.
+ * - `depleted`: balance fully used.
+ * - `expired`: validity ended; unused balance is gone.
+ * - `removing`: a removal was requested and is being applied. On definitive rejection the package returns to its prior status, reported by `esim.operation_failed`.
+ * - `removed`: taken off the eSIM at your request; remaining balance forfeited.
+ * - `failed`: could not be applied; any charge is credited back automatically through the owning order, which reports this through its `failed` status and the `esim.order.failed` event.
+ *
+ */
+export type EsimPackageStatus =
+  | "provisioning"
+  | "pending_first_use"
+  | "active"
+  | "depleted"
+  | "expired"
+  | "removing"
+  | "removed"
+  | "failed";
+
+/**
+ * Package allowance and reported consumption. `total_bytes` is the purchased allowance. `used_bytes`, `remaining_bytes`, and `used_percent` are null until usage is reported. Reports can lag device usage; use `as_of` to show when the balance was updated.
+ */
+export type EsimPackageBalance = {
+  /**
+   * Total data in bytes, as purchased. Known from the order, so never null.
+   */
+  readonly total_bytes: number;
+  /**
+   * Data used in bytes, or null while no network has reported on this package.
+   */
+  readonly used_bytes: number | null;
+  /**
+   * Data remaining in bytes, or null while no network has reported on this package.
+   */
+  readonly remaining_bytes: number | null;
+  /**
+   * Share of the total data already used, as a percentage. Null while no network has reported on this package.
+   */
+  readonly used_percent: number | null;
+  /**
+   * When the balance was last established. Before consumption is reported, this is the package delivery time. Check whether the consumption fields are null before treating this timestamp as a usage update.
+   */
+  readonly as_of: string;
+  /**
+   * Measurement time supplied by the mobile network. Null when no measurement or measurement time is available. Use `as_of` for the balance update time.
+   */
+  readonly observed_at: string | null;
+};
+
+/**
+ * One data package held by an eSIM: a single purchase with its own balance, validity, and coverage zone. Every order that completes creates exactly one package, so a package is always traceable to the order that bought it. An eSIM can hold several packages per zone; the right one is consumed automatically based on the device's location, and zone_balances on the eSIM carries the combined remainder per zone.
+ *
+ */
+export type EsimPackage = {
+  readonly id: EsimPackageId;
+  /**
+   * The order that purchased this package.
+   */
+  readonly order_id: EsimOrderId;
+  /**
+   * Offer this package was purchased from.
+   */
+  readonly offer_id: EsimOfferId;
+  /**
+   * Coverage zone the package draws on. The name and countries below are captured at purchase time; the zone resource carries the live footprint.
+   */
+  readonly zone_id: EsimZoneId;
+  /**
+   * Coverage zone name, from the offer.
+   */
+  readonly zone_name: string;
+  /**
+   * Countries the package's zone covers, captured at purchase time so the package is meaningful without fetching the offer.
+   *
+   */
+  readonly countries: Array<CountryCode>;
+  readonly status: EsimPackageStatus;
+  /**
+   * Speed class, from the offer.
+   */
+  readonly speed: EsimSpeed;
+  readonly balance: EsimPackageBalance;
+  /**
+   * When the package started consuming data (first use in its zone). Null until then.
+   */
+  readonly activated_at?: string | null;
+  /**
+   * When the package's validity ends and unused balance expires. Already capped by the eSIM's service period, so this is always the effective expiry. Null until the package activates.
+   *
+   */
+  readonly expires_at?: string | null;
+  /**
+   * What your workspace was billed for this package.
+   */
+  readonly price: Money;
+  readonly created_at: string;
+};
+
+/**
+ * Reported balance across packages in one coverage zone. Zones can overlap; check each package’s countries before using these totals to estimate allowance for a destination. The mobile network selects which eligible package serves a connection.
+ */
+export type EsimZoneBalance = {
+  readonly zone_id: EsimZoneId;
+  /**
+   * Total purchased data for the zone, in bytes. Known from the orders, so never null.
+   */
+  readonly total_bytes: number;
+  /**
+   * Reported data used in this zone, in bytes. Null if any contributing package lacks a usage report. Read individual package balances for available measurements.
+   */
+  readonly used_bytes: number | null;
+  /**
+   * Data remaining, in bytes. Null under the same condition as `used_bytes`.
+   */
+  readonly remaining_bytes: number | null;
+  /**
+   * Freshness of this combined figure - the oldest balance read among the zone's contributing packages. Each package's own balance.as_of can be newer.
+   */
+  readonly as_of: string;
+  /**
+   * Oldest network measurement time among the contributing packages. Null if any package lacks a report or a measurement time. Use `as_of` for the balance update time.
+   */
+  readonly observed_at: string | null;
+};
+
+/**
+ * An operation you can attempt on an eSIM.
+ *
+ * - `suspend`: pause data service, keeping packages and their validity running.
+ * - `resume`: restore service to a suspended eSIM.
+ * - `release`: permanently retire the eSIM.
+ * - `install`: read the install credentials for a device.
+ * - `top_up`: order another data package onto this eSIM.
+ * - `assign`: assign an unassigned profile to a person, or read back the same assignment.
+ *
+ * Tolerate a value you do not recognize: we report on more actions over time.
+ *
+ */
+export type EsimActionName =
+  | "suspend"
+  | "resume"
+  | "release"
+  | "install"
+  | "top_up"
+  | "assign"
+  | (string & {});
+
+/**
+ * Reason an action is unavailable.
+ *
+ * - `permission_denied`: your credentials lack the required permission. Update permissions and check availability again; another restriction may still apply.
+ * - `network_unsupported`: the serving mobile network does not support the action for this eSIM.
+ * - `network_unconfirmed`: support for the action has not been confirmed. Contact support if you need it.
+ * - `esim_state`: the profile is not in a state that permits the action. Check the eSIM status.
+ * - `operation_in_progress`: an existing order must finish before this action can proceed.
+ * - `package_limit_reached`: the eSIM has reached its concurrent package limit. A depleted package still occupies a slot until it expires or is removed.
+ * - `identification_required`: retained for compatibility; subscriber assignment no longer returns this reason.
+ *
+ * Treat an unrecognized reason as unavailable and avoid automatically retrying the action.
+ *
+ */
+export type EsimActionUnavailableReason =
+  | "permission_denied"
+  | "network_unsupported"
+  | "network_unconfirmed"
+  | "esim_state"
+  | "operation_in_progress"
+  | "package_limit_reached"
+  | "identification_required"
+  | (string & {});
+
+/**
+ * One action, and whether this eSIM permits it for you right now.
+ *
+ */
+export type EsimAvailableAction = {
+  readonly action: EsimActionName;
+  /**
+   * Operation to call for this action. Consult that operation’s reference for its request and response.
+   */
+  readonly operation: string;
+  /**
+   * Whether the action is available given your permissions and the current eSIM state. The action checks these again when submitted; a later request can be refused if conditions change.
+   */
+  readonly available: boolean;
+  /**
+   * Why the action is unavailable. Null while `available` is true.
+   */
+  readonly reason: EsimActionUnavailableReason | null;
+  /**
+   * Additional parameters required by the current state, such as `acknowledge_balance_forfeit` when releasing an eSIM with remaining data. Absent when no additional parameters apply or when permissions, network support, or profile state prevent the action.
+   */
+  readonly requires?: Array<string>;
+};
+
+/**
+ * Whether package consumption can be reported for this eSIM.
+ *
+ * - `available`: consumption reporting has not been ruled out. A null package balance means no measurement is available yet.
+ * - `unavailable`: ongoing consumption reporting is unavailable. Display the purchased `total_bytes` as allowance; do not present it as measured remaining data.
+ *
+ * This field is separate from daily usage history. Reporting availability can change as network support is confirmed.
+ *
+ */
+export type EsimBalanceReporting = "available" | "unavailable";
+
+/**
+ * The most recent mobile network the device attached to.
+ */
+export type EsimNetworkAttachment = {
+  /**
+   * Country of the network.
+   */
+  readonly country_code: CountryCode;
+  /**
+   * English name of the country, or null when not known.
+   */
+  readonly country_name?: string | null;
+  /**
+   * Name of the mobile network, or null when not known.
+   */
+  readonly network_name?: string | null;
+  /**
+   * When the device attached.
+   */
+  readonly attached_at: string;
+};
+
+export type Esim = {
+  /**
+   * The assigned service user, or null when the eSIM has no person assignment.
+   */
+  readonly subscriber_id: EsimSubscriberId | null;
+  readonly id: EsimId;
+  readonly status: EsimStatus;
+  readonly mode: EsimMode;
+  /**
+   * ICCID of the eSIM profile. Null while no profile is allocated yet, for example when provisioning failed before allocation.
+   */
+  readonly iccid: string | null;
+  /**
+   * Phone number attached to this eSIM, in E.164 format, as the supplier reports it. Null while none is on record: a data-only plan comes with no number, and a plan that includes one reports it after provisioning.
+   *
+   */
+  readonly phone_number: string | null;
+  readonly capabilities?: EsimServiceCapabilities;
+  /**
+   * The order that created this eSIM.
+   */
+  readonly order_id: EsimOrderId;
+  /**
+   * Free-text label for your own reference, for example a traveler or order reference.
+   */
+  display_name?: string | null;
+  readonly installation: EsimInstallation;
+  /**
+   * Current data packages, one per purchase.
+   */
+  readonly packages: Array<EsimPackage>;
+  /**
+   * Remaining data per coverage zone, combined across the zone's packages. Derived; the packages are the source of truth.
+   */
+  readonly zone_balances: Array<EsimZoneBalance>;
+  /**
+   * Actions currently available to you on this eSIM, with reasons for unavailable actions. Returned by the individual eSIM read. Use this to display controls and explain restrictions. Each action rechecks permissions and state when submitted, so availability is not a guarantee of success.
+   */
+  readonly available_actions?: Array<EsimAvailableAction>;
+  /**
+   * Maximum number of concurrent data packages this eSIM can hold, counted across all zones; several packages may share one zone. Enforced when packages are added.
+   *
+   */
+  readonly package_limit: number;
+  /**
+   * Whether daily usage history is supported for this eSIM. The daily usage endpoint is currently unavailable; read package balances for reported consumption.
+   */
+  readonly usage_available: boolean;
+  /**
+   * Whether ongoing package consumption reporting is available. Separate from daily usage history. Null package consumption values mean no measurement is available.
+   */
+  readonly balance_reporting: EsimBalanceReporting;
+  /**
+   * Activate (first network use) before this moment or the eSIM expires. Null once activated.
+   */
+  readonly ready_until?: string | null;
+  /**
+   * When the eSIM first used a mobile network. Null until then.
+   */
+  readonly activated_at?: string | null;
+  /**
+   * When the eSIM's service period ends. The period starts at activation and data packages cannot outlive it. Null until activated.
+   *
+   */
+  readonly active_until?: string | null;
+  /**
+   * Most recent network attachment, or null before first attach.
+   */
+  readonly last_attachment?: EsimNetworkAttachment | null;
+  /**
+   * Tags for routing, filtering, and stats grouping, echoed on webhook events for the eSIM.
+   */
+  tags?: Array<Tag>;
+  /**
+   * Your own key-value data, echoed on webhook events for the eSIM. Maximum 2 KB serialized.
+   */
+  metadata?: {
+    [key: string]: unknown;
+  };
+} & Timestamps;
+
+/**
+ * Order state.
+ *
+ * - `scheduled`: reserved for a future scheduled purchase; no charge has been made.
+ * - `charging`: payment is being obtained. If funds are insufficient, inspect `funding` and your wallet balance. One-time orders retry automatically; an initial recurring purchase requires an explicit retry after adding funds.
+ * - `provisioning`: the package is being provisioned during the request.
+ * - `pending`: the purchase continues after the request returns. Read the order again to check its outcome.
+ * - `completed`: delivery completed and the eSIM and package IDs are available. This does not confirm device installation. Terminal.
+ * - `failed`: delivery failed. Any charge is credited automatically; `refund_transaction_id` identifies an issued credit. Terminal.
+ * - `canceled`: reserved for a scheduled purchase withdrawn before execution. Canceling an unfunded order currently returns `failed` with `failure_code: canceled`.
+ *
+ */
+export type EsimOrderStatus =
+  | "scheduled"
+  | "charging"
+  | "provisioning"
+  | "pending"
+  | "completed"
+  | "failed"
+  | "canceled";
+
+/**
+ * Where and how install credentials reach the traveler. The recipient is a raw address, so delivery works for travelers who are not stored anywhere: an email address for email, an E.164 phone number for sms.
+ *
+ */
+export type EsimDelivery = {
+  /**
+   * Recipient address. An email address for the email channel, an E.164 phone number for the sms channel.
+   */
+  to: string;
+  channel: EsimDeliveryChannel;
+  /**
+   * Language for the message. Falls back to the closest available language, then English.
+   */
+  locale?: LanguageTag;
+};
+
+/**
+ * Funding needed for an order in `charging`. Add funds to the wallet and retry the existing order. One-time orders also retry automatically. A funded order proceeds to delivery; a failed order receives an automatic credit for any charge.
+ */
+export type EsimOrderFunding = {
+  /**
+   * Total wallet balance required for the charge, including tax. This is the required balance rather than the amount to add. Compare it with your current wallet balance.
+   */
+  required_amount: Money;
+  /**
+   * Earliest time a further insufficient-funds attempt can fail the order. Adding funds after this time can still complete the purchase before that attempt. Check the order status to determine whether it remains payable.
+   */
+  lapses_at: string;
+};
+
+export type EsimOrder = Timestamps & {
+  readonly id: EsimOrderId;
+  readonly status: EsimOrderStatus;
+  readonly mode: EsimMode;
+  /**
+   * Offer purchased.
+   */
+  readonly offer_id: EsimOfferId;
+  /**
+   * Revision of the offer this order locked at creation. The quoted price stays that of this revision even if the offer changes later. The produced package snapshots its coverage at purchase; the zone's live country list governs new sales only.
+   */
+  readonly offer_revision: number;
+  /**
+   * Coverage zone of the purchased offer, captured at creation.
+   */
+  readonly zone_id: EsimZoneId;
+  /**
+   * The eSIM the package lands on. Set at creation when adding to an existing eSIM; set when provisioning starts for a new-eSIM order; null before that.
+   */
+  readonly esim_id: EsimId | null;
+  /**
+   * Subscriber to assign when the new eSIM is delivered. Null when none was requested, including top-up orders, which retain the existing assignment.
+   */
+  readonly subscriber_id: EsimSubscriberId | null;
+  /**
+   * The recurring service associated with this purchase. Absent for one-time orders.
+   */
+  readonly recurring_subscription_id?: EsimRecurringSubscriptionId;
+  /**
+   * The purchased data package, set when the order completes; null before that.
+   */
+  readonly package_id: EsimPackageId | null;
+  /**
+   * The quoted price, locked at creation in your billing currency. A `mode: test` order quotes this price and is never charged it, so its `wallet_transaction_id` stays null.
+   */
+  readonly price: Money;
+  /**
+   * The wallet transaction that paid for this order, for reconciling against your billing transactions. Null until the charge lands, and always null for a `mode: test` order, which is never charged.
+   */
+  readonly wallet_transaction_id: WalletTransactionId | null;
+  /**
+   * The wallet transaction that credited the charge back after a failure. Null unless the order failed after charging.
+   */
+  readonly refund_transaction_id: WalletTransactionId | null;
+  /**
+   * Where install credentials are delivered once available. Present when requested at creation.
+   */
+  readonly delivery?: EsimDelivery;
+  /**
+   * Details of an insufficient-funds attempt while the order is in `charging`. May be null even while the order is awaiting funds; a null value does not confirm payment. Check the order status and your wallet balance.
+   */
+  readonly funding: EsimOrderFunding | null;
+  /**
+   * Reason the order failed. Null unless `status` is `failed`. Handle unrecognized codes without assuming the purchase succeeded.
+   *
+   * - `canceled`: canceled while awaiting funds.
+   * - `resolved_by_support`: support closed an unresolved order as failed.
+   * - `esim_released`: the target profile became unavailable before delivery.
+   * - `mode_mismatch`: the purchase could not be fulfilled in its original live or test mode.
+   *
+   * Any charge is credited automatically. Check `refund_transaction_id` to confirm an issued credit.
+   *
+   */
+  readonly failure_code: string | null;
+  /**
+   * Why the order failed, in plain terms. Null unless status is failed.
+   */
+  readonly failure_reason: string | null;
+  /**
+   * When the order reached completed. Null before that.
+   */
+  readonly completed_at: string | null;
 };
 
 export type VoiceLegList = {
@@ -23628,6 +24315,861 @@ export type VoiceDestinationsUpdate = {
    *
    */
   destinations: Array<DestinationSetting>;
+};
+
+/**
+ * Field to sort zones by. Only `created_at` is supported.
+ */
+export type EsimZoneSortField = "created_at";
+
+export type EsimZoneList = {
+  /**
+   * Zones, newest first.
+   */
+  data: Array<EsimZone>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * Field to sort offers by. Only `created_at` is supported.
+ */
+export type EsimOfferSortField = "created_at";
+
+/**
+ * How the plan provides a phone number.
+ *
+ * - `always`: a phone number is included with each eSIM purchased from the offer.
+ * - `on_request`: reserved for offers with an optional phone number; currently unavailable.
+ *
+ */
+export type EsimOfferPhoneInclusion = "always" | "on_request";
+
+/**
+ * Phone service included with the plan. Every eSIM sold from the offer gets its own phone number; each flag states one direction of service on that number. A false flag means the plan does not include that service.
+ *
+ */
+export type EsimOfferPhone = {
+  included: EsimOfferPhoneInclusion;
+  /**
+   * The eSIM can receive calls on its phone number.
+   */
+  voice_inbound: boolean;
+  /**
+   * The eSIM can place calls.
+   */
+  voice_outbound: boolean;
+  /**
+   * The eSIM can receive text messages on its phone number.
+   */
+  sms_inbound: boolean;
+  /**
+   * The eSIM can send text messages.
+   */
+  sms_outbound: boolean;
+};
+
+/**
+ * Data allowance of a bundle.
+ */
+export type EsimOfferData = {
+  /**
+   * Total data allowance in bytes.
+   */
+  readonly amount_bytes: number;
+  /**
+   * Data amount in bytes after which speed is reduced instead of cut off. Null when the allowance is a hard cap.
+   *
+   */
+  readonly throttled_after_bytes?: number | null;
+};
+
+/**
+ * How the validity period behaves. one_time runs once and expires; recurring renews for a further period each time it lapses.
+ */
+export type EsimOfferValidityType = "one_time" | "recurring";
+
+/**
+ * Unit of the validity period.
+ */
+export type EsimOfferValidityUnit = "day" | "month";
+
+/**
+ * How long a package from this offer stays usable. one_time offers run once for the given period after activation; recurring offers renew for a further period each time it lapses. Match on type and treat an unrecognized value as an offer your integration cannot order.
+ *
+ */
+export type EsimOfferValidity = {
+  readonly type: EsimOfferValidityType;
+  readonly unit: EsimOfferValidityUnit;
+  /**
+   * Number of units per period.
+   */
+  readonly value: number;
+  /**
+   * For recurring offers, the minimum number of periods committed. Null when there is no minimum, and for one_time offers.
+   */
+  readonly minimum_periods?: number | null;
+};
+
+/**
+ * Fixed-allowance terms: a data allowance with a validity period, charged once per provisioned package.
+ *
+ */
+export type EsimOfferBundlePricing = {
+  /**
+   * Pricing type.
+   */
+  readonly type: "bundle";
+  readonly data: EsimOfferData;
+  /**
+   * Validity of packages created from this offer. The period starts at activation, which happens on first use in the coverage zone. The effective validity is capped by the eSIM's service period: see the package's expires_at for the real expiry.
+   *
+   */
+  readonly validity: EsimOfferValidity;
+  /**
+   * What your workspace is billed per package provisioned from this offer.
+   */
+  readonly price: Money;
+};
+
+/**
+ * Compact offer row for lists: the full offer minus the embedded zone. Fetch the offer or its zone for the country list.
+ *
+ */
+export type EsimOfferSummary = {
+  readonly id: EsimOfferId;
+  /**
+   * Display name of the offer.
+   */
+  readonly name: string;
+  /**
+   * Increments whenever the offer's terms change. Orders lock the revision they were quoted at.
+   */
+  readonly revision: number;
+  /**
+   * Coverage zone the offer sells. Offers for the same footprint share one zone.
+   */
+  readonly zone_id: EsimZoneId;
+  /**
+   * Speed class. For reduced-speed offers, the bundle's data.throttled_after_bytes carries the full-speed allowance.
+   */
+  readonly speed: EsimSpeed;
+  /**
+   * Whether packages from this offer can be held alongside packages from other zones on the same eSIM, subject to the eSIM's package_limit.
+   */
+  readonly stackable: boolean;
+  /**
+   * Phone service that comes with the plan, or null when the plan includes no phone number. When present, `included` says how the number is provided and the flags state which call and text directions work.
+   *
+   */
+  readonly phone: EsimOfferPhone | null;
+  /**
+   * Commercial terms of the offer. Every offer in the current catalog is a bundle: a fixed allowance with a validity period for a fixed price. Match on the pricing type; treat an unrecognized type as an offer your integration cannot order yet.
+   *
+   */
+  readonly pricing: EsimOfferBundlePricing;
+  /**
+   * Billing product the offer's charges post under, as it appears on your invoice line items.
+   */
+  readonly product: BillingProductSlug;
+  readonly status: EsimOfferStatus;
+  readonly created_at: string;
+};
+
+export type EsimOfferList = {
+  /**
+   * Offers, newest first.
+   */
+  data: Array<EsimOfferSummary>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * A purchasable offer from the curated catalog: the commercial terms for prepaid data in one coverage zone, priced as your workspace is billed. The coverage itself lives on the referenced zone, shared by every offer selling the same footprint.
+ *
+ */
+export type EsimOffer = {
+  readonly id: EsimOfferId;
+  /**
+   * Display name of the offer.
+   */
+  readonly name: string;
+  /**
+   * Increments whenever the offer's terms change. Orders lock the revision they were quoted at.
+   */
+  readonly revision: number;
+  /**
+   * Coverage zone the offer sells. Offers for the same footprint share one zone.
+   */
+  readonly zone_id: EsimZoneId;
+  /**
+   * The offer's coverage zone, embedded so one read answers "where does this work". The zone resource is authoritative.
+   */
+  readonly zone: EsimZone;
+  /**
+   * Speed class. For reduced-speed offers, the bundle's data.throttled_after_bytes carries the full-speed allowance.
+   */
+  readonly speed: EsimSpeed;
+  /**
+   * Whether packages from this offer can be held alongside packages from other zones on the same eSIM, subject to the eSIM's package_limit.
+   */
+  readonly stackable: boolean;
+  /**
+   * Phone service that comes with the plan, or null when the plan includes no phone number. When present, `included` says how the number is provided and the flags state which call and text directions work.
+   *
+   */
+  readonly phone: EsimOfferPhone | null;
+  /**
+   * Commercial terms of the offer. Every offer in the current catalog is a bundle: a fixed allowance with a validity period for a fixed price. Match on the pricing type; treat an unrecognized type as an offer your integration cannot order yet.
+   *
+   */
+  readonly pricing: EsimOfferBundlePricing;
+  /**
+   * Billing product the offer's charges post under, as it appears on your invoice line items.
+   */
+  readonly product: BillingProductSlug;
+  readonly status: EsimOfferStatus;
+  readonly created_at: string;
+};
+
+/**
+ * Complete identification schema for one covered country. A country without maintained extra requirements returns the baseline schema requiring first_name, last_name, and email. Customers handle collection, validation, and compliance; Bird does not receive or verify these values.
+ */
+export type EsimCountryRequirements = {
+  country_code: CountryCode;
+  schema_revision: EsimSchemaRevision;
+  schema: EsimIdentificationSchema;
+};
+
+/**
+ * Identification guidance for the countries covered by the offer. You collect and validate the information; this response does not verify a person or authorize a purchase.
+ */
+export type EsimOfferRequirements = {
+  countries: Array<EsimCountryRequirements>;
+};
+
+export type EsimOrderList = {
+  /**
+   * Orders, newest first.
+   */
+  data: Array<EsimOrder>;
+} & ListEnvelope;
+
+/**
+ * Buy the first package and enable automatic renewal in one purchase. Requires subscriber_id, offer_revision and Idempotency-Key. Omit esim_id and expected_price.
+ *
+ */
+export type EsimOrderRecurrence = {
+  /**
+   * The accepted recurring configuration revision.
+   */
+  recurrence_revision: number;
+  accepted_price: Money;
+};
+
+export type EsimOrderCreate = unknown & {
+  /**
+   * Offer to purchase.
+   */
+  offer_id: EsimOfferId;
+  /**
+   * Existing eSIM to add the package to. Omit to provision a new eSIM.
+   */
+  esim_id?: EsimId;
+  /**
+   * Person to assign the new eSIM to when delivery completes. Must be a subscriber in this workspace. Omit to leave it unassigned. Supplying it with esim_id returns 422; top-ups retain the existing assignment. An unknown subscriber or one outside this workspace returns 404 before charging. Identification guidance does not gate purchase.
+   */
+  subscriber_id?: EsimSubscriberId;
+  /**
+   * The offer revision you are quoting from. When set and the offer has since moved to a newer revision, the order is refused with a conflict instead of charging a price you did not see. Omitted, the current revision is used.
+   */
+  offer_revision?: number;
+  recurrence?: EsimOrderRecurrence;
+  /**
+   * The price you displayed to the buyer. When set and the workspace's current resolved price differs, the order is refused with a conflict instead of charging a different amount. Catches billing-rate changes, which move independently of the offer revision.
+   */
+  expected_price?: Money;
+  /**
+   * Free-text label for the new eSIM, for your own reference. Ignored when esim_id is set.
+   */
+  display_name?: string;
+  /**
+   * Tags for the new eSIM, echoed on its lifecycle webhook events. Ignored when esim_id is set.
+   */
+  tags?: Array<Tag>;
+  /**
+   * Your own key-value data for the new eSIM, echoed on its lifecycle webhook events. Maximum 2 KB serialized. Ignored when esim_id is set.
+   */
+  metadata?: {
+    [key: string]: unknown;
+  };
+  /**
+   * Set to true to accept a validity cut short by the eSIM's service period. Without it, an order whose package would expire early is refused with a conflict that states the effective validity.
+   */
+  acknowledge_shortened_validity?: boolean;
+};
+
+/**
+ * Relationship between the paid period and package delivery.
+ *
+ * - `exact_period`: the package covers the accepted paid interval.
+ * - `recurring_top_up`: each funded period purchases a standard package. Activation, expiry, and accumulation follow that package’s terms.
+ *
+ */
+export type EsimRecurrenceDeliveryMode = "exact_period" | "recurring_top_up";
+
+/**
+ * Billing cadence for recurring packages.
+ *
+ * - `calendar_month`: periods follow calendar months from the billing anchor.
+ * - `fixed_days`: each period lasts the stated number of 24-hour days.
+ *
+ */
+export type EsimRecurrenceModel = "calendar_month" | "fixed_days";
+
+/**
+ * Published one-time purchase terms before tax.
+ */
+export type EsimCheckoutOneTime = {
+  /**
+   * The offer revision to accept when purchasing.
+   */
+  offer_revision: number;
+  price: Money;
+};
+
+/**
+ * Published recurring terms before tax. The first period starts when payment is funded, and cancellation stops future renewal while preserving paid packages.
+ */
+export type EsimCheckoutRecurringQuote = {
+  delivery_mode: EsimRecurrenceDeliveryMode;
+  /**
+   * The offer revision to accept when purchasing.
+   */
+  offer_revision: number;
+  /**
+   * The recurring configuration revision to accept when purchasing.
+   */
+  recurrence_revision: number;
+  price: Money;
+  model: EsimRecurrenceModel;
+  /**
+   * The number of calendar months or fixed 24-hour days per period.
+   */
+  interval_count: number;
+};
+
+/**
+ * Renewal is not configured, has no published price, or has no eligible mobile network. A failed lookup returns an error instead.
+ */
+export type EsimCheckoutUnavailableReason =
+  "not_configured" | "price_unavailable" | "no_eligible_route";
+
+export type EsimCheckoutRecurrence = (
+  | {
+      available?: true;
+      quote?: EsimCheckoutRecurringQuote;
+      unavailable_reason?: unknown;
+    }
+  | {
+      available?: false;
+      quote?: unknown;
+      unavailable_reason?: EsimCheckoutUnavailableReason;
+    }
+) & {
+  /**
+   * Whether automatic renewal is currently available for a new eSIM.
+   */
+  available: boolean;
+  quote: EsimCheckoutRecurringQuote | null;
+  unavailable_reason: EsimCheckoutUnavailableReason | null;
+};
+
+/**
+ * Published purchase terms. Renewal availability is a preview and does not reserve stock.
+ */
+export type EsimCheckoutOptions = {
+  offer_id: EsimOfferId;
+  one_time: EsimCheckoutOneTime;
+  recurrence: EsimCheckoutRecurrence;
+};
+
+/**
+ * The published recurring package price and cadence. Calendar months follow the billing anchor; fixed days use the stated number of 24-hour days.
+ */
+export type EsimRecurringOffer = {
+  delivery_mode: EsimRecurrenceDeliveryMode;
+  offer_id: EsimOfferId;
+  model: EsimRecurrenceModel;
+  /**
+   * The number of calendar months or fixed days in each period.
+   */
+  interval_count: number;
+  /**
+   * The recurring configuration revision to accept.
+   */
+  revision: number;
+  price: Money;
+};
+
+/**
+ * Delivery state of the recurring service. Check payment and renewal fields separately.
+ *
+ * - `pending`: enrollment or the initial purchase is still being processed.
+ * - `active`: the service has delivered a package and remains active.
+ * - `needs_attention`: delivery or a related credit remains unresolved. Check period history and the associated order before purchasing a replacement.
+ * - `ended`: recurrence has ended. Previously delivered packages keep their own validity.
+ *
+ */
+export type EsimRecurringSubscriptionStatus =
+  "pending" | "active" | "needs_attention" | "ended";
+
+export type EsimRecurringSubscription = (
+  | {
+      esim_id?: EsimId;
+    }
+  | {
+      initial_order_id?: EsimOrderId;
+    }
+) & {
+  delivery_mode: EsimRecurrenceDeliveryMode;
+  id: EsimRecurringSubscriptionId;
+  /**
+   * The provisioned eSIM, or null while the initial purchase is pending.
+   */
+  esim_id: EsimId | null;
+  /**
+   * The initial purchase order, or null when recurrence was enrolled on an existing eSIM.
+   */
+  initial_order_id: EsimOrderId | null;
+  subscriber_id: EsimSubscriberId;
+  offer_id: EsimOfferId;
+  status: EsimRecurringSubscriptionStatus;
+  /**
+   * The financial subscription state, or null while acceptance is pending.
+   */
+  billing_status: string | null;
+  /**
+   * The authoritative billing period boundary, or null while acceptance is pending.
+   */
+  current_period_start: string | null;
+  /**
+   * The authoritative billing period boundary, or null while acceptance is pending.
+   */
+  current_period_end: string | null;
+  /**
+   * Whether future renewal is stopped at the current paid boundary.
+   */
+  cancel_at_period_end: boolean;
+  /**
+   * The order for the current billing period, or null before fulfillment starts.
+   */
+  latest_order_id: EsimOrderId | null;
+  /**
+   * When the recurring service was requested.
+   */
+  created_at: string;
+  /**
+   * Accepted package price before tax, in its published currency. Null before Billing accepts enrollment.
+   */
+  price: Money | null;
+  /**
+   * Accepted cadence, or null before Billing accepts enrollment.
+   */
+  model: EsimRecurrenceModel | null;
+  /**
+   * Number of calendar months or fixed 24-hour days in each accepted period. Null before acceptance.
+   */
+  interval_count: number | null;
+  /**
+   * Next scheduled renewal boundary. Null when enrollment is pending or future renewals have stopped.
+   */
+  next_renewal_at: string | null;
+  /**
+   * When canceled recurrence ends: the paid boundary for scheduled cancellation, or the recorded cancellation time for an immediate stop. Null when renewal has not been stopped or no period was accepted. Paid packages remain available under their own validity.
+   */
+  cancellation_effective_at: string | null;
+  /**
+   * First recorded reason future renewal stopped. Null when no reason has been recorded. Delivery outcomes are available separately in period history.
+   */
+  stop_reason: EsimRecurringStopReason | null;
+};
+
+export type EsimRecurringSubscriptionList = {
+  /**
+   * Recurring services in this workspace.
+   */
+  data: Array<EsimRecurringSubscription>;
+} & ListEnvelope;
+
+/**
+ * Starts a new paid package period on an existing assigned eSIM. The workspace organization pays; the subscriber has no personal wallet.
+ */
+export type EsimRecurringSubscriptionCreate = {
+  /**
+   * Assigned eSIM receiving the recurring package.
+   */
+  esim_id: EsimId;
+  /**
+   * Offer whose recurring terms the buyer accepted.
+   */
+  offer_id: EsimOfferId;
+  /**
+   * The accepted offer revision.
+   */
+  offer_revision: number;
+  /**
+   * The accepted recurring configuration revision.
+   */
+  recurrence_revision: number;
+  accepted_price: Money;
+};
+
+/**
+ * Delivery outcome of a paid period.
+ *
+ * - `pending`: package delivery has not been confirmed, including an uncertain network outcome.
+ * - `completed`: the package was delivered.
+ * - `failing`: delivery failed and the credit is being processed.
+ * - `failed`: failure processing is complete. Check `refund_transaction_id` for an issued credit.
+ *
+ */
+export type EsimRecurringPeriodStatus =
+  "pending" | "completed" | "failing" | "failed";
+
+/**
+ * A funded period and its delivery outcome. Amounts retain the original charged currency and tax; free periods have no wallet transaction.
+ */
+export type EsimRecurringPeriod = {
+  delivery_mode: EsimRecurrenceDeliveryMode;
+  /**
+   * Start of the funded billing period. Package activation follows the accepted delivery mode.
+   */
+  period_start: string;
+  /**
+   * End of the paid billing period. A recurring top-up package can expire at a different time; check the package’s expiry.
+   */
+  period_end: string;
+  status: EsimRecurringPeriodStatus;
+  net_amount: Money;
+  tax_amount: Money;
+  total_amount: Money;
+  /**
+   * Original wallet charge, or null for a free period.
+   */
+  wallet_transaction_id: WalletTransactionId | null;
+  /**
+   * Confirmed wallet credit after definitive failure, or null when no credit was issued.
+   */
+  refund_transaction_id: WalletTransactionId | null;
+  /**
+   * Delivery order, or null before fulfillment starts.
+   */
+  order_id: EsimOrderId | null;
+  /**
+   * Delivery order state, or null before fulfillment starts.
+   */
+  order_status: EsimOrderStatus | null;
+};
+
+export type EsimRecurringPeriodList = ListEnvelope & {
+  data: Array<EsimRecurringPeriod>;
+};
+
+/**
+ * A stable person reference for eSIM service in this workspace. Editing contact details does not change this identity.
+ */
+export type EsimSubscriber = {
+  id: EsimSubscriberId;
+  contact_id: ContactId;
+} & Timestamps;
+
+export type EsimSubscriberList = {
+  /**
+   * Subscribers in creation order, newest first.
+   */
+  data: Array<EsimSubscriber>;
+} & ListEnvelope;
+
+/**
+ * Select an existing contact in this workspace. One subscriber is kept per contact. Creating the link requires Contacts read permission and prevents Contact deletion, including after any assigned eSIM ends. Subscriber links cannot currently be removed.
+ */
+export type EsimSubscriberCreate = {
+  /**
+   * Existing contact in this workspace; requires Contacts read permission.
+   */
+  contact_id: ContactId;
+};
+
+export type EsimAssignmentId = string;
+
+/**
+ * The person assigned to one eSIM. Assignment grants no workspace membership or permission to read installation credentials.
+ */
+export type EsimAssignment = {
+  id: EsimAssignmentId;
+  subscriber_id: EsimSubscriberId;
+  esim_id: EsimId;
+} & Timestamps;
+
+/**
+ * Assign an unassigned eSIM to this person. The profile must be allocated and ready, active, or suspended. Customers handle identification collection and compliance.
+ */
+export type EsimAssignmentCreate = {
+  /**
+   * Subscriber in this workspace to assign to the eSIM.
+   */
+  subscriber_id: EsimSubscriberId;
+};
+
+/**
+ * Compact eSIM representation used in lists. Fetch the eSIM by id for the full aggregate with packages, balances, and installation state.
+ *
+ */
+export type EsimSummary = {
+  /**
+   * The assigned service user, or null when the eSIM has no person assignment.
+   */
+  readonly subscriber_id: EsimSubscriberId | null;
+  readonly id: EsimId;
+  readonly status: EsimStatus;
+  readonly mode: EsimMode;
+  /**
+   * ICCID of the eSIM profile, or null while none is allocated.
+   */
+  readonly iccid: string | null;
+  /**
+   * Phone number attached to this eSIM, in E.164 format, as the supplier reports it. Null while none is on record.
+   *
+   */
+  readonly phone_number: string | null;
+  /**
+   * Free-text label for your own reference.
+   */
+  readonly display_name: string | null;
+  readonly created_at: string;
+};
+
+export type EsimList = {
+  /**
+   * eSIMs, newest first, in compact form; fetch one by id for the full aggregate.
+   */
+  data: Array<EsimSummary>;
+} & ListEnvelope;
+
+/**
+ * Fields that can be updated on an eSIM.
+ */
+export type EsimUpdate = {
+  /**
+   * Free-text label for your own reference. Null clears it.
+   */
+  display_name?: string | null;
+  /**
+   * Replaces the eSIM's tags.
+   */
+  tags?: Array<Tag>;
+  /**
+   * Replaces the eSIM's metadata. Maximum 2 KB serialized.
+   */
+  metadata?: {
+    [key: string]: unknown;
+  };
+};
+
+/**
+ * Device installation steps based on the available credentials. Follow the list for the recipient’s device.
+ */
+export type EsimInstallationInstructions = {
+  /**
+   * BCP-47 tag of the language `ios` and `android` are written in. This is the language served, which is the closest match to Accept-Language, or English when nothing closer is available. One list never mixes two languages.
+   *
+   */
+  language: LanguageTag;
+  /**
+   * Ordered steps for iOS devices.
+   */
+  ios: Array<string>;
+  /**
+   * Ordered steps for Android devices.
+   */
+  android: Array<string>;
+};
+
+/**
+ * Installation details for an eSIM. Keep activation codes, installation links, QR images, and manual setup credentials private because they can grant access to the profile. Use fields with a value and follow the returned device instructions.
+ */
+export type EsimCredentials = {
+  readonly esim_id: EsimId;
+  /**
+   * One-tap install link for iOS 17.4 and later, derived from the activation code. Null when a valid link cannot be derived for this eSIM.
+   */
+  readonly ios_install_url: string | null;
+  /**
+   * Android installation link. Currently unavailable; returns null. Use the returned Android instructions for manual setup.
+   */
+  readonly android_install_url: string | null;
+  /**
+   * Hosted QR image URL. Currently unavailable; returns null. Use the activation code in your own installation flow or provide a hosted installation page.
+   */
+  readonly qr_code_url: string | null;
+  /**
+   * Raw activation string for manual entry in device settings.
+   */
+  readonly activation_code: string;
+  /**
+   * SM-DP+ server address, for building a custom install flow.
+   */
+  readonly smdp_address: string;
+  /**
+   * Matching ID component of the activation code, for building a custom install flow.
+   */
+  readonly matching_id: string;
+  /**
+   * Confirmation code requested during installation, when available. Null means the requirement is unknown; it does not confirm that a code is unnecessary.
+   */
+  readonly confirmation_code?: string | null;
+  /**
+   * Access point name for mobile data, when available. Null means no APN information is available; it does not confirm automatic configuration.
+   */
+  readonly apn: string | null;
+  /**
+   * Whether data roaming must be enabled. Null means the requirement is unknown. When true, `instructions` includes a step to enable roaming.
+   */
+  readonly data_roaming_required: boolean | null;
+  /**
+   * Step-by-step install instructions, covering whichever of the fields in this response carry a value, in the closest language available for the Accept-Language request header. Its `language` field names the one served.
+   *
+   */
+  readonly instructions: EsimInstallationInstructions;
+};
+
+/**
+ * Outcome of a credential delivery.
+ *
+ * - `pending`: accepted; the outcome has not settled.
+ * - `delivered`: the message reached the recipient's provider; terminal.
+ * - `failed`: the message could not be delivered; `failure_code` says why. Terminal.
+ *
+ */
+export type EsimDeliveryStatus = "pending" | "delivered" | "failed";
+
+export type EsimInstallLinkId = string;
+
+/**
+ * Non-secret link details for identifying and revoking a delivered installation link. Contains no token or installation credentials.
+ */
+export type EsimInstallLinkMetadata = {
+  id: EsimInstallLinkId;
+  /**
+   * When the installation link expires.
+   */
+  expires_at: string;
+  /**
+   * When the link was revoked, or null while not revoked.
+   */
+  revoked_at: string | null;
+};
+
+/**
+ * One credential delivery to a traveler. Returned when a delivery is accepted and listed on the eSIM's delivery history; the id reappears on the event that settles it.
+ */
+export type EsimCredentialsDelivery = {
+  readonly id: EsimDeliveryId;
+  readonly channel: EsimDeliveryChannel;
+  /**
+   * Recipient address the message goes to.
+   */
+  readonly to: string;
+  readonly status: EsimDeliveryStatus;
+  /**
+   * Why the delivery failed. Null unless status is failed. Open enum: treat unrecognized values as future failure kinds.
+   */
+  readonly failure_code: string | null;
+  /**
+   * When the delivery was accepted.
+   */
+  readonly created_at: string;
+  /**
+   * When the outcome became known. Null while pending.
+   */
+  readonly settled_at: string | null;
+  /**
+   * Link metadata for explicit revocation. Null for deliveries created before hosted links were enabled.
+   */
+  readonly install_link: EsimInstallLinkMetadata | null;
+};
+
+/**
+ * The eSIM's credential deliveries, newest first, most recent 50.
+ */
+export type EsimDeliveryList = {
+  data: Array<EsimCredentialsDelivery>;
+};
+
+/**
+ * A hosted installation page for one eSIM. The recipient does not need a Bird account. The secret URL is returned at creation and cannot be retrieved through later reads.
+ */
+export type EsimInstallLink = {
+  readonly id: EsimInstallLinkId;
+  readonly esim_id: EsimId;
+  /**
+   * Private installation URL. Anyone holding it can access installation details until expiry or revocation. Store or share it securely when created; later reads do not return it.
+   */
+  readonly url: string;
+  /**
+   * When the link stops granting access to installation details.
+   */
+  readonly expires_at: string;
+  /**
+   * When the link was created.
+   */
+  readonly created_at: string;
+};
+
+/**
+ * The eSIM's data packages. Bounded: an eSIM holds at most package_limit concurrent packages, so the list is returned in full.
+ */
+export type EsimPackageList = {
+  /**
+   * Packages, newest first.
+   */
+  data: Array<EsimPackage>;
+};
+
+/**
+ * Offers this eSIM can take as a top-up right now, given its mobile network, current packages, and package_limit. A point-in-time answer; re-fetch rather than caching.
+ */
+export type EsimCompatibleOfferList = {
+  /**
+   * Orderable top-up offers for this eSIM.
+   */
+  data: Array<EsimOfferSummary>;
+  /**
+   * When this answer was computed.
+   */
+  readonly as_of: string;
+};
+
+/**
+ * The eSIM settings your workspace controls. Every field carries its effective value, whether or not the workspace has ever changed it.
+ *
+ */
+export type EsimSettings = {
+  /**
+   * Whether Bird sends eSIM install credentials to travelers for this workspace. When `false`, sending an eSIM's credentials by email or SMS is refused; reading them from the API still works, so you can deliver them yourself. This governs the install message only. Your workspace's other email and SMS sending is unaffected. Defaults to `true`.
+   *
+   */
+  credential_delivery_enabled: boolean;
+};
+
+/**
+ * Changes to your workspace's eSIM settings. Omit a field to leave it as it is.
+ *
+ */
+export type EsimSettingsUpdate = {
+  /**
+   * Send `false` to stop Bird sending eSIM install credentials to travelers for this workspace, or `true` to allow it again. Credentials stay readable from the API either way.
+   *
+   */
+  credential_delivery_enabled?: boolean;
 };
 
 /**
@@ -25308,6 +26850,13 @@ export type WhatsAppInboundStatsByPhoneNumberResponseWritable = {
   [key: string]: never;
 };
 
+export type WhatsAppAgentNotificationListWritable = {
+  /**
+   * A page of the notifications sent to the agent.
+   */
+  data: Array<unknown>;
+} & ListEnvelope;
+
 export type WhatsAppNumberWritable = {
   [key: string]: never;
 };
@@ -25317,21 +26866,6 @@ export type WhatsAppNumberListWritable = {
    * The WhatsApp numbers your workspace can send from.
    */
   data: Array<WhatsAppNumberWritable>;
-} & ListEnvelope;
-
-/**
- * A notification you sent the agent about one contact, and what came of it. The agent decides whether to write to the contact about it; that message, if any, shows up on the contact's conversation.
- *
- */
-export type WhatsAppAgentNotificationWritable = {
-  [key: string]: never;
-};
-
-export type WhatsAppAgentNotificationListWritable = {
-  /**
-   * A page of the notifications sent to the agent.
-   */
-  data: Array<WhatsAppAgentNotificationWritable>;
 } & ListEnvelope;
 
 export type WhatsAppNumberEventWritable = {
@@ -28066,6 +29600,10 @@ export type NumberWritable = {
    */
   allocated_at: string;
   /**
+   * When a scheduled release of this number takes effect, at the end of its current billing period. The number stays allocated, with its current `status`, until then. `null` when no release is scheduled.
+   */
+  releases_at: string | null;
+  /**
    * When this number was released. `null` while it is still allocated to your workspace.
    */
   released_at?: string | null;
@@ -28224,7 +29762,8 @@ export type VoiceNumberProviderWritable =
 
 export type VoiceInboundConfigurationWritable = {
   /**
-   * Null when the stored route type is unsupported; inspect configuration_error before changing it.
+   * Null when the number has no route of its own and follows your workspace's default inbound route from the voice settings. Also null when the stored route type is unsupported, in which case configuration_error says so; inspect it before changing the route.
+   *
    */
   route: VoiceCallRoute | null;
 };
@@ -28267,6 +29806,54 @@ export type VoiceVerifiedNumberListWritable = {
   data: Array<VoiceVerifiedNumberWritable>;
 } & ListEnvelope;
 
+/**
+ * Supported services for the eSIM. These values describe capabilities; package balances and current eSIM status determine whether service can be used now. Optional phone service can remain `unknown` until a number is assigned. Data packages do not establish call or SMS allowances.
+ */
+export type EsimServiceCapabilitiesWritable = {
+  [key: string]: never;
+};
+
+/**
+ * One data package held by an eSIM: a single purchase with its own balance, validity, and coverage zone. Every order that completes creates exactly one package, so a package is always traceable to the order that bought it. An eSIM can hold several packages per zone; the right one is consumed automatically based on the device's location, and zone_balances on the eSIM carries the combined remainder per zone.
+ *
+ */
+export type EsimPackageWritable = {
+  [key: string]: never;
+};
+
+export type EsimWritable = {
+  /**
+   * Free-text label for your own reference, for example a traveler or order reference.
+   */
+  display_name?: string | null;
+  /**
+   * Tags for routing, filtering, and stats grouping, echoed on webhook events for the eSIM.
+   */
+  tags?: Array<Tag>;
+  /**
+   * Your own key-value data, echoed on webhook events for the eSIM. Maximum 2 KB serialized.
+   */
+  metadata?: {
+    [key: string]: unknown;
+  };
+};
+
+/**
+ * Funding needed for an order in `charging`. Add funds to the wallet and retry the existing order. One-time orders also retry automatically. A funded order proceeds to delivery; a failed order receives an automatic credit for any charge.
+ */
+export type EsimOrderFundingWritable = {
+  /**
+   * Total wallet balance required for the charge, including tax. This is the required balance rather than the amount to add. Compare it with your current wallet balance.
+   */
+  required_amount: Money;
+  /**
+   * Earliest time a further insufficient-funds attempt can fail the order. Adding funds after this time can still complete the purchase before that attempt. Check the order status to determine whether it remains payable.
+   */
+  lapses_at: string;
+};
+
+export type EsimOrderWritable = unknown;
+
 export type VoiceLegListWritable = {
   data: Array<VoiceLegWritable>;
 } & ListEnvelope;
@@ -28294,6 +29881,181 @@ export type VoiceDestinationListWritable = {
    * Total number of destination countries.
    */
   total: number;
+};
+
+export type EsimZoneListWritable = {
+  /**
+   * Zones, newest first.
+   */
+  data: Array<unknown>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * Phone service included with the plan. Every eSIM sold from the offer gets its own phone number; each flag states one direction of service on that number. A false flag means the plan does not include that service.
+ *
+ */
+export type EsimOfferPhoneWritable = {
+  included: EsimOfferPhoneInclusion;
+  /**
+   * The eSIM can receive calls on its phone number.
+   */
+  voice_inbound: boolean;
+  /**
+   * The eSIM can place calls.
+   */
+  voice_outbound: boolean;
+  /**
+   * The eSIM can receive text messages on its phone number.
+   */
+  sms_inbound: boolean;
+  /**
+   * The eSIM can send text messages.
+   */
+  sms_outbound: boolean;
+};
+
+/**
+ * Fixed-allowance terms: a data allowance with a validity period, charged once per provisioned package.
+ *
+ */
+export type EsimOfferBundlePricingWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Compact offer row for lists: the full offer minus the embedded zone. Fetch the offer or its zone for the country list.
+ *
+ */
+export type EsimOfferSummaryWritable = {
+  [key: string]: never;
+};
+
+export type EsimOfferListWritable = {
+  /**
+   * Offers, newest first.
+   */
+  data: Array<EsimOfferSummaryWritable>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * A purchasable offer from the curated catalog: the commercial terms for prepaid data in one coverage zone, priced as your workspace is billed. The coverage itself lives on the referenced zone, shared by every offer selling the same footprint.
+ *
+ */
+export type EsimOfferWritable = {
+  [key: string]: never;
+};
+
+export type EsimOrderListWritable = {
+  /**
+   * Orders, newest first.
+   */
+  data: Array<EsimOrderWritable>;
+} & ListEnvelope;
+
+/**
+ * A stable person reference for eSIM service in this workspace. Editing contact details does not change this identity.
+ */
+export type EsimSubscriberWritable = {
+  id: EsimSubscriberId;
+  contact_id: ContactId;
+};
+
+export type EsimSubscriberListWritable = {
+  /**
+   * Subscribers in creation order, newest first.
+   */
+  data: Array<EsimSubscriberWritable>;
+} & ListEnvelope;
+
+/**
+ * The person assigned to one eSIM. Assignment grants no workspace membership or permission to read installation credentials.
+ */
+export type EsimAssignmentWritable = {
+  id: EsimAssignmentId;
+  subscriber_id: EsimSubscriberId;
+  esim_id: EsimId;
+};
+
+export type EsimListWritable = {
+  /**
+   * eSIMs, newest first, in compact form; fetch one by id for the full aggregate.
+   */
+  data: Array<unknown>;
+} & ListEnvelope;
+
+/**
+ * Device installation steps based on the available credentials. Follow the list for the recipient’s device.
+ */
+export type EsimInstallationInstructionsWritable = {
+  /**
+   * BCP-47 tag of the language `ios` and `android` are written in. This is the language served, which is the closest match to Accept-Language, or English when nothing closer is available. One list never mixes two languages.
+   *
+   */
+  language: LanguageTag;
+  /**
+   * Ordered steps for iOS devices.
+   */
+  ios: Array<string>;
+  /**
+   * Ordered steps for Android devices.
+   */
+  android: Array<string>;
+};
+
+/**
+ * Installation details for an eSIM. Keep activation codes, installation links, QR images, and manual setup credentials private because they can grant access to the profile. Use fields with a value and follow the returned device instructions.
+ */
+export type EsimCredentialsWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Non-secret link details for identifying and revoking a delivered installation link. Contains no token or installation credentials.
+ */
+export type EsimInstallLinkMetadataWritable = {
+  id: EsimInstallLinkId;
+  /**
+   * When the installation link expires.
+   */
+  expires_at: string;
+  /**
+   * When the link was revoked, or null while not revoked.
+   */
+  revoked_at: string | null;
+};
+
+/**
+ * One credential delivery to a traveler. Returned when a delivery is accepted and listed on the eSIM's delivery history; the id reappears on the event that settles it.
+ */
+export type EsimCredentialsDeliveryWritable = {
+  [key: string]: never;
+};
+
+/**
+ * The eSIM's credential deliveries, newest first, most recent 50.
+ */
+export type EsimDeliveryListWritable = {
+  data: Array<EsimCredentialsDeliveryWritable>;
+};
+
+/**
+ * The eSIM's data packages. Bounded: an eSIM holds at most package_limit concurrent packages, so the list is returned in full.
+ */
+export type EsimPackageListWritable = {
+  /**
+   * Packages, newest first.
+   */
+  data: Array<EsimPackageWritable>;
+};
+
+/**
+ * Offers this eSIM can take as a top-up right now, given its mobile network, current packages, and package_limit. A point-in-time answer; re-fetch rather than caching.
+ */
+export type EsimCompatibleOfferListWritable = {
+  /**
+   * Orderable top-up offers for this eSIM.
+   */
+  data: Array<EsimOfferSummaryWritable>;
 };
 
 /**
@@ -28397,8 +30159,7 @@ export type EmailBroadcastAudienceFilter = AudienceId;
 export type EmailBroadcastTagFilter = string;
 
 /**
- * Case-insensitive substring match against the broadcast's tag names and values, or the referenced template's name.
- *
+ * Case-insensitive literal substring match against the broadcast's tags or the referenced template's name. With `email_management` read access, also matches the subject in the effective language of the template version resolved when this broadcast's execution starts. Draft and scheduled broadcasts have no execution subject to search. Percent signs, underscores, and backslashes are literal characters.
  */
 export type EmailBroadcastSearchFilter = string;
 
@@ -28446,6 +30207,28 @@ export type EmailCompetitiveRange = 7 | 30 | 90;
  *
  */
 export type EmailCompetitiveTimezone = Timezone;
+
+/**
+ * Required client-supplied deduplication key for this write. Reuse it for retries of the same intent. Successful results replay within the configured idempotency window (three hours by default); selected connected-app writes also replay uncertain-write conflicts. Use a new key only after confirming the prior result and beginning a different action.
+ */
+export type RequiredIdempotencyKey = string;
+
+/**
+ * Return eSIMs assigned to this subscriber.
+ */
+export type EsimSubscriberFilter = EsimSubscriberId;
+
+/**
+ * Filter by tag. Accepts `name` to match any eSIM carrying that tag name, or `name:value` to match a specific tag pair (e.g. `trip:summer`). A trailing colon (`name:`) matches the name alone, the same as `name`. A term with an empty name is rejected. Repeat the parameter to AND-combine several tag filters.
+ *
+ */
+export type EsimTagFilter = Array<string>;
+
+/**
+ * Keep only eSIMs whose ICCID starts with these digits. Use it when you hold only the first part of an ICCID. Pass `iccid` instead when you hold the whole number.
+ *
+ */
+export type EsimIccidPrefixFilter = string;
 
 export type GetCurrentWorkspaceData = {
   body?: never;
@@ -29159,6 +30942,10 @@ export type ListEmailMessagesData = {
      */
     created_before?: string;
     /**
+     * Filter messages by broadcast ID.
+     */
+    broadcast_id?: EmailBroadcastId;
+    /**
      * Filter by aggregate delivery status.
      */
     status?: EmailMessageStatus;
@@ -29636,8 +31423,7 @@ export type ListEmailBroadcastsData = {
      */
     tag?: string;
     /**
-     * Case-insensitive substring match against the broadcast's tag names and values, or the referenced template's name.
-     *
+     * Case-insensitive literal substring match against the broadcast's tags or the referenced template's name. With `email_management` read access, also matches the subject in the effective language of the template version resolved when this broadcast's execution starts. Draft and scheduled broadcasts have no execution subject to search. Percent signs, underscores, and backslashes are literal characters.
      */
     q?: string;
     /**
@@ -40369,6 +42155,255 @@ export type GetWhatsAppInboundStatsByPhoneNumberResponses = {
 export type GetWhatsAppInboundStatsByPhoneNumberResponse =
   GetWhatsAppInboundStatsByPhoneNumberResponses[keyof GetWhatsAppInboundStatsByPhoneNumberResponses];
 
+export type ListWhatsAppAgentNotificationsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Return only notifications in this state.
+     */
+    status?: WhatsAppAgentNotificationStatus;
+    /**
+     * Return only notifications sent to the agent on this business number, in E.164 format. A phone number is normalized before matching, so spacing does not matter.
+     */
+    from?: string;
+    /**
+     * Return only notifications about this contact, a phone number in E.164 format or a business-scoped user ID. A phone number is normalized before matching, so spacing does not matter.
+     */
+    to?: string;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/agents/notifications";
+};
+
+export type ListWhatsAppAgentNotificationsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppAgentNotificationsError =
+  ListWhatsAppAgentNotificationsErrors[keyof ListWhatsAppAgentNotificationsErrors];
+
+export type ListWhatsAppAgentNotificationsResponses = {
+  /**
+   * A page of the notifications sent to your agents.
+   */
+  200: WhatsAppAgentNotificationList;
+};
+
+export type ListWhatsAppAgentNotificationsResponse =
+  ListWhatsAppAgentNotificationsResponses[keyof ListWhatsAppAgentNotificationsResponses];
+
+export type CreateWhatsAppAgentNotificationData = {
+  body: WhatsAppAgentNotificationCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/whatsapp/agents/notifications";
+};
+
+export type CreateWhatsAppAgentNotificationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateWhatsAppAgentNotificationError =
+  CreateWhatsAppAgentNotificationErrors[keyof CreateWhatsAppAgentNotificationErrors];
+
+export type CreateWhatsAppAgentNotificationResponses = {
+  /**
+   * Bird accepted the notification and will hand it to WhatsApp. The notification reads `accepted` until WhatsApp has worked on it.
+   */
+  202: WhatsAppAgentNotification;
+};
+
+export type CreateWhatsAppAgentNotificationResponse =
+  CreateWhatsAppAgentNotificationResponses[keyof CreateWhatsAppAgentNotificationResponses];
+
+export type GetWhatsAppAgentNotificationData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the notification (`waan_` prefix), as returned when it was sent.
+     */
+    notification_id: WhatsAppAgentNotificationId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/agents/notifications/{notification_id}";
+};
+
+export type GetWhatsAppAgentNotificationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWhatsAppAgentNotificationError =
+  GetWhatsAppAgentNotificationErrors[keyof GetWhatsAppAgentNotificationErrors];
+
+export type GetWhatsAppAgentNotificationResponses = {
+  /**
+   * The notification.
+   */
+  200: WhatsAppAgentNotification;
+};
+
+export type GetWhatsAppAgentNotificationResponse =
+  GetWhatsAppAgentNotificationResponses[keyof GetWhatsAppAgentNotificationResponses];
+
 export type ListWhatsAppNumbersData = {
   body?: never;
   headers?: {
@@ -40535,265 +42570,6 @@ export type GetWhatsAppNumberResponses = {
 
 export type GetWhatsAppNumberResponse =
   GetWhatsAppNumberResponses[keyof GetWhatsAppNumberResponses];
-
-export type ListWhatsAppAgentNotificationsData = {
-  body?: never;
-  headers?: {
-    /**
-     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
-     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
-     */
-    "X-Organization-Id"?: string;
-  };
-  path: {
-    /**
-     * ID of the WhatsApp number (`wan_` prefix), as returned by the number list.
-     */
-    number_id: WhatsAppNumberId;
-  };
-  query?: {
-    /**
-     * Return only notifications in this state.
-     */
-    status?: WhatsAppAgentNotificationStatus;
-    /**
-     * Return only notifications about this contact, a phone number in E.164 format or a business-scoped user ID. A phone number is normalized before matching, so spacing does not matter.
-     */
-    to?: string;
-    /**
-     * Maximum number of items to return per page.
-     */
-    limit?: number;
-    /**
-     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
-     */
-    starting_after?: string;
-    /**
-     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
-     */
-    ending_before?: string;
-  };
-  url: "/v1/whatsapp/numbers/{number_id}/agent/notifications";
-};
-
-export type ListWhatsAppAgentNotificationsErrors = {
-  /**
-   * Bad request
-   */
-  400: Error;
-  /**
-   * Authentication required
-   */
-  401: Error;
-  /**
-   * Insufficient permissions
-   */
-  403: Error;
-  /**
-   * Resource not found
-   */
-  404: Error;
-  /**
-   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
-   *
-   */
-  422: Error;
-  /**
-   * Rate limit exceeded
-   */
-  429: Error;
-  /**
-   * Internal server error
-   */
-  500: Error;
-};
-
-export type ListWhatsAppAgentNotificationsError =
-  ListWhatsAppAgentNotificationsErrors[keyof ListWhatsAppAgentNotificationsErrors];
-
-export type ListWhatsAppAgentNotificationsResponses = {
-  /**
-   * A page of the notifications sent to the agent.
-   */
-  200: WhatsAppAgentNotificationList;
-};
-
-export type ListWhatsAppAgentNotificationsResponse =
-  ListWhatsAppAgentNotificationsResponses[keyof ListWhatsAppAgentNotificationsResponses];
-
-export type CreateWhatsAppAgentNotificationData = {
-  body: WhatsAppAgentNotificationCreate;
-  headers?: {
-    /**
-     * Client-supplied key. On operations supporting request deduplication, a retained
-     * response is replayed for duplicate requests with the same key within the
-     * idempotency window (3 hours by default). This protection requires a workspace,
-     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
-     * streams, and operations with a separate replay contract do not use this
-     * response replay.
-     *
-     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
-     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
-     * backoff using the same key and request. An operation that takes effect before
-     * its response is retained can still execute again on retry.
-     *
-     * Two distinct 409 errors signal misuse:
-     *
-     * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
-     * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
-     *
-     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
-     *
-     */
-    "Idempotency-Key"?: string;
-    /**
-     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
-     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
-     */
-    "X-Organization-Id"?: string;
-  };
-  path: {
-    /**
-     * ID of the WhatsApp number (`wan_` prefix), as returned by the number list.
-     */
-    number_id: WhatsAppNumberId;
-  };
-  query?: never;
-  url: "/v1/whatsapp/numbers/{number_id}/agent/notifications";
-};
-
-export type CreateWhatsAppAgentNotificationErrors = {
-  /**
-   * Bad request
-   */
-  400: Error;
-  /**
-   * Authentication required
-   */
-  401: Error;
-  /**
-   * Insufficient permissions
-   */
-  403: Error;
-  /**
-   * Resource not found
-   */
-  404: Error;
-  /**
-   * Resource conflict
-   */
-  409: Error;
-  /**
-   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
-   *
-   */
-  422: Error;
-  /**
-   * Rate limit exceeded
-   */
-  429: Error;
-  /**
-   * Internal server error
-   */
-  500: Error;
-  /**
-   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
-   *
-   */
-  503: Error;
-};
-
-export type CreateWhatsAppAgentNotificationError =
-  CreateWhatsAppAgentNotificationErrors[keyof CreateWhatsAppAgentNotificationErrors];
-
-export type CreateWhatsAppAgentNotificationResponses = {
-  /**
-   * Bird accepted the notification and will hand it to WhatsApp. The notification reads `accepted` until WhatsApp has worked on it.
-   */
-  202: WhatsAppAgentNotification;
-};
-
-export type CreateWhatsAppAgentNotificationResponse =
-  CreateWhatsAppAgentNotificationResponses[keyof CreateWhatsAppAgentNotificationResponses];
-
-export type GetWhatsAppAgentNotificationData = {
-  body?: never;
-  headers?: {
-    /**
-     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
-     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
-     */
-    "X-Organization-Id"?: string;
-  };
-  path: {
-    /**
-     * ID of the WhatsApp number (`wan_` prefix), as returned by the number list.
-     */
-    number_id: WhatsAppNumberId;
-    /**
-     * ID of the notification (`waan_` prefix), as returned when it was sent.
-     */
-    notification_id: WhatsAppAgentNotificationId;
-  };
-  query?: never;
-  url: "/v1/whatsapp/numbers/{number_id}/agent/notifications/{notification_id}";
-};
-
-export type GetWhatsAppAgentNotificationErrors = {
-  /**
-   * Bad request
-   */
-  400: Error;
-  /**
-   * Authentication required
-   */
-  401: Error;
-  /**
-   * Insufficient permissions
-   */
-  403: Error;
-  /**
-   * Resource not found
-   */
-  404: Error;
-  /**
-   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
-   *
-   */
-  422: Error;
-  /**
-   * Rate limit exceeded
-   */
-  429: Error;
-  /**
-   * Internal server error
-   */
-  500: Error;
-};
-
-export type GetWhatsAppAgentNotificationError =
-  GetWhatsAppAgentNotificationErrors[keyof GetWhatsAppAgentNotificationErrors];
-
-export type GetWhatsAppAgentNotificationResponses = {
-  /**
-   * The notification.
-   */
-  200: WhatsAppAgentNotification;
-};
-
-export type GetWhatsAppAgentNotificationResponse =
-  GetWhatsAppAgentNotificationResponses[keyof GetWhatsAppAgentNotificationResponses];
 
 export type ListWhatsAppNumberEventsData = {
   body?: never;
@@ -55607,7 +57383,7 @@ export type GetNumbersOrderResponses = {
 export type GetNumbersOrderResponse =
   GetNumbersOrderResponses[keyof GetNumbersOrderResponses];
 
-export type ReleaseWorkspaceNumberData = {
+export type CancelWorkspaceNumberData = {
   body?: never;
   headers?: {
     /**
@@ -55645,7 +57421,7 @@ export type ReleaseWorkspaceNumberData = {
   };
   path: {
     /**
-     * Identifier of the number to release, as returned in the id field of GET /v1/numbers.
+     * Identifier of the number to cancel, as returned in the id field of GET /v1/numbers.
      */
     number_id: AllocatedNumberId;
   };
@@ -55653,7 +57429,7 @@ export type ReleaseWorkspaceNumberData = {
   url: "/v1/numbers/{number_id}";
 };
 
-export type ReleaseWorkspaceNumberErrors = {
+export type CancelWorkspaceNumberErrors = {
   /**
    * Bad request
    */
@@ -55694,18 +57470,22 @@ export type ReleaseWorkspaceNumberErrors = {
   503: Error;
 };
 
-export type ReleaseWorkspaceNumberError =
-  ReleaseWorkspaceNumberErrors[keyof ReleaseWorkspaceNumberErrors];
+export type CancelWorkspaceNumberError =
+  CancelWorkspaceNumberErrors[keyof CancelWorkspaceNumberErrors];
 
-export type ReleaseWorkspaceNumberResponses = {
+export type CancelWorkspaceNumberResponses = {
   /**
-   * Number released.
+   * The number had no subscription behind it and was released now. Its `status` is `released` and `released_at` is set.
    */
-  204: void;
+  200: Number;
+  /**
+   * Cancellation scheduled. The number stays allocated, with its current status, until `releases_at`.
+   */
+  202: Number;
 };
 
-export type ReleaseWorkspaceNumberResponse =
-  ReleaseWorkspaceNumberResponses[keyof ReleaseWorkspaceNumberResponses];
+export type CancelWorkspaceNumberResponse =
+  CancelWorkspaceNumberResponses[keyof CancelWorkspaceNumberResponses];
 
 export type GetWorkspaceNumberData = {
   body?: never;
@@ -55873,6 +57653,106 @@ export type UpdateWorkspaceNumberResponses = {
 
 export type UpdateWorkspaceNumberResponse =
   UpdateWorkspaceNumberResponses[keyof UpdateWorkspaceNumberResponses];
+
+export type ReleaseWorkspaceNumberData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Identifier of the number to release, as returned in the id field of GET /v1/numbers.
+     */
+    number_id: AllocatedNumberId;
+  };
+  query?: never;
+  url: "/v1/numbers/{number_id}/release";
+};
+
+export type ReleaseWorkspaceNumberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ReleaseWorkspaceNumberError =
+  ReleaseWorkspaceNumberErrors[keyof ReleaseWorkspaceNumberErrors];
+
+export type ReleaseWorkspaceNumberResponses = {
+  /**
+   * Number released.
+   */
+  204: void;
+};
+
+export type ReleaseWorkspaceNumberResponse =
+  ReleaseWorkspaceNumberResponses[keyof ReleaseWorkspaceNumberResponses];
 
 export type ListVoiceTrunksData = {
   body?: never;
@@ -56847,9 +58727,10 @@ export type ListVoiceNumbersData = {
      */
     provider?: VoiceNumberProviderType;
     /**
-     * Filter by the configured answer to incoming calls.
+     * Filter by the answer incoming calls get. A number without a route of its
+     * own matches the route of your workspace's default.
      *
-     * - `reject`: rejects incoming calls, including numbers without a route configured.
+     * - `reject`: rejects incoming calls.
      * - `trunk`: delivers calls to a SIP trunk.
      * - `forward`: connects calls to the configured forwarding number.
      * - `sequence`: runs the selected voice sequence entry.
@@ -57088,6 +58969,167 @@ export type UpdateVoiceNumberResponses = {
 
 export type UpdateVoiceNumberResponse =
   UpdateVoiceNumberResponses[keyof UpdateVoiceNumberResponses];
+
+export type GetVoiceSettingsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/voice/settings";
+};
+
+export type GetVoiceSettingsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetVoiceSettingsError =
+  GetVoiceSettingsErrors[keyof GetVoiceSettingsErrors];
+
+export type GetVoiceSettingsResponses = {
+  /**
+   * The workspace's voice settings.
+   */
+  200: VoiceSettings;
+};
+
+export type GetVoiceSettingsResponse =
+  GetVoiceSettingsResponses[keyof GetVoiceSettingsResponses];
+
+export type UpdateVoiceSettingsData = {
+  body: VoiceSettingsUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/voice/settings";
+};
+
+export type UpdateVoiceSettingsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateVoiceSettingsError =
+  UpdateVoiceSettingsErrors[keyof UpdateVoiceSettingsErrors];
+
+export type UpdateVoiceSettingsResponses = {
+  /**
+   * The workspace's voice settings after the update.
+   */
+  200: VoiceSettings;
+};
+
+export type UpdateVoiceSettingsResponse =
+  UpdateVoiceSettingsResponses[keyof UpdateVoiceSettingsResponses];
 
 export type ListVoiceVerifiedNumbersData = {
   body?: never;
@@ -58064,3 +60106,3266 @@ export type UpdateVoiceDestinationsResponses = {
 
 export type UpdateVoiceDestinationsResponse =
   UpdateVoiceDestinationsResponses[keyof UpdateVoiceDestinationsResponses];
+
+export type ListEsimZonesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by. Possible values: created_at.
+     */
+    sort?: EsimZoneSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+    /**
+     * Keep only zones that include this country (ISO 3166-1 alpha-2).
+     */
+    country?: CountryCode;
+  };
+  url: "/v1/esim/zones";
+};
+
+export type ListEsimZonesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEsimZonesError = ListEsimZonesErrors[keyof ListEsimZonesErrors];
+
+export type ListEsimZonesResponses = {
+  /**
+   * Paginated list of zones.
+   */
+  200: EsimZoneList;
+};
+
+export type ListEsimZonesResponse =
+  ListEsimZonesResponses[keyof ListEsimZonesResponses];
+
+export type GetEsimZoneData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Zone ID.
+     */
+    zone_id: EsimZoneId;
+  };
+  query?: never;
+  url: "/v1/esim/zones/{zone_id}";
+};
+
+export type GetEsimZoneErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEsimZoneError = GetEsimZoneErrors[keyof GetEsimZoneErrors];
+
+export type GetEsimZoneResponses = {
+  /**
+   * The zone.
+   */
+  200: EsimZone;
+};
+
+export type GetEsimZoneResponse =
+  GetEsimZoneResponses[keyof GetEsimZoneResponses];
+
+export type ListEsimOffersData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by. Possible values: created_at.
+     */
+    sort?: EsimOfferSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+    /**
+     * Keep only offers whose coverage zone includes this country (ISO 3166-1 alpha-2).
+     */
+    country?: CountryCode;
+    /**
+     * Keep only offers selling this coverage zone.
+     */
+    zone_id?: EsimZoneId;
+    /**
+     * Filter by offer availability. Omitted, only active offers are returned.
+     */
+    status?: EsimOfferStatus;
+  };
+  url: "/v1/esim/offers";
+};
+
+export type ListEsimOffersErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEsimOffersError =
+  ListEsimOffersErrors[keyof ListEsimOffersErrors];
+
+export type ListEsimOffersResponses = {
+  /**
+   * Paginated list of offers.
+   */
+  200: EsimOfferList;
+};
+
+export type ListEsimOffersResponse =
+  ListEsimOffersResponses[keyof ListEsimOffersResponses];
+
+export type GetEsimOfferData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Offer ID.
+     */
+    offer_id: EsimOfferId;
+  };
+  query?: never;
+  url: "/v1/esim/offers/{offer_id}";
+};
+
+export type GetEsimOfferErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEsimOfferError = GetEsimOfferErrors[keyof GetEsimOfferErrors];
+
+export type GetEsimOfferResponses = {
+  /**
+   * The offer.
+   */
+  200: EsimOffer;
+};
+
+export type GetEsimOfferResponse =
+  GetEsimOfferResponses[keyof GetEsimOfferResponses];
+
+export type GetEsimOfferRequirementsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Offer ID.
+     */
+    offer_id: EsimOfferId;
+  };
+  query?: never;
+  url: "/v1/esim/offers/{offer_id}/requirements";
+};
+
+export type GetEsimOfferRequirementsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEsimOfferRequirementsError =
+  GetEsimOfferRequirementsErrors[keyof GetEsimOfferRequirementsErrors];
+
+export type GetEsimOfferRequirementsResponses = {
+  /**
+   * Requirements for the offer coverage countries.
+   */
+  200: EsimOfferRequirements;
+};
+
+export type GetEsimOfferRequirementsResponse =
+  GetEsimOfferRequirementsResponses[keyof GetEsimOfferRequirementsResponses];
+
+export type ListEsimOrdersData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * Limits the response to resources created at or after this timestamp. Combine it with `created_before` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_after?: string;
+    /**
+     * Limits the response to resources created before this timestamp. Combine it with `created_after` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_before?: string;
+    /**
+     * Keep only orders whose `status` matches; repeat the parameter to match any of several.
+     */
+    status?: Array<EsimOrderStatus>;
+    /**
+     * Keep only orders for this eSIM.
+     */
+    esim_id?: EsimId;
+    /**
+     * Keep only orders created in this mode. Without it, both live and test orders are returned.
+     */
+    mode?: EsimMode;
+    /**
+     * Keep only orders completed at or after this timestamp. Combine it with `completed_before` to select a completion window, which is what the analytics spend and completion figures are counted by; `created_after` selects when an order was placed instead. Orders that never completed are excluded. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    completed_after?: string;
+    /**
+     * Keep only orders completed before this timestamp. Combine it with `completed_after` to select a completion window. Orders that never completed are excluded. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    completed_before?: string;
+  };
+  url: "/v1/esim/orders";
+};
+
+export type ListEsimOrdersErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEsimOrdersError =
+  ListEsimOrdersErrors[keyof ListEsimOrdersErrors];
+
+export type ListEsimOrdersResponses = {
+  /**
+   * Paginated list of orders.
+   */
+  200: EsimOrderList;
+};
+
+export type ListEsimOrdersResponse =
+  ListEsimOrdersResponses[keyof ListEsimOrdersResponses];
+
+export type CreateEsimOrderData = {
+  body: EsimOrderCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/esim/orders";
+};
+
+export type CreateEsimOrderErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateEsimOrderError =
+  CreateEsimOrderErrors[keyof CreateEsimOrderErrors];
+
+export type CreateEsimOrderResponses = {
+  /**
+   * The order finished within the request, either completed (esim_id and package_id are set) or failed (failure_code is set and the charge is credited back automatically; refund_transaction_id records the credit once it lands).
+   */
+  201: EsimOrder;
+  /**
+   * The order was accepted and is completing asynchronously; poll it until completed or failed.
+   */
+  202: EsimOrder;
+};
+
+export type CreateEsimOrderResponse =
+  CreateEsimOrderResponses[keyof CreateEsimOrderResponses];
+
+export type GetEsimOrderData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Order ID.
+     */
+    order_id: EsimOrderId;
+  };
+  query?: never;
+  url: "/v1/esim/orders/{order_id}";
+};
+
+export type GetEsimOrderErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEsimOrderError = GetEsimOrderErrors[keyof GetEsimOrderErrors];
+
+export type GetEsimOrderResponses = {
+  /**
+   * The order.
+   */
+  200: EsimOrder;
+};
+
+export type GetEsimOrderResponse =
+  GetEsimOrderResponses[keyof GetEsimOrderResponses];
+
+export type CancelEsimOrderData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Order ID.
+     */
+    order_id: EsimOrderId;
+  };
+  query?: never;
+  url: "/v1/esim/orders/{order_id}/cancel";
+};
+
+export type CancelEsimOrderErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CancelEsimOrderError =
+  CancelEsimOrderErrors[keyof CancelEsimOrderErrors];
+
+export type CancelEsimOrderResponses = {
+  /**
+   * The order after cancellation. An unfunded order is failed with `failure_code: canceled`. For an initial recurring purchase whose payment was recovered, the paid order continues and future renewal is stopped.
+   */
+  200: EsimOrder;
+};
+
+export type CancelEsimOrderResponse =
+  CancelEsimOrderResponses[keyof CancelEsimOrderResponses];
+
+export type GetEsimOfferCheckoutOptionsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The offer.
+     */
+    offer_id: EsimOfferId;
+  };
+  query?: never;
+  url: "/v1/esim/offers/{offer_id}/checkout";
+};
+
+export type GetEsimOfferCheckoutOptionsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEsimOfferCheckoutOptionsError =
+  GetEsimOfferCheckoutOptionsErrors[keyof GetEsimOfferCheckoutOptionsErrors];
+
+export type GetEsimOfferCheckoutOptionsResponses = {
+  /**
+   * The requested resource.
+   */
+  200: EsimCheckoutOptions;
+};
+
+export type GetEsimOfferCheckoutOptionsResponse =
+  GetEsimOfferCheckoutOptionsResponses[keyof GetEsimOfferCheckoutOptionsResponses];
+
+export type GetEsimOfferRecurrenceData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The offer.
+     */
+    offer_id: EsimOfferId;
+  };
+  query?: never;
+  url: "/v1/esim/offers/{offer_id}/recurrence";
+};
+
+export type GetEsimOfferRecurrenceErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEsimOfferRecurrenceError =
+  GetEsimOfferRecurrenceErrors[keyof GetEsimOfferRecurrenceErrors];
+
+export type GetEsimOfferRecurrenceResponses = {
+  /**
+   * The requested resource.
+   */
+  200: EsimRecurringOffer;
+};
+
+export type GetEsimOfferRecurrenceResponse =
+  GetEsimOfferRecurrenceResponses[keyof GetEsimOfferRecurrenceResponses];
+
+export type ListEsimRecurringSubscriptionsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * Return eSIMs assigned to this subscriber.
+     */
+    subscriber_id?: EsimSubscriberId;
+    /**
+     * Filter by esim id.
+     */
+    esim_id?: EsimId;
+  };
+  url: "/v1/esim/subscriptions";
+};
+
+export type ListEsimRecurringSubscriptionsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEsimRecurringSubscriptionsError =
+  ListEsimRecurringSubscriptionsErrors[keyof ListEsimRecurringSubscriptionsErrors];
+
+export type ListEsimRecurringSubscriptionsResponses = {
+  /**
+   * The requested resource.
+   */
+  200: EsimRecurringSubscriptionList;
+};
+
+export type ListEsimRecurringSubscriptionsResponse =
+  ListEsimRecurringSubscriptionsResponses[keyof ListEsimRecurringSubscriptionsResponses];
+
+export type CreateEsimRecurringSubscriptionData = {
+  body: EsimRecurringSubscriptionCreate;
+  headers: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Required client-supplied deduplication key for this write. Reuse it for retries of the same intent. Successful results replay within the configured idempotency window (three hours by default); selected connected-app writes also replay uncertain-write conflicts. Use a new key only after confirming the prior result and beginning a different action.
+     */
+    "Idempotency-Key": string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/esim/subscriptions";
+};
+
+export type CreateEsimRecurringSubscriptionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateEsimRecurringSubscriptionError =
+  CreateEsimRecurringSubscriptionErrors[keyof CreateEsimRecurringSubscriptionErrors];
+
+export type CreateEsimRecurringSubscriptionResponses = {
+  /**
+   * The requested resource.
+   */
+  200: EsimRecurringSubscription;
+};
+
+export type CreateEsimRecurringSubscriptionResponse =
+  CreateEsimRecurringSubscriptionResponses[keyof CreateEsimRecurringSubscriptionResponses];
+
+export type GetEsimRecurringSubscriptionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The recurring eSIM service.
+     */
+    subscription_id: EsimRecurringSubscriptionId;
+  };
+  query?: never;
+  url: "/v1/esim/subscriptions/{subscription_id}";
+};
+
+export type GetEsimRecurringSubscriptionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEsimRecurringSubscriptionError =
+  GetEsimRecurringSubscriptionErrors[keyof GetEsimRecurringSubscriptionErrors];
+
+export type GetEsimRecurringSubscriptionResponses = {
+  /**
+   * The requested resource.
+   */
+  200: EsimRecurringSubscription;
+};
+
+export type GetEsimRecurringSubscriptionResponse =
+  GetEsimRecurringSubscriptionResponses[keyof GetEsimRecurringSubscriptionResponses];
+
+export type ListEsimRecurringPeriodsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The recurring eSIM service.
+     */
+    subscription_id: EsimRecurringSubscriptionId;
+  };
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/esim/subscriptions/{subscription_id}/periods";
+};
+
+export type ListEsimRecurringPeriodsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEsimRecurringPeriodsError =
+  ListEsimRecurringPeriodsErrors[keyof ListEsimRecurringPeriodsErrors];
+
+export type ListEsimRecurringPeriodsResponses = {
+  /**
+   * The requested resource.
+   */
+  200: EsimRecurringPeriodList;
+};
+
+export type ListEsimRecurringPeriodsResponse =
+  ListEsimRecurringPeriodsResponses[keyof ListEsimRecurringPeriodsResponses];
+
+export type CancelEsimRecurringSubscriptionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The recurring eSIM service.
+     */
+    subscription_id: EsimRecurringSubscriptionId;
+  };
+  query?: never;
+  url: "/v1/esim/subscriptions/{subscription_id}/cancel";
+};
+
+export type CancelEsimRecurringSubscriptionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CancelEsimRecurringSubscriptionError =
+  CancelEsimRecurringSubscriptionErrors[keyof CancelEsimRecurringSubscriptionErrors];
+
+export type CancelEsimRecurringSubscriptionResponses = {
+  /**
+   * The requested resource.
+   */
+  200: EsimRecurringSubscription;
+};
+
+export type CancelEsimRecurringSubscriptionResponse =
+  CancelEsimRecurringSubscriptionResponses[keyof CancelEsimRecurringSubscriptionResponses];
+
+export type ListEsimSubscribersData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * The contact id.
+     */
+    contact_id?: ContactId;
+  };
+  url: "/v1/esim/subscribers";
+};
+
+export type ListEsimSubscribersErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEsimSubscribersError =
+  ListEsimSubscribersErrors[keyof ListEsimSubscribersErrors];
+
+export type ListEsimSubscribersResponses = {
+  /**
+   * The requested resource.
+   */
+  200: EsimSubscriberList;
+};
+
+export type ListEsimSubscribersResponse =
+  ListEsimSubscribersResponses[keyof ListEsimSubscribersResponses];
+
+export type CreateEsimSubscriberData = {
+  body: EsimSubscriberCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/esim/subscribers";
+};
+
+export type CreateEsimSubscriberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateEsimSubscriberError =
+  CreateEsimSubscriberErrors[keyof CreateEsimSubscriberErrors];
+
+export type CreateEsimSubscriberResponses = {
+  /**
+   * The requested resource.
+   */
+  200: EsimSubscriber;
+};
+
+export type CreateEsimSubscriberResponse =
+  CreateEsimSubscriberResponses[keyof CreateEsimSubscriberResponses];
+
+export type GetEsimSubscriberData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The subscriber id.
+     */
+    subscriber_id: EsimSubscriberId;
+  };
+  query?: never;
+  url: "/v1/esim/subscribers/{subscriber_id}";
+};
+
+export type GetEsimSubscriberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEsimSubscriberError =
+  GetEsimSubscriberErrors[keyof GetEsimSubscriberErrors];
+
+export type GetEsimSubscriberResponses = {
+  /**
+   * The requested resource.
+   */
+  200: EsimSubscriber;
+};
+
+export type GetEsimSubscriberResponse =
+  GetEsimSubscriberResponses[keyof GetEsimSubscriberResponses];
+
+export type GetEsimAssignmentData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The esim id.
+     */
+    esim_id: EsimId;
+  };
+  query?: never;
+  url: "/v1/esim/sims/{esim_id}/assignment";
+};
+
+export type GetEsimAssignmentErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEsimAssignmentError =
+  GetEsimAssignmentErrors[keyof GetEsimAssignmentErrors];
+
+export type GetEsimAssignmentResponses = {
+  /**
+   * The requested resource.
+   */
+  200: EsimAssignment;
+};
+
+export type GetEsimAssignmentResponse =
+  GetEsimAssignmentResponses[keyof GetEsimAssignmentResponses];
+
+export type CreateEsimAssignmentData = {
+  body: EsimAssignmentCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The esim id.
+     */
+    esim_id: EsimId;
+  };
+  query?: never;
+  url: "/v1/esim/sims/{esim_id}/assignment";
+};
+
+export type CreateEsimAssignmentErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateEsimAssignmentError =
+  CreateEsimAssignmentErrors[keyof CreateEsimAssignmentErrors];
+
+export type CreateEsimAssignmentResponses = {
+  /**
+   * The requested resource.
+   */
+  200: EsimAssignment;
+};
+
+export type CreateEsimAssignmentResponse =
+  CreateEsimAssignmentResponses[keyof CreateEsimAssignmentResponses];
+
+export type ListEsimsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * Return eSIMs assigned to this subscriber.
+     */
+    subscriber_id?: EsimSubscriberId;
+    /**
+     * Limits the response to resources created at or after this timestamp. Combine it with `created_before` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_after?: string;
+    /**
+     * Limits the response to resources created before this timestamp. Combine it with `created_after` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_before?: string;
+    /**
+     * Keep only eSIMs whose current `status` matches; repeat the parameter to match any of several.
+     */
+    status?: Array<EsimStatus>;
+    /**
+     * Filter by ICCID (exact match).
+     */
+    iccid?: string;
+    /**
+     * Keep only eSIMs created in this mode. Without it, both live and test eSIMs are returned.
+     */
+    mode?: EsimMode;
+    /**
+     * Filter by tag. Accepts `name` to match any eSIM carrying that tag name, or `name:value` to match a specific tag pair (e.g. `trip:summer`). A trailing colon (`name:`) matches the name alone, the same as `name`. A term with an empty name is rejected. Repeat the parameter to AND-combine several tag filters.
+     *
+     */
+    tag?: Array<string>;
+    /**
+     * Keep only eSIMs whose ICCID starts with these digits. Use it when you hold only the first part of an ICCID. Pass `iccid` instead when you hold the whole number.
+     *
+     */
+    iccid_prefix?: string;
+    /**
+     * Keep only eSIMs whose `display_name` contains this text, ignoring case. An eSIM you have not named has no `display_name`, so it never matches.
+     */
+    display_name?: string;
+    /**
+     * Keep only eSIMs whose mobile network has reported this phone number, matched as a whole number rather than as a fragment. Give it in international form, with or without the leading `+`: `+31612345678` and `31612345678` select the same eSIMs. An eSIM matches on any number its mobile network has ever reported for the profile, so a number that has since moved on still finds the eSIM that held it. An eSIM whose number no network has reported yet never matches.
+     */
+    phone_number?: string;
+  };
+  url: "/v1/esim/sims";
+};
+
+export type ListEsimsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEsimsError = ListEsimsErrors[keyof ListEsimsErrors];
+
+export type ListEsimsResponses = {
+  /**
+   * Paginated list of eSIMs.
+   */
+  200: EsimList;
+};
+
+export type ListEsimsResponse = ListEsimsResponses[keyof ListEsimsResponses];
+
+export type ReleaseEsimData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * eSIM ID.
+     */
+    esim_id: EsimId;
+  };
+  query?: {
+    /**
+     * Confirms you accept that remaining package balances are forfeited. Omitted or false while unexpired balance remains, the request fails with a conflict error.
+     *
+     */
+    acknowledge_balance_forfeit?: boolean;
+  };
+  url: "/v1/esim/sims/{esim_id}";
+};
+
+export type ReleaseEsimErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ReleaseEsimError = ReleaseEsimErrors[keyof ReleaseEsimErrors];
+
+export type ReleaseEsimResponses = {
+  /**
+   * Release in progress. The eSIM is in releasing and transitions to released when complete.
+   */
+  202: Esim;
+};
+
+export type ReleaseEsimResponse =
+  ReleaseEsimResponses[keyof ReleaseEsimResponses];
+
+export type GetEsimData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * eSIM ID.
+     */
+    esim_id: EsimId;
+  };
+  query?: never;
+  url: "/v1/esim/sims/{esim_id}";
+};
+
+export type GetEsimErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEsimError = GetEsimErrors[keyof GetEsimErrors];
+
+export type GetEsimResponses = {
+  /**
+   * The eSIM.
+   */
+  200: Esim;
+};
+
+export type GetEsimResponse = GetEsimResponses[keyof GetEsimResponses];
+
+export type UpdateEsimData = {
+  body: EsimUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * eSIM ID.
+     */
+    esim_id: EsimId;
+  };
+  query?: never;
+  url: "/v1/esim/sims/{esim_id}";
+};
+
+export type UpdateEsimErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateEsimError = UpdateEsimErrors[keyof UpdateEsimErrors];
+
+export type UpdateEsimResponses = {
+  /**
+   * The updated eSIM.
+   */
+  200: Esim;
+};
+
+export type UpdateEsimResponse = UpdateEsimResponses[keyof UpdateEsimResponses];
+
+export type GetEsimCredentialsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Preferred languages for the instructions field, as a standard weighted Accept-Language list. Bird serves the first one it stocks, then a variant sharing a requested base language, then English.
+     *
+     */
+    "Accept-Language"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * eSIM ID.
+     */
+    esim_id: EsimId;
+  };
+  query?: never;
+  url: "/v1/esim/sims/{esim_id}/credentials";
+};
+
+export type GetEsimCredentialsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEsimCredentialsError =
+  GetEsimCredentialsErrors[keyof GetEsimCredentialsErrors];
+
+export type GetEsimCredentialsResponses = {
+  /**
+   * The install credentials.
+   */
+  200: EsimCredentials;
+};
+
+export type GetEsimCredentialsResponse =
+  GetEsimCredentialsResponses[keyof GetEsimCredentialsResponses];
+
+export type DeliverEsimCredentialsData = {
+  body: EsimDelivery;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * eSIM ID.
+     */
+    esim_id: EsimId;
+  };
+  query?: never;
+  url: "/v1/esim/sims/{esim_id}/credentials/deliver";
+};
+
+export type DeliverEsimCredentialsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeliverEsimCredentialsError =
+  DeliverEsimCredentialsErrors[keyof DeliverEsimCredentialsErrors];
+
+export type DeliverEsimCredentialsResponses = {
+  /**
+   * The delivery was accepted. The returned id reappears on the `esim.credentials.delivered` or `esim.credentials.delivery_failed` event that settles this delivery.
+   *
+   */
+  202: EsimCredentialsDelivery;
+};
+
+export type DeliverEsimCredentialsResponse =
+  DeliverEsimCredentialsResponses[keyof DeliverEsimCredentialsResponses];
+
+export type ListEsimDeliveriesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Identifier of the eSIM.
+     */
+    esim_id: EsimId;
+  };
+  query?: never;
+  url: "/v1/esim/sims/{esim_id}/deliveries";
+};
+
+export type ListEsimDeliveriesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEsimDeliveriesError =
+  ListEsimDeliveriesErrors[keyof ListEsimDeliveriesErrors];
+
+export type ListEsimDeliveriesResponses = {
+  /**
+   * The eSIM's deliveries.
+   */
+  200: EsimDeliveryList;
+};
+
+export type ListEsimDeliveriesResponse =
+  ListEsimDeliveriesResponses[keyof ListEsimDeliveriesResponses];
+
+export type CreateEsimInstallLinkData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * eSIM ID.
+     */
+    esim_id: EsimId;
+  };
+  query?: never;
+  url: "/v1/esim/sims/{esim_id}/install-links";
+};
+
+export type CreateEsimInstallLinkErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateEsimInstallLinkError =
+  CreateEsimInstallLinkErrors[keyof CreateEsimInstallLinkErrors];
+
+export type CreateEsimInstallLinkResponses = {
+  /**
+   * The link was minted. Its url appears here and in no later read.
+   */
+  201: EsimInstallLink;
+};
+
+export type CreateEsimInstallLinkResponse =
+  CreateEsimInstallLinkResponses[keyof CreateEsimInstallLinkResponses];
+
+export type DeleteEsimInstallLinkData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * eSIM ID.
+     */
+    esim_id: EsimId;
+    /**
+     * Hosted install link ID.
+     */
+    install_link_id: EsimInstallLinkId;
+  };
+  query?: never;
+  url: "/v1/esim/sims/{esim_id}/install-links/{install_link_id}";
+};
+
+export type DeleteEsimInstallLinkErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteEsimInstallLinkError =
+  DeleteEsimInstallLinkErrors[keyof DeleteEsimInstallLinkErrors];
+
+export type DeleteEsimInstallLinkResponses = {
+  /**
+   * The link no longer installs the eSIM.
+   */
+  204: void;
+};
+
+export type DeleteEsimInstallLinkResponse =
+  DeleteEsimInstallLinkResponses[keyof DeleteEsimInstallLinkResponses];
+
+export type ListEsimPackagesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * eSIM ID.
+     */
+    esim_id: EsimId;
+  };
+  query?: never;
+  url: "/v1/esim/sims/{esim_id}/packages";
+};
+
+export type ListEsimPackagesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEsimPackagesError =
+  ListEsimPackagesErrors[keyof ListEsimPackagesErrors];
+
+export type ListEsimPackagesResponses = {
+  /**
+   * The eSIM's packages.
+   */
+  200: EsimPackageList;
+};
+
+export type ListEsimPackagesResponse =
+  ListEsimPackagesResponses[keyof ListEsimPackagesResponses];
+
+export type DeleteEsimPackageData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * eSIM ID.
+     */
+    esim_id: EsimId;
+    /**
+     * Data package ID.
+     */
+    package_id: EsimPackageId;
+  };
+  query?: {
+    /**
+     * Confirms you accept that the package's remaining balance is forfeited. Omitted or false while balance remains, the request fails with a conflict error.
+     *
+     */
+    acknowledge_balance_forfeit?: boolean;
+  };
+  url: "/v1/esim/sims/{esim_id}/packages/{package_id}";
+};
+
+export type DeleteEsimPackageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteEsimPackageError =
+  DeleteEsimPackageErrors[keyof DeleteEsimPackageErrors];
+
+export type DeleteEsimPackageResponses = {
+  /**
+   * Removal in progress. The returned package is in `removing`; it reaches `removed` once complete, confirmed by the esim.package.removed event.
+   */
+  202: EsimPackage;
+};
+
+export type DeleteEsimPackageResponse =
+  DeleteEsimPackageResponses[keyof DeleteEsimPackageResponses];
+
+export type GetEsimPackageData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * eSIM ID.
+     */
+    esim_id: EsimId;
+    /**
+     * Data package ID.
+     */
+    package_id: EsimPackageId;
+  };
+  query?: never;
+  url: "/v1/esim/sims/{esim_id}/packages/{package_id}";
+};
+
+export type GetEsimPackageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEsimPackageError =
+  GetEsimPackageErrors[keyof GetEsimPackageErrors];
+
+export type GetEsimPackageResponses = {
+  /**
+   * The package.
+   */
+  200: EsimPackage;
+};
+
+export type GetEsimPackageResponse =
+  GetEsimPackageResponses[keyof GetEsimPackageResponses];
+
+export type ListEsimCompatibleOffersData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Identifier of the eSIM.
+     */
+    esim_id: EsimId;
+  };
+  query?: {
+    /**
+     * Keep only offers with recurring service configured. Enrollment still checks supplier support and the published recurring price.
+     */
+    recurring_only?: boolean;
+  };
+  url: "/v1/esim/sims/{esim_id}/compatible-offers";
+};
+
+export type ListEsimCompatibleOffersErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListEsimCompatibleOffersError =
+  ListEsimCompatibleOffersErrors[keyof ListEsimCompatibleOffersErrors];
+
+export type ListEsimCompatibleOffersResponses = {
+  /**
+   * Offers orderable as top-ups for this eSIM.
+   */
+  200: EsimCompatibleOfferList;
+};
+
+export type ListEsimCompatibleOffersResponse =
+  ListEsimCompatibleOffersResponses[keyof ListEsimCompatibleOffersResponses];
+
+export type SuspendEsimData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * eSIM ID.
+     */
+    esim_id: EsimId;
+  };
+  query?: never;
+  url: "/v1/esim/sims/{esim_id}/suspend";
+};
+
+export type SuspendEsimErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type SuspendEsimError = SuspendEsimErrors[keyof SuspendEsimErrors];
+
+export type SuspendEsimResponses = {
+  /**
+   * Suspension in progress. The returned eSIM is in `suspending`; confirmed by the esim.suspended event.
+   */
+  202: Esim;
+};
+
+export type SuspendEsimResponse =
+  SuspendEsimResponses[keyof SuspendEsimResponses];
+
+export type ResumeEsimData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * eSIM ID.
+     */
+    esim_id: EsimId;
+  };
+  query?: never;
+  url: "/v1/esim/sims/{esim_id}/resume";
+};
+
+export type ResumeEsimErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ResumeEsimError = ResumeEsimErrors[keyof ResumeEsimErrors];
+
+export type ResumeEsimResponses = {
+  /**
+   * Resume in progress. The returned eSIM is in `resuming`; confirmed by the esim.resumed event.
+   */
+  202: Esim;
+};
+
+export type ResumeEsimResponse = ResumeEsimResponses[keyof ResumeEsimResponses];
+
+export type GetEsimSettingsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/esim/settings";
+};
+
+export type GetEsimSettingsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetEsimSettingsError =
+  GetEsimSettingsErrors[keyof GetEsimSettingsErrors];
+
+export type GetEsimSettingsResponses = {
+  /**
+   * The workspace's eSIM settings.
+   */
+  200: EsimSettings;
+};
+
+export type GetEsimSettingsResponse =
+  GetEsimSettingsResponses[keyof GetEsimSettingsResponses];
+
+export type UpdateEsimSettingsData = {
+  body: EsimSettingsUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/esim/settings";
+};
+
+export type UpdateEsimSettingsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateEsimSettingsError =
+  UpdateEsimSettingsErrors[keyof UpdateEsimSettingsErrors];
+
+export type UpdateEsimSettingsResponses = {
+  /**
+   * The workspace's eSIM settings after the update.
+   */
+  200: EsimSettings;
+};
+
+export type UpdateEsimSettingsResponse =
+  UpdateEsimSettingsResponses[keyof UpdateEsimSettingsResponses];
