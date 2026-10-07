@@ -2502,11 +2502,13 @@ export const updateContactProperty = <ThrowOnError extends boolean = false>(
 /**
  * Archive a contact property
  *
- * Archives a contact property. The key stops being accepted in contact writes, but every value already stored on your contacts is preserved and still returned when you read a contact.
+ * Archiving is how you remove a contact property. Bird keeps its values so you can restore it with Unarchive.
  *
- * Archiving a live property succeeds whatever else reads the key. From then on the property behaves as though it does not exist for new work: it is gone from the property pickers, and publishing a template version whose content reads `bird.contact.<key>` is refused, naming the property. Template versions published before you archived it are untouched and keep sending, filling the key from the values your contacts already carry.
+ * The property disappears from property pickers, including import column mapping. New template versions that read it cannot be published. The publish error names the property. Templates already published keep sending and fill in its value. You can still read and update the property's values through the API and imports. Values must match the property's type. See [Archiving a property](/docs/guides/email/contacts#archiving-a-property) for more details.
  *
- * The key stays reserved and still counts toward the workspace's 200-property limit, so it cannot be re-created with a different type. Archiving an already-archived property returns a conflict error; reverse it with [Unarchive a contact property](/docs/api/reference/unarchive-contact-property).
+ * Archiving returns a `409` conflict while a published automation, including a paused one, uses the property in a trigger or contact write. An active run that writes the property also blocks archiving. Remove the property from those automations or archive them. Let active runs finish or cancel them, then archive the property again. If you have permission to read automations, the error names up to five that use the property.
+ *
+ * The key stays reserved and counts toward the workspace's 200-property limit. Archiving an already archived property also returns a `409` conflict. Use [Unarchive a contact property](/docs/api/reference/unarchive-contact-property) to restore it.
  *
  */
 export const archiveContactProperty = <ThrowOnError extends boolean = false>(
@@ -2536,7 +2538,7 @@ export const archiveContactProperty = <ThrowOnError extends boolean = false>(
 /**
  * Unarchive a contact property
  *
- * Reactivates an archived contact property. The key is accepted in contact writes and new template versions. Stored values are unchanged. Unarchiving a property that is not archived returns a conflict error.
+ * Restores an archived contact property with its stored values. It appears in property pickers again and can be used in new template versions. Unarchiving a property that is not archived returns a `409` conflict.
  *
  */
 export const unarchiveContactProperty = <ThrowOnError extends boolean = false>(
