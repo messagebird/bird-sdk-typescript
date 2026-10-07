@@ -4,13 +4,17 @@ import { EmailInboxInsightsDomainsResource } from "./emailInboxInsightsDomains.g
 import { EmailInboxInsightsDomainMonitoringResource } from "./emailInboxInsightsDomainMonitoring.gen.js";
 import { EmailInboxInsightsBenchmarksResource } from "./emailInboxInsightsBenchmarks.gen.js";
 
+import { EmailInboxInsightsSeedTestsResource } from "./emailInboxInsightsSeedTests.js";
+
 export class EmailInboxInsightsResource extends EmailInboxInsightsResourceBase {
+  readonly seedTests: EmailInboxInsightsSeedTestsResource;
   readonly domains: EmailInboxInsightsDomainsResource;
   readonly domainMonitoring: EmailInboxInsightsDomainMonitoringResource;
   readonly benchmarks: EmailInboxInsightsBenchmarksResource;
 
   constructor(...args: ConstructorParameters<typeof Resource>) {
     super(...args);
+    this.seedTests = new EmailInboxInsightsSeedTestsResource(...args);
     this.domains = new EmailInboxInsightsDomainsResource(...args);
     this.domainMonitoring = new EmailInboxInsightsDomainMonitoringResource(...args);
     this.benchmarks = new EmailInboxInsightsBenchmarksResource(...args);

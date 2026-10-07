@@ -72,6 +72,9 @@ import type {
   CreateEmailCompetitiveWatchlistBrandData,
   CreateEmailCompetitiveWatchlistBrandErrors,
   CreateEmailCompetitiveWatchlistBrandResponses,
+  CreateEmailInboxInsightsSeedTestData,
+  CreateEmailInboxInsightsSeedTestErrors,
+  CreateEmailInboxInsightsSeedTestResponses,
   CreateEmailLookupBatchData,
   CreateEmailLookupBatchErrors,
   CreateEmailLookupBatchResponses,
@@ -423,6 +426,12 @@ import type {
   GetEmailInboxInsightsPlacementData,
   GetEmailInboxInsightsPlacementErrors,
   GetEmailInboxInsightsPlacementResponses,
+  GetEmailInboxInsightsSeedTestConfigurationData,
+  GetEmailInboxInsightsSeedTestConfigurationErrors,
+  GetEmailInboxInsightsSeedTestConfigurationResponses,
+  GetEmailInboxInsightsSeedTestsData,
+  GetEmailInboxInsightsSeedTestsErrors,
+  GetEmailInboxInsightsSeedTestsResponses,
   GetEmailInboxInsightsSpamTrapsData,
   GetEmailInboxInsightsSpamTrapsErrors,
   GetEmailInboxInsightsSpamTrapsResponses,
@@ -8468,6 +8477,160 @@ export const getEmailInboxInsightsIndustryBenchmark = <
   });
 
 /**
+ * Get seed tests for a sending domain
+ *
+ * Returns the seed tests run for a sending domain over the period, newest
+ * first, together with the newest test's full results and the organization's
+ * seed-test allowance for the current billing period.
+ *
+ * A seed test sends to a panel of real mailboxes across many providers and
+ * reports exactly where each copy landed, so unlike the placement estimates
+ * it is a direct measurement of one send. Seed counts are small by nature,
+ * so a single seed moves a rate noticeably.
+ *
+ * The list is capped at 100 tests rather than paged: `tests.truncated` says
+ * whether the period holds more than that, and an earlier period reaches the
+ * ones left out. A test counts against the billing-period allowance when it is
+ * registered, whether or not its send goes out.
+ *
+ * Scoped API keys, OAuth and service accounts require organization preview access.
+ *
+ */
+export const getEmailInboxInsightsSeedTests = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEmailInboxInsightsSeedTestsData, ThrowOnError>,
+): RequestResult<
+  GetEmailInboxInsightsSeedTestsResponses,
+  GetEmailInboxInsightsSeedTestsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailInboxInsightsSeedTestsResponses,
+    GetEmailInboxInsightsSeedTestsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/seed-tests",
+    ...options,
+  });
+
+/**
+ * Register a seed test and get its addresses
+ *
+ * Registers a seed test for a sending domain and returns the seed addresses
+ * it measures.
+ *
+ * Registering a test does not add the addresses to a send. Include them in
+ * the recipients of the send you want measured, and results appear as the
+ * seed mail arrives. A test that receives no seed mail before it expires
+ * never produces results.
+ *
+ * The test appears in the seed-test list for the domain once its seed mail has
+ * been measured, carrying the subject and the date of the send it rode on.
+ * Those two fields are what tell you the send has happened.
+ *
+ * Registering spends one of the organization's seed-test allowance
+ * whether or not the send goes out, and an expired test does not return it,
+ * so register when the send you want measured is ready. The configuration
+ * endpoint reports which seed pools, regions, and engagement behaviours this
+ * domain's account can use.
+ *
+ * Send an Idempotency-Key and reuse it with the unchanged request when retrying
+ * a lost response. Before running the curl example, set `IDEMPOTENCY_KEY` to a
+ * unique key for this registration and retain it for retries of the same intent.
+ * If registration cannot be confirmed, the API returns
+ * 409 E27008 and retains that outcome for keyed retries while the replay result
+ * remains available. The allowance may have been used. Contact support before
+ * starting another test; a new key or a request without a key can register
+ * another batch. A replay does not recover addresses from an uncertain result.
+ *
+ * Scoped API keys, OAuth and service accounts require organization preview access.
+ *
+ */
+export const createEmailInboxInsightsSeedTest = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateEmailInboxInsightsSeedTestData, ThrowOnError>,
+): RequestResult<
+  CreateEmailInboxInsightsSeedTestResponses,
+  CreateEmailInboxInsightsSeedTestErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateEmailInboxInsightsSeedTestResponses,
+    CreateEmailInboxInsightsSeedTestErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/seed-tests",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get the choices available for a new seed test
+ *
+ * Returns what a new seed test can be configured with for a sending domain:
+ * the seed pools the account can use, the regions seeds can be placed in, and
+ * the engagement behaviours the seeds can simulate.
+ *
+ * A seed pool flagged unavailable is one the account has not been provisioned
+ * for, and no self-serve route enables one, so leave it out of the choices you
+ * offer rather than showing it unpickable. This is reference data
+ * that changes only when provisioning does, so it suits being fetched when a
+ * configuration form opens rather than on every page view.
+ *
+ * Scoped API keys, OAuth and service accounts require organization preview access.
+ *
+ */
+export const getEmailInboxInsightsSeedTestConfiguration = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    GetEmailInboxInsightsSeedTestConfigurationData,
+    ThrowOnError
+  >,
+): RequestResult<
+  GetEmailInboxInsightsSeedTestConfigurationResponses,
+  GetEmailInboxInsightsSeedTestConfigurationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailInboxInsightsSeedTestConfigurationResponses,
+    GetEmailInboxInsightsSeedTestConfigurationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/seed-tests/configuration",
+    ...options,
+  });
+
+/**
  * List sending domains and their Inbox Insights status
  *
  * Returns a page of sending domains this workspace can report on, in alphabetical
@@ -12499,6 +12662,9 @@ export const updateVoiceNumber = <ThrowOnError extends boolean = false>(
  * inbound route of its own. Verified caller IDs receive no calls, so it never applies to them.
  * It is "reject" until you change it.
  *
+ * `daily_spend_limit` is the daily limit outbound calls are admitted against, what has been
+ * used toward it today including calls in progress, and when it resets at midnight UTC.
+ *
  */
 export const getVoiceSettings = <ThrowOnError extends boolean = false>(
   options?: Options<GetVoiceSettingsData, ThrowOnError>,
@@ -12537,6 +12703,12 @@ export const getVoiceSettings = <ThrowOnError extends boolean = false>(
  * verified caller IDs, otherwise the update returns 412. A trunk_id that is not
  * one of your trunks returns 404. Deleting the trunk, or
  * turning off its inbound calling, sets the default back to "reject".
+ *
+ * `daily_spend_limit.workspace_limit` sets your workspace's own daily spend limit. It can be
+ * above or below `default_limit`, up to `max_limit`, and must be in your organization's
+ * wallet currency, otherwise the update returns 422. An organization without a wallet cannot
+ * set a limit yet and gets 422 until it has one. Null removes it so the default applies.
+ * Calls already in progress are never ended; the limit applies from the next call.
  *
  */
 export const updateVoiceSettings = <ThrowOnError extends boolean = false>(

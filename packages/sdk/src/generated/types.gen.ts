@@ -13532,6 +13532,448 @@ export type EmailInboxInsightsIndustryBenchmark =
   };
 
 /**
+ * Which pool of seed addresses a test uses. Which pools an account can use depends on what has been provisioned for it, so read the usable set from the seed-test options rather than assuming these are the only values.
+ *
+ */
+export type EmailInboxInsightsSeedListType =
+  "private" | "public" | "exclusive" | (string & {});
+
+/**
+ * Which engagement behaviour the seed addresses simulate. `all` mixes engaged and dormant seeds, which is what makes an engagement split measurable; single-cohort profiles exist too, and the usable set comes from the seed-test options rather than from this list.
+ *
+ */
+export type EmailInboxInsightsSeedEngagementProfile =
+  "all" | "engaging" | "non_engaging" | (string & {});
+
+/**
+ * The fields every view of a seed test carries.
+ *
+ * There is no status field. The measurement reports none for a test it has
+ * already run, and nothing else on the surface stands in for one, so a test
+ * that is still waiting for its send says so by having no subject and no
+ * tested-at date rather than by being labelled.
+ *
+ */
+export type EmailInboxInsightsSeedTestSummary = {
+  /**
+   * The test's identifier. It is a string and needs to stay one: the values are long enough that any language storing every number as a floating point value will round them, and a rounded identifier matches no test.
+   *
+   */
+  readonly test_id: string;
+  /**
+   * Subject line of the tested send, or null before the send goes out. With `tested_at`, this is what distinguishes a test that has run from one still waiting for its send.
+   *
+   */
+  readonly subject: string | null;
+  /**
+   * When the tested send went out, or null while the test is still awaiting it.
+   */
+  readonly tested_at: string | null;
+  /**
+   * The seed pool the test used, or null on a test that predates the recording of it.
+   *
+   */
+  readonly list_type: EmailInboxInsightsSeedListType | null;
+  /**
+   * The engagement behaviour the seeds simulated, or null on a test that predates the recording of it.
+   *
+   */
+  readonly engagement_profile: EmailInboxInsightsSeedEngagementProfile | null;
+  /**
+   * How many seed addresses the test used.
+   */
+  readonly seed_count: number | null;
+  /**
+   * Share of the test's seed addresses that received the message in the inbox, as a percentage. Null until results arrive.
+   *
+   */
+  readonly inbox_rate_percent: number | null;
+};
+
+/**
+ * One seed test as it appears in the history list.
+ */
+export type EmailInboxInsightsSeedTestRow =
+  EmailInboxInsightsSeedTestSummary & {
+    /**
+     * The sending domain the test was run for.
+     */
+    readonly domain: string;
+    /**
+     * The regions the test placed seeds in, as the seed-test options name them. Null on a test that predates registration, whose regions were never recorded (the same unknown `list_type` and `engagement_profile` carry), and not an empty list, which would claim a test placed seeds in no region at all.
+     *
+     */
+    readonly regions: Array<string> | null;
+    /**
+     * How this test's inbox rate compares with the previous test for the same domain, in percentage points. Null when there is no earlier test to compare against.
+     *
+     */
+    readonly delta_pts_vs_prior: number | null;
+  };
+
+/**
+ * The domain's seed tests over the period, newest first, up to 100 of them. The list is capped rather than paged, so `truncated` says whether older tests in the period were left out.
+ *
+ */
+export type EmailInboxInsightsSeedTestList = {
+  /**
+   * One row per seed test, newest first.
+   */
+  readonly items: Array<EmailInboxInsightsSeedTestRow>;
+  /**
+   * True when the period holds more than the 100 tests returned, so the list is the newest of them rather than all of them. Request an earlier period to reach the tests left out.
+   *
+   */
+  readonly truncated: boolean;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * Which Gmail tab the test's Gmail seeds mostly landed under.
+ */
+export type EmailInboxInsightsGmailCategory = {
+  /**
+   * The tab the test's Gmail seeds mostly landed under.
+   */
+  readonly category: EmailInboxInsightsGmailTab;
+  /**
+   * Share of the test's Gmail seeds that landed under this tab, as a percentage.
+   */
+  readonly share_percent: number | null;
+};
+
+/**
+ * How one mailbox provider treated the test, with the seed counts behind the rates. Seed counts are small by nature, so a single seed moves a rate noticeably.
+ *
+ */
+export type EmailInboxInsightsSeedTestProvider = {
+  /**
+   * The provider whose treatment of the test this row describes.
+   */
+  readonly mailbox_provider: EmailInboxInsightsMailboxProvider;
+  /**
+   * Share of this provider's seeds that received the message in the inbox, as a percentage.
+   */
+  readonly inbox_rate_percent: number | null;
+  /**
+   * Share of this provider's seeds that received the message in spam, as a percentage.
+   */
+  readonly spam_rate_percent: number | null;
+  /**
+   * Seed addresses at this provider that received the message in the inbox.
+   */
+  readonly inbox_seeds: number;
+  /**
+   * Seed addresses at this provider that received the message in spam.
+   */
+  readonly spam_seeds: number;
+  /**
+   * Seed addresses at this provider included in the test.
+   */
+  readonly total_seeds: number;
+  /**
+   * Which Gmail tab the seeds landed under. Present only on the Gmail row, since no other provider sorts mail into tabs.
+   *
+   */
+  readonly gmail_category?: EmailInboxInsightsGmailCategory;
+};
+
+/**
+ * The per-provider grid for one seed test.
+ */
+export type EmailInboxInsightsSeedTestProviders = {
+  /**
+   * One row per mailbox provider the test placed seeds at.
+   */
+  readonly items: Array<EmailInboxInsightsSeedTestProvider>;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * How the tested send authenticated, measured on the seed mail itself rather than on reporting from receivers.
+ *
+ */
+export type EmailInboxInsightsSeedTestAuth = {
+  /**
+   * Share of the test's seed mail that passed SPF, as a percentage.
+   */
+  readonly spf_pass_rate_percent: number | null;
+  /**
+   * Share of the test's seed mail that passed DKIM, as a percentage.
+   */
+  readonly dkim_pass_rate_percent: number | null;
+  /**
+   * Share of the test's seed mail that passed DMARC alignment, as a percentage.
+   */
+  readonly dmarc_aligned_rate_percent: number | null;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * How one provider treated engaged seeds against dormant ones. A gap means the provider is sorting the same mail differently by how the recipient behaves.
+ *
+ */
+export type EmailInboxInsightsSeedEngagementSplitRow = {
+  /**
+   * The provider whose treatment of engaged and dormant seeds this row compares.
+   */
+  readonly mailbox_provider: EmailInboxInsightsMailboxProvider;
+  /**
+   * Inbox rate across seeds simulating engaged recipients, as a percentage.
+   */
+  readonly engaged_inbox_rate_percent: number | null;
+  /**
+   * Inbox rate across seeds simulating dormant recipients, as a percentage.
+   */
+  readonly dormant_inbox_rate_percent: number | null;
+  /**
+   * Engaged inbox rate minus dormant inbox rate, in percentage points. The value can be negative, which means dormant seeds placed better, and is reported as measured rather than floored at zero.
+   *
+   */
+  readonly gap_pts: number | null;
+  /**
+   * Seeds simulating engaged recipients at this provider.
+   */
+  readonly engaged_seeds: number;
+  /**
+   * Seeds simulating dormant recipients at this provider.
+   */
+  readonly dormant_seeds: number;
+};
+
+/**
+ * Engaged against dormant placement, per provider. The status is `not_applicable` for a test run with a single-cohort engagement profile, where there is no second group to compare: hide the comparison rather than showing a zero gap.
+ *
+ */
+export type EmailInboxInsightsSeedEngagementSplit = {
+  /**
+   * One row per provider where both cohorts placed seeds.
+   */
+  readonly items: Array<EmailInboxInsightsSeedEngagementSplitRow>;
+  readonly status: EmailInboxInsightsSectionStatus;
+};
+
+/**
+ * One seed test with its full results.
+ */
+export type EmailInboxInsightsSeedTestDetail =
+  EmailInboxInsightsSeedTestSummary & {
+    providers: EmailInboxInsightsSeedTestProviders;
+    auth: EmailInboxInsightsSeedTestAuth;
+    engagement_split: EmailInboxInsightsSeedEngagementSplit;
+  };
+
+/**
+ * The organization's seed-test allowance for the current billing period. Registering a test spends one of the allowance whether or not its send goes out, and a test that expires unused does not return it. Uncertain registrations can retain allowance.
+ *
+ */
+export type EmailInboxInsightsSeedTestQuota = {
+  /**
+   * Allowance used in the current billing period, including retained uncertain registrations. When `limit` is null, usage is not tracked and this field is zero.
+   *
+   */
+  readonly used: number;
+  /**
+   * Seed tests included in the billing period, or null when no cap applies to this organization.
+   *
+   */
+  readonly limit: number | null;
+  /**
+   * When the billing-period allowance next resets.
+   */
+  readonly resets_at: string;
+};
+
+/**
+ * The domain's seed tests over the period, with the newest test's full results
+ * and the organization's billing-period allowance.
+ *
+ * A seed test sends to a panel of real mailboxes across many providers and
+ * reports exactly where each copy landed, which is a direct measurement rather
+ * than an estimate. Seed counts are small by nature, so a single seed moves a
+ * rate noticeably.
+ *
+ */
+export type EmailInboxInsightsSeedTests = EmailInboxInsightsEnvelope & {
+  tests: EmailInboxInsightsSeedTestList;
+  /**
+   * The newest test in the period with its full results, so the summary panels need no second request. Absent when the period holds no tests.
+   *
+   */
+  latest?: EmailInboxInsightsSeedTestDetail;
+  quota: EmailInboxInsightsSeedTestQuota;
+};
+
+/**
+ * How to configure a seed test. The choices available for a domain come from the seed-test configuration.
+ *
+ */
+export type EmailInboxInsightsSeedTestCreate = {
+  /**
+   * The sending domain the test measures: one of the workspace's verified sending domains, exactly as it appears there.
+   *
+   */
+  sending_domain: string;
+  /**
+   * Which seed pool to draw addresses from. Use a value the seed-test configuration reports as available for this account.
+   *
+   */
+  list_type: EmailInboxInsightsSeedListType;
+  /**
+   * Which engagement behaviour the seeds should simulate. Mixing both behaviours is what makes the engaged-against-dormant comparison measurable.
+   *
+   */
+  engagement_profile: EmailInboxInsightsSeedEngagementProfile;
+  /**
+   * The regions to place seeds in, as the seed-test configuration names them.
+   */
+  regions: Array<string>;
+  /**
+   * A name attached to this registration. It is not returned in seed-test history.
+   */
+  label?: string;
+};
+
+/**
+ * One seed address to include in the tested send.
+ */
+export type EmailInboxInsightsSeedAddress = {
+  /**
+   * The address to add to the send's recipients. Include it exactly as given; an altered address is not a seed and will not be measured.
+   *
+   */
+  readonly address: string;
+  /**
+   * The provider this address is hosted at.
+   */
+  readonly mailbox_provider: EmailInboxInsightsMailboxProvider;
+  /**
+   * The region this address sits in, as the seed-test choices name it.
+   */
+  readonly region: string;
+  /**
+   * Whether this address simulates a recipient who engages with mail. There are two behaviours rather than a scale, so a test either mixes both or uses one of them.
+   *
+   */
+  readonly engaging: boolean;
+};
+
+/**
+ * A registered seed test and the addresses it measures.
+ *
+ * Registering a test does not put the addresses into a send. Add them to the
+ * recipients of the send you want measured, and the test appears in the
+ * seed-test list for the domain once its seed mail has been measured.
+ *
+ * There is no status field. The measurement reports none for a seed test at any
+ * point, so read the test's own fields instead: a registered test has addresses
+ * and an expiry date, and it gains a subject and a tested-at date once its send
+ * goes out.
+ *
+ */
+export type EmailInboxInsightsSeedTestRegistration = {
+  /**
+   * Identifies this registration. It is not the identifier the seed-test list
+   * reports for the resulting test.
+   *
+   * It is here so a registration can be quoted in a support conversation, and
+   * so a client can tell two registrations apart. To read the results, find
+   * the test in the seed-test list for this domain.
+   *
+   */
+  readonly registration_id: string;
+  /**
+   * Every address to include in the tested send. Copy them into the send's recipients; results are measured from mail these addresses receive.
+   *
+   */
+  readonly seed_addresses: Array<EmailInboxInsightsSeedAddress>;
+  /**
+   * How many seed addresses the test issued.
+   */
+  readonly seed_count: number;
+  /**
+   * When the test expires if no seed mail has arrived. An expired test never produces results, and the allowance it spent is not returned, so send before this time.
+   *
+   */
+  readonly expires_at: string;
+};
+
+/**
+ * One seed pool a test can be run against, and whether this account can use it.
+ */
+export type EmailInboxInsightsSeedListTypeOption = {
+  /**
+   * The value to send when registering a test against this pool.
+   */
+  readonly value: EmailInboxInsightsSeedListType;
+  /**
+   * Whether this pool is provisioned for the account. An unavailable pool is one the account has not been set up for rather than one its plan forbids, and there is no self-serve way to enable one, so leave it out of the choices you offer rather than showing it unpickable.
+   *
+   */
+  readonly available: boolean;
+};
+
+/**
+ * One region seeds can be placed in.
+ */
+export type EmailInboxInsightsSeedRegionOption = {
+  /**
+   * The value to send when registering a test against this region. Free text rather than an enumeration: the set belongs to the measurement and is wider than the continents it looks like, so send one of these back verbatim rather than composing your own.
+   *
+   */
+  readonly value: string;
+};
+
+/**
+ * One engagement behaviour a test can simulate, and whether this account can use it.
+ */
+export type EmailInboxInsightsSeedEngagementProfileOption = {
+  /**
+   * The value to send when registering a test against this behaviour.
+   */
+  readonly value: EmailInboxInsightsSeedEngagementProfile;
+  /**
+   * Whether this behaviour is provisioned for the account. As with the seed pools, an unavailable behaviour is one the account has not been set up for rather than one its plan forbids, so leave it out of the choices you offer rather than showing it unpickable.
+   *
+   */
+  readonly available: boolean;
+};
+
+/**
+ * The choices available when registering a seed test for a domain: which seed
+ * pools the account can use, which regions seeds can be placed in, and which
+ * engagement behaviours the seeds can simulate.
+ *
+ * This is reference data rather than a measurement, so it carries no period and
+ * no measurement detail. It changes only when an account's provisioning does.
+ *
+ */
+export type EmailInboxInsightsSeedTestConfiguration = {
+  /**
+   * Which resource this response is, echoed for self-description.
+   */
+  readonly resource: string;
+  /**
+   * The sending domain these choices apply to.
+   */
+  readonly domain: string;
+  /**
+   * The seed pools, each flagged with whether the account can use it.
+   */
+  readonly list_types: Array<EmailInboxInsightsSeedListTypeOption>;
+  /**
+   * The regions seeds can be placed in. Objects rather than bare strings, to match the two lists beside it: the measurement reports no availability for a region today, and an object can carry one later without a second array.
+   *
+   */
+  readonly regions: Array<EmailInboxInsightsSeedRegionOption>;
+  /**
+   * The engagement behaviours the seeds can simulate, each flagged with whether the account can use it.
+   *
+   */
+  readonly engagement_profiles: Array<EmailInboxInsightsSeedEngagementProfileOption>;
+};
+
+/**
  * Field used to sort owned domains.
  */
 export type EmailInboxInsightsDomainSort = "domain";
@@ -23386,12 +23828,54 @@ export type VoiceSettingsInboundConfiguration = {
   route: VoiceCallRoute;
 };
 
+export type VoiceDailySpendLimit = {
+  /**
+   * The organization's wallet currency, which every amount here is in.
+   */
+  currency_code: CurrencyCode;
+  /**
+   * The daily limit calls are admitted against: the workspace limit when one is set, otherwise the default, and never more than `max_limit`. Null when there is no limit.
+   *
+   */
+  limit: Money | null;
+  /**
+   * Used toward today's limit, including calls in progress. A call counts its expected cost when it starts; the part it did not use returns when it is billed. Null when today's usage cannot be read right now; the limit is still enforced.
+   *
+   */
+  used: Money | null;
+  /**
+   * What is left of the limit today, never below zero. Null when there is no limit or today's usage cannot be read.
+   */
+  remaining: Money | null;
+  /**
+   * When usage resets to zero, at midnight UTC.
+   */
+  resets_at: string;
+  /**
+   * The daily limit a workspace has until it sets its own. Null when there is no default limit.
+   */
+  default_limit: Money | null;
+  /**
+   * The highest daily limit this workspace can set. Null when there is no maximum.
+   */
+  max_limit: Money | null;
+  /**
+   * The daily limit this workspace set for itself. Null when it uses the default.
+   */
+  workspace_limit: Money | null;
+};
+
 /**
  * The voice settings your workspace controls. Every field carries its effective value, whether or not the workspace has ever changed it.
  *
  */
 export type VoiceSettings = {
   inbound_configuration: VoiceSettingsInboundConfiguration;
+  /**
+   * The workspace's daily Voice spend limit and today's usage toward it. Null until your organization has a wallet, since amounts are in its currency.
+   *
+   */
+  daily_spend_limit: VoiceDailySpendLimit | null;
 };
 
 /**
@@ -23402,12 +23886,21 @@ export type VoiceSettingsInboundConfigurationPut = {
   route: VoiceCallRouteWritable;
 };
 
+export type VoiceDailySpendLimitUpdate = {
+  /**
+   * The workspace's own daily limit, in the organization's wallet currency from zero up to `max_limit`, with at most six decimal places; a negative or more precise amount is refused with 422. It can be above or below the default. Null removes it, so the default applies.
+   *
+   */
+  workspace_limit: Money | null;
+};
+
 /**
  * Changes to your workspace's voice settings. Omit a field to leave it as it is.
  *
  */
 export type VoiceSettingsUpdate = {
   inbound_configuration?: VoiceSettingsInboundConfigurationPut;
+  daily_spend_limit?: VoiceDailySpendLimitUpdate;
 };
 
 /**
@@ -27555,6 +28048,32 @@ export type EmailInboxInsightsComplaintsWritable =
  */
 export type EmailInboxInsightsSpamTrapsWritable =
   EmailInboxInsightsEnvelopeWritable;
+
+/**
+ * One seed test with its full results.
+ */
+export type EmailInboxInsightsSeedTestDetailWritable = {
+  [key: string]: unknown;
+};
+
+/**
+ * The domain's seed tests over the period, with the newest test's full results
+ * and the organization's billing-period allowance.
+ *
+ * A seed test sends to a panel of real mailboxes across many providers and
+ * reports exactly where each copy landed, which is a direct measurement rather
+ * than an estimate. Seed counts are small by nature, so a single seed moves a
+ * rate noticeably.
+ *
+ */
+export type EmailInboxInsightsSeedTestsWritable =
+  EmailInboxInsightsEnvelopeWritable & {
+    /**
+     * The newest test in the period with its full results, so the summary panels need no second request. Absent when the period holds no tests.
+     *
+     */
+    latest?: EmailInboxInsightsSeedTestDetailWritable;
+  };
 
 /**
  * A page of sending domains this workspace can report on, and which of them Inbox Insights is switched on for.
@@ -48437,6 +48956,274 @@ export type GetEmailInboxInsightsIndustryBenchmarkResponses = {
 export type GetEmailInboxInsightsIndustryBenchmarkResponse =
   GetEmailInboxInsightsIndustryBenchmarkResponses[keyof GetEmailInboxInsightsIndustryBenchmarkResponses];
 
+export type GetEmailInboxInsightsSeedTestsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query: {
+    /**
+     * The sending domain to report on: one of the workspace's verified sending domains, exactly as it appears there. A domain that is not verified in this workspace answers not-found.
+     *
+     */
+    sending_domain: string;
+    /**
+     * First UTC day of the period, inclusive, in YYYY-MM-DD: the same window
+     * convention as the email statistics endpoints. Defaults to 90 days
+     * before `to`, which is the span the history view shows.
+     *
+     * It may be at most 90 days before `to`, which is also the default, so a
+     * request naming neither date is already at the limit. Asking for more
+     * answers `422`. To reach older tests, request an earlier period.
+     *
+     */
+    from?: string;
+    /**
+     * Last UTC day of the period, inclusive, in YYYY-MM-DD. Defaults to today.
+     */
+    to?: string;
+  };
+  url: "/v1/email/inbox-insights/seed-tests";
+};
+
+export type GetEmailInboxInsightsSeedTestsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailInboxInsightsSeedTestsError =
+  GetEmailInboxInsightsSeedTestsErrors[keyof GetEmailInboxInsightsSeedTestsErrors];
+
+export type GetEmailInboxInsightsSeedTestsResponses = {
+  /**
+   * Seed tests for the requested domain and period.
+   */
+  200: EmailInboxInsightsSeedTests;
+};
+
+export type GetEmailInboxInsightsSeedTestsResponse =
+  GetEmailInboxInsightsSeedTestsResponses[keyof GetEmailInboxInsightsSeedTestsResponses];
+
+export type CreateEmailInboxInsightsSeedTestData = {
+  body: EmailInboxInsightsSeedTestCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/email/inbox-insights/seed-tests";
+};
+
+export type CreateEmailInboxInsightsSeedTestErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateEmailInboxInsightsSeedTestError =
+  CreateEmailInboxInsightsSeedTestErrors[keyof CreateEmailInboxInsightsSeedTestErrors];
+
+export type CreateEmailInboxInsightsSeedTestResponses = {
+  /**
+   * The seed test was registered.
+   */
+  201: EmailInboxInsightsSeedTestRegistration;
+};
+
+export type CreateEmailInboxInsightsSeedTestResponse =
+  CreateEmailInboxInsightsSeedTestResponses[keyof CreateEmailInboxInsightsSeedTestResponses];
+
+export type GetEmailInboxInsightsSeedTestConfigurationData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query: {
+    /**
+     * The sending domain a test would be registered for: one of the workspace's verified sending domains, exactly as it appears there. A domain that is not verified in this workspace answers not-found.
+     *
+     */
+    sending_domain: string;
+  };
+  url: "/v1/email/inbox-insights/seed-tests/configuration";
+};
+
+export type GetEmailInboxInsightsSeedTestConfigurationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailInboxInsightsSeedTestConfigurationError =
+  GetEmailInboxInsightsSeedTestConfigurationErrors[keyof GetEmailInboxInsightsSeedTestConfigurationErrors];
+
+export type GetEmailInboxInsightsSeedTestConfigurationResponses = {
+  /**
+   * The choices available for a new seed test on this domain.
+   */
+  200: EmailInboxInsightsSeedTestConfiguration;
+};
+
+export type GetEmailInboxInsightsSeedTestConfigurationResponse =
+  GetEmailInboxInsightsSeedTestConfigurationResponses[keyof GetEmailInboxInsightsSeedTestConfigurationResponses];
+
 export type GetEmailInboxInsightsDomainsData = {
   body?: never;
   headers?: {
@@ -59017,6 +59804,11 @@ export type GetVoiceSettingsErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type GetVoiceSettingsError =

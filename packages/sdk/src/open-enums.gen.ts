@@ -318,6 +318,34 @@ export const EmailInboxInsightsGmailTab = {
 export type EmailInboxInsightsGmailTabValue = (typeof EmailInboxInsightsGmailTab)[keyof typeof EmailInboxInsightsGmailTab];
 
 /**
+ * Values of EmailInboxInsightsSeedEngagementProfile known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailInboxInsightsSeedEngagementProfile = {
+  All: "all",
+  Engaging: "engaging",
+  NonEngaging: "non_engaging",
+} as const;
+
+/** A known EmailInboxInsightsSeedEngagementProfile value. */
+export type EmailInboxInsightsSeedEngagementProfileValue = (typeof EmailInboxInsightsSeedEngagementProfile)[keyof typeof EmailInboxInsightsSeedEngagementProfile];
+
+/**
+ * Values of EmailInboxInsightsSeedListType known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailInboxInsightsSeedListType = {
+  Exclusive: "exclusive",
+  Private: "private",
+  Public: "public",
+} as const;
+
+/** A known EmailInboxInsightsSeedListType value. */
+export type EmailInboxInsightsSeedListTypeValue = (typeof EmailInboxInsightsSeedListType)[keyof typeof EmailInboxInsightsSeedListType];
+
+/**
  * Values of EmailInboxInsightsTrapSource known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.

@@ -9,7 +9,7 @@ export type VoiceSettingsUpdateParams = NonNullable<UpdateVoiceSettingsData["bod
 
 export class VoiceSettingsResource extends Resource {
   /**
-   * Read the workspace's voice settings, including the default inbound route that every Bird number without its own route follows. Bird numbers whose `inbound_configuration.route` is null use this route; verified caller IDs receive no calls and never do.
+   * Read the workspace's voice settings: the default inbound route that every Bird number without its own route follows, and the daily spend limit with today's usage toward it. Bird numbers whose `inbound_configuration.route` is null use this route; verified caller IDs receive no calls and never do.
    *
    * @example Read the default inbound route
    * const settings = await bird.voice.settings.get();
@@ -21,7 +21,7 @@ export class VoiceSettingsResource extends Resource {
   }
 
   /**
-   * Change the workspace's default inbound route. Every Bird number whose own route is null follows it from the next call (verified caller IDs receive no calls): `reject` refuses those calls, `trunk` with a trunk_id delivers them to one of your SIP trunks, and `forward` with a forward_to and a forward_as connects them to one of your verified caller IDs. Numbers with a route of their own are unaffected.
+   * Change the workspace's default inbound route. Every Bird number whose own route is null follows it from the next call (verified caller IDs receive no calls): `reject` refuses those calls, `trunk` with a trunk_id delivers them to one of your SIP trunks, and `forward` with a forward_to and a forward_as connects them to one of your verified caller IDs. Numbers with a route of their own are unaffected. `daily_spend_limit.workspace_limit` sets the workspace's daily spend limit in the wallet currency, anywhere up to its `max_limit`, or null returns it to the default; calls in progress keep running. Read the wallet currency and `max_limit` with the get voice settings operation first.
    *
    * @example Send unrouted numbers to a trunk
    * const settings = await bird.voice.settings.update({

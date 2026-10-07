@@ -27,9 +27,9 @@ panel/seed estimates with audience weighting, not delivery counts or a
 marketing/transactional split; a domain name alone does not identify a stream.
 Read rate measures reading, not opens. Label freshness from freshness.as_of;
 missing days and nulls are not zeros. Associations do not establish a cause.
-This read does not enable monitoring. Individual seed-test results and Google
-Postmaster connection status are dashboard-only; these aggregates cannot
-substitute for a particular test or prove placement for every customer.
+This read does not enable monitoring. Use `email.inbox_insights.seed_tests.list`
+for individual seed-test results. Google Postmaster connection status remains
+dashboard-only. These aggregates cannot prove placement for every customer.
 
 API-key calls require Insights preview access for your organization.
    *

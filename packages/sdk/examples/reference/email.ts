@@ -481,3 +481,44 @@ export async function emailStatsQuery() {
     console.log(group.dimensions, group.metrics, group.series);
   }
 }
+
+export async function seed_tests_configuration_get() {
+  // Requires Insights preview access for the organization.
+  let sendingDomain: string | undefined;
+  for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
+    if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
+  }
+  if (!sendingDomain) throw new Error("Verify mail.example.com in this workspace first");
+  const report = await bird.email.inboxInsights.seedTests.configuration.get({ sending_domain: sendingDomain });
+  console.log(report);
+}
+
+export async function seed_tests_list() {
+  // Requires Insights preview access for the organization.
+  let sendingDomain: string | undefined;
+  for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
+    if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
+  }
+  if (!sendingDomain) throw new Error("Verify mail.example.com in this workspace first");
+  const report = await bird.email.inboxInsights.seedTests.list({ sending_domain: sendingDomain });
+  console.log(report);
+}
+
+export async function seed_tests_create() {
+  // Requires Insights preview access for the organization.
+  const idempotencyKey = process.env.IDEMPOTENCY_KEY;
+  if (!idempotencyKey) throw new Error("Set IDEMPOTENCY_KEY to a unique key for this registration and retain it for retries");
+  let sendingDomain: string | undefined;
+  for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
+    if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
+  }
+  if (!sendingDomain) throw new Error("Verify mail.example.com in this workspace first");
+  const configuration = await bird.email.inboxInsights.seedTests.configuration.get({ sending_domain: sendingDomain });
+  const pool = configuration.list_types.find(choice => choice.available);
+  const profile = configuration.engagement_profiles.find(choice => choice.available);
+  const region = configuration.regions[0];
+  if (!pool || !profile || !region) throw new Error("No seed-test options available");
+
+  const report = await bird.email.inboxInsights.seedTests.create({ sending_domain: sendingDomain, list_type: pool.value, engagement_profile: profile.value, regions: [region.value] }, { idempotencyKey });
+  console.log(report);
+}

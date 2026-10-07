@@ -24879,6 +24879,736 @@ export const EmailInboxInsightsIndustryBenchmarkSchema = {
   ],
 } as const;
 
+export const EmailInboxInsightsSeedListTypeSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Which pool of seed addresses a test uses. Which pools an account can use depends on what has been provisioned for it, so read the usable set from the seed-test options rather than assuming these are the only values.\n",
+  "x-extensible-enum": ["private", "public", "exclusive"],
+  example: "private",
+} as const;
+
+export const EmailInboxInsightsSeedEngagementProfileSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Which engagement behaviour the seed addresses simulate. `all` mixes engaged and dormant seeds, which is what makes an engagement split measurable; single-cohort profiles exist too, and the usable set comes from the seed-test options rather than from this list.\n",
+  "x-extensible-enum": ["all", "engaging", "non_engaging"],
+  example: "all",
+} as const;
+
+export const EmailInboxInsightsSeedTestSummarySchema = {
+  type: "object",
+  description:
+    "The fields every view of a seed test carries.\n\nThere is no status field. The measurement reports none for a test it has\nalready run, and nothing else on the surface stands in for one, so a test\nthat is still waiting for its send says so by having no subject and no\ntested-at date rather than by being labelled.\n",
+  required: [
+    "test_id",
+    "subject",
+    "tested_at",
+    "list_type",
+    "engagement_profile",
+    "seed_count",
+    "inbox_rate_percent",
+  ],
+  properties: {
+    test_id: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The test's identifier. It is a string and needs to stay one: the values are long enough that any language storing every number as a floating point value will round them, and a rounded identifier matches no test.\n",
+      example: "91901",
+    },
+    subject: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "Subject line of the tested send, or null before the send goes out. With `tested_at`, this is what distinguishes a test that has run from one still waiting for its send.\n",
+      example: "Fall Preview, first look",
+    },
+    tested_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the tested send went out, or null while the test is still awaiting it.",
+      example: "2026-08-13T09:12:00Z",
+    },
+    list_type: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailInboxInsightsSeedListType",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The seed pool the test used, or null on a test that predates the recording of it.\n",
+    },
+    engagement_profile: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailInboxInsightsSeedEngagementProfile",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The engagement behaviour the seeds simulated, or null on a test that predates the recording of it.\n",
+    },
+    seed_count: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description: "How many seed addresses the test used.",
+      example: 212,
+    },
+    inbox_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of the test's seed addresses that received the message in the inbox, as a percentage. Null until results arrive.\n",
+      example: 89.2,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedTestRowSchema = {
+  description: "One seed test as it appears in the history list.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsSeedTestSummary",
+    },
+    {
+      type: "object",
+      required: ["domain", "regions", "delta_pts_vs_prior"],
+      properties: {
+        domain: {
+          type: "string",
+          minLength: 1,
+          readOnly: true,
+          description: "The sending domain the test was run for.",
+          example: "mail.acme.com",
+        },
+        regions: {
+          type: ["array", "null"],
+          readOnly: true,
+          description:
+            "The regions the test placed seeds in, as the seed-test options name them. Null on a test that predates registration, whose regions were never recorded (the same unknown `list_type` and `engagement_profile` carry), and not an empty list, which would claim a test placed seeds in no region at all.\n",
+          items: {
+            type: "string",
+            minLength: 1,
+          },
+          example: ["North America - US", "Europe - UK"],
+        },
+        delta_pts_vs_prior: {
+          type: ["number", "null"],
+          readOnly: true,
+          description:
+            "How this test's inbox rate compares with the previous test for the same domain, in percentage points. Null when there is no earlier test to compare against.\n",
+          example: -3.1,
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsSeedTestListSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The domain's seed tests over the period, newest first, up to 100 of them. The list is capped rather than paged, so `truncated` says whether older tests in the period were left out.\n",
+  required: ["items", "truncated", "status"],
+  properties: {
+    items: {
+      type: "array",
+      readOnly: true,
+      description: "One row per seed test, newest first.",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsSeedTestRow",
+      },
+    },
+    truncated: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "True when the period holds more than the 100 tests returned, so the list is the newest of them rather than all of them. Request an earlier period to reach the tests left out.\n",
+      example: false,
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsGmailCategorySchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Which Gmail tab the test's Gmail seeds mostly landed under.",
+  required: ["category", "share_percent"],
+  properties: {
+    category: {
+      $ref: "#/components/schemas/EmailInboxInsightsGmailTab",
+      readOnly: true,
+      description: "The tab the test's Gmail seeds mostly landed under.",
+    },
+    share_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of the test's Gmail seeds that landed under this tab, as a percentage.",
+      example: 61,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedTestProviderSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "How one mailbox provider treated the test, with the seed counts behind the rates. Seed counts are small by nature, so a single seed moves a rate noticeably.\n",
+  required: [
+    "mailbox_provider",
+    "inbox_rate_percent",
+    "spam_rate_percent",
+    "inbox_seeds",
+    "spam_seeds",
+    "total_seeds",
+  ],
+  properties: {
+    mailbox_provider: {
+      $ref: "#/components/schemas/EmailInboxInsightsMailboxProvider",
+      readOnly: true,
+      description:
+        "The provider whose treatment of the test this row describes.",
+    },
+    inbox_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this provider's seeds that received the message in the inbox, as a percentage.",
+      example: 95,
+    },
+    spam_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of this provider's seeds that received the message in spam, as a percentage.",
+      example: 5,
+    },
+    inbox_seeds: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Seed addresses at this provider that received the message in the inbox.",
+      example: 61,
+    },
+    spam_seeds: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Seed addresses at this provider that received the message in spam.",
+      example: 3,
+    },
+    total_seeds: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Seed addresses at this provider included in the test.",
+      example: 64,
+    },
+    gmail_category: {
+      $ref: "#/components/schemas/EmailInboxInsightsGmailCategory",
+      readOnly: true,
+      description:
+        "Which Gmail tab the seeds landed under. Present only on the Gmail row, since no other provider sorts mail into tabs.\n",
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedTestProvidersSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "The per-provider grid for one seed test.",
+  required: ["items", "status"],
+  properties: {
+    items: {
+      type: "array",
+      readOnly: true,
+      description: "One row per mailbox provider the test placed seeds at.",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsSeedTestProvider",
+      },
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedTestAuthSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "How the tested send authenticated, measured on the seed mail itself rather than on reporting from receivers.\n",
+  required: [
+    "spf_pass_rate_percent",
+    "dkim_pass_rate_percent",
+    "dmarc_aligned_rate_percent",
+    "status",
+  ],
+  properties: {
+    spf_pass_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of the test's seed mail that passed SPF, as a percentage.",
+      example: 100,
+    },
+    dkim_pass_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of the test's seed mail that passed DKIM, as a percentage.",
+      example: 100,
+    },
+    dmarc_aligned_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Share of the test's seed mail that passed DMARC alignment, as a percentage.",
+      example: 100,
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedEngagementSplitRowSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "How one provider treated engaged seeds against dormant ones. A gap means the provider is sorting the same mail differently by how the recipient behaves.\n",
+  required: [
+    "mailbox_provider",
+    "engaged_inbox_rate_percent",
+    "dormant_inbox_rate_percent",
+    "gap_pts",
+    "engaged_seeds",
+    "dormant_seeds",
+  ],
+  properties: {
+    mailbox_provider: {
+      $ref: "#/components/schemas/EmailInboxInsightsMailboxProvider",
+      readOnly: true,
+      description:
+        "The provider whose treatment of engaged and dormant seeds this row compares.",
+    },
+    engaged_inbox_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Inbox rate across seeds simulating engaged recipients, as a percentage.",
+      example: 96,
+    },
+    dormant_inbox_rate_percent: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Inbox rate across seeds simulating dormant recipients, as a percentage.",
+      example: 71,
+    },
+    gap_pts: {
+      type: ["number", "null"],
+      readOnly: true,
+      description:
+        "Engaged inbox rate minus dormant inbox rate, in percentage points. The value can be negative, which means dormant seeds placed better, and is reported as measured rather than floored at zero.\n",
+      example: 25,
+    },
+    engaged_seeds: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Seeds simulating engaged recipients at this provider.",
+      example: 32,
+    },
+    dormant_seeds: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "Seeds simulating dormant recipients at this provider.",
+      example: 32,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedEngagementSplitSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Engaged against dormant placement, per provider. The status is `not_applicable` for a test run with a single-cohort engagement profile, where there is no second group to compare: hide the comparison rather than showing a zero gap.\n",
+  required: ["items", "status"],
+  properties: {
+    items: {
+      type: "array",
+      readOnly: true,
+      description: "One row per provider where both cohorts placed seeds.",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsSeedEngagementSplitRow",
+      },
+    },
+    status: {
+      $ref: "#/components/schemas/EmailInboxInsightsSectionStatus",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedTestDetailSchema = {
+  type: "object",
+  description: "One seed test with its full results.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsSeedTestSummary",
+    },
+    {
+      type: "object",
+      required: ["providers", "auth", "engagement_split"],
+      properties: {
+        providers: {
+          $ref: "#/components/schemas/EmailInboxInsightsSeedTestProviders",
+        },
+        auth: {
+          $ref: "#/components/schemas/EmailInboxInsightsSeedTestAuth",
+        },
+        engagement_split: {
+          $ref: "#/components/schemas/EmailInboxInsightsSeedEngagementSplit",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsSeedTestQuotaSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The organization's seed-test allowance for the current billing period. Registering a test spends one of the allowance whether or not its send goes out, and a test that expires unused does not return it. Uncertain registrations can retain allowance.\n",
+  required: ["used", "limit", "resets_at"],
+  properties: {
+    used: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Allowance used in the current billing period, including retained uncertain registrations. When `limit` is null, usage is not tracked and this field is zero.\n",
+      example: 112,
+    },
+    limit: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Seed tests included in the billing period, or null when no cap applies to this organization.\n",
+      example: 300,
+    },
+    resets_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the billing-period allowance next resets.",
+      example: "2026-09-01T00:00:00Z",
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedTestsSchema = {
+  description:
+    "The domain's seed tests over the period, with the newest test's full results\nand the organization's billing-period allowance.\n\nA seed test sends to a panel of real mailboxes across many providers and\nreports exactly where each copy landed, which is a direct measurement rather\nthan an estimate. Seed counts are small by nature, so a single seed moves a\nrate noticeably.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsEnvelope",
+    },
+    {
+      type: "object",
+      required: ["tests", "quota"],
+      properties: {
+        tests: {
+          $ref: "#/components/schemas/EmailInboxInsightsSeedTestList",
+        },
+        latest: {
+          $ref: "#/components/schemas/EmailInboxInsightsSeedTestDetail",
+          description:
+            "The newest test in the period with its full results, so the summary panels need no second request. Absent when the period holds no tests.\n",
+        },
+        quota: {
+          $ref: "#/components/schemas/EmailInboxInsightsSeedTestQuota",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsSeedTestCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "How to configure a seed test. The choices available for a domain come from the seed-test configuration.\n",
+  required: ["sending_domain", "list_type", "engagement_profile", "regions"],
+  properties: {
+    sending_domain: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The sending domain the test measures: one of the workspace's verified sending domains, exactly as it appears there.\n",
+      example: "mail.acme.com",
+    },
+    list_type: {
+      $ref: "#/components/schemas/EmailInboxInsightsSeedListType",
+      description:
+        "Which seed pool to draw addresses from. Use a value the seed-test configuration reports as available for this account.\n",
+    },
+    engagement_profile: {
+      $ref: "#/components/schemas/EmailInboxInsightsSeedEngagementProfile",
+      description:
+        "Which engagement behaviour the seeds should simulate. Mixing both behaviours is what makes the engaged-against-dormant comparison measurable.\n",
+    },
+    regions: {
+      type: "array",
+      minItems: 1,
+      description:
+        "The regions to place seeds in, as the seed-test configuration names them.",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      example: ["North America - US", "Europe - UK"],
+    },
+    label: {
+      type: "string",
+      minLength: 1,
+      maxLength: 200,
+      description:
+        "A name attached to this registration. It is not returned in seed-test history.",
+      example: "Fall preview send",
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedAddressSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One seed address to include in the tested send.",
+  required: ["address", "mailbox_provider", "region", "engaging"],
+  properties: {
+    address: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The address to add to the send's recipients. Include it exactly as given; an altered address is not a seed and will not be measured.\n",
+      example: "sd8241.hk@example-seeds.net",
+    },
+    mailbox_provider: {
+      $ref: "#/components/schemas/EmailInboxInsightsMailboxProvider",
+      readOnly: true,
+      description: "The provider this address is hosted at.",
+    },
+    region: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The region this address sits in, as the seed-test choices name it.",
+      example: "North America - US",
+    },
+    engaging: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this address simulates a recipient who engages with mail. There are two behaviours rather than a scale, so a test either mixes both or uses one of them.\n",
+      example: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedTestRegistrationSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A registered seed test and the addresses it measures.\n\nRegistering a test does not put the addresses into a send. Add them to the\nrecipients of the send you want measured, and the test appears in the\nseed-test list for the domain once its seed mail has been measured.\n\nThere is no status field. The measurement reports none for a seed test at any\npoint, so read the test's own fields instead: a registered test has addresses\nand an expiry date, and it gains a subject and a tested-at date once its send\ngoes out.\n",
+  required: ["registration_id", "seed_addresses", "seed_count", "expires_at"],
+  properties: {
+    registration_id: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Identifies this registration. It is not the identifier the seed-test list\nreports for the resulting test.\n\nIt is here so a registration can be quoted in a support conversation, and\nso a client can tell two registrations apart. To read the results, find\nthe test in the seed-test list for this domain.\n",
+      example: "43ea66c8-6837-48a4-b81b-26fdf5cc8cd8",
+    },
+    seed_addresses: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Every address to include in the tested send. Copy them into the send's recipients; results are measured from mail these addresses receive.\n",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsSeedAddress",
+      },
+    },
+    seed_count: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "How many seed addresses the test issued.",
+      example: 212,
+    },
+    expires_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When the test expires if no seed mail has arrived. An expired test never produces results, and the allowance it spent is not returned, so send before this time.\n",
+      example: "2026-08-27T09:12:00Z",
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedListTypeOptionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One seed pool a test can be run against, and whether this account can use it.",
+  required: ["value", "available"],
+  properties: {
+    value: {
+      $ref: "#/components/schemas/EmailInboxInsightsSeedListType",
+      readOnly: true,
+      description:
+        "The value to send when registering a test against this pool.",
+    },
+    available: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this pool is provisioned for the account. An unavailable pool is one the account has not been set up for rather than one its plan forbids, and there is no self-serve way to enable one, so leave it out of the choices you offer rather than showing it unpickable.\n",
+      example: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedRegionOptionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One region seeds can be placed in.",
+  required: ["value"],
+  properties: {
+    value: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The value to send when registering a test against this region. Free text rather than an enumeration: the set belongs to the measurement and is wider than the continents it looks like, so send one of these back verbatim rather than composing your own.\n",
+      example: "North America - US",
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedEngagementProfileOptionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One engagement behaviour a test can simulate, and whether this account can use it.",
+  required: ["value", "available"],
+  properties: {
+    value: {
+      $ref: "#/components/schemas/EmailInboxInsightsSeedEngagementProfile",
+      readOnly: true,
+      description:
+        "The value to send when registering a test against this behaviour.",
+    },
+    available: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this behaviour is provisioned for the account. As with the seed pools, an unavailable behaviour is one the account has not been set up for rather than one its plan forbids, so leave it out of the choices you offer rather than showing it unpickable.\n",
+      example: true,
+    },
+  },
+} as const;
+
+export const EmailInboxInsightsSeedTestConfigurationSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The choices available when registering a seed test for a domain: which seed\npools the account can use, which regions seeds can be placed in, and which\nengagement behaviours the seeds can simulate.\n\nThis is reference data rather than a measurement, so it carries no period and\nno measurement detail. It changes only when an account's provisioning does.\n",
+  required: [
+    "resource",
+    "domain",
+    "list_types",
+    "regions",
+    "engagement_profiles",
+  ],
+  properties: {
+    resource: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Which resource this response is, echoed for self-description.",
+      example: "seed-test-configuration",
+    },
+    domain: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The sending domain these choices apply to.",
+      example: "mail.acme.com",
+    },
+    list_types: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The seed pools, each flagged with whether the account can use it.",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsSeedListTypeOption",
+      },
+    },
+    regions: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The regions seeds can be placed in. Objects rather than bare strings, to match the two lists beside it: the measurement reports no availability for a region today, and an object can carry one later without a second array.\n",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsSeedRegionOption",
+      },
+    },
+    engagement_profiles: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The engagement behaviours the seeds can simulate, each flagged with whether the account can use it.\n",
+      items: {
+        $ref: "#/components/schemas/EmailInboxInsightsSeedEngagementProfileOption",
+      },
+    },
+  },
+} as const;
+
 export const EmailInboxInsightsDomainSortSchema = {
   type: "string",
   minLength: 1,
@@ -41930,15 +42660,128 @@ export const VoiceSettingsInboundConfigurationSchema = {
   },
 } as const;
 
+export const VoiceDailySpendLimitSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "currency_code",
+    "limit",
+    "used",
+    "remaining",
+    "resets_at",
+    "default_limit",
+    "max_limit",
+    "workspace_limit",
+  ],
+  properties: {
+    currency_code: {
+      $ref: "#/components/schemas/CurrencyCode",
+      description:
+        "The organization's wallet currency, which every amount here is in.",
+      example: "EUR",
+    },
+    limit: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The daily limit calls are admitted against: the workspace limit when one is set, otherwise the default, and never more than `max_limit`. Null when there is no limit.\n",
+    },
+    used: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Used toward today's limit, including calls in progress. A call counts its expected cost when it starts; the part it did not use returns when it is billed. Null when today's usage cannot be read right now; the limit is still enforced.\n",
+    },
+    remaining: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "What is left of the limit today, never below zero. Null when there is no limit or today's usage cannot be read.",
+    },
+    resets_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When usage resets to zero, at midnight UTC.",
+    },
+    default_limit: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The daily limit a workspace has until it sets its own. Null when there is no default limit.",
+    },
+    max_limit: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The highest daily limit this workspace can set. Null when there is no maximum.",
+    },
+    workspace_limit: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The daily limit this workspace set for itself. Null when it uses the default.",
+    },
+  },
+} as const;
+
 export const VoiceSettingsSchema = {
   type: "object",
   additionalProperties: false,
   description:
     "The voice settings your workspace controls. Every field carries its effective value, whether or not the workspace has ever changed it.\n",
-  required: ["inbound_configuration"],
+  required: ["inbound_configuration", "daily_spend_limit"],
   properties: {
     inbound_configuration: {
       $ref: "#/components/schemas/VoiceSettingsInboundConfiguration",
+    },
+    daily_spend_limit: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceDailySpendLimit",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The workspace's daily Voice spend limit and today's usage toward it. Null until your organization has a wallet, since amounts are in its currency.\n",
     },
   },
 } as const;
@@ -41956,6 +42799,26 @@ export const VoiceSettingsInboundConfigurationPutSchema = {
   },
 } as const;
 
+export const VoiceDailySpendLimitUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["workspace_limit"],
+  properties: {
+    workspace_limit: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The workspace's own daily limit, in the organization's wallet currency from zero up to `max_limit`, with at most six decimal places; a negative or more precise amount is refused with 422. It can be above or below the default. Null removes it, so the default applies.\n",
+    },
+  },
+} as const;
+
 export const VoiceSettingsUpdateSchema = {
   type: "object",
   additionalProperties: false,
@@ -41965,6 +42828,9 @@ export const VoiceSettingsUpdateSchema = {
   properties: {
     inbound_configuration: {
       $ref: "#/components/schemas/VoiceSettingsInboundConfigurationPut",
+    },
+    daily_spend_limit: {
+      $ref: "#/components/schemas/VoiceDailySpendLimitUpdate",
     },
   },
 } as const;
@@ -49902,6 +50768,32 @@ export const EmailInboxInsightsSpamTrapsWritableSchema = {
   allOf: [
     {
       $ref: "#/components/schemas/EmailInboxInsightsEnvelopeWritable",
+    },
+  ],
+} as const;
+
+export const EmailInboxInsightsSeedTestDetailWritableSchema = {
+  type: "object",
+  description: "One seed test with its full results.",
+} as const;
+
+export const EmailInboxInsightsSeedTestsWritableSchema = {
+  description:
+    "The domain's seed tests over the period, with the newest test's full results\nand the organization's billing-period allowance.\n\nA seed test sends to a panel of real mailboxes across many providers and\nreports exactly where each copy landed, which is a direct measurement rather\nthan an estimate. Seed counts are small by nature, so a single seed moves a\nrate noticeably.\n",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailInboxInsightsEnvelopeWritable",
+    },
+    {
+      type: "object",
+      properties: {
+        latest: {
+          $ref: "#/components/schemas/EmailInboxInsightsSeedTestDetailWritable",
+          description:
+            "The newest test in the period with its full results, so the summary panels need no second request. Absent when the period holds no tests.\n",
+        },
+      },
     },
   ],
 } as const;

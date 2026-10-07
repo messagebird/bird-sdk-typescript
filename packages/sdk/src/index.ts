@@ -437,6 +437,8 @@ export {
   EmailInboxInsightsDmarcVerdict,
   EmailInboxInsightsTrapType,
   EmailInboxInsightsTrapSource,
+  EmailInboxInsightsSeedEngagementProfile,
+  EmailInboxInsightsSeedListType,
   EmailCompetitiveCampaignSignal,
   EmailEventType,
   EmailLookupFlag,
@@ -509,6 +511,8 @@ export type {
   EmailInboxInsightsDmarcVerdictValue,
   EmailInboxInsightsTrapTypeValue,
   EmailInboxInsightsTrapSourceValue,
+  EmailInboxInsightsSeedEngagementProfileValue,
+  EmailInboxInsightsSeedListTypeValue,
   EmailCompetitiveCampaignSignalValue,
   EmailEventTypeValue,
   EmailLookupFlagValue,
@@ -773,6 +777,16 @@ export type {
   AmbSuppression,
 } from "./resources/ambSuppressions.gen.js";
 
+export type {
+  EmailInboxInsightsSeedTestRegistration,
+  EmailInboxInsightsSeedTests,
+  EmailInboxInsightsSeedTestsCreateParams,
+  EmailInboxInsightsSeedTestsListQuery,
+} from "./resources/emailInboxInsightsSeedTests.gen.js";
+export type {
+  EmailInboxInsightsSeedTestConfiguration,
+  EmailInboxInsightsSeedTestsConfigurationGetQuery,
+} from "./resources/emailInboxInsightsSeedTestsConfiguration.gen.js";
 export type {
   EsimSummary,
   Esim,
