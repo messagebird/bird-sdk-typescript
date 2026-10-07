@@ -905,7 +905,7 @@ export const RealtimeAppSchema = {
         connection_count_events: {
           type: "boolean",
           description:
-            "Broadcast a connection-count event to a channel's subscribers whenever its connection count changes. Requires `connection_counting`.",
+            "Broadcast connection-count events to public and private channel subscribers. Requires `connection_counting`. Presence channels do not emit these events; use a channel query to read their connection count.",
         },
         watchlist_events: {
           type: "boolean",
@@ -993,7 +993,7 @@ export const RealtimeAppConfigSchema = {
     connection_count_events: {
       type: "boolean",
       description:
-        "Broadcast a connection-count event to a channel's subscribers whenever its connection count changes. Requires `connection_counting`.",
+        "Broadcast connection-count events to public and private channel subscribers. Requires `connection_counting`. Presence channels do not emit these events; use a channel query to read their connection count.",
     },
     watchlist_events: {
       type: "boolean",
@@ -1054,7 +1054,7 @@ export const RealtimeAppCreateSchema = {
           type: "boolean",
           default: false,
           description:
-            "Broadcast a connection-count event to a channel's subscribers whenever its connection count changes. Requires `connection_counting`.",
+            "Broadcast connection-count events to public and private channel subscribers. Requires `connection_counting`. Presence channels do not emit these events; use a channel query to read their connection count.",
         },
         watchlist_events: {
           type: "boolean",
@@ -1171,7 +1171,7 @@ export const RealtimeAppUpdateSchema = {
     connection_count_events: {
       type: "boolean",
       description:
-        "Broadcast a connection-count event to a channel's subscribers whenever its connection count changes. Requires `connection_counting`.",
+        "Broadcast connection-count events to public and private channel subscribers. Requires `connection_counting`. Presence channels do not emit these events; use a channel query to read their connection count.",
     },
     watchlist_events: {
       type: "boolean",
@@ -4088,6 +4088,20 @@ export const ContactUpsertErrorSchema = {
       type: "string",
       minLength: 1,
       description: "Human-readable explanation of why this entry failed.",
+    },
+    param: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The field in this entry that caused the failure, such as `data` or `email`. Omitted when the failure names no field.",
+    },
+    details: {
+      type: "array",
+      description:
+        "Per-field problems with this entry, in the same shape as the top-level error `details`. A contact property failure names the property as `data.<key>`, such as `data.plan`. Omitted when the failure has no per-field problems.",
+      items: {
+        $ref: "#/components/schemas/ErrorDetail",
+      },
     },
   },
 } as const;
@@ -31834,11 +31848,12 @@ export const EmailTemplateCreateSchema = {
         $ref: "#/components/schemas/EmailTemplateLanguageContent",
       },
       description:
-        "The initial draft's content, keyed by language tag in BCP-47 form such as\n`en` or `pt-BR`. A template holds up to 25 languages, and a send picks one\nof them.\n\nOmit this to create an empty draft and add content later.\n",
+        "The initial draft's content, keyed by language tag in BCP-47 form such as\n`en` or `pt-BR`. A template holds up to 25 languages, and a send picks one\nof them.\n\nOmit this to create an empty draft and add content later.\n\nThe example's `{{ first_name }}` is a parameter, filled from\n`template.parameters` at send time. A `{{ bird.contact.<attribute> }}`\nplaceholder reads a contact record instead. A send to an email address\nhas no contact record, so it refuses such a template. A broadcast fills\nit from each recipient's contact, and a preview from the `contact` or\n`parameters` you supply.\n",
       example: {
         en: {
-          subject: "Welcome to Acme, {{ bird.contact.first_name }}!",
-          html: "<h1>Hi {{ bird.contact.first_name }}</h1>",
+          subject: "Welcome, {{ first_name }}",
+          preview_text: "Your account is ready",
+          html: "<!DOCTYPE html>\n<html>\n<body>\n<p>Hi {{ first_name }}, thanks for signing up.</p>\n</body>\n</html>\n",
         },
       },
     },
@@ -44059,10 +44074,16 @@ export const EsimOrderSchema = {
           description:
             "Where install credentials are delivered once available. Present when requested at creation.",
         },
+        awaiting_funds: {
+          type: "boolean",
+          readOnly: true,
+          description:
+            "Whether this order is in `charging` after an insufficient wallet balance refusal. The required balance is in `funding` when available. False does not confirm payment; check `status` and `wallet_transaction_id`. When absent, `funding` indicates a refusal if present; otherwise the funding state is unknown.",
+        },
         funding: {
           readOnly: true,
           description:
-            "Details of an insufficient-funds attempt while the order is in `charging`. May be null even while the order is awaiting funds; a null value does not confirm payment. Check the order status and your wallet balance.",
+            "Details of an insufficient-funds attempt while the order is in `charging`. May be null even while the order is awaiting funds; a null value does not confirm payment. Check `awaiting_funds` to identify an outstanding insufficient-balance refusal.",
           oneOf: [
             {
               $ref: "#/components/schemas/EsimOrderFunding",
@@ -46934,7 +46955,7 @@ export const RealtimeAppWritableSchema = {
         connection_count_events: {
           type: "boolean",
           description:
-            "Broadcast a connection-count event to a channel's subscribers whenever its connection count changes. Requires `connection_counting`.",
+            "Broadcast connection-count events to public and private channel subscribers. Requires `connection_counting`. Presence channels do not emit these events; use a channel query to read their connection count.",
         },
         watchlist_events: {
           type: "boolean",

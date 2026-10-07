@@ -39,6 +39,20 @@ export class EmailTemplatesVersionsResourceBase extends Resource {
 
   /**
    * Freeze a complete draft as the new immutable live version. Every language needs a subject and body, and the default language must be present. Submission is all or nothing and reports every language error. Set `validate_only: true` to check without publishing, or pass `expected_revision` to reject a concurrent edit. An unchanged draft is rejected. The response also carries `compatibility` across every language, each finding naming the language it is in: what the HTML uses that mail clients remove, ignore, or render inconsistently. Advisory and separate from `errors`, so a finding never fails a submit.
+   *
+   * @example Check the draft, then publish it
+   * const templateId = "TEMPLATE_ID";
+   * const draftVersionId = "DRAFT_VERSION_ID";
+   * const check = await bird.email.templates.versions.submit(templateId, draftVersionId, {
+   *   validate_only: true,
+   * });
+   * for (const problem of check.errors) {
+   *   console.log(problem.language, problem.field, problem.message);
+   * }
+   * if (check.valid) {
+   *   const result = await bird.email.templates.versions.submit(templateId, draftVersionId);
+   *   console.log(result.version?.version_number);
+   * }
    */
   submit(templateRef: string, versionId: string, params: EmailTemplatesVersionsSubmitParams = {}, options?: RequestOptions): APIPromise<EmailTemplateSubmitResult> {
     return this.call<EmailTemplateSubmitResult>("POST", options, ({ signal, headers }) =>

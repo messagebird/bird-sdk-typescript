@@ -523,7 +523,7 @@ export type RealtimeApp = Timestamps & {
    */
   connection_counting: boolean;
   /**
-   * Broadcast a connection-count event to a channel's subscribers whenever its connection count changes. Requires `connection_counting`.
+   * Broadcast connection-count events to public and private channel subscribers. Requires `connection_counting`. Presence channels do not emit these events; use a channel query to read their connection count.
    */
   connection_count_events: boolean;
   /**
@@ -570,7 +570,7 @@ export type RealtimeAppConfig = {
    */
   connection_counting?: boolean;
   /**
-   * Broadcast a connection-count event to a channel's subscribers whenever its connection count changes. Requires `connection_counting`.
+   * Broadcast connection-count events to public and private channel subscribers. Requires `connection_counting`. Presence channels do not emit these events; use a channel query to read their connection count.
    */
   connection_count_events?: boolean;
   /**
@@ -601,7 +601,7 @@ export type RealtimeAppCreate = RealtimeAppConfig & {
    */
   connection_counting?: boolean;
   /**
-   * Broadcast a connection-count event to a channel's subscribers whenever its connection count changes. Requires `connection_counting`.
+   * Broadcast connection-count events to public and private channel subscribers. Requires `connection_counting`. Presence channels do not emit these events; use a channel query to read their connection count.
    */
   connection_count_events?: boolean;
   /**
@@ -657,7 +657,7 @@ export type RealtimeAppUpdate = {
    */
   connection_counting?: boolean;
   /**
-   * Broadcast a connection-count event to a channel's subscribers whenever its connection count changes. Requires `connection_counting`.
+   * Broadcast connection-count events to public and private channel subscribers. Requires `connection_counting`. Presence channels do not emit these events; use a channel query to read their connection count.
    */
   connection_count_events?: boolean;
   /**
@@ -2403,6 +2403,14 @@ export type ContactUpsertError = {
    * Human-readable explanation of why this entry failed.
    */
   message: string;
+  /**
+   * The field in this entry that caused the failure, such as `data` or `email`. Omitted when the failure names no field.
+   */
+  param?: string;
+  /**
+   * Per-field problems with this entry, in the same shape as the top-level error `details`. A contact property failure names the property as `data.<key>`, such as `data.plan`. Omitted when the failure has no per-field problems.
+   */
+  details?: Array<ErrorDetail>;
 };
 
 export type ContactUpsertResultItem = {
@@ -17533,6 +17541,13 @@ export type EmailTemplateCreate = {
    *
    * Omit this to create an empty draft and add content later.
    *
+   * The example's `{{ first_name }}` is a parameter, filled from
+   * `template.parameters` at send time. A `{{ bird.contact.<attribute> }}`
+   * placeholder reads a contact record instead. A send to an email address
+   * has no contact record, so it refuses such a template. A broadcast fills
+   * it from each recipient's contact, and a preview from the `contact` or
+   * `parameters` you supply.
+   *
    */
   languages?: {
     [key in LanguageTag]?: EmailTemplateLanguageContent;
@@ -24523,7 +24538,11 @@ export type EsimOrder = Timestamps & {
    */
   readonly delivery?: EsimDelivery;
   /**
-   * Details of an insufficient-funds attempt while the order is in `charging`. May be null even while the order is awaiting funds; a null value does not confirm payment. Check the order status and your wallet balance.
+   * Whether this order is in `charging` after an insufficient wallet balance refusal. The required balance is in `funding` when available. False does not confirm payment; check `status` and `wallet_transaction_id`. When absent, `funding` indicates a refusal if present; otherwise the funding state is unknown.
+   */
+  readonly awaiting_funds?: boolean;
+  /**
+   * Details of an insufficient-funds attempt while the order is in `charging`. May be null even while the order is awaiting funds; a null value does not confirm payment. Check `awaiting_funds` to identify an outstanding insufficient-balance refusal.
    */
   readonly funding: EsimOrderFunding | null;
   /**
@@ -25882,7 +25901,7 @@ export type RealtimeAppWritable = {
    */
   connection_counting: boolean;
   /**
-   * Broadcast a connection-count event to a channel's subscribers whenever its connection count changes. Requires `connection_counting`.
+   * Broadcast connection-count events to public and private channel subscribers. Requires `connection_counting`. Presence channels do not emit these events; use a channel query to read their connection count.
    */
   connection_count_events: boolean;
   /**

@@ -21,6 +21,14 @@ export class EmailTemplatesVersionsLanguagesResource extends Resource {
 
   /**
    * Read one language's subject and bodies from a template version. The response carries `compatibility`: what the stored HTML uses that mail clients remove, ignore, or render inconsistently, and `compatibility_severity` reducing it to `problem`, `warning`, or `none`.
+   *
+   * @example Read a draft language's HTML back
+   * const language = await bird.email.templates.versions.languages.get(
+   *   "TEMPLATE_ID",
+   *   "DRAFT_VERSION_ID",
+   *   "en",
+   * );
+   * console.log(language.content?.html);
    */
   get(templateRef: string, versionId: string, language: string, options?: RequestOptions): APIPromise<EmailTemplateLanguage> {
     return this.call<EmailTemplateLanguage>("GET", options, ({ signal, headers }) =>

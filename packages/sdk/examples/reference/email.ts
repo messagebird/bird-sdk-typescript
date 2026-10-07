@@ -288,6 +288,46 @@ export async function emailTemplatesList() {
   }
 }
 
+export async function emailTemplatesAuthor() {
+  const template = await bird.email.templates.create({
+    slug: "welcome-email",
+    category: "transactional",
+    source: "html",
+    languages: {
+      en: {
+        subject: "Welcome, {{ first_name }}",
+        preview_text: "Your account is ready",
+        html: "<!DOCTYPE html>\n<html>\n<body>\n<p>Hi {{ first_name }}, thanks for signing up.</p>\n</body>\n</html>\n",
+      },
+    },
+  });
+  console.log(template.id, template.draft_version_id);
+}
+
+export async function emailTemplatesLanguagesGet() {
+  const language = await bird.email.templates.versions.languages.get(
+    "TEMPLATE_ID",
+    "DRAFT_VERSION_ID",
+    "en",
+  );
+  console.log(language.content?.html);
+}
+
+export async function emailTemplatesSubmit() {
+  const templateId = "TEMPLATE_ID";
+  const draftVersionId = "DRAFT_VERSION_ID";
+  const check = await bird.email.templates.versions.submit(templateId, draftVersionId, {
+    validate_only: true,
+  });
+  for (const problem of check.errors) {
+    console.log(problem.language, problem.field, problem.message);
+  }
+  if (check.valid) {
+    const result = await bird.email.templates.versions.submit(templateId, draftVersionId);
+    console.log(result.version?.version_number);
+  }
+}
+
 export async function insights_email_competitive_brands_search() {
   // Requires Insights preview access for the organization.
   const report = await bird.email.competitive.brands.search({ q: "Everlane" });

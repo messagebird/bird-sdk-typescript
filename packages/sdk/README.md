@@ -138,7 +138,7 @@ try {
 }
 ```
 
-Every API error carries `statusCode`, `requestId`, and `type`. The core retries safely on `429`/`5xx`/network failures (mutations reuse one idempotency key across attempts).
+Every API error carries `statusCode`, `requestId`, and `type`. When the Bird API sent the error, it also carries a readable `message`, a stable `code` such as `E01001`, and a `docUrl` to that code's page, which says what went wrong and what to do. Every code is listed at [bird.com/docs/api/errors](https://bird.com/docs/api/errors). When a response has no code or docs link, such as one from a proxy, `code` is `"unknown"` and `docUrl` is empty. The core retries safely on `429`/`5xx`/network failures (mutations reuse one idempotency key across attempts).
 
 Prefer to branch on a value instead of catching? Use `.safe()`:
 
