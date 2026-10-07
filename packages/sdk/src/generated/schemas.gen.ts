@@ -40575,6 +40575,7 @@ export const NumberSchema = {
     "status",
     "allocated_at",
     "releases_at",
+    "released_at",
   ],
   properties: {
     name: {
@@ -40598,7 +40599,7 @@ export const NumberSchema = {
         },
       ],
       description:
-        "Identifier of this allocated number. Pass it as `number_id` to read this number, or to release it when kind is dedicated.",
+        "Identifier of this allocated number. Pass it as `number_id` to read this number, or to cancel or release it when kind is dedicated.",
     },
     kind: {
       type: "string",
@@ -53298,6 +53299,7 @@ export const NumberWritableSchema = {
     "status",
     "allocated_at",
     "releases_at",
+    "released_at",
   ],
   properties: {
     name: {
@@ -53321,7 +53323,7 @@ export const NumberWritableSchema = {
         },
       ],
       description:
-        "Identifier of this allocated number. Pass it as `number_id` to read this number, or to release it when kind is dedicated.",
+        "Identifier of this allocated number. Pass it as `number_id` to read this number, or to cancel or release it when kind is dedicated.",
     },
     kind: {
       type: "string",
