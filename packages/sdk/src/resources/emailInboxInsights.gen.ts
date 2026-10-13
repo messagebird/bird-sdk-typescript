@@ -30,11 +30,9 @@ missing days and nulls are not zeros. Associations do not establish a cause.
 This read does not enable monitoring. Use `email.inbox_insights.seed_tests.list`
 for individual seed-test results. Google Postmaster connection status remains
 dashboard-only. These aggregates cannot prove placement for every customer.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example Read placement with per-section statuses
-   * // Requires Insights preview access for the organization.
+   * // Requires inbox_insights:read permission in the target workspace.
    * let sendingDomain: string | undefined;
    * for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
    *   if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
@@ -57,11 +55,9 @@ must be checked. Read section statuses, sources.latest_data_date and freshness
 before drawing conclusions. Authentication and placement changes can coincide
 without establishing cause. This read does not configure authentication or
 enable monitoring.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example Read authentication readiness
-   * // Requires Insights preview access for the organization.
+   * // Requires inbox_insights:read permission in the target workspace.
    * let sendingDomain: string | undefined;
    * for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
    *   if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
@@ -85,11 +81,9 @@ not zero complaints. Freshness identifies the last reported day, not a promised
 update schedule. Correlation with placement cannot identify causative sends.
 Sections can report not_configured when setup is incomplete; connection
 status and setup are available in the dashboard, not through this read.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example Read Gmail complaint measurements and setup status
-   * // Requires Insights preview access for the organization.
+   * // Requires inbox_insights:read permission in the target workspace.
    * let sendingDomain: string | undefined;
    * for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
    *   if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
@@ -110,11 +104,9 @@ compare=previous_period includes the preceding period. hit_rows has its own
 status and truncated_types; empty rows do not negate a positive total, and row
 counts cannot reconstruct total hits. A measured zero is valid. Hits alone
 do not identify the sending campaign or establish why placement changed.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example Read spam-trap hits including measured zero
-   * // Requires Insights preview access for the organization.
+   * // Requires inbox_insights:read permission in the target workspace.
    * let sendingDomain: string | undefined;
    * for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
    *   if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
@@ -130,11 +122,9 @@ API-key calls require Insights preview access for your organization.
 
   /**
    * Check blocklist standing for the sending infrastructure of a verified domain owned by the workspace. This is a current lookup and accepts no date window. Inspect each target status and checked_at; a null active_count means the lookup service supplied no count. Zero and an empty target list do not establish complete coverage.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example Read the current blocklist result
-   * // Requires Insights preview access for the organization.
+   * // Requires inbox_insights:read permission in the target workspace.
    * let sendingDomain: string | undefined;
    * for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
    *   if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }

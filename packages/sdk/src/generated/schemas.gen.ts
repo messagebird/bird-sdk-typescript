@@ -3621,7 +3621,57 @@ export const EmailSendAllowanceWindowSchema = {
   minLength: 1,
   enum: ["none", "monthly", "daily"],
   description:
-    "Which of the organization's email send allowances stops a send from reaching its whole audience.\n\n- `none`: every recipient is covered.\n- `monthly`: the allowance that runs with the billing period.\n- `daily`: the allowance that resets at the end of each UTC day.\n\nWhen both apply, the tighter of the two is reported.\n",
+    "The email limit that prevents a broadcast from reaching its full audience.\n\n- `none`: the email send allowance covers every recipient.\n- `monthly`: the monthly email limit for the billing period.\n- `daily`: the daily email limit, which resets at the end of each UTC day.\n\nWhen both email limits apply, the response reports the more restrictive one. If you pass `send_at`, the check evaluates both at that time.\n",
+} as const;
+
+export const EmailSendAllowanceLimitReasonSchema = {
+  type: "string",
+  minLength: 1,
+  enum: [
+    "plan",
+    "overage_off",
+    "overdue_payment",
+    "unfunded",
+    "overage_ceiling",
+    "custom_limit",
+  ],
+  description:
+    "What sets the monthly email limit and how to raise it.\n\n- `plan`: the organization's monthly email limit. This is the plan's included volume unless we have set a different limit for the organization. If the limit matches the included volume, a plan with more included volume raises it. Otherwise, contact Bird support.\n- `overage_off`: email overage is turned off, so sending stops at the included volume. Turn email overage back on to raise the monthly email limit.\n- `overdue_payment`: an overdue payment pauses email overage, so sending stops at the included volume. Pay the overdue invoice to raise the monthly email limit.\n- `unfunded`: the wallet cannot cover email overage, or its funding cannot be confirmed, so sending stops at the included volume. Top up the wallet if it lacks funds. Email overage resumes once sufficient funding is confirmed.\n- `overage_ceiling`: email overage is billed up to a configured multiple of the included volume. A plan with more included volume raises the email overage ceiling.\n- `custom_limit`: we have set a monthly email limit for the organization that differs from the plan's included volume. Contact Bird support to change it. These limits currently report as `plan`. This enum value is declared in advance so reporting them as `custom_limit` will not be a breaking change.\n",
+} as const;
+
+export const EmailBroadcastCountAllowanceSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "The organization's broadcast count allowance for the current window. This counts broadcasts rather than emails. The window is the billing period, or the UTC day when no current billing period is available.\n\nSending or scheduling a draft uses one broadcast from the window current when you submit the request. The scheduled send time does not determine the window. Sending an already scheduled broadcast again uses no additional broadcast allowance. `send_at` on the send-quota request does not change this allowance.\n",
+  required: ["limit", "remaining", "resets_at"],
+  properties: {
+    limit: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Maximum number of broadcasts the organization can send in this window.\n",
+      example: 20,
+    },
+    remaining: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Number of broadcasts remaining in this window. At 0, you cannot send or schedule a draft.\n",
+      example: 4,
+    },
+    resets_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description:
+        "When the window ends and broadcast usage resets to 0. This is the end of the billing period, or the end of the UTC day when no current billing period is available.\n",
+      example: "2026-09-01T00:00:00Z",
+    },
+  },
 } as const;
 
 export const EmailBroadcastSendQuotaSchema = {
@@ -3629,7 +3679,7 @@ export const EmailBroadcastSendQuotaSchema = {
   additionalProperties: false,
   required: ["recipients", "allowed", "limited_by"],
   description:
-    "How much of a broadcast the organization's email send allowance covers, read before the broadcast is sent. The allowance is shared with every other email the organization sends, so `allowed` moves as those sends land, and `recipients` moves as audience membership and suppressions change. Treat both as a live estimate rather than a promise: a broadcast whose recipients all fit today can still run into the allowance if other sends consume it first.\n",
+    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit.\n",
   properties: {
     recipients: {
       type: "integer",
@@ -3638,7 +3688,7 @@ export const EmailBroadcastSendQuotaSchema = {
       readOnly: true,
       example: 12000,
       description:
-        "Number of contacts the broadcast would send to right now, after contacts without an email address and contacts suppressed for the broadcast's category are dropped. The same number the broadcast's audience counts report as sendable.\n",
+        "Number of contacts the broadcast could reach now. Excludes contacts without an email address and contacts suppressed for the broadcast's category. Matches the sendable count from the broadcast's audience counts.\n",
     },
     allowed: {
       type: "integer",
@@ -3647,7 +3697,7 @@ export const EmailBroadcastSendQuotaSchema = {
       readOnly: true,
       example: 5000,
       description:
-        "Number of those recipients the organization's email send allowance covers. Equal to `recipients` when nothing limits the send, and lower when part of the audience runs past what is left of it. A part-covered send goes out in whole batches, so this is cut back to a batch boundary rather than to the exact number of emails left: it can sit below `remaining` rather than matching it, and should be read rather than worked out from `limit` and `remaining`. 0 means none of them would go out, either because the audience is larger than the whole allowance, which is refused rather than sent in part, or because too little of the allowance is left to carry any of it.\n",
+        "Number of recipients covered by the organization's email send allowance at `send_at`, or now if you omit it. Equals `recipients` when no email limit restricts the send. It is lower when the remaining allowance cannot cover the audience.\n\nPartially covered broadcasts send in whole batches. This count is rounded down to a batch boundary and can be lower than `remaining`. Read this value directly instead of calculating it from `limit` and `remaining`.\n\nA value of 0 means no recipients would receive the broadcast. This happens if the audience exceeds the full email limit, which rejects the send, or if the remaining allowance cannot cover a batch.\n",
     },
     limited_by: {
       readOnly: true,
@@ -3661,7 +3711,7 @@ export const EmailBroadcastSendQuotaSchema = {
       readOnly: true,
       example: 50000,
       description:
-        "Size of the allowance named by `limited_by`, in emails. Omitted when nothing limits the send.\n",
+        "The email limit identified by `limited_by`, in emails. Omitted when no email limit restricts the send.\n",
     },
     remaining: {
       type: "integer",
@@ -3670,7 +3720,25 @@ export const EmailBroadcastSendQuotaSchema = {
       readOnly: true,
       example: 7000,
       description:
-        "How much of that allowance is left in the current window, in emails. Omitted when nothing limits the send.\n",
+        "The allowance remaining under the email limit identified by `limited_by`, in emails, at `send_at`, or now if you omit it. If the window resets by `send_at`, the check uses its full allowance. Omitted when no email limit restricts the send.\n",
+    },
+    resets_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      example: "2026-09-01T00:00:00Z",
+      description:
+        "When usage resets to 0 for the email limit identified by `limited_by`, evaluated at `send_at`, or now if you omit it.\n\nA broadcast sent before this time uses the same window and the allowance left after other sends. A broadcast sent at or after this time uses a new window. If `recipients` exceeds the full `limit`, the send is rejected in any window with that limit. Pass the later time as `send_at` to check whether the other email limit still restricts the send.\n\nOmitted when no email limit restricts the send, when the reset is at or before `send_at`, or when the billing period has ended and the next one has not started.\n",
+    },
+    limit_reason: {
+      readOnly: true,
+      example: "plan",
+      $ref: "#/components/schemas/EmailSendAllowanceLimitReason",
+    },
+    broadcasts: {
+      readOnly: true,
+      $ref: "#/components/schemas/EmailBroadcastCountAllowance",
     },
   },
 } as const;
@@ -4752,6 +4820,130 @@ export const AudienceUpdateRequestSchema = {
   },
   example: {
     name: "Newsletter subscribers",
+  },
+} as const;
+
+export const AudienceMembershipSummarySchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["total", "data_as_of"],
+  description:
+    "Exact count of all audience members at the source evaluation instant, including contacts without email and unsubscribed contacts.",
+  properties: {
+    total: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Number of members at evaluation time.",
+    },
+    data_as_of: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "Source evaluation instant for the live count. Membership changes committed after the read began appear in a later response.",
+    },
+  },
+} as const;
+
+export const AudienceMembershipResponseSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "Exact audience membership at evaluation time. Membership is absent when the count is unavailable.",
+  properties: {
+    membership: {
+      $ref: "#/components/schemas/AudienceMembershipSummary",
+    },
+  },
+} as const;
+
+export const AudienceMembershipStatisticsPeriodSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["from", "to", "data_as_of"],
+  description:
+    "Inclusive UTC date window for daily membership observations. Snapshots do not establish continuous freshness; data_as_of is always null.",
+  properties: {
+    from: {
+      type: "string",
+      minLength: 1,
+      format: "date",
+      description: "Inclusive first UTC date.",
+    },
+    to: {
+      type: "string",
+      minLength: 1,
+      format: "date",
+      description: "Inclusive last UTC date.",
+    },
+    data_as_of: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "Always null. Use each point's observed_at for its actual observation instant.",
+    },
+  },
+} as const;
+
+export const AudienceMembershipStatisticsPointSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["bucket", "total", "observed_at"],
+  description:
+    "First successful membership observation for a UTC date. Both total and observed_at are null when no retained observation exists; a successful empty audience has total zero.",
+  properties: {
+    bucket: {
+      type: "string",
+      minLength: 1,
+      format: "date",
+      description:
+        "UTC date of the observation, or the requested date for a gap.",
+    },
+    total: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "Exact number of all members at observation time, or null for a gap.",
+    },
+    observed_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "Actual source observation instant, or null for a gap. This is not a day-close count.",
+    },
+  },
+} as const;
+
+export const AudienceMembershipStatisticsResponseSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["period", "data"],
+  description:
+    "Daily membership observations in ascending UTC date order. Missing observations are explicit null gaps; changes between samples are unobserved.",
+  properties: {
+    period: {
+      description: "Requested UTC date window.",
+      allOf: [
+        {
+          $ref: "#/components/schemas/AudienceMembershipStatisticsPeriod",
+        },
+      ],
+    },
+    data: {
+      type: "array",
+      maxItems: 365,
+      items: {
+        $ref: "#/components/schemas/AudienceMembershipStatisticsPoint",
+      },
+      description: "One point for every requested date, including gaps.",
+    },
   },
 } as const;
 
@@ -8634,23 +8826,6 @@ export const DestinationSuperRegionSchema = {
     "The continent-scale group the region rolls up into. Derived from `region`, and `null` whenever that is. Treat the set as open.\n",
 } as const;
 
-export const DestinationSettingSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["country_code", "enabled"],
-  properties: {
-    country_code: {
-      $ref: "#/components/schemas/CountryCode",
-    },
-    enabled: {
-      type: "boolean",
-      description:
-        "Whether to enable (`true`) or disable (`false`) this destination country.",
-      example: true,
-    },
-  },
-} as const;
-
 export const AllocatedNumberIDSchema = {
   type: "string",
   minLength: 1,
@@ -9920,7 +10095,7 @@ export const WhatsAppLocationSendSchema = {
       minimum: -90,
       maximum: 90,
       description: "Latitude in decimal degrees.",
-      example: 52.3702,
+      example: 37.7955,
     },
     longitude: {
       type: "number",
@@ -9928,27 +10103,27 @@ export const WhatsAppLocationSendSchema = {
       minimum: -180,
       maximum: 180,
       description: "Longitude in decimal degrees.",
-      example: 4.8952,
+      example: -122.3937,
     },
     name: {
       type: "string",
       maxLength: 1000,
       description: "Name of the place, shown above the address.",
-      example: "Bird HQ",
+      example: "Ferry Building",
     },
     address: {
       type: "string",
       maxLength: 1000,
       description:
         "Street address of the place. Shown only when `name` is also set.",
-      example: "Keizersgracht 117, Amsterdam",
+      example: "1 Ferry Building, San Francisco, CA 94111",
     },
   },
   example: {
-    latitude: 52.3702,
-    longitude: 4.8952,
-    name: "Bird HQ",
-    address: "Keizersgracht 117, Amsterdam",
+    latitude: 37.7955,
+    longitude: -122.3937,
+    name: "Ferry Building",
+    address: "1 Ferry Building, San Francisco, CA 94111",
   },
 } as const;
 
@@ -9977,7 +10152,7 @@ export const WhatsAppMessageTemplateComponentParameterSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the file a media header shows. Send it on an `image`, `video`, `gif` or `document` parameter. WhatsApp fetches it at send time, so it must still be reachable then, the same way a free-form media message's `url` must.\n",
+        "Public `https` URL of the file a media header shows, fetched by WhatsApp at send time. Send it on an `image`, `video`, `gif` or `document` parameter.\n",
       example: "https://cdn.example.com/receipts/a1b2c3.png",
     },
     location: {
@@ -9993,7 +10168,7 @@ export const WhatsAppMessageTemplateComponentParameterSchema = {
       type: "string",
       minLength: 1,
       description:
-        "Required when the template declares named parameters: the placeholder this value fills (for example `first_name`), matching exactly one of the names the template declares. Name every parameter in that case; order does not matter once names are supplied. Omit this field for a positional template, which takes its values in `{{n}}` order instead. Sending the wrong set of names, or leaving one out that the template requires, returns a `422` `WhatsAppTemplateParameterMismatch`.\n",
+        "The placeholder this value fills, for a template with named parameters (for example `first_name`); name every parameter then. Omit it for a positional template, which takes values in `{{n}}` order.\n",
     },
   },
 } as const;
@@ -10050,12 +10225,12 @@ export const WhatsAppMessageTemplateComponentSchema = {
       minLength: 1,
       "x-extensible-enum": ["header", "body", "button", "carousel"],
       description:
-        "Which part of the template this fills in.\n\n- `body`: the main text.\n- `button`: a button's variable.\n- `header`: the header's text, media or location.\n- `carousel`: the cards.\n",
+        "Which part of the template this fills in.\n\n- `body`: the main text.\n- `button`: one button's variable, a part per button; there is no `buttons` part.\n- `header`: the header's text, media or location.\n- `carousel`: the cards.\n",
     },
     parameters: {
       type: "array",
       description:
-        "The values that fill this part's placeholders. A positional template takes them in `{{n}}` placeholder order; a template with named parameters requires each parameter's `name` to match one the template declares, and order then carries no meaning. Send it on every part except `carousel`, which carries its values on `cards`. Send no `button` part at all for a button that takes no value, such as a `quick_reply` or `request_contact_info` button, or a `url` button whose address has no placeholder: a part the template has no slot for is refused here, before the message is sent and charged.\n",
+        "The values for this part's placeholders, in `{{n}}` order unless the template names them. Send it on every part except `carousel`, which uses `cards`. Send no `button` part for a button that takes no value.\n",
       items: {
         $ref: "#/components/schemas/WhatsAppMessageTemplateComponentParameter",
       },
@@ -10065,7 +10240,7 @@ export const WhatsAppMessageTemplateComponentSchema = {
       minItems: 2,
       maxItems: 10,
       description:
-        "The values that fill each card of a carousel. Send it only on a `carousel` part. A carousel sends exactly the number of cards its template was approved with, so every card needs an entry.\n",
+        "Values for each carousel card, one entry per card the template was approved with. Send it only on a `carousel` part.\n",
       items: {
         $ref: "#/components/schemas/WhatsAppMessageTemplateCard",
       },
@@ -10110,7 +10285,7 @@ export const WhatsAppMessageTemplateSchema = {
       readOnly: true,
       description:
         "The canonical BCP-47 tag of the template variant that was sent.",
-      example: "pt-BR",
+      example: "en-US",
     },
     components: {
       type: "array",
@@ -10162,20 +10337,20 @@ export const WhatsAppMediaSchema = {
         },
       ],
       description:
-        "ID of the stored file, to pass as `media_id` when fetching it. Absent on an outbound message, whose file we never stored.\n",
+        "ID of the stored file, to pass as `media_id` when fetching it. Absent on a message sent through Bird, whose file we never stored.\n",
     },
     url: {
       type: "string",
       format: "uri",
       description:
-        "Where to fetch the media. On an inbound message this is a Bird URL you fetch with your API key; it is absent when the file could not be retrieved from WhatsApp. It stays populated after the stored bytes expire, and the link returns `410` from then on. On an outbound message it is the URL the sender supplied, whose availability is the sender's to guarantee.\n",
+        "Where to fetch the media. On an inbound message, or one from the WhatsApp Business app, this is a Bird URL you fetch with your API key; it is absent when the file could not be retrieved from WhatsApp. It stays populated after the stored bytes expire, and the link returns `410` from then on. On a message sent through Bird it is the URL the sender supplied, whose availability is the sender's to guarantee.\n",
       example:
         "https://platform.bird.com/v1/whatsapp/messages/wam_01kya19eknftrs2s6p82asmvnh/media/waf_01kyb2m4xq7whs0d8n3prv6tez",
     },
     mime_type: {
       type: "string",
       description:
-        "Media type WhatsApp reported for the file, for example `image/jpeg`. Absent on outbound messages.\n",
+        "Media type WhatsApp reported for the file, for example `image/jpeg`. Absent on messages sent through Bird.\n",
       example: "image/jpeg",
     },
   },
@@ -10941,7 +11116,7 @@ export const WhatsAppUnsupportedSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A message whose content we do not model, named so it is visible in the message log rather than arriving empty. Inbound only.\n",
+    "A message whose content we do not model, named so it is visible in the message log rather than arriving empty. Never on a message sent through Bird.\n",
   required: ["type"],
   properties: {
     type: {
@@ -11027,6 +11202,19 @@ export const ActorSchema = {
         "The label the actor is shown under: typically a member's name or email address, or the API key's name. Null when it could not be resolved.\n",
     },
   },
+} as const;
+
+export const WhatsAppMessageOriginSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "business_agent_echo",
+    "business_app_echo",
+    "history_sync",
+  ],
+  description:
+    "Where a message came from when it did not come through Bird live: its provenance. It does not say who answers the contact. On a number shared with the WhatsApp Business app, a message can come from the app while Bird keeps answering.\n\n- `business_agent_echo`: the Meta Business Agent on this number composed it.\n- `business_app_echo`: someone sent it from the WhatsApp Business app on a number shared with it.\n- `history_sync`: WhatsApp copied it, in either direction, from the WhatsApp Business app's chat history when the number was shared. `/v1/whatsapp/messages` does not return imported messages, so it never reports this value.\n",
+  example: "business_agent_echo",
 } as const;
 
 export const WhatsAppErrorCodeSchema = {
@@ -11240,7 +11428,7 @@ export const WhatsAppMessageSchema = {
         },
       ],
       description:
-        "Set when the contact sent content we do not model, naming the WhatsApp content type so the message is not silently empty. Inbound only.\n",
+        "Set when a message that did not come from a Bird send carries content we do not model, naming the WhatsApp content type so the message is not silently empty. Never on a message sent through Bird.\n",
     },
     reactions: {
       readOnly: true,
@@ -11258,6 +11446,16 @@ export const WhatsAppMessageSchema = {
           $ref: "#/components/schemas/WhatsAppMessageStatus",
         },
       ],
+    },
+    origin: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMessageOrigin",
+        },
+      ],
+      description:
+        "Where the message came from when it did not come through Bird live. Absent when your workspace sent the message through Bird, or the contact sent it to Bird.\n",
     },
     recipient_count: {
       type: "integer",
@@ -11390,13 +11588,13 @@ export const WhatsAppTemplateSendSchema = {
         },
       ],
       description:
-        "Which of the template's languages to send, as a BCP-47 tag (for example `en` or `pt-BR`); Meta's underscore form (`pt_BR`) is accepted and normalized. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not carry the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected. The accepted message echoes the canonical BCP-47 form of the language it resolved to, which is the language it is priced at: Meta categorizes each language separately, so a send served by a different language than the one you asked for is priced at that language's category.\n",
-      example: "pt-BR",
+        "Which of the template's languages to send, as a BCP-47 tag (for example `en-US`; Meta's `en_US` is accepted too). Omit it for the template's default language, unless the template sets `language_source_required`. A language the template lacks is handled by its `on_missing_language` setting. The message is priced at the language it resolves to, which the accepted message echoes.\n",
+      example: "en-US",
     },
     components: {
       type: "array",
       description:
-        "The values that fill the template's placeholders: one entry per content block that has placeholders, each carrying its `parameters`. A positional template takes its parameters in `{{n}}` order; a template with named parameters requires each parameter's `name` to match one the template declares. Either way, sending parameters that do not match what the template declares returns a `422` `WhatsAppTemplateParameterMismatch`.\n",
+        "Values for the template's placeholders. Build it from the template language's `components`: each block's `example_parameters`, with real values, becomes that part's `parameters`. A template's `buttons` block becomes one `button` part per button that has `example_parameters`, in order; a `carousel` becomes one `cards` entry per card, built the same way. A `location` header always needs a part with a `location` parameter. Leave out other blocks without any.\n",
       items: {
         $ref: "#/components/schemas/WhatsAppMessageTemplateComponent",
       },
@@ -11442,7 +11640,7 @@ export const WhatsAppTemplateSendSchema = {
             {
               type: "text",
               name: "amount",
-              text: "EUR 49.99",
+              text: "$49.99",
             },
           ],
         },
@@ -11494,7 +11692,7 @@ export const WhatsAppTextSendSchema = {
       type: "boolean",
       default: false,
       description:
-        "Whether the WhatsApp client renders a preview of the first URL in `body`. A URL must begin with `http://` or `https://`, only the first one is previewed, and the client falls back to a plain link when it cannot fetch a preview. Not returned when the message is read back, because WhatsApp does not report whether a preview rendered.\n",
+        "Whether the WhatsApp client previews the first link in `body`. Not returned when the message is read back.\n",
     },
   },
   example: {
@@ -11515,7 +11713,7 @@ export const WhatsAppImageSendSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the image. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch. JPEG and PNG only, up to 5 MB.\n",
+        "Public `https` URL of the image. WhatsApp fetches it at send time, so it must still be reachable then. JPEG or PNG, up to 5 MB.\n",
       example: "https://cdn.example.com/receipts/a1b2c3.png",
     },
     caption: {
@@ -11543,7 +11741,7 @@ export const WhatsAppVideoSendSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the video. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch. MP4 with H.264 video and AAC audio, up to 16 MB.\n",
+        "Public `https` URL of the video. WhatsApp fetches it at send time, so it must still be reachable then. MP4 with H.264 video and AAC audio, up to 16 MB.\n",
       example: "https://cdn.example.com/unboxing.mp4",
     },
     caption: {
@@ -11571,14 +11769,14 @@ export const WhatsAppAudioSendSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the audio file. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch. AAC, AMR, MP3, M4A and OGG (OPUS codec, mono) are supported, up to 16 MB.\n",
+        "Public `https` URL of the audio file. WhatsApp fetches it at send time, so it must still be reachable then. AAC, AMR, MP3, M4A or OGG (OPUS codec, mono), up to 16 MB.\n",
       example: "https://cdn.example.com/voice/9f2e4a.ogg",
     },
     voice: {
       type: "boolean",
       default: false,
       description:
-        "Whether to send this as a voice note rather than a basic audio message. A voice note auto-downloads, shows the sender's profile picture, and can be transcribed for the recipient. It requires an `.ogg` file encoded with the OPUS codec; any other format makes transcription fail. Leave it false for an ordinary audio attachment.\n",
+        "Whether to send this as a voice note rather than an audio file. A voice note needs an `.ogg` file encoded with the OPUS codec.\n",
     },
   },
   example: {
@@ -11599,7 +11797,7 @@ export const WhatsAppStickerSendSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the sticker. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch. WebP only: up to 100 KB for a static sticker and 500 KB for an animated one. A sticker carries no caption.\n",
+        "Public `https` URL of the sticker. WhatsApp fetches it at send time, so it must still be reachable then. WebP only, up to 100 KB static or 500 KB animated.\n",
       example: "https://cdn.example.com/stickers/thumbs-up.webp",
     },
   },
@@ -11620,7 +11818,7 @@ export const WhatsAppDocumentSendSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the document. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch. Up to 100 MB. PDF, Word, Excel, PowerPoint and plain text render reliably in the WhatsApp client; other file types are transmitted but WhatsApp does not support them.\n",
+        "Public `https` URL of the document. WhatsApp fetches it at send time, so it must still be reachable then. Up to 100 MB; PDF, Word, Excel, PowerPoint and plain text render reliably in the WhatsApp client.\n",
       example: "https://cdn.example.com/invoices/a1b2c3.pdf",
     },
     caption: {
@@ -11665,7 +11863,7 @@ export const WhatsAppInteractiveTypeWriteSchema = {
     "WhatsAppInteractiveTypeWriteRequestContactInfo",
   ],
   description:
-    "Which kind of interactive message to send.\n\n- `button`: up to three tappable buttons, each sending its own identifier\n  back as an inbound message. Carried in `buttons`.\n- `list`: a single button that opens a menu of rows to choose one from.\n- `cta_url`: a single button that opens a link, so the address stays out of\n  the message body.\n- `carousel`: 2 to 10 media cards the recipient scrolls through sideways,\n  each with its own buttons. Carried in `cards`.\n- `location_request_message`: a single button that asks the recipient to\n  share where they are. A tap arrives as an inbound `location` message.\n- `request_contact_info`: a single button that asks the recipient to share\n  their phone number. A tap arrives as an inbound message carrying the number\n  on `contact_cards`, with `origin` set to `contact_request`.\n\nThe last two name no field of their own: the ask is the whole message, and\n`body_text` is all they carry.\n\nClosed on the write side: a kind Bird cannot send to Meta is rejected rather\nthan accepted and then failed asynchronously.\n",
+    "Which kind of interactive message to send.\n\n- `button`: up to three tappable buttons, each sending its own identifier\n  back as an inbound message. Carried in `buttons`.\n- `list`: a single button that opens a menu of rows to choose one from.\n- `cta_url`: a single button that opens a link, so the address stays out of\n  the message body.\n- `carousel`: 2 to 10 media cards the recipient scrolls through sideways,\n  each with its own buttons. Carried in `cards`.\n- `location_request_message`: a single button that asks the recipient to\n  share where they are. A tap arrives as an inbound `location` message.\n- `request_contact_info`: a single button that asks the recipient to share\n  their phone number. A tap arrives as an inbound message carrying the number\n  on `contact_cards`, with `origin` set to `contact_request`.\n",
   example: "button",
 } as const;
 
@@ -11689,7 +11887,7 @@ export const WhatsAppInteractiveHeaderSendSchema = {
   additionalProperties: false,
   required: ["type"],
   description:
-    "What to show above an interactive message's body. `type` names the kind and the field that carries it: `text` for a line of copy, `url` for the file every other kind shows, the same pairing a template's `parameters` use. A `list` accepts a `text` header only, and any other kind on it is refused.\n",
+    "What to show above an interactive message's body: `text` for a line of copy, or `url` for an image, video or document. A `list` accepts a `text` header only.\n",
   oneOf: [
     {
       properties: {
@@ -11736,7 +11934,7 @@ export const WhatsAppInteractiveHeaderSendSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the file to show. Send it on an `image`, `video` or `document` header. An image must be JPEG or PNG, up to 5 MB; a video, MP4 with H.264 video and AAC audio, up to 16 MB; a document, up to 100 MB, and PDF, Word, Excel, PowerPoint and plain text render reliably in the WhatsApp client while other file types are transmitted but unsupported. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch.\n",
+        "Public `https` URL of the file to show on an `image`, `video` or `document` header, fetched by WhatsApp at send time. The free-form `image`, `video` and `document` limits apply.\n",
       example: "https://cdn.example.com/banners/workshop.png",
     },
   },
@@ -12132,7 +12330,7 @@ export const WhatsAppInteractiveSendSchema = {
   additionalProperties: false,
   required: ["type", "body_text"],
   description:
-    "An interactive message to send: body text plus something for the recipient to tap. Name the kind in `type` and carry that kind's field alongside it: `buttons`, `list`, `cta_url` or `cards`. The schema pins each `type` to its own field and bars the other kinds', so a request carrying a second kind's field alongside the right one is refused. `location_request_message` and `request_contact_info` name no field: each is a single button asking the recipient for something, so `body_text` is the whole message and every other kind's field is barred. Deliverable only inside an open 24-hour customer service window; outside one, send a template instead.\n",
+    "An interactive message: body text plus something for the recipient to tap. Name the kind in `type` and send that kind's field: `buttons`, `list`, `cta_url` or `cards`. `location_request_message` and `request_contact_info` carry only `body_text`.\n",
   oneOf: [
     {
       properties: {
@@ -12312,14 +12510,14 @@ export const WhatsAppInteractiveSendSchema = {
         },
       ],
       description:
-        "Optional content above the body. A `list` accepts a `text` header only; `button` and `cta_url` also accept an image, video or document. A `carousel` accepts none: its cards carry their own media. Neither request kind accepts one.\n",
+        "Optional content above the body: text on a `list`; text, image, video or document on `button` and `cta_url`. A `carousel` and the two request kinds take none.\n",
     },
     body_text: {
       type: "string",
       minLength: 1,
       maxLength: 4096,
       description:
-        "The message's main text, required on every kind, and the whole message on `location_request_message` and `request_contact_info`. The WhatsApp client turns any URL it contains into a clickable link. Only a `list` may use the full length; the other kinds cap it at 1024 characters.\n",
+        "The message's main text, required on every kind. Up to 1024 characters, except on a `list`.\n",
       example: "Your workshop is scheduled for 9am tomorrow.",
     },
     footer_text: {
@@ -12335,7 +12533,7 @@ export const WhatsAppInteractiveSendSchema = {
       minItems: 1,
       maxItems: 3,
       description:
-        "The buttons to show, in the order given. Send this on a `button` message, where every button is a `quick_reply`. Every label must be unique within the message; a repeat returns a `422` `WhatsAppInteractiveDuplicateLabel`.\n",
+        "The `quick_reply` buttons of a `button` message, in order. Labels must be unique within the message.\n",
       items: {
         $ref: "#/components/schemas/WhatsAppInteractiveButtonSend",
       },
@@ -12361,7 +12559,7 @@ export const WhatsAppInteractiveSendSchema = {
       minItems: 2,
       maxItems: 10,
       description:
-        "The cards to show, in the order they appear, left to right. Send this on a `carousel` message, with between 2 and 10 cards. The message's own `body_text` introduces them; a carousel carries no header and no footer of its own.\n",
+        "The cards of a `carousel` message, 2 to 10, left to right. A carousel takes no header or footer of its own.\n",
       items: {
         $ref: "#/components/schemas/WhatsAppInteractiveCardSend",
       },
@@ -12750,21 +12948,21 @@ export const WhatsAppMessageSendRequestSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A WhatsApp message to send. Carry exactly one kind of content: a request with none returns a `422` `WhatsAppContentRequired`, and one carrying more than one returns a `422` `WhatsAppContentAmbiguous`. The schema does not express that constraint, because which combinations are available depends on the content types your workspace can send.\n",
+    "A WhatsApp message to send, carrying exactly one kind of content.\n",
   required: ["to"],
   properties: {
     to: {
       type: "string",
       minLength: 1,
       description:
-        "The message recipient: a phone number in E.164 format (for example `+31612345678`), the recipient's business-scoped user ID (for example `US.13491208655302741918`), which addresses a WhatsApp user whose phone number you do not have, or a WhatsApp group ID (for example `wag_01krdgeqcxet5s7t44vh8rt9mg`), which sends to every participant of that group. A value that is none of these returns a `422` `WhatsAppInvalidRecipient`. One-time-passcode templates require a phone number and return a `422` `WhatsAppRecipientNotSupportedForTemplate` when sent to a business-scoped user ID. A group ID naming no group this workspace holds returns a `404` `WhatsAppGroupNotFound`, and one whose group is not active returns a `409` `WhatsAppGroupNotActive`. Content a group cannot take is refused ahead of both, so a group ID paired with interactive content returns the `422` below whether or not the group exists.\n",
-      example: "+31612345678",
+        "The recipient: a phone number in E.164 format (for example `+14155550100`), a business-scoped user ID (for example `US.13491208655302741918`) for a WhatsApp user whose number you do not have, or a WhatsApp group ID (for example `wag_01krdgeqcxet5s7t44vh8rt9mg`). One-time-passcode templates need a phone number. Bird tracks the customer service window per identity and business number, so reply to the identity a contact's message came from, from the number it reached.\n",
+      example: "+14155550100",
     },
     from: {
       type: "string",
       minLength: 1,
       description:
-        "The business phone number to send from, in E.164 format. Omit it for a Bird-managed template, which selects its own number from its category: setting it there returns a `422` `WhatsAppSenderNotAllowed`. Every other send, whether free-form content of any kind or a template your workspace authored, requires it, and the number must be one this workspace owns. Omitting it returns a `422` `WhatsAppSenderRequired`, and naming a number this workspace cannot send from returns a `422` `WhatsAppSenderNotFound`. Naming a number this workspace owns but that sits on a different WhatsApp Business Account than an authored template returns a `422` `WhatsAppSenderWABAMismatch`. A number this workspace holds but has not finished connecting returns a `422` `WhatsAppSenderNotConnected`. Omit it for a group send too: the group sends on its own number, so naming one returns a `422` `WhatsAppSenderNotAllowed`.\n",
+        "The business phone number to send from, in E.164 format: a connected number this workspace owns, on the same WhatsApp Business Account as an authored template. Omit it for a Bird-managed template or a group send, which use their own number; every other send requires it.\n",
       example: "+13124495648",
     },
     template: {
@@ -12774,7 +12972,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "The template to send. A Bird-managed template selects the sender number from the template's category, so `from` must be omitted. A template is the only content deliverable outside a customer service window. A group send takes a template your workspace authored in any category but authentication: WhatsApp does not deliver an authentication template to a group, which returns a `422` `WhatsAppGroupContentNotSupported`. A Bird-managed template sends from a Bird-owned number that no group is scoped to, so addressing one to a group returns a `422` `WhatsAppInvalidRecipient`.\n",
+        "The template to send, the only content deliverable outside the customer service window. A group takes only templates your workspace authored, outside the authentication category.\n",
     },
     text: {
       allOf: [
@@ -12783,7 +12981,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "Free-form text to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
+        "Free-form text. Deliverable only inside an open customer service window.",
     },
     image: {
       allOf: [
@@ -12792,7 +12990,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "A free-form image to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
+        "A free-form image. Deliverable only inside an open customer service window.",
     },
     video: {
       allOf: [
@@ -12801,7 +12999,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "A free-form video to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
+        "A free-form video. Deliverable only inside an open customer service window.",
     },
     audio: {
       allOf: [
@@ -12810,7 +13008,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "Free-form audio to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
+        "Free-form audio. Deliverable only inside an open customer service window.",
     },
     sticker: {
       allOf: [
@@ -12819,7 +13017,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "A free-form sticker to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
+        "A free-form sticker. Deliverable only inside an open customer service window.",
     },
     document: {
       allOf: [
@@ -12828,7 +13026,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "A free-form document to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
+        "A free-form document. Deliverable only inside an open customer service window.",
     },
     location: {
       allOf: [
@@ -12837,7 +13035,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "A free-form location to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.\n",
+        "A free-form location. Deliverable only inside an open customer service window.",
     },
     interactive: {
       allOf: [
@@ -12846,14 +13044,14 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "Free-form interactive content to send instead of a template: body text plus reply buttons, a menu, a link button, media cards, or a single button asking the recipient to share their location or their phone number. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`. WhatsApp does not deliver interactive content to a group, so a group recipient returns a `422` `WhatsAppGroupContentNotSupported`.\n",
+        "Free-form interactive content: reply buttons, a list menu, a link button, media cards, or a request for the recipient's location or contact details. Deliverable only inside an open customer service window, and never to a group.\n",
     },
     contact_cards: {
       type: "array",
       minItems: 1,
       maxItems: 5,
       description:
-        "Contact cards to send instead of a template. Up to five: WhatsApp accepts far more, and a message that opens as one name plus a count of the rest is not a card the recipient will read.\n",
+        "Up to five contact cards, each `name` carrying `formatted_name` plus at least one other part. Deliverable only inside an open customer service window.\n",
       items: {
         $ref: "#/components/schemas/WhatsAppContactCardSend",
       },
@@ -12865,7 +13063,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "Quote a message the contact will see above this one, the way replying in the WhatsApp client does. Name a message from the same conversation: one this workspace sent to this recipient, or received from them. Any content quotes, template or free-form. The quote is resolved before the send is accepted, so a quote WhatsApp cannot render fails this request rather than the message. An id naming no message this workspace holds, or one older than the 15 days we keep provider ids for, answers `404`; a message that never reached WhatsApp, or one from a different conversation than this send's `to` and `from`, answers `422`. Nothing is charged either way.\n",
+        "An earlier message to quote above this one: one from the same conversation, between this `to` and `from`, in the last 15 days.\n",
       example: "wam_01kya19eknftrs2s6p82asmvnh",
     },
     tags: {
@@ -16694,6 +16892,12 @@ export const WhatsAppNumberSchema = {
       description:
         "Whether WhatsApp grants this number Official Business Account status as of `meta_synced_at`. Absent until WhatsApp has reported it, and always absent for a number we operate on your behalf. WhatsApp grants the status per number, so two numbers on one WhatsApp Business Account can differ. The status also decides whether a rename is possible here: a number that has it cannot be renamed through `PATCH /v1/whatsapp/numbers/{number_id}/profile` at all, and has to be renamed through WhatsApp support instead.",
     },
+    is_on_business_app: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this number is also in use on the WhatsApp Business app, so the business keeps sending one-to-one messages from the app while you send through the API. Absent until WhatsApp has reported it, and always absent for a number we operate on your behalf.",
+    },
     meta_synced_at: {
       type: "string",
       format: "date-time",
@@ -18666,7 +18870,7 @@ export const AMBNativeQuickReplySchema = {
       minLength: 1,
       "x-sensitive": true,
       description:
-        "Text used for the device notification and shown in the transcript after the customer chooses an item. Send a separate text message to introduce the choices.",
+        "Text used for the device notification and shown in the transcript after the customer chooses an item. Automatic introductions through the enclosing content.body depend on regional activation and the send retry mode; see content.body. For an introduction independent of activation, send a separate text message and omit content.body from the quick reply.",
     },
     items: {
       type: "array",
@@ -18864,7 +19068,8 @@ export const AMBNativeEventSchema = {
     },
     title: {
       type: "string",
-      description: "Event title.",
+      description:
+        "Event title. Also supplies the title of each omitted received or reply bubble, where the 512-character bubble text limit applies. Supply both bubbles explicitly to use a longer event title.",
     },
   },
 } as const;
@@ -19830,7 +20035,7 @@ export const AMBNativeInteractiveContentSchema = {
     body: {
       type: "string",
       description:
-        "Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.",
+        "Automatic introductions for inline quick replies are enabled regionally in stages. When enabled for a new send containing `interactive_data.data.quick_reply`, a nonblank body is sent as separate text before the choices. Messages using `interactive_data_ref` do not receive this automatic introduction, even after activation. All parts belong to one message, which becomes sent after Apple accepts all parts. For referenced interactions, before activation, and for retries retaining legacy behavior, body is included in the interactive request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the quick reply. Omit body to send choices only. For list pickers, time pickers and forms, use interactive_data.received_message for the visible introduction. Use one U+FFFC object replacement character per attachment to control placement.",
       "x-sensitive": true,
     },
     subject: {
@@ -19967,7 +20172,8 @@ export const AMBNativeInboundListPickerSchema = {
       items: {
         $ref: "#/components/schemas/AMBNativeInboundListPickerSection",
       },
-      description: "Sections and selected rows returned by Apple.",
+      description:
+        "Sections returned by Apple. Sections can include unselected options; preserve their titles and item grouping.",
     },
   },
 } as const;
@@ -29670,6 +29876,34 @@ export const DomainCapabilitiesSchema = {
   },
 } as const;
 
+export const DomainReceivingStateSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 14,
+  enum: ["enabled", "disabling", "disable_failed", "disabled"],
+  description:
+    "Receiving control state, separate from DNS verification. `enabled` means receiving is configured; check `capabilities.inbound.status` for readiness. `disabling` means a request to turn off receiving is in progress. `disable_failed` means the latest attempt failed and can be retried. `disabled` means receiving is off and no longer blocks deletion.\n",
+} as const;
+
+export const DomainReceivingSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["state", "managed_elsewhere"],
+  description:
+    "Receiving state and whether it is managed from another workspace.",
+  properties: {
+    state: {
+      $ref: "#/components/schemas/DomainReceivingState",
+    },
+    managed_elsewhere: {
+      type: "boolean",
+      description:
+        "Receiving is assigned to another workspace in this organization. Its controls are unavailable in the current workspace. An authorized user must open the receiving workspace to turn it off.\n",
+    },
+  },
+} as const;
+
 export const DNSRecordSchema = {
   type: "object",
   additionalProperties: false,
@@ -29765,6 +29999,7 @@ export const DomainSchema = {
     "settings",
     "dkim",
     "capabilities",
+    "receiving",
     "dns_records",
     "created_at",
     "updated_at",
@@ -29829,6 +30064,10 @@ export const DomainSchema = {
     },
     capabilities: {
       $ref: "#/components/schemas/DomainCapabilities",
+    },
+    receiving: {
+      $ref: "#/components/schemas/DomainReceiving",
+      readOnly: true,
     },
     dns_records: {
       type: "array",
@@ -29986,7 +30225,7 @@ export const DomainInboundConfigSchema = {
     enabled: {
       type: "boolean",
       description:
-        "Set `true` to enable receiving on this domain, `false` to disable it. Disabling tears receiving down and removes the MX records from `dns_records`; this is immediate in the normal case, and if a step needs retrying the capability clears as soon as teardown finishes.\n",
+        "Set `true` to enable receiving on this domain, `false` to disable it. Read `receiving.state` to follow the request: `disabling` while receiving is turning off, `disable_failed` if the latest attempt failed, and `disabled` when it is off. Retry a failed request with `false`. Before deleting the domain or workspace, poll the domain until `capabilities.inbound.status` is `not_configured`. Its MX records remain in `dns_records` as optional. Receiving with an assigned workspace is managed there. Disabling from a sibling workspace returns `403`; re-enabling does not move the assigned receiver. A sibling also receives `403` if it re-enables while a request to turn off receiving is pending or has failed. `receiving.managed_elsewhere` identifies this restriction before a request. Older setups without a recorded receiver can be disabled from an authorized workspace sharing the domain; re-enabling records that workspace as the receiver.\n",
       example: true,
     },
   },
@@ -33719,6 +33958,7 @@ export const MailboxSchema = {
   required: [
     "id",
     "address",
+    "forwarding_address",
     "display_name",
     "default_reply_to",
     "receive_policy",
@@ -33748,6 +33988,14 @@ export const MailboxSchema = {
       readOnly: true,
       description: "The mailbox's email address. Immutable once created.",
       example: "concierge@inbox.ai",
+    },
+    forwarding_address: {
+      type: ["string", "null"],
+      format: "email",
+      readOnly: true,
+      description:
+        "An address we generate on our receiving domain when the mailbox is created on a domain not set up for receiving with us. Forward mail for `address` here from your current email provider, and it lands in this mailbox. Replies still go out from `address`. Immutable. It stops receiving while the mailbox is deleted, works again with the same value after a restore, and keeps working if you later enable receiving on the domain. `null` on mailboxes created on the shared domain or on a domain already enabled for receiving.",
+      example: "k7q2mzxw4h6p5ra3@eu1.inbound.bird.com",
     },
     display_name: {
       type: ["string", "null"],
@@ -33912,7 +34160,7 @@ export const MailboxCreateSchema = {
       maxLength: 255,
       default: "inbox.ai",
       description:
-        "The domain the address lives under. Defaults to `inbox.ai`, our shared mailbox domain. Creating a mailbox claims the shared address for your organization on a first-come, first-served basis. The address remains reserved to your organization after the mailbox is deleted. You can instead use one of your own domains enabled for receiving email.",
+        "The domain the address lives under. Defaults to `inbox.ai`, our shared mailbox domain. Creating a mailbox claims the shared address for your organization on a first-come, first-served basis. The address remains reserved to your organization after the mailbox is deleted. You can instead use one of your own domains. On a domain enabled for receiving, mail arrives directly. On a domain this workspace has verified (its `status` is `verified`) that is not set up for receiving, the mailbox gets a `forwarding_address`: forward mail for the address there from your current email provider, with no MX change. If another workspace receives the domain's mail, creation fails with `E17009`.",
       example: "mail.acme.com",
     },
     display_name: {
@@ -43123,19 +43371,19 @@ export const EsimStatusSchema = {
     "Lifecycle state of an eSIM. A pending state always settles: to its target on\nsuccess, or back to the prior status when the network definitively rejects\nthe change, reported by the `esim.operation_failed` event.\n\n- `provisioning`: the initial data package is being applied; install credentials may already be available.\n- `ready`: installable and usable, waiting for first network use; allows top-up orders and release. Activate before `ready_until` or the eSIM expires.\n- `activating`: an activation is being applied.\n- `active`: in service; the service period ends at `active_until`. Allows top-up orders, suspend, resync, and release.\n- `suspending`: a suspension was requested and is being applied.\n- `suspended`: data service is paused; allows resume and release.\n- `resuming`: a resume was requested and is being applied.\n- `releasing`: a permanent release is in progress.\n- `released`: permanently released; terminal.\n- `expired`: dormant. No data package has been live (each one depleted, expired, removed, or failed) for the expiry window. Not terminal: a completed top-up returns the eSIM to `active`, and release remains available. Balances and the installed profile are untouched.\n- `failed`: provisioning failed; any charge on the owning order is credited back automatically, reported by that order. Terminal.\n",
 } as const;
 
-export const EsimSubscriberIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^esub_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "esub_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
 export const EsimModeSchema = {
   type: "string",
   minLength: 1,
   enum: ["live", "test"],
   description:
     "Whether a purchase or eSIM is live or simulated. The mode is fixed when the order is created; the resulting eSIM retains it.\n\n- `live`: purchases service for use on a device and charges the wallet.\n- `test`: simulates a purchase without a charge or usable mobile service.\n\nList responses can include both modes. Filter by `mode` when separating test activity from live purchases.\n",
+} as const;
+
+export const EsimSubscriberIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^esub_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "esub_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const EsimServiceCapabilitySchema = {
@@ -44581,6 +44829,54 @@ export const CreateVoiceCallRequestSchema = {
   },
 } as const;
 
+export const VoiceDestinationDailySpendLimitSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["limit", "used", "remaining", "resets_at"],
+  properties: {
+    limit: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+      ],
+      description:
+        "The most your workspace can spend on calls to this country each day, in your organization's wallet currency. Calls are also held to the workspace's own daily limit, and whichever is reached first refuses the call.\n",
+    },
+    used: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Used toward today's limit for this country, including calls in progress. A call counts its expected cost when it starts; the part it did not use returns when it is billed. Null when today's usage cannot be read right now; the limit is still enforced.\n",
+    },
+    remaining: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "What is left of this country's limit today, never below zero. Null when today's usage cannot be read.",
+    },
+    resets_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When usage resets to zero, at midnight UTC.",
+      example: "2026-10-09T00:00:00Z",
+    },
+  },
+} as const;
+
 export const VoiceDestinationSchema = {
   type: "object",
   additionalProperties: false,
@@ -44590,6 +44886,7 @@ export const VoiceDestinationSchema = {
     "enabled",
     "status",
     "high_risk_destination",
+    "daily_spend_limit",
   ],
   properties: {
     country_code: {
@@ -44649,6 +44946,19 @@ export const VoiceDestinationSchema = {
         "Whether we treat this country as a high-risk calling destination.",
       readOnly: true,
     },
+    daily_spend_limit: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceDestinationDailySpendLimit",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Your workspace's daily spend limit for calls to this country and today's usage toward it. It applies whether or not the country is enabled, including to verification calls. Null when you have not set one, before your organization has a wallet, or while your wallet currency cannot be read; a limit you set is still enforced then.\n",
+      readOnly: true,
+    },
   },
 } as const;
 
@@ -44673,6 +44983,48 @@ export const VoiceDestinationListSchema = {
   },
 } as const;
 
+export const VoiceDestinationDailySpendLimitUpdateSchema = {
+  type: "object",
+  description:
+    "Sets or removes this country's daily spend limit; omit it to leave the limit unchanged. Once today's spend reaches the limit, new calls to the country are refused, verification calls included, whether or not it is enabled; a call already in progress is not cut off, so spend can pass the limit by what that call costs.\n",
+  additionalProperties: false,
+  required: ["limit"],
+  properties: {
+    limit: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The daily spend limit for calls to this country, in your organization's wallet currency, from zero up to the workspace's `max_limit` in Voice settings, with at most six decimal places. Setting an amount needs an organization wallet; removing one does not. Null removes it, so only the workspace's daily limit applies.\n",
+    },
+  },
+} as const;
+
+export const DestinationSettingSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["country_code"],
+  properties: {
+    country_code: {
+      $ref: "#/components/schemas/CountryCode",
+    },
+    enabled: {
+      type: "boolean",
+      description:
+        "Whether to enable (`true`) or disable (`false`) this destination country. Omit it to leave the country's enabled setting unchanged.\n",
+      example: true,
+    },
+    daily_spend_limit: {
+      $ref: "#/components/schemas/VoiceDestinationDailySpendLimitUpdate",
+    },
+  },
+} as const;
+
 export const VoiceDestinationsUpdateSchema = {
   type: "object",
   additionalProperties: false,
@@ -44684,7 +45036,7 @@ export const VoiceDestinationsUpdateSchema = {
         $ref: "#/components/schemas/DestinationSetting",
       },
       description:
-        "The destination countries to enable or disable. Only the countries listed here change; any country you do not list keeps its current setting.\n",
+        "The destination countries to change. Only the countries listed here change, and only the fields you send; anything else keeps its current setting. A country listed more than once takes its last `enabled`, but may set or remove `daily_spend_limit` only once. A limit can be set only on a country the Voice service supports; removing one accepts any country code. Otherwise the request is rejected and nothing changes.\n",
       example: [
         {
           country_code: "NL",
@@ -44693,6 +45045,12 @@ export const VoiceDestinationsUpdateSchema = {
         {
           country_code: "GB",
           enabled: false,
+          daily_spend_limit: {
+            limit: {
+              amount: "25.00",
+              currency_code: "EUR",
+            },
+          },
         },
       ],
     },
@@ -45386,12 +45744,51 @@ export const EsimRecurrenceModelSchema = {
   enum: ["calendar_month", "fixed_days"],
 } as const;
 
+export const EsimCheckoutFundingSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Current funding needed for this purchase, including tax and approved credit. The quoted price excludes tax; `total` includes tax for this purchase. This read reserves no funds; payment checks funding again. Test purchases have zero tax and total and are always covered.",
+  required: ["tax_amount", "total", "covered", "shortfall"],
+  properties: {
+    tax_amount: {
+      $ref: "#/components/schemas/Money",
+      description: "Tax included in the purchase total.",
+    },
+    total: {
+      $ref: "#/components/schemas/Money",
+      description: "Total wallet charge for this purchase, including tax.",
+    },
+    covered: {
+      type: "boolean",
+      description:
+        "Whether the wallet can currently cover this purchase after reservations and approved credit.",
+    },
+    shortfall: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Additional funds needed to cover this purchase, or null without organization billing read permission. Zero when covered is true.",
+    },
+  },
+} as const;
+
 export const EsimCheckoutOneTimeSchema = {
   type: "object",
   additionalProperties: false,
-  description: "Published one-time purchase terms before tax.",
-  required: ["offer_revision", "price"],
+  description:
+    "Published one-time price and current funding requirement. The `price` excludes tax; `funding.total` includes tax.",
+  required: ["offer_revision", "price", "funding"],
   properties: {
+    funding: {
+      $ref: "#/components/schemas/EsimCheckoutFunding",
+    },
     offer_revision: {
       type: "integer",
       minimum: 1,
@@ -45399,6 +45796,7 @@ export const EsimCheckoutOneTimeSchema = {
     },
     price: {
       $ref: "#/components/schemas/Money",
+      description: "Price before tax to accept when creating the order.",
     },
   },
 } as const;
@@ -45407,7 +45805,7 @@ export const EsimCheckoutRecurringQuoteSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Published recurring terms before tax. The first period starts when payment is funded, and cancellation stops future renewal while preserving paid packages.",
+    "Published recurring terms and current funding requirement. The `price` excludes tax; `funding.total` includes tax for the first period. The first period starts when payment is funded, and cancellation stops future renewal while preserving paid packages.",
   required: [
     "delivery_mode",
     "offer_revision",
@@ -45415,8 +45813,12 @@ export const EsimCheckoutRecurringQuoteSchema = {
     "price",
     "model",
     "interval_count",
+    "funding",
   ],
   properties: {
+    funding: {
+      $ref: "#/components/schemas/EsimCheckoutFunding",
+    },
     delivery_mode: {
       $ref: "#/components/schemas/EsimRecurrenceDeliveryMode",
     },
@@ -45433,6 +45835,7 @@ export const EsimCheckoutRecurringQuoteSchema = {
     },
     price: {
       $ref: "#/components/schemas/Money",
+      description: "Price before tax for the first period and each renewal.",
     },
     model: {
       $ref: "#/components/schemas/EsimRecurrenceModel",
@@ -46585,8 +46988,8 @@ export const EsimSettingsSchema = {
     credential_delivery_enabled: {
       type: "boolean",
       description:
-        "Whether Bird sends eSIM install credentials to travelers for this workspace. When `false`, sending an eSIM's credentials by email or SMS is refused; reading them from the API still works, so you can deliver them yourself. This governs the install message only. Your workspace's other email and SMS sending is unaffected. Defaults to `true`.\n",
-      example: true,
+        "Whether Bird automatically sends an install link after a new eSIM purchase with a linked contact. Uses the contact's email address, or SMS when only a phone number is available. Defaults to `false`. Manual install-link sends remain available regardless of this setting.\n",
+      example: false,
     },
   },
 } as const;
@@ -46600,7 +47003,7 @@ export const EsimSettingsUpdateSchema = {
     credential_delivery_enabled: {
       type: "boolean",
       description:
-        "Send `false` to stop Bird sending eSIM install credentials to travelers for this workspace, or `true` to allow it again. Credentials stay readable from the API either way.\n",
+        "Whether Bird automatically sends an install link after a new eSIM purchase with a linked contact. Uses the contact's email address, or SMS when only a phone number is available. Omit this field to retain the current value; a workspace without saved settings starts with `false`. Manual install-link sends remain available regardless of this setting.\n",
       example: false,
     },
   },
@@ -47574,6 +47977,13 @@ export const EmailBroadcastCountsWritableSchema = {
     "How many people a broadcast would reach right now, narrowing from everyone in the audience down to the ones it could actually be sent to.\n\nThese are live numbers, worked out at the moment you ask. Audience membership and suppressions change, so they can drift between now and when the broadcast sends.\n\n**They are about the audience, not about delivery, and sending does not change them.** Once the broadcast has sent, its own `recipient_count` is the number that actually went out, and what each of those recipients did with the message is in [the broadcast's recipients](/docs/api/reference/list-email-broadcast-recipients) and [its events](/docs/api/reference/list-email-broadcast-events). `status` is here so you can tell which question these numbers are answering, and `broadcast_id` names what they are about.\n",
 } as const;
 
+export const EmailBroadcastSendQuotaWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit.\n",
+} as const;
+
 export const EmailBroadcastClickedLinkListWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -47794,6 +48204,46 @@ export const ContactPropertyListWritableSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
+} as const;
+
+export const AudienceMembershipResponseWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "Exact audience membership at evaluation time. Membership is absent when the count is unavailable.",
+  properties: {
+    membership: {
+      $ref: "#/components/schemas/AudienceMembershipSummary",
+    },
+  },
+} as const;
+
+export const AudienceMembershipStatisticsResponseWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["period", "data"],
+  description:
+    "Daily membership observations in ascending UTC date order. Missing observations are explicit null gaps; changes between samples are unobserved.",
+  properties: {
+    period: {
+      description: "Requested UTC date window.",
+      allOf: [
+        {
+          $ref: "#/components/schemas/AudienceMembershipStatisticsPeriod",
+        },
+      ],
+    },
+    data: {
+      type: "array",
+      maxItems: 365,
+      items: {
+        $ref: "#/components/schemas/AudienceMembershipStatisticsPoint",
+      },
+      description: "One point for every requested date, including gaps.",
+    },
+  },
 } as const;
 
 export const AudienceMemberWritableSchema = {
@@ -48415,14 +48865,14 @@ export const WhatsAppMediaWritableSchema = {
       type: "string",
       format: "uri",
       description:
-        "Where to fetch the media. On an inbound message this is a Bird URL you fetch with your API key; it is absent when the file could not be retrieved from WhatsApp. It stays populated after the stored bytes expire, and the link returns `410` from then on. On an outbound message it is the URL the sender supplied, whose availability is the sender's to guarantee.\n",
+        "Where to fetch the media. On an inbound message, or one from the WhatsApp Business app, this is a Bird URL you fetch with your API key; it is absent when the file could not be retrieved from WhatsApp. It stays populated after the stored bytes expire, and the link returns `410` from then on. On a message sent through Bird it is the URL the sender supplied, whose availability is the sender's to guarantee.\n",
       example:
         "https://platform.bird.com/v1/whatsapp/messages/wam_01kya19eknftrs2s6p82asmvnh/media/waf_01kyb2m4xq7whs0d8n3prv6tez",
     },
     mime_type: {
       type: "string",
       description:
-        "Media type WhatsApp reported for the file, for example `image/jpeg`. Absent on outbound messages.\n",
+        "Media type WhatsApp reported for the file, for example `image/jpeg`. Absent on messages sent through Bird.\n",
       example: "image/jpeg",
     },
   },
@@ -50014,7 +50464,7 @@ export const AMBNativeInteractiveContentWritableSchema = {
     body: {
       type: "string",
       description:
-        "Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.",
+        "Automatic introductions for inline quick replies are enabled regionally in stages. When enabled for a new send containing `interactive_data.data.quick_reply`, a nonblank body is sent as separate text before the choices. Messages using `interactive_data_ref` do not receive this automatic introduction, even after activation. All parts belong to one message, which becomes sent after Apple accepts all parts. For referenced interactions, before activation, and for retries retaining legacy behavior, body is included in the interactive request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the quick reply. Omit body to send choices only. For list pickers, time pickers and forms, use interactive_data.received_message for the visible introduction. Use one U+FFFC object replacement character per attachment to control placement.",
       "x-sensitive": true,
     },
     subject: {
@@ -51672,6 +52122,25 @@ export const DomainCapabilitiesWritableSchema = {
       $ref: "#/components/schemas/DomainCapabilityWritable",
       description:
         "Inbound mail receiving. `not_configured` until receiving is enabled on this domain (see `DomainUpdate.inbound`), then `pending` while the published MX records are checked, and `verified` once they resolve to us. The MX records to publish are always listed under `dns_records` (`purpose: inbound_mx`) as a regional reference, even while this is `not_configured`: enabling is what actually starts delivery.\n",
+    },
+  },
+} as const;
+
+export const DomainReceivingWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["state", "managed_elsewhere"],
+  description:
+    "Receiving state and whether it is managed from another workspace.",
+  properties: {
+    state: {
+      $ref: "#/components/schemas/DomainReceivingState",
+    },
+    managed_elsewhere: {
+      type: "boolean",
+      description:
+        "Receiving is assigned to another workspace in this organization. Its controls are unavailable in the current workspace. An authorized user must open the receiving workspace to turn it off.\n",
     },
   },
 } as const;

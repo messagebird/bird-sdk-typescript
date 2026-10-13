@@ -10,7 +10,9 @@ import { BirdClient } from "@messagebird/sdk";
 const bird = new BirdClient({ apiKey: process.env.BIRD_API_KEY! });
 
 export async function audiencesCreate() {
-  const audience = await bird.audiences.create({ name: "Newsletter subscribers" });
+  const audience = await bird.audiences.create({
+    name: "Newsletter subscribers",
+  });
   console.log(audience.id); // "adn_…"
 }
 
@@ -20,7 +22,9 @@ export async function audiencesGet() {
 }
 
 export async function audiencesUpdate() {
-  await bird.audiences.update("adn_01krdgeqcxet5s7t44vh8rt9mg", { name: "Renamed" });
+  await bird.audiences.update("adn_01krdgeqcxet5s7t44vh8rt9mg", {
+    name: "Renamed",
+  });
 }
 
 export async function audiencesDelete() {
@@ -34,7 +38,9 @@ export async function audiencesList() {
 }
 
 export async function audiencesListContacts() {
-  for await (const member of bird.audiences.listContacts("adn_01krdgeqcxet5s7t44vh8rt9mg")) {
+  for await (const member of bird.audiences.listContacts(
+    "adn_01krdgeqcxet5s7t44vh8rt9mg",
+  )) {
     console.log(member.contact.id, member.joined_at);
   }
 }
@@ -56,4 +62,26 @@ export async function audiencesRemoveContact() {
     "adn_01krdgeqcxet5s7t44vh8rt9mg",
     "con_01krdgeqcxet5s7t44vh8rt9mg",
   );
+}
+
+export async function audiencesMembership() {
+  const result = await bird.audiences.membership(
+    "adn_01krdgeqcxet5s7t44vh8rt9mg",
+  );
+  if (result.membership) {
+    console.log(result.membership.total, result.membership.data_as_of);
+  }
+}
+
+export async function audiencesMembershipHistory() {
+  const history = await bird.audiences.membershipHistory(
+    "adn_01krdgeqcxet5s7t44vh8rt9mg",
+    {
+      from: "2026-10-09",
+      to: "2026-10-12",
+    },
+  );
+  for (const point of history.data) {
+    console.log(point.bucket, point.total, point.observed_at);
+  }
 }

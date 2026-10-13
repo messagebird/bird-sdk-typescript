@@ -2133,43 +2133,105 @@ export type EmailBroadcastCounts = {
 };
 
 /**
- * Which of the organization's email send allowances stops a send from reaching its whole audience.
+ * The email limit that prevents a broadcast from reaching its full audience.
  *
- * - `none`: every recipient is covered.
- * - `monthly`: the allowance that runs with the billing period.
- * - `daily`: the allowance that resets at the end of each UTC day.
+ * - `none`: the email send allowance covers every recipient.
+ * - `monthly`: the monthly email limit for the billing period.
+ * - `daily`: the daily email limit, which resets at the end of each UTC day.
  *
- * When both apply, the tighter of the two is reported.
+ * When both email limits apply, the response reports the more restrictive one. If you pass `send_at`, the check evaluates both at that time.
  *
  */
 export type EmailSendAllowanceWindow = "none" | "monthly" | "daily";
 
 /**
- * How much of a broadcast the organization's email send allowance covers, read before the broadcast is sent. The allowance is shared with every other email the organization sends, so `allowed` moves as those sends land, and `recipients` moves as audience membership and suppressions change. Treat both as a live estimate rather than a promise: a broadcast whose recipients all fit today can still run into the allowance if other sends consume it first.
+ * What sets the monthly email limit and how to raise it.
+ *
+ * - `plan`: the organization's monthly email limit. This is the plan's included volume unless we have set a different limit for the organization. If the limit matches the included volume, a plan with more included volume raises it. Otherwise, contact Bird support.
+ * - `overage_off`: email overage is turned off, so sending stops at the included volume. Turn email overage back on to raise the monthly email limit.
+ * - `overdue_payment`: an overdue payment pauses email overage, so sending stops at the included volume. Pay the overdue invoice to raise the monthly email limit.
+ * - `unfunded`: the wallet cannot cover email overage, or its funding cannot be confirmed, so sending stops at the included volume. Top up the wallet if it lacks funds. Email overage resumes once sufficient funding is confirmed.
+ * - `overage_ceiling`: email overage is billed up to a configured multiple of the included volume. A plan with more included volume raises the email overage ceiling.
+ * - `custom_limit`: we have set a monthly email limit for the organization that differs from the plan's included volume. Contact Bird support to change it. These limits currently report as `plan`. This enum value is declared in advance so reporting them as `custom_limit` will not be a breaking change.
+ *
+ */
+export type EmailSendAllowanceLimitReason =
+  | "plan"
+  | "overage_off"
+  | "overdue_payment"
+  | "unfunded"
+  | "overage_ceiling"
+  | "custom_limit";
+
+/**
+ * The organization's broadcast count allowance for the current window. This counts broadcasts rather than emails. The window is the billing period, or the UTC day when no current billing period is available.
+ *
+ * Sending or scheduling a draft uses one broadcast from the window current when you submit the request. The scheduled send time does not determine the window. Sending an already scheduled broadcast again uses no additional broadcast allowance. `send_at` on the send-quota request does not change this allowance.
+ *
+ */
+export type EmailBroadcastCountAllowance = {
+  /**
+   * Maximum number of broadcasts the organization can send in this window.
+   *
+   */
+  limit: number;
+  /**
+   * Number of broadcasts remaining in this window. At 0, you cannot send or schedule a draft.
+   *
+   */
+  remaining: number;
+  /**
+   * When the window ends and broadcast usage resets to 0. This is the end of the billing period, or the end of the UTC day when no current billing period is available.
+   *
+   */
+  resets_at: string;
+};
+
+/**
+ * The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.
+ *
+ * The organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.
+ *
+ * `limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit.
  *
  */
 export type EmailBroadcastSendQuota = {
   /**
-   * Number of contacts the broadcast would send to right now, after contacts without an email address and contacts suppressed for the broadcast's category are dropped. The same number the broadcast's audience counts report as sendable.
+   * Number of contacts the broadcast could reach now. Excludes contacts without an email address and contacts suppressed for the broadcast's category. Matches the sendable count from the broadcast's audience counts.
    *
    */
   readonly recipients: number;
   /**
-   * Number of those recipients the organization's email send allowance covers. Equal to `recipients` when nothing limits the send, and lower when part of the audience runs past what is left of it. A part-covered send goes out in whole batches, so this is cut back to a batch boundary rather than to the exact number of emails left: it can sit below `remaining` rather than matching it, and should be read rather than worked out from `limit` and `remaining`. 0 means none of them would go out, either because the audience is larger than the whole allowance, which is refused rather than sent in part, or because too little of the allowance is left to carry any of it.
+   * Number of recipients covered by the organization's email send allowance at `send_at`, or now if you omit it. Equals `recipients` when no email limit restricts the send. It is lower when the remaining allowance cannot cover the audience.
+   *
+   * Partially covered broadcasts send in whole batches. This count is rounded down to a batch boundary and can be lower than `remaining`. Read this value directly instead of calculating it from `limit` and `remaining`.
+   *
+   * A value of 0 means no recipients would receive the broadcast. This happens if the audience exceeds the full email limit, which rejects the send, or if the remaining allowance cannot cover a batch.
    *
    */
   readonly allowed: number;
   readonly limited_by: EmailSendAllowanceWindow;
   /**
-   * Size of the allowance named by `limited_by`, in emails. Omitted when nothing limits the send.
+   * The email limit identified by `limited_by`, in emails. Omitted when no email limit restricts the send.
    *
    */
   readonly limit?: number;
   /**
-   * How much of that allowance is left in the current window, in emails. Omitted when nothing limits the send.
+   * The allowance remaining under the email limit identified by `limited_by`, in emails, at `send_at`, or now if you omit it. If the window resets by `send_at`, the check uses its full allowance. Omitted when no email limit restricts the send.
    *
    */
   readonly remaining?: number;
+  /**
+   * When usage resets to 0 for the email limit identified by `limited_by`, evaluated at `send_at`, or now if you omit it.
+   *
+   * A broadcast sent before this time uses the same window and the allowance left after other sends. A broadcast sent at or after this time uses a new window. If `recipients` exceeds the full `limit`, the send is rejected in any window with that limit. Pass the later time as `send_at` to check whether the other email limit still restricts the send.
+   *
+   * Omitted when no email limit restricts the send, when the reset is at or before `send_at`, or when the billing period has ended and the next one has not started.
+   *
+   */
+  readonly resets_at?: string;
+  readonly limit_reason?: EmailSendAllowanceLimitReason;
+  readonly broadcasts?: EmailBroadcastCountAllowance;
 };
 
 /**
@@ -2712,6 +2774,77 @@ export type AudienceUpdateRequest = {
    * Longer description of who this audience is. Set to null to clear.
    */
   description?: string | null;
+};
+
+/**
+ * Exact count of all audience members at the source evaluation instant, including contacts without email and unsubscribed contacts.
+ */
+export type AudienceMembershipSummary = {
+  /**
+   * Number of members at evaluation time.
+   */
+  total: number;
+  /**
+   * Source evaluation instant for the live count. Membership changes committed after the read began appear in a later response.
+   */
+  data_as_of: string;
+};
+
+/**
+ * Exact audience membership at evaluation time. Membership is absent when the count is unavailable.
+ */
+export type AudienceMembershipResponse = {
+  membership?: AudienceMembershipSummary;
+};
+
+/**
+ * Inclusive UTC date window for daily membership observations. Snapshots do not establish continuous freshness; data_as_of is always null.
+ */
+export type AudienceMembershipStatisticsPeriod = {
+  /**
+   * Inclusive first UTC date.
+   */
+  from: string;
+  /**
+   * Inclusive last UTC date.
+   */
+  to: string;
+  /**
+   * Always null. Use each point's observed_at for its actual observation instant.
+   */
+  data_as_of: string | null;
+};
+
+/**
+ * First successful membership observation for a UTC date. Both total and observed_at are null when no retained observation exists; a successful empty audience has total zero.
+ */
+export type AudienceMembershipStatisticsPoint = {
+  /**
+   * UTC date of the observation, or the requested date for a gap.
+   */
+  bucket: string;
+  /**
+   * Exact number of all members at observation time, or null for a gap.
+   */
+  total: number | null;
+  /**
+   * Actual source observation instant, or null for a gap. This is not a day-close count.
+   */
+  observed_at: string | null;
+};
+
+/**
+ * Daily membership observations in ascending UTC date order. Missing observations are explicit null gaps; changes between samples are unobserved.
+ */
+export type AudienceMembershipStatisticsResponse = {
+  /**
+   * Requested UTC date window.
+   */
+  period: AudienceMembershipStatisticsPeriod;
+  /**
+   * One point for every requested date, including gaps.
+   */
+  data: Array<AudienceMembershipStatisticsPoint>;
 };
 
 export type AudienceMember = {
@@ -4783,14 +4916,6 @@ export type SmsInboundStatsByNumberResponse = {
  */
 export type DestinationSuperRegion = string | null;
 
-export type DestinationSetting = {
-  country_code: CountryCode;
-  /**
-   * Whether to enable (`true`) or disable (`false`) this destination country.
-   */
-  enabled: boolean;
-};
-
 /**
  * Identifier of a number allocated to your workspace, as returned in the id field of `GET /v1/numbers`.
  */
@@ -5614,7 +5739,7 @@ export type WhatsAppMessageTemplateComponentParameter = {
    */
   text?: string;
   /**
-   * Public `https` URL of the file a media header shows. Send it on an `image`, `video`, `gif` or `document` parameter. WhatsApp fetches it at send time, so it must still be reachable then, the same way a free-form media message's `url` must.
+   * Public `https` URL of the file a media header shows, fetched by WhatsApp at send time. Send it on an `image`, `video`, `gif` or `document` parameter.
    *
    */
   url?: string;
@@ -5623,7 +5748,7 @@ export type WhatsAppMessageTemplateComponentParameter = {
    */
   location?: WhatsAppLocationSend;
   /**
-   * Required when the template declares named parameters: the placeholder this value fills (for example `first_name`), matching exactly one of the names the template declares. Name every parameter in that case; order does not matter once names are supplied. Omit this field for a positional template, which takes its values in `{{n}}` order instead. Sending the wrong set of names, or leaving one out that the template requires, returns a `422` `WhatsAppTemplateParameterMismatch`.
+   * The placeholder this value fills, for a template with named parameters (for example `first_name`); name every parameter then. Omit it for a positional template, which takes values in `{{n}}` order.
    *
    */
   name?: string;
@@ -5664,19 +5789,19 @@ export type WhatsAppMessageTemplateComponent = {
    * Which part of the template this fills in.
    *
    * - `body`: the main text.
-   * - `button`: a button's variable.
+   * - `button`: one button's variable, a part per button; there is no `buttons` part.
    * - `header`: the header's text, media or location.
    * - `carousel`: the cards.
    *
    */
   type: string;
   /**
-   * The values that fill this part's placeholders. A positional template takes them in `{{n}}` placeholder order; a template with named parameters requires each parameter's `name` to match one the template declares, and order then carries no meaning. Send it on every part except `carousel`, which carries its values on `cards`. Send no `button` part at all for a button that takes no value, such as a `quick_reply` or `request_contact_info` button, or a `url` button whose address has no placeholder: a part the template has no slot for is refused here, before the message is sent and charged.
+   * The values for this part's placeholders, in `{{n}}` order unless the template names them. Send it on every part except `carousel`, which uses `cards`. Send no `button` part for a button that takes no value.
    *
    */
   parameters?: Array<WhatsAppMessageTemplateComponentParameter>;
   /**
-   * The values that fill each card of a carousel. Send it only on a `carousel` part. A carousel sends exactly the number of cards its template was approved with, so every card needs an entry.
+   * Values for each carousel card, one entry per card the template was approved with. Send it only on a `carousel` part.
    *
    */
   cards?: Array<WhatsAppMessageTemplateCard>;
@@ -5724,17 +5849,17 @@ export type WhatsAppFileId = string;
  */
 export type WhatsAppMedia = {
   /**
-   * ID of the stored file, to pass as `media_id` when fetching it. Absent on an outbound message, whose file we never stored.
+   * ID of the stored file, to pass as `media_id` when fetching it. Absent on a message sent through Bird, whose file we never stored.
    *
    */
   readonly id?: WhatsAppFileId;
   /**
-   * Where to fetch the media. On an inbound message this is a Bird URL you fetch with your API key; it is absent when the file could not be retrieved from WhatsApp. It stays populated after the stored bytes expire, and the link returns `410` from then on. On an outbound message it is the URL the sender supplied, whose availability is the sender's to guarantee.
+   * Where to fetch the media. On an inbound message, or one from the WhatsApp Business app, this is a Bird URL you fetch with your API key; it is absent when the file could not be retrieved from WhatsApp. It stays populated after the stored bytes expire, and the link returns `410` from then on. On a message sent through Bird it is the URL the sender supplied, whose availability is the sender's to guarantee.
    *
    */
   url?: string;
   /**
-   * Media type WhatsApp reported for the file, for example `image/jpeg`. Absent on outbound messages.
+   * Media type WhatsApp reported for the file, for example `image/jpeg`. Absent on messages sent through Bird.
    *
    */
   mime_type?: string;
@@ -6222,7 +6347,7 @@ export type WhatsAppInteractiveReply = {
 };
 
 /**
- * A message whose content we do not model, named so it is visible in the message log rather than arriving empty. Inbound only.
+ * A message whose content we do not model, named so it is visible in the message log rather than arriving empty. Never on a message sent through Bird.
  *
  */
 export type WhatsAppUnsupported = {
@@ -6272,6 +6397,17 @@ export type Actor = {
    */
   readonly display_name?: string | null;
 };
+
+/**
+ * Where a message came from when it did not come through Bird live: its provenance. It does not say who answers the contact. On a number shared with the WhatsApp Business app, a message can come from the app while Bird keeps answering.
+ *
+ * - `business_agent_echo`: the Meta Business Agent on this number composed it.
+ * - `business_app_echo`: someone sent it from the WhatsApp Business app on a number shared with it.
+ * - `history_sync`: WhatsApp copied it, in either direction, from the WhatsApp Business app's chat history when the number was shared. `/v1/whatsapp/messages` does not return imported messages, so it never reports this value.
+ *
+ */
+export type WhatsAppMessageOrigin =
+  "business_agent_echo" | "business_app_echo" | "history_sync" | (string & {});
 
 /**
  * Standardized failure reason:
@@ -6389,7 +6525,7 @@ export type WhatsAppMessage = {
    */
   readonly interactive_reply?: WhatsAppInteractiveReply;
   /**
-   * Set when the contact sent content we do not model, naming the WhatsApp content type so the message is not silently empty. Inbound only.
+   * Set when a message that did not come from a Bird send carries content we do not model, naming the WhatsApp content type so the message is not silently empty. Never on a message sent through Bird.
    *
    */
   readonly unsupported?: WhatsAppUnsupported;
@@ -6399,6 +6535,11 @@ export type WhatsAppMessage = {
    */
   readonly reactions?: Array<WhatsAppReaction>;
   readonly status: WhatsAppMessageStatus;
+  /**
+   * Where the message came from when it did not come through Bird live. Absent when your workspace sent the message through Bird, or the contact sent it to Bird.
+   *
+   */
+  readonly origin?: WhatsAppMessageOrigin;
   /**
    * How many recipients a group send was addressed to, taken when the send
    * was accepted. It is the group's membership at that moment, not its
@@ -6503,12 +6644,12 @@ export type WhatsAppTemplateSend = unknown & {
    */
   slug?: TemplateSlug;
   /**
-   * Which of the template's languages to send, as a BCP-47 tag (for example `en` or `pt-BR`); Meta's underscore form (`pt_BR`) is accepted and normalized. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not carry the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected. The accepted message echoes the canonical BCP-47 form of the language it resolved to, which is the language it is priced at: Meta categorizes each language separately, so a send served by a different language than the one you asked for is priced at that language's category.
+   * Which of the template's languages to send, as a BCP-47 tag (for example `en-US`; Meta's `en_US` is accepted too). Omit it for the template's default language, unless the template sets `language_source_required`. A language the template lacks is handled by its `on_missing_language` setting. The message is priced at the language it resolves to, which the accepted message echoes.
    *
    */
   language?: LanguageTag;
   /**
-   * The values that fill the template's placeholders: one entry per content block that has placeholders, each carrying its `parameters`. A positional template takes its parameters in `{{n}}` order; a template with named parameters requires each parameter's `name` to match one the template declares. Either way, sending parameters that do not match what the template declares returns a `422` `WhatsAppTemplateParameterMismatch`.
+   * Values for the template's placeholders. Build it from the template language's `components`: each block's `example_parameters`, with real values, becomes that part's `parameters`. A template's `buttons` block becomes one `button` part per button that has `example_parameters`, in order; a `carousel` becomes one `cards` entry per card, built the same way. A `location` header always needs a part with a `location` parameter. Leave out other blocks without any.
    *
    */
   components?: Array<WhatsAppMessageTemplateComponent>;
@@ -6525,7 +6666,7 @@ export type WhatsAppTextSend = {
    */
   body: string;
   /**
-   * Whether the WhatsApp client renders a preview of the first URL in `body`. A URL must begin with `http://` or `https://`, only the first one is previewed, and the client falls back to a plain link when it cannot fetch a preview. Not returned when the message is read back, because WhatsApp does not report whether a preview rendered.
+   * Whether the WhatsApp client previews the first link in `body`. Not returned when the message is read back.
    *
    */
   preview_url?: boolean;
@@ -6537,7 +6678,7 @@ export type WhatsAppTextSend = {
  */
 export type WhatsAppImageSend = {
   /**
-   * Public `https` URL of the image. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch. JPEG and PNG only, up to 5 MB.
+   * Public `https` URL of the image. WhatsApp fetches it at send time, so it must still be reachable then. JPEG or PNG, up to 5 MB.
    *
    */
   url: string;
@@ -6553,7 +6694,7 @@ export type WhatsAppImageSend = {
  */
 export type WhatsAppVideoSend = {
   /**
-   * Public `https` URL of the video. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch. MP4 with H.264 video and AAC audio, up to 16 MB.
+   * Public `https` URL of the video. WhatsApp fetches it at send time, so it must still be reachable then. MP4 with H.264 video and AAC audio, up to 16 MB.
    *
    */
   url: string;
@@ -6569,12 +6710,12 @@ export type WhatsAppVideoSend = {
  */
 export type WhatsAppAudioSend = {
   /**
-   * Public `https` URL of the audio file. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch. AAC, AMR, MP3, M4A and OGG (OPUS codec, mono) are supported, up to 16 MB.
+   * Public `https` URL of the audio file. WhatsApp fetches it at send time, so it must still be reachable then. AAC, AMR, MP3, M4A or OGG (OPUS codec, mono), up to 16 MB.
    *
    */
   url: string;
   /**
-   * Whether to send this as a voice note rather than a basic audio message. A voice note auto-downloads, shows the sender's profile picture, and can be transcribed for the recipient. It requires an `.ogg` file encoded with the OPUS codec; any other format makes transcription fail. Leave it false for an ordinary audio attachment.
+   * Whether to send this as a voice note rather than an audio file. A voice note needs an `.ogg` file encoded with the OPUS codec.
    *
    */
   voice?: boolean;
@@ -6586,7 +6727,7 @@ export type WhatsAppAudioSend = {
  */
 export type WhatsAppStickerSend = {
   /**
-   * Public `https` URL of the sticker. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch. WebP only: up to 100 KB for a static sticker and 500 KB for an animated one. A sticker carries no caption.
+   * Public `https` URL of the sticker. WhatsApp fetches it at send time, so it must still be reachable then. WebP only, up to 100 KB static or 500 KB animated.
    *
    */
   url: string;
@@ -6598,7 +6739,7 @@ export type WhatsAppStickerSend = {
  */
 export type WhatsAppDocumentSend = {
   /**
-   * Public `https` URL of the document. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch. Up to 100 MB. PDF, Word, Excel, PowerPoint and plain text render reliably in the WhatsApp client; other file types are transmitted but WhatsApp does not support them.
+   * Public `https` URL of the document. WhatsApp fetches it at send time, so it must still be reachable then. Up to 100 MB; PDF, Word, Excel, PowerPoint and plain text render reliably in the WhatsApp client.
    *
    */
   url: string;
@@ -6628,12 +6769,6 @@ export type WhatsAppDocumentSend = {
  * - `request_contact_info`: a single button that asks the recipient to share
  * their phone number. A tap arrives as an inbound message carrying the number
  * on `contact_cards`, with `origin` set to `contact_request`.
- *
- * The last two name no field of their own: the ask is the whole message, and
- * `body_text` is all they carry.
- *
- * Closed on the write side: a kind Bird cannot send to Meta is rejected rather
- * than accepted and then failed asynchronously.
  *
  */
 export type WhatsAppInteractiveTypeWrite =
@@ -6670,7 +6805,7 @@ export type WhatsAppInteractiveHeaderSend = (
    */
   text?: string;
   /**
-   * Public `https` URL of the file to show. Send it on an `image`, `video` or `document` header. An image must be JPEG or PNG, up to 5 MB; a video, MP4 with H.264 video and AAC audio, up to 16 MB; a document, up to 100 MB, and PDF, Word, Excel, PowerPoint and plain text render reliably in the WhatsApp client while other file types are transmitted but unsupported. WhatsApp fetches it at send time, so it must still be reachable then: a signed URL has to outlive the send. We do not store or proxy the file. WhatsApp caches a fetched URL for 10 minutes and re-serves that copy for an identical URL sent again within the window; vary the URL to force a re-fetch.
+   * Public `https` URL of the file to show on an `image`, `video` or `document` header, fetched by WhatsApp at send time. The free-form `image`, `video` and `document` limits apply.
    *
    */
   url?: string;
@@ -6904,12 +7039,12 @@ export type WhatsAppInteractiveSend = (
    */
   type: WhatsAppInteractiveTypeWrite;
   /**
-   * Optional content above the body. A `list` accepts a `text` header only; `button` and `cta_url` also accept an image, video or document. A `carousel` accepts none: its cards carry their own media. Neither request kind accepts one.
+   * Optional content above the body: text on a `list`; text, image, video or document on `button` and `cta_url`. A `carousel` and the two request kinds take none.
    *
    */
   header?: WhatsAppInteractiveHeaderSend;
   /**
-   * The message's main text, required on every kind, and the whole message on `location_request_message` and `request_contact_info`. The WhatsApp client turns any URL it contains into a clickable link. Only a `list` may use the full length; the other kinds cap it at 1024 characters.
+   * The message's main text, required on every kind. Up to 1024 characters, except on a `list`.
    *
    */
   body_text: string;
@@ -6919,7 +7054,7 @@ export type WhatsAppInteractiveSend = (
    */
   footer_text?: string;
   /**
-   * The buttons to show, in the order given. Send this on a `button` message, where every button is a `quick_reply`. Every label must be unique within the message; a repeat returns a `422` `WhatsAppInteractiveDuplicateLabel`.
+   * The `quick_reply` buttons of a `button` message, in order. Labels must be unique within the message.
    *
    */
   buttons?: Array<WhatsAppInteractiveButtonSend>;
@@ -6932,7 +7067,7 @@ export type WhatsAppInteractiveSend = (
    */
   cta_url?: WhatsAppInteractiveCtaUrlSend;
   /**
-   * The cards to show, in the order they appear, left to right. Send this on a `carousel` message, with between 2 and 10 cards. The message's own `body_text` introduces them; a carousel carries no header and no footer of its own.
+   * The cards of a `carousel` message, 2 to 10, left to right. A carousel takes no header or footer of its own.
    *
    */
   cards?: Array<WhatsAppInteractiveCardSend>;
@@ -7054,72 +7189,65 @@ export type WhatsAppContactCardSend = {
 };
 
 /**
- * A WhatsApp message to send. Carry exactly one kind of content: a request with none returns a `422` `WhatsAppContentRequired`, and one carrying more than one returns a `422` `WhatsAppContentAmbiguous`. The schema does not express that constraint, because which combinations are available depends on the content types your workspace can send.
+ * A WhatsApp message to send, carrying exactly one kind of content.
  *
  */
 export type WhatsAppMessageSendRequest = {
   /**
-   * The message recipient: a phone number in E.164 format (for example `+31612345678`), the recipient's business-scoped user ID (for example `US.13491208655302741918`), which addresses a WhatsApp user whose phone number you do not have, or a WhatsApp group ID (for example `wag_01krdgeqcxet5s7t44vh8rt9mg`), which sends to every participant of that group. A value that is none of these returns a `422` `WhatsAppInvalidRecipient`. One-time-passcode templates require a phone number and return a `422` `WhatsAppRecipientNotSupportedForTemplate` when sent to a business-scoped user ID. A group ID naming no group this workspace holds returns a `404` `WhatsAppGroupNotFound`, and one whose group is not active returns a `409` `WhatsAppGroupNotActive`. Content a group cannot take is refused ahead of both, so a group ID paired with interactive content returns the `422` below whether or not the group exists.
+   * The recipient: a phone number in E.164 format (for example `+14155550100`), a business-scoped user ID (for example `US.13491208655302741918`) for a WhatsApp user whose number you do not have, or a WhatsApp group ID (for example `wag_01krdgeqcxet5s7t44vh8rt9mg`). One-time-passcode templates need a phone number. Bird tracks the customer service window per identity and business number, so reply to the identity a contact's message came from, from the number it reached.
    *
    */
   to: string;
   /**
-   * The business phone number to send from, in E.164 format. Omit it for a Bird-managed template, which selects its own number from its category: setting it there returns a `422` `WhatsAppSenderNotAllowed`. Every other send, whether free-form content of any kind or a template your workspace authored, requires it, and the number must be one this workspace owns. Omitting it returns a `422` `WhatsAppSenderRequired`, and naming a number this workspace cannot send from returns a `422` `WhatsAppSenderNotFound`. Naming a number this workspace owns but that sits on a different WhatsApp Business Account than an authored template returns a `422` `WhatsAppSenderWABAMismatch`. A number this workspace holds but has not finished connecting returns a `422` `WhatsAppSenderNotConnected`. Omit it for a group send too: the group sends on its own number, so naming one returns a `422` `WhatsAppSenderNotAllowed`.
+   * The business phone number to send from, in E.164 format: a connected number this workspace owns, on the same WhatsApp Business Account as an authored template. Omit it for a Bird-managed template or a group send, which use their own number; every other send requires it.
    *
    */
   from?: string;
   /**
-   * The template to send. A Bird-managed template selects the sender number from the template's category, so `from` must be omitted. A template is the only content deliverable outside a customer service window. A group send takes a template your workspace authored in any category but authentication: WhatsApp does not deliver an authentication template to a group, which returns a `422` `WhatsAppGroupContentNotSupported`. A Bird-managed template sends from a Bird-owned number that no group is scoped to, so addressing one to a group returns a `422` `WhatsAppInvalidRecipient`.
+   * The template to send, the only content deliverable outside the customer service window. A group takes only templates your workspace authored, outside the authentication category.
    *
    */
   template?: WhatsAppTemplateSend;
   /**
-   * Free-form text to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.
-   *
+   * Free-form text. Deliverable only inside an open customer service window.
    */
   text?: WhatsAppTextSend;
   /**
-   * A free-form image to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.
-   *
+   * A free-form image. Deliverable only inside an open customer service window.
    */
   image?: WhatsAppImageSend;
   /**
-   * A free-form video to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.
-   *
+   * A free-form video. Deliverable only inside an open customer service window.
    */
   video?: WhatsAppVideoSend;
   /**
-   * Free-form audio to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.
-   *
+   * Free-form audio. Deliverable only inside an open customer service window.
    */
   audio?: WhatsAppAudioSend;
   /**
-   * A free-form sticker to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.
-   *
+   * A free-form sticker. Deliverable only inside an open customer service window.
    */
   sticker?: WhatsAppStickerSend;
   /**
-   * A free-form document to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.
-   *
+   * A free-form document. Deliverable only inside an open customer service window.
    */
   document?: WhatsAppDocumentSend;
   /**
-   * A free-form location to send instead of a template. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`.
-   *
+   * A free-form location. Deliverable only inside an open customer service window.
    */
   location?: WhatsAppLocationSend;
   /**
-   * Free-form interactive content to send instead of a template: body text plus reply buttons, a menu, a link button, media cards, or a single button asking the recipient to share their location or their phone number. Deliverable only inside an open 24-hour customer service window, which the contact opens by messaging or calling you and resets each time they do it again. A send into a closed window is refused with a `422` `WhatsAppServiceWindowClosed` before anything is created or charged; one whose window closes between accept and dispatch fails asynchronously, with `service_window_expired` on the message's `last_error`. WhatsApp does not deliver interactive content to a group, so a group recipient returns a `422` `WhatsAppGroupContentNotSupported`.
+   * Free-form interactive content: reply buttons, a list menu, a link button, media cards, or a request for the recipient's location or contact details. Deliverable only inside an open customer service window, and never to a group.
    *
    */
   interactive?: WhatsAppInteractiveSend;
   /**
-   * Contact cards to send instead of a template. Up to five: WhatsApp accepts far more, and a message that opens as one name plus a count of the rest is not a card the recipient will read.
+   * Up to five contact cards, each `name` carrying `formatted_name` plus at least one other part. Deliverable only inside an open customer service window.
    *
    */
   contact_cards?: Array<WhatsAppContactCardSend>;
   /**
-   * Quote a message the contact will see above this one, the way replying in the WhatsApp client does. Name a message from the same conversation: one this workspace sent to this recipient, or received from them. Any content quotes, template or free-form. The quote is resolved before the send is accepted, so a quote WhatsApp cannot render fails this request rather than the message. An id naming no message this workspace holds, or one older than the 15 days we keep provider ids for, answers `404`; a message that never reached WhatsApp, or one from a different conversation than this send's `to` and `from`, answers `422`. Nothing is charged either way.
+   * An earlier message to quote above this one: one from the same conversation, between this `to` and `from`, in the last 15 days.
    *
    */
   in_reply_to_message_id?: WhatsAppMessageId;
@@ -9259,6 +9387,10 @@ export type WhatsAppNumber = {
    */
   readonly is_official_business_account?: boolean;
   /**
+   * Whether this number is also in use on the WhatsApp Business app, so the business keeps sending one-to-one messages from the app while you send through the API. Absent until WhatsApp has reported it, and always absent for a number we operate on your behalf.
+   */
+  readonly is_on_business_app?: boolean;
+  /**
    * When this number's state was last read from WhatsApp. `status`, `quality_rating`, `messaging_limit`, `throughput_level`, and `is_official_business_account` all belong to that reading rather than representing live values. We re-read roughly hourly, so a change at WhatsApp can be up to an hour old here. Absent for a number we have never read back and for a number we operate on your behalf.
    */
   readonly meta_synced_at?: string;
@@ -10231,7 +10363,7 @@ export type AmbQuickReplyItem = {
 
 export type AmbNativeQuickReply = {
   /**
-   * Text used for the device notification and shown in the transcript after the customer chooses an item. Send a separate text message to introduce the choices.
+   * Text used for the device notification and shown in the transcript after the customer chooses an item. Automatic introductions through the enclosing content.body depend on regional activation and the send retry mode; see content.body. For an introduction independent of activation, send a separate text message and omit content.body from the quick reply.
    */
   summary_text: string;
   /**
@@ -10345,7 +10477,7 @@ export type AmbNativeEvent = {
    */
   image_identifier?: string;
   /**
-   * Event title.
+   * Event title. Also supplies the title of each omitted received or reply bubble, where the 512-character bubble text limit applies. Supply both bubbles explicitly to use a longer event title.
    */
   title?: string;
 };
@@ -10659,7 +10791,7 @@ export type AmbNativeInteractiveContent = unknown & {
    */
   type: AmbMessageType;
   /**
-   * Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.
+   * Automatic introductions for inline quick replies are enabled regionally in stages. When enabled for a new send containing `interactive_data.data.quick_reply`, a nonblank body is sent as separate text before the choices. Messages using `interactive_data_ref` do not receive this automatic introduction, even after activation. All parts belong to one message, which becomes sent after Apple accepts all parts. For referenced interactions, before activation, and for retries retaining legacy behavior, body is included in the interactive request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the quick reply. Omit body to send choices only. For list pickers, time pickers and forms, use interactive_data.received_message for the visible introduction. Use one U+FFFC object replacement character per attachment to control placement.
    */
   body?: string;
   /**
@@ -10724,7 +10856,7 @@ export type AmbNativeInboundListPickerSection = {
 
 export type AmbNativeInboundListPicker = {
   /**
-   * Sections and selected rows returned by Apple.
+   * Sections returned by Apple. Sections can include unselected options; preserve their titles and item grouping.
    */
   sections: Array<AmbNativeInboundListPickerSection>;
 };
@@ -16127,6 +16259,25 @@ export type DomainCapabilities = {
   inbound?: DomainCapability;
 };
 
+/**
+ * Receiving control state, separate from DNS verification. `enabled` means receiving is configured; check `capabilities.inbound.status` for readiness. `disabling` means a request to turn off receiving is in progress. `disable_failed` means the latest attempt failed and can be retried. `disabled` means receiving is off and no longer blocks deletion.
+ *
+ */
+export type DomainReceivingState =
+  "enabled" | "disabling" | "disable_failed" | "disabled";
+
+/**
+ * Receiving state and whether it is managed from another workspace.
+ */
+export type DomainReceiving = {
+  state: DomainReceivingState;
+  /**
+   * Receiving is assigned to another workspace in this organization. Its controls are unavailable in the current workspace. An authorized user must open the receiving workspace to turn it off.
+   *
+   */
+  managed_elsewhere: boolean;
+};
+
 export type DnsRecord = {
   /**
    * The DNS record type to publish, determined by `purpose`.
@@ -16270,6 +16421,7 @@ export type Domain = {
   readonly next?: Array<NextAction>;
   readonly dkim: DomainDkim;
   capabilities: DomainCapabilities;
+  readonly receiving: DomainReceiving;
   /**
    * The domain's DNS records and their individual verification state, returned in full on both the list and single-domain responses. This is the complete set to publish across DKIM, return-path, DMARC, tracking, and inbound; records for a staged change carry `state: pending`. Inbound MX records are always included as a regional reference, even while receiving is off and `capabilities.inbound.status` is `not_configured`. Their presence alone does not mean receiving is enabled; see `DomainUpdate.inbound`.
    *
@@ -16362,7 +16514,7 @@ export type DomainCreate = {
  */
 export type DomainInboundConfig = {
   /**
-   * Set `true` to enable receiving on this domain, `false` to disable it. Disabling tears receiving down and removes the MX records from `dns_records`; this is immediate in the normal case, and if a step needs retrying the capability clears as soon as teardown finishes.
+   * Set `true` to enable receiving on this domain, `false` to disable it. Read `receiving.state` to follow the request: `disabling` while receiving is turning off, `disable_failed` if the latest attempt failed, and `disabled` when it is off. Retry a failed request with `false`. Before deleting the domain or workspace, poll the domain until `capabilities.inbound.status` is `not_configured`. Its MX records remain in `dns_records` as optional. Receiving with an assigned workspace is managed there. Disabling from a sibling workspace returns `403`; re-enabling does not move the assigned receiver. A sibling also receives `403` if it re-enables while a request to turn off receiving is pending or has failed. `receiving.managed_elsewhere` identifies this restriction before a request. Older setups without a recorded receiver can be disabled from an authorized workspace sharing the domain; re-enabling records that workspace as the receiver.
    *
    */
   enabled: boolean;
@@ -18713,6 +18865,10 @@ export type Mailbox = {
    */
   readonly address: string;
   /**
+   * An address we generate on our receiving domain when the mailbox is created on a domain not set up for receiving with us. Forward mail for `address` here from your current email provider, and it lands in this mailbox. Replies still go out from `address`. Immutable. It stops receiving while the mailbox is deleted, works again with the same value after a restore, and keeps working if you later enable receiving on the domain. `null` on mailboxes created on the shared domain or on a domain already enabled for receiving.
+   */
+  readonly forwarding_address: string | null;
+  /**
    * Display name used as the sender name on mail from this mailbox. `null` when unset.
    */
   display_name: string | null;
@@ -18808,7 +18964,7 @@ export type MailboxCreate = {
    */
   local_part?: string;
   /**
-   * The domain the address lives under. Defaults to `inbox.ai`, our shared mailbox domain. Creating a mailbox claims the shared address for your organization on a first-come, first-served basis. The address remains reserved to your organization after the mailbox is deleted. You can instead use one of your own domains enabled for receiving email.
+   * The domain the address lives under. Defaults to `inbox.ai`, our shared mailbox domain. Creating a mailbox claims the shared address for your organization on a first-come, first-served basis. The address remains reserved to your organization after the mailbox is deleted. You can instead use one of your own domains. On a domain enabled for receiving, mail arrives directly. On a domain this workspace has verified (its `status` is `verified`) that is not set up for receiving, the mailbox gets a `forwarding_address`: forward mail for the address there from your current email provider, with no MX change. If another workspace receives the domain's mail, creation fails with `E17009`.
    */
   domain?: string;
   /**
@@ -24075,8 +24231,6 @@ export type EsimStatus =
   | "expired"
   | "failed";
 
-export type EsimSubscriberId = string;
-
 /**
  * Whether a purchase or eSIM is live or simulated. The mode is fixed when the order is created; the resulting eSIM retains it.
  *
@@ -24087,6 +24241,8 @@ export type EsimSubscriberId = string;
  *
  */
 export type EsimMode = "live" | "test";
+
+export type EsimSubscriberId = string;
 
 /**
  * Whether a service is supported. `yes` confirms support, `no` confirms it is not supported, and `unknown` means support has not been established.
@@ -24783,6 +24939,27 @@ export type CreateVoiceCallRequest = {
   sequence: CreateVoiceCallSequenceRequest;
 };
 
+export type VoiceDestinationDailySpendLimit = {
+  /**
+   * The most your workspace can spend on calls to this country each day, in your organization's wallet currency. Calls are also held to the workspace's own daily limit, and whichever is reached first refuses the call.
+   *
+   */
+  limit: Money;
+  /**
+   * Used toward today's limit for this country, including calls in progress. A call counts its expected cost when it starts; the part it did not use returns when it is billed. Null when today's usage cannot be read right now; the limit is still enforced.
+   *
+   */
+  used: Money | null;
+  /**
+   * What is left of this country's limit today, never below zero. Null when today's usage cannot be read.
+   */
+  remaining: Money | null;
+  /**
+   * When usage resets to zero, at midnight UTC.
+   */
+  resets_at: string;
+};
+
 export type VoiceDestination = {
   readonly country_code: CountryCode;
   /**
@@ -24808,6 +24985,11 @@ export type VoiceDestination = {
    * Whether we treat this country as a high-risk calling destination.
    */
   readonly high_risk_destination: boolean;
+  /**
+   * Your workspace's daily spend limit for calls to this country and today's usage toward it. It applies whether or not the country is enabled, including to verification calls. Null when you have not set one, before your organization has a wallet, or while your wallet currency cannot be read; a limit you set is still enforced then.
+   *
+   */
+  readonly daily_spend_limit: VoiceDestinationDailySpendLimit | null;
 };
 
 export type VoiceDestinationList = {
@@ -24821,9 +25003,31 @@ export type VoiceDestinationList = {
   total: number;
 };
 
+/**
+ * Sets or removes this country's daily spend limit; omit it to leave the limit unchanged. Once today's spend reaches the limit, new calls to the country are refused, verification calls included, whether or not it is enabled; a call already in progress is not cut off, so spend can pass the limit by what that call costs.
+ *
+ */
+export type VoiceDestinationDailySpendLimitUpdate = {
+  /**
+   * The daily spend limit for calls to this country, in your organization's wallet currency, from zero up to the workspace's `max_limit` in Voice settings, with at most six decimal places. Setting an amount needs an organization wallet; removing one does not. Null removes it, so only the workspace's daily limit applies.
+   *
+   */
+  limit: Money | null;
+};
+
+export type DestinationSetting = {
+  country_code: CountryCode;
+  /**
+   * Whether to enable (`true`) or disable (`false`) this destination country. Omit it to leave the country's enabled setting unchanged.
+   *
+   */
+  enabled?: boolean;
+  daily_spend_limit?: VoiceDestinationDailySpendLimitUpdate;
+};
+
 export type VoiceDestinationsUpdate = {
   /**
-   * The destination countries to enable or disable. Only the countries listed here change; any country you do not list keeps its current setting.
+   * The destination countries to change. Only the countries listed here change, and only the fields you send; anything else keeps its current setting. A country listed more than once takes its last `enabled`, but may set or remove `daily_spend_limit` only once. A limit can be set only on a country the Voice service supports; removing one accepts any country code. Otherwise the request is rejected and nothing changes.
    *
    */
   destinations: Array<DestinationSetting>;
@@ -25137,20 +25341,47 @@ export type EsimRecurrenceDeliveryMode = "exact_period" | "recurring_top_up";
 export type EsimRecurrenceModel = "calendar_month" | "fixed_days";
 
 /**
- * Published one-time purchase terms before tax.
+ * Current funding needed for this purchase, including tax and approved credit. The quoted price excludes tax; `total` includes tax for this purchase. This read reserves no funds; payment checks funding again. Test purchases have zero tax and total and are always covered.
+ */
+export type EsimCheckoutFunding = {
+  /**
+   * Tax included in the purchase total.
+   */
+  tax_amount: Money;
+  /**
+   * Total wallet charge for this purchase, including tax.
+   */
+  total: Money;
+  /**
+   * Whether the wallet can currently cover this purchase after reservations and approved credit.
+   */
+  covered: boolean;
+  /**
+   * Additional funds needed to cover this purchase, or null without organization billing read permission. Zero when covered is true.
+   */
+  shortfall: Money | null;
+};
+
+/**
+ * Published one-time price and current funding requirement. The `price` excludes tax; `funding.total` includes tax.
  */
 export type EsimCheckoutOneTime = {
+  funding: EsimCheckoutFunding;
   /**
    * The offer revision to accept when purchasing.
    */
   offer_revision: number;
+  /**
+   * Price before tax to accept when creating the order.
+   */
   price: Money;
 };
 
 /**
- * Published recurring terms before tax. The first period starts when payment is funded, and cancellation stops future renewal while preserving paid packages.
+ * Published recurring terms and current funding requirement. The `price` excludes tax; `funding.total` includes tax for the first period. The first period starts when payment is funded, and cancellation stops future renewal while preserving paid packages.
  */
 export type EsimCheckoutRecurringQuote = {
+  funding: EsimCheckoutFunding;
   delivery_mode: EsimRecurrenceDeliveryMode;
   /**
    * The offer revision to accept when purchasing.
@@ -25160,6 +25391,9 @@ export type EsimCheckoutRecurringQuote = {
    * The recurring configuration revision to accept when purchasing.
    */
   recurrence_revision: number;
+  /**
+   * Price before tax for the first period and each renewal.
+   */
   price: Money;
   model: EsimRecurrenceModel;
   /**
@@ -25666,7 +25900,7 @@ export type EsimCompatibleOfferList = {
  */
 export type EsimSettings = {
   /**
-   * Whether Bird sends eSIM install credentials to travelers for this workspace. When `false`, sending an eSIM's credentials by email or SMS is refused; reading them from the API still works, so you can deliver them yourself. This governs the install message only. Your workspace's other email and SMS sending is unaffected. Defaults to `true`.
+   * Whether Bird automatically sends an install link after a new eSIM purchase with a linked contact. Uses the contact's email address, or SMS when only a phone number is available. Defaults to `false`. Manual install-link sends remain available regardless of this setting.
    *
    */
   credential_delivery_enabled: boolean;
@@ -25678,7 +25912,7 @@ export type EsimSettings = {
  */
 export type EsimSettingsUpdate = {
   /**
-   * Send `false` to stop Bird sending eSIM install credentials to travelers for this workspace, or `true` to allow it again. Credentials stay readable from the API either way.
+   * Whether Bird automatically sends an install link after a new eSIM purchase with a linked contact. Uses the contact's email address, or SMS when only a phone number is available. Omit this field to retain the current value; a workspace without saved settings starts with `false`. Manual install-link sends remain available regardless of this setting.
    *
    */
   credential_delivery_enabled?: boolean;
@@ -26278,6 +26512,18 @@ export type EmailBroadcastCountsWritable = {
   [key: string]: never;
 };
 
+/**
+ * The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.
+ *
+ * The organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.
+ *
+ * `limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit.
+ *
+ */
+export type EmailBroadcastSendQuotaWritable = {
+  [key: string]: never;
+};
+
 export type EmailBroadcastClickedLinkListWritable = {
   /**
    * The broadcast's clicked URLs, most-clicked first, capped at 100 rows.
@@ -26379,6 +26625,27 @@ export type ContactPropertyListWritable = {
    */
   data: Array<ContactPropertyWritable>;
 } & ListEnvelope;
+
+/**
+ * Exact audience membership at evaluation time. Membership is absent when the count is unavailable.
+ */
+export type AudienceMembershipResponseWritable = {
+  membership?: AudienceMembershipSummary;
+};
+
+/**
+ * Daily membership observations in ascending UTC date order. Missing observations are explicit null gaps; changes between samples are unobserved.
+ */
+export type AudienceMembershipStatisticsResponseWritable = {
+  /**
+   * Requested UTC date window.
+   */
+  period: AudienceMembershipStatisticsPeriod;
+  /**
+   * One point for every requested date, including gaps.
+   */
+  data: Array<AudienceMembershipStatisticsPoint>;
+};
 
 export type AudienceMemberWritable = {
   contact: ContactWritable;
@@ -26790,12 +27057,12 @@ export type WhatsAppMessageTemplateWritable = {
  */
 export type WhatsAppMediaWritable = {
   /**
-   * Where to fetch the media. On an inbound message this is a Bird URL you fetch with your API key; it is absent when the file could not be retrieved from WhatsApp. It stays populated after the stored bytes expire, and the link returns `410` from then on. On an outbound message it is the URL the sender supplied, whose availability is the sender's to guarantee.
+   * Where to fetch the media. On an inbound message, or one from the WhatsApp Business app, this is a Bird URL you fetch with your API key; it is absent when the file could not be retrieved from WhatsApp. It stays populated after the stored bytes expire, and the link returns `410` from then on. On a message sent through Bird it is the URL the sender supplied, whose availability is the sender's to guarantee.
    *
    */
   url?: string;
   /**
-   * Media type WhatsApp reported for the file, for example `image/jpeg`. Absent on outbound messages.
+   * Media type WhatsApp reported for the file, for example `image/jpeg`. Absent on messages sent through Bird.
    *
    */
   mime_type?: string;
@@ -27581,7 +27848,7 @@ export type AmbNativeInteractiveContentWritable = unknown & {
    */
   type: AmbMessageType;
   /**
-   * Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.
+   * Automatic introductions for inline quick replies are enabled regionally in stages. When enabled for a new send containing `interactive_data.data.quick_reply`, a nonblank body is sent as separate text before the choices. Messages using `interactive_data_ref` do not receive this automatic introduction, even after activation. All parts belong to one message, which becomes sent after Apple accepts all parts. For referenced interactions, before activation, and for retries retaining legacy behavior, body is included in the interactive request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the quick reply. Omit body to send choices only. For list pickers, time pickers and forms, use interactive_data.received_message for the visible introduction. Use one U+FFFC object replacement character per attachment to control placement.
    */
   body?: string;
   /**
@@ -28660,6 +28927,18 @@ export type DomainCapabilitiesWritable = {
    *
    */
   inbound?: DomainCapabilityWritable;
+};
+
+/**
+ * Receiving state and whether it is managed from another workspace.
+ */
+export type DomainReceivingWritable = {
+  state: DomainReceivingState;
+  /**
+   * Receiving is assigned to another workspace in this organization. Its controls are unavailable in the current workspace. An authorized user must open the receiving workspace to turn it off.
+   *
+   */
+  managed_elsewhere: boolean;
 };
 
 export type DnsRecordWritable = {
@@ -32468,11 +32747,22 @@ export type GetEmailBroadcastSendQuotaData = {
   };
   path: {
     /**
-     * ID of the broadcast whose send allowance to check.
+     * ID of the broadcast to check the email send allowance for.
+     *
      */
     broadcast_id: EmailBroadcastId;
   };
-  query?: never;
+  query?: {
+    /**
+     * The proposed send time as an RFC 3339 date-time. If a daily or monthly window resets at or before this time, the check uses its full allowance. Otherwise, it uses the allowance remaining now. The check estimates your send quota at this time using current limits without subtracting broadcasts that are scheduled but have not sent yet, including those scheduled before this time. It does not reflect plan changes or temporary limit changes that take effect before this time.
+     *
+     * Must be at least 30 seconds and no more than 365 days in the future, the same range accepted by `scheduled_at`. Omit `send_at` to check a send now. A scheduled broadcast's `scheduled_at` is used only if you pass it as `send_at`.
+     *
+     * Does not change `broadcasts`. The broadcast count allowance is used when you submit the send or schedule request.
+     *
+     */
+    send_at?: string;
+  };
   url: "/v1/email/broadcasts/{broadcast_id}/send-quota";
 };
 
@@ -32513,7 +32803,8 @@ export type GetEmailBroadcastSendQuotaError =
 
 export type GetEmailBroadcastSendQuotaResponses = {
   /**
-   * How much of the broadcast the send allowance covers.
+   * The recipients covered by the broadcast's email send allowance.
+   *
    */
   200: EmailBroadcastSendQuota;
 };
@@ -34896,6 +35187,169 @@ export type UpdateAudienceResponses = {
 
 export type UpdateAudienceResponse =
   UpdateAudienceResponses[keyof UpdateAudienceResponses];
+
+export type GetAudienceMembershipData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the audience whose membership to read.
+     */
+    audience_id: AudienceId;
+  };
+  query?: never;
+  url: "/v1/audiences/{audience_id}/membership";
+};
+
+export type GetAudienceMembershipErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request reached the wrong regional endpoint. The organization or API key belongs to a different region; reissue the request against the regional host named in the error message.
+   *
+   */
+  421: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAudienceMembershipError =
+  GetAudienceMembershipErrors[keyof GetAudienceMembershipErrors];
+
+export type GetAudienceMembershipResponses = {
+  /**
+   * Exact audience membership, when available.
+   */
+  200: AudienceMembershipResponse;
+};
+
+export type GetAudienceMembershipResponse =
+  GetAudienceMembershipResponses[keyof GetAudienceMembershipResponses];
+
+export type GetAudienceMembershipStatisticsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the audience whose observations to read.
+     */
+    audience_id: AudienceId;
+  };
+  query?: {
+    /**
+     * Inclusive first UTC date. Defaults to 30 days before to, yielding 31 inclusive dates.
+     */
+    from?: string;
+    /**
+     * Inclusive last UTC date. Defaults to today in UTC; future dates are rejected. At most 365 inclusive dates.
+     */
+    to?: string;
+  };
+  url: "/v1/audiences/{audience_id}/membership-statistics";
+};
+
+export type GetAudienceMembershipStatisticsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request reached the wrong regional endpoint. The organization or API key belongs to a different region; reissue the request against the regional host named in the error message.
+   *
+   */
+  421: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAudienceMembershipStatisticsError =
+  GetAudienceMembershipStatisticsErrors[keyof GetAudienceMembershipStatisticsErrors];
+
+export type GetAudienceMembershipStatisticsResponses = {
+  /**
+   * Daily membership observations for the requested period.
+   */
+  200: AudienceMembershipStatisticsResponse;
+};
+
+export type GetAudienceMembershipStatisticsResponse =
+  GetAudienceMembershipStatisticsResponses[keyof GetAudienceMembershipStatisticsResponses];
 
 export type ListAudienceContactsData = {
   body?: never;

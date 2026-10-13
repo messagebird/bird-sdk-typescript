@@ -25,7 +25,7 @@ another batch. registration_id is for support, not a history lookup. The person
 reviewing a CLI or MCP proposal needs write access to the workspace.
    *
    * @example Register addresses for a ready send
-   * // Requires Insights preview access for the organization.
+   * // Requires inbox_insights:write permission in the target workspace.
    * const idempotencyKey = process.env.IDEMPOTENCY_KEY;
    * if (!idempotencyKey) throw new Error("Set IDEMPOTENCY_KEY to a unique key for this registration and retain it for retries");
    * let sendingDomain: string | undefined;
@@ -52,10 +52,9 @@ reviewing a CLI or MCP proposal needs write access to the workspace.
 allowance. Results are capped at 100; narrow the date window if tests.truncated
 is true. Only the newest test has full detail. registration_id cannot locate a
 history row, and absent history does not prove a registration failed.
-Scoped API keys, OAuth and service accounts require organization preview access.
    *
    * @example Read seed-test history and allowance
-   * // Requires Insights preview access for the organization.
+   * // Requires inbox_insights:read permission in the target workspace.
    * let sendingDomain: string | undefined;
    * for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
    *   if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }

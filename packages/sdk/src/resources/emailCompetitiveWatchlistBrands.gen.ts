@@ -17,11 +17,9 @@ export class EmailCompetitiveWatchlistBrandsResourceBase extends Resource {
 identifies the new workspace watchlist entry for reads and removal. Each entry
 uses one place in the organization-wide allowance and tracks the brand's
 highest-volume sending domain. Reuse an idempotency key when retrying the same addition.
-
-API-key, OAuth, and service-account calls require Insights preview access for your organization.
    *
    * @example Add the brand returned by search
-   * // Requires Insights preview access for the organization.
+   * // Requires competitive:write permission in the target workspace.
    * const matches = await bird.email.competitive.brands.search({ q: "Everlane" });
    * const match = matches.data.find((brand) => brand.name === "Everlane");
    * if (!match) throw new Error("No exact Everlane match");
@@ -37,11 +35,9 @@ API-key, OAuth, and service-account calls require Insights preview access for yo
    * Remove the workspace watchlist entry using its cwb_ ID. This frees one place
 in the organization-wide allowance. Adding the brand again creates a new
 entry; removal does not delete campaign data from eDataSource.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example Remove the selected competitor
-   * // Requires Insights preview access for the organization.
+   * // Requires competitive:write permission in the target workspace.
    * const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
    * const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
    * if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
@@ -62,11 +58,9 @@ watchlist already supplies headline comparisons. Rates are fractions. Interpret
 nulls by field: unavailable rates, no observed last campaign, or no overlap
 returned by the panel. Panel read rate differs from open rate. Tracked domains
 can cover only part of a brand's program.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example Read one watched brand
-   * // Requires Insights preview access for the organization.
+   * // Requires competitive:read permission in the target workspace.
    * const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
    * const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
    * if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
@@ -89,11 +83,9 @@ available for observation, not campaigns or independent recipients.
 peak_send_window can be null when no sending was observed. This describes a
 competitor's schedule, not a best time for your audience; timing hypotheses
 need your own controlled test and engagement evidence.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example Read its send-time distribution
-   * // Requires Insights preview access for the organization.
+   * // Requires competitive:read permission in the target workspace.
    * const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
    * const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
    * if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");

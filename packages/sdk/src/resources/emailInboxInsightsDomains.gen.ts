@@ -13,11 +13,9 @@ export class EmailInboxInsightsDomainsResource extends Resource {
    * List verified sending domains owned by the workspace and their monitoring settings.
 Follow next_cursor with starting_after, keeping filters and ordering. A monitored
 value records the workspace setting; it does not establish that vendor measurements exist.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example List verified owned domains and monitoring preferences
-   * // Requires Insights preview access for the organization.
+   * // Requires inbox_insights:read permission in the target workspace.
    * for await (const domain of bird.email.inboxInsights.domains.list({ limit: 25 })) {
    *   console.log(domain.domain, domain.monitored);
    * }
@@ -33,11 +31,9 @@ Enabling enrolls the domain with eDataSource and saves the workspace preference.
 Disabling removes only that preference; vendor enrollment and measurement history remain.
 Reports still require verified ownership and are not gated by this preference.
 Repeating the same value is safe. Reuse an idempotency key when retrying the same change.
-
-API-key and service-account calls require Insights preview access for your organization.
    *
    * @example Disable the workspace preference while preserving measurement history
-   * // Requires Insights preview access for the organization.
+   * // Requires inbox_insights:write permission in the target workspace.
    * let sendingDomain: string | undefined;
    * for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
    *   if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }

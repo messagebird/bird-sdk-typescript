@@ -11,11 +11,10 @@ export class EmailInboxInsightsSeedTestsConfigurationResource extends Resource {
   /**
    * Read available seed pools, regions and engagement profiles for an owned sending
 domain before `email.inbox_insights.seed_tests.create`. Use only available pools
-and preserve region strings exactly. Scoped API keys, OAuth and service accounts
-require organization preview access.
+and preserve region strings exactly.
    *
    * @example Read available seed-test options
-   * // Requires Insights preview access for the organization.
+   * // Requires inbox_insights:read permission in the target workspace.
    * let sendingDomain: string | undefined;
    * for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
    *   if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }

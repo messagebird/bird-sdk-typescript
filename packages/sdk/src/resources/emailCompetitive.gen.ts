@@ -14,11 +14,9 @@ export class EmailCompetitiveResourceBase extends Resource {
 own line. Competitor lines retain the requested order after the workspace
 line, when present. Each line's source distinguishes estimated panel volume
 from the workspace's accepted sends. Returns daily series without pagination.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example Compare daily volume with a watched brand
-   * // Requires Insights preview access for the organization.
+   * // Requires competitive:read permission in the target workspace.
    * const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
    * const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
    * if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");

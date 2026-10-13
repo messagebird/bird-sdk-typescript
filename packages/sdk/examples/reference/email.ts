@@ -329,19 +329,19 @@ export async function emailTemplatesSubmit() {
 }
 
 export async function insights_email_competitive_brands_search() {
-  // Requires Insights preview access for the organization.
+  // Requires competitive:read permission in the target workspace.
   const report = await bird.email.competitive.brands.search({ q: "Everlane" });
   console.log(report.data);
 }
 
 export async function insights_email_competitive_watchlist_get() {
-  // Requires Insights preview access for the organization.
+  // Requires competitive:read permission in the target workspace.
   const report = await bird.email.competitive.watchlist.get({ range: 30 });
   console.log(report.data);
 }
 
 export async function insights_email_competitive_watchlist_brands_create() {
-  // Requires Insights preview access for the organization.
+  // Requires competitive:write permission in the target workspace.
   const matches = await bird.email.competitive.brands.search({ q: "Everlane" });
   const match = matches.data.find((brand) => brand.name === "Everlane");
   if (!match) throw new Error("No exact Everlane match");
@@ -350,7 +350,7 @@ export async function insights_email_competitive_watchlist_brands_create() {
 }
 
 export async function insights_email_competitive_watchlist_brands_get() {
-  // Requires Insights preview access for the organization.
+  // Requires competitive:read permission in the target workspace.
   const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
   const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
   if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
@@ -360,7 +360,7 @@ export async function insights_email_competitive_watchlist_brands_get() {
 }
 
 export async function insights_email_competitive_watchlist_brands_sendTime() {
-  // Requires Insights preview access for the organization.
+  // Requires competitive:read permission in the target workspace.
   const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
   const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
   if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
@@ -370,7 +370,7 @@ export async function insights_email_competitive_watchlist_brands_sendTime() {
 }
 
 export async function insights_email_competitive_watchlist_brands_delete() {
-  // Requires Insights preview access for the organization.
+  // Requires competitive:write permission in the target workspace.
   const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
   const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
   if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
@@ -379,13 +379,13 @@ export async function insights_email_competitive_watchlist_brands_delete() {
 }
 
 export async function insights_email_competitive_watchlist_notable() {
-  // Requires Insights preview access for the organization.
+  // Requires competitive:read permission in the target workspace.
   const report = await bird.email.competitive.watchlist.notable({ range: 30 });
   console.log(report);
 }
 
 export async function insights_email_competitive_volumeSeries() {
-  // Requires Insights preview access for the organization.
+  // Requires competitive:read permission in the target workspace.
   const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
   const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
   if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
@@ -395,7 +395,7 @@ export async function insights_email_competitive_volumeSeries() {
 }
 
 export async function insights_email_competitive_watchlist_brands_campaigns_list() {
-  // Requires Insights preview access for the organization.
+  // Requires competitive:read permission in the target workspace.
   const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
   const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
   if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
@@ -406,7 +406,7 @@ export async function insights_email_competitive_watchlist_brands_campaigns_list
 }
 
 export async function insights_email_competitive_watchlist_brands_campaigns_get() {
-  // Requires Insights preview access for the organization.
+  // Requires competitive:read permission in the target workspace.
   const watchlist = await bird.email.competitive.watchlist.get({ range: 30 });
   const entry = watchlist.data.find((row) => row.name === "Everlane" && row.watchlist_brand_id);
   if (!entry?.watchlist_brand_id) throw new Error("Add Everlane to the watchlist first");
@@ -419,14 +419,14 @@ export async function insights_email_competitive_watchlist_brands_campaigns_get(
 }
 
 export async function insights_email_inboxInsights_domains_list() {
-  // Requires Insights preview access for the organization.
+  // Requires inbox_insights:read permission in the target workspace.
   for await (const domain of bird.email.inboxInsights.domains.list({ limit: 25 })) {
     console.log(domain.domain, domain.monitored);
   }
 }
 
 export async function insights_email_inboxInsights_domains_update() {
-  // Requires Insights preview access for the organization.
+  // Requires inbox_insights:write permission in the target workspace.
   let sendingDomain: string | undefined;
   for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
     if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
@@ -437,13 +437,13 @@ export async function insights_email_inboxInsights_domains_update() {
 }
 
 export async function insights_email_inboxInsights_domainMonitoring_upsert() {
-  // Requires Insights preview access for the organization.
+  // Requires inbox_insights:write permission in the target workspace.
   const result = await bird.email.inboxInsights.domainMonitoring.upsert();
   console.log(result.outcome, result.domain);
 }
 
 export async function insights_email_inboxInsights_placement() {
-  // Requires Insights preview access for the organization.
+  // Requires inbox_insights:read permission in the target workspace.
   let sendingDomain: string | undefined;
   for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
     if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
@@ -454,7 +454,7 @@ export async function insights_email_inboxInsights_placement() {
 }
 
 export async function insights_email_inboxInsights_authentication() {
-  // Requires Insights preview access for the organization.
+  // Requires inbox_insights:read permission in the target workspace.
   let sendingDomain: string | undefined;
   for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
     if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
@@ -465,7 +465,7 @@ export async function insights_email_inboxInsights_authentication() {
 }
 
 export async function insights_email_inboxInsights_complaints() {
-  // Requires Insights preview access for the organization.
+  // Requires inbox_insights:read permission in the target workspace.
   let sendingDomain: string | undefined;
   for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
     if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
@@ -476,7 +476,7 @@ export async function insights_email_inboxInsights_complaints() {
 }
 
 export async function insights_email_inboxInsights_spamTraps() {
-  // Requires Insights preview access for the organization.
+  // Requires inbox_insights:read permission in the target workspace.
   let sendingDomain: string | undefined;
   for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
     if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
@@ -487,7 +487,7 @@ export async function insights_email_inboxInsights_spamTraps() {
 }
 
 export async function insights_email_inboxInsights_blocklists() {
-  // Requires Insights preview access for the organization.
+  // Requires inbox_insights:read permission in the target workspace.
   let sendingDomain: string | undefined;
   for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
     if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
@@ -498,7 +498,7 @@ export async function insights_email_inboxInsights_blocklists() {
 }
 
 export async function insights_email_inboxInsights_benchmarks_industry() {
-  // Requires Insights preview access for the organization.
+  // Requires inbox_insights:read permission in the target workspace.
   let sendingDomain: string | undefined;
   for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
     if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
@@ -523,7 +523,7 @@ export async function emailStatsQuery() {
 }
 
 export async function seed_tests_configuration_get() {
-  // Requires Insights preview access for the organization.
+  // Requires inbox_insights:read permission in the target workspace.
   let sendingDomain: string | undefined;
   for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
     if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
@@ -534,7 +534,7 @@ export async function seed_tests_configuration_get() {
 }
 
 export async function seed_tests_list() {
-  // Requires Insights preview access for the organization.
+  // Requires inbox_insights:read permission in the target workspace.
   let sendingDomain: string | undefined;
   for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
     if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
@@ -545,7 +545,7 @@ export async function seed_tests_list() {
 }
 
 export async function seed_tests_create() {
-  // Requires Insights preview access for the organization.
+  // Requires inbox_insights:write permission in the target workspace.
   const idempotencyKey = process.env.IDEMPOTENCY_KEY;
   if (!idempotencyKey) throw new Error("Set IDEMPOTENCY_KEY to a unique key for this registration and retain it for retries");
   let sendingDomain: string | undefined;

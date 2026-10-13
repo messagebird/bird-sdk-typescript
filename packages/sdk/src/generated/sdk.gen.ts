@@ -359,6 +359,12 @@ import type {
   GetAmbSuppressionResponses,
   GetAudienceData,
   GetAudienceErrors,
+  GetAudienceMembershipData,
+  GetAudienceMembershipErrors,
+  GetAudienceMembershipResponses,
+  GetAudienceMembershipStatisticsData,
+  GetAudienceMembershipStatisticsErrors,
+  GetAudienceMembershipStatisticsResponses,
   GetAudienceResponses,
   GetAvailableNumberData,
   GetAvailableNumberErrors,
@@ -1818,9 +1824,17 @@ export const getEmailBroadcastCounts = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Get how much of a broadcast the send allowance covers
+ * Get the email send allowance for a broadcast
  *
- * Returns how much of the broadcast the organization's email send allowance covers, so a send that would run past it can be reconsidered rather than failing part-way. `recipients` is how many contacts the broadcast would send to right now, the same number the audience counts report as sendable. `allowed` is how many of those the allowance covers, and equals `recipients` when nothing limits the send. `limited_by` names the allowance that stops the rest, either the monthly one that runs with the billing period or the daily one, with `limit` and `remaining` describing it. Both numbers are live estimates: audience membership, suppressions and the sends already made in the current window all move until the broadcast sends. The broadcast must have an audience selected; a broadcast with no audience yet returns a 422.
+ * Returns how many recipients the organization's email send allowance covers. Use this estimate before sending or scheduling to check whether the daily or monthly email limit would restrict the send.
+ *
+ * `recipients` is the number of contacts the broadcast could reach now. It matches the sendable count from the audience counts. `allowed` is the number covered by the email send allowance. It equals `recipients` when no email limit restricts the send. `limited_by` identifies the monthly email limit for the billing period or the daily email limit that prevents the rest from receiving the broadcast. `limit` and `remaining` describe that email limit. `resets_at` is its reset time. For a monthly email limit, `limit_reason` explains what sets it if you can read the organization's billing.
+ *
+ * Pass `send_at` to check a later send, such as the `scheduled_at` you plan to use. If a daily or monthly window resets by that time, the check uses its full allowance. Otherwise, it uses the allowance remaining now. The check estimates your send quota using current limits without subtracting broadcasts that are scheduled but have not sent yet, so broadcasts scheduled for the same period may together exceed the limit even if each check shows enough quota. Without `send_at`, it checks a send now.
+ *
+ * `broadcasts` reports the separate broadcast count allowance for the billing period, or the UTC day when no current billing period is available. Sending or scheduling a draft uses one broadcast from this allowance. `send_at` does not change `broadcasts`.
+ *
+ * These counts are live estimates. Audience membership, suppressions, and email usage can change before the broadcast sends. This check reserves nothing. The email send allowance is checked again when the broadcast sends. The broadcast must have an audience selected. A broadcast without an audience returns a `422`.
  *
  */
 export const getEmailBroadcastSendQuota = <
@@ -2701,6 +2715,74 @@ export const updateAudience = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Get audience membership
+ *
+ * Returns the exact number of audience members at the source evaluation instant, including contacts without email and unsubscribed contacts. Membership is absent when the count is unavailable; an empty audience has total zero. For daily observations, use [Get audience membership statistics](/docs/api/reference/get-audience-membership-statistics).
+ *
+ * Returns 421 when the workspace's organization is served from a different region from the API host. Retry against that workspace's regional host.
+ *
+ */
+export const getAudienceMembership = <ThrowOnError extends boolean = false>(
+  options: Options<GetAudienceMembershipData, ThrowOnError>,
+): RequestResult<
+  GetAudienceMembershipResponses,
+  GetAudienceMembershipErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAudienceMembershipResponses,
+    GetAudienceMembershipErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/audiences/{audience_id}/membership",
+    ...options,
+  });
+
+/**
+ * Get audience membership statistics
+ *
+ * Returns the first successful observation for each requested UTC date, in chronological order. Changes between observations are unobserved. A missing observation has null total and observed_at; a successful empty audience has zero members. History retains today and the preceding 364 UTC dates; older requested dates are gaps. No history is reconstructed before observation began.
+ *
+ * Only daily UTC observations are supported. Period data_as_of is always null because samples do not establish continuous freshness; each point carries its actual observed_at. Future, reversed, invalid or longer-than-365-date windows return 422. For the current exact count, use [Get audience membership](/docs/api/reference/get-audience-membership).
+ *
+ * Returns 421 when the workspace's organization is served from a different region from the API host. Retry against that workspace's regional host.
+ *
+ */
+export const getAudienceMembershipStatistics = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetAudienceMembershipStatisticsData, ThrowOnError>,
+): RequestResult<
+  GetAudienceMembershipStatisticsResponses,
+  GetAudienceMembershipStatisticsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAudienceMembershipStatisticsResponses,
+    GetAudienceMembershipStatisticsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/audiences/{audience_id}/membership-statistics",
+    ...options,
   });
 
 /**
@@ -4579,9 +4661,11 @@ export const listWhatsAppMessageEvents = <ThrowOnError extends boolean = false>(
 /**
  * Get a WhatsApp message's media
  *
- * Redirects to a short-lived URL for the media on a received WhatsApp message.
- * Inbound media is stored because WhatsApp's own URL is not fetchable
- * without our credentials; this endpoint is what the `url` on the message's
+ * Redirects to a short-lived URL for the media on a received WhatsApp message,
+ * or on one from the WhatsApp Business app on a number shared with it: sent
+ * from the app (`origin: business_app_echo`) or imported from its chat
+ * history (`origin: history_sync`). That media is stored because WhatsApp's own
+ * URL is not fetchable without our credentials; this endpoint is what the `url` on the message's
  * `image`, `video`, `audio`, `sticker` or `document` points at. The bytes
  * live in object storage and are served straight from there, so they never
  * transit the API.
@@ -4597,7 +4681,7 @@ export const listWhatsAppMessageEvents = <ThrowOnError extends boolean = false>(
  * Media is kept for 30 days after the message is received, and the message
  * itself is kept longer. A message older than that still lists its media's
  * `mime_type` and `caption`, and this operation returns `410` once the bytes
- * have expired. Outbound messages have no media to serve.
+ * have expired. Other outbound messages have no media to serve.
  *
  */
 export const getWhatsAppMessageMedia = <ThrowOnError extends boolean = false>(
@@ -8211,8 +8295,6 @@ export const updateWhatsAppKeywordRule = <ThrowOnError extends boolean = false>(
  * section carries its own status, and a successful response never implies
  * every section is populated.
  *
- * API-key calls require Insights preview access for your organization.
- *
  */
 export const getEmailInboxInsightsPlacement = <
   ThrowOnError extends boolean = false,
@@ -8258,8 +8340,6 @@ export const getEmailInboxInsightsPlacement = <
  * configured, sections report `not_configured` with a setup path, not an
  * error.
  *
- * API-key calls require Insights preview access for your organization.
- *
  */
 export const getEmailInboxInsightsAuthentication = <
   ThrowOnError extends boolean = false,
@@ -8300,8 +8380,6 @@ export const getEmailInboxInsightsAuthentication = <
  * rendered as separate lines, never combined. For a domain without a
  * completed Google Postmaster connection, sections report `not_configured`
  * with a setup path, not an error.
- *
- * API-key calls require Insights preview access for your organization.
  *
  */
 export const getEmailInboxInsightsComplaints = <
@@ -8344,8 +8422,6 @@ export const getEmailInboxInsightsComplaints = <
  * harvested or guessed addresses; hits on recycled traps point at stale list
  * data. Zero hits is a measured zero and a good result, so the totals are
  * real figures rather than an empty state.
- *
- * API-key calls require Insights preview access for your organization.
  *
  */
 export const getEmailInboxInsightsSpamTraps = <
@@ -8400,8 +8476,6 @@ export const getEmailInboxInsightsSpamTraps = <
  * could not reach the lookup service at all, which is a different answer from
  * a lookup that ran and reported nothing.
  *
- * API-key calls require Insights preview access for your organization.
- *
  */
 export const getEmailInboxInsightsBlocklists = <
   ThrowOnError extends boolean = false,
@@ -8449,8 +8523,6 @@ export const getEmailInboxInsightsBlocklists = <
  * is normal for a young cohort rather than an edge case, so handle it from
  * the start.
  *
- * API-key calls require Insights preview access for your organization.
- *
  */
 export const getEmailInboxInsightsIndustryBenchmark = <
   ThrowOnError extends boolean = false,
@@ -8494,8 +8566,6 @@ export const getEmailInboxInsightsIndustryBenchmark = <
  * whether the period holds more than that, and an earlier period reaches the
  * ones left out. A test counts against the billing-period allowance when it is
  * registered, whether or not its send goes out.
- *
- * Scoped API keys, OAuth and service accounts require organization preview access.
  *
  */
 export const getEmailInboxInsightsSeedTests = <
@@ -8554,8 +8624,6 @@ export const getEmailInboxInsightsSeedTests = <
  * starting another test; a new key or a request without a key can register
  * another batch. A replay does not recover addresses from an uncertain result.
  *
- * Scoped API keys, OAuth and service accounts require organization preview access.
- *
  */
 export const createEmailInboxInsightsSeedTest = <
   ThrowOnError extends boolean = false,
@@ -8599,8 +8667,6 @@ export const createEmailInboxInsightsSeedTest = <
  * offer rather than showing it unpickable. This is reference data
  * that changes only when provisioning does, so it suits being fetched when a
  * configuration form opens rather than on every page view.
- *
- * Scoped API keys, OAuth and service accounts require organization preview access.
  *
  */
 export const getEmailInboxInsightsSeedTestConfiguration = <
@@ -8650,8 +8716,6 @@ export const getEmailInboxInsightsSeedTestConfiguration = <
  * The `monitored` field records the workspace's monitoring preference; report access
  * depends on verified ownership and remains available when monitoring is off.
  *
- * API-key calls require Insights preview access for your organization.
- *
  */
 export const getEmailInboxInsightsDomains = <
   ThrowOnError extends boolean = false,
@@ -8695,8 +8759,6 @@ export const getEmailInboxInsightsDomains = <
  *
  * Setting the value it already has changes nothing and answers normally, so this
  * is safe to repeat.
- *
- * API-key and service-account calls require Insights preview access for your organization.
  *
  */
 export const updateEmailInboxInsightsDomain = <
@@ -8748,8 +8810,6 @@ export const updateEmailInboxInsightsDomain = <
  * This chooses a starting point, not a permanent setting: the domain it picks
  * is switched on the same way as one chosen by hand, and can be switched off
  * or added to at any time.
- *
- * API-key and service-account calls require Insights preview access for your organization.
  *
  */
 export const upsertEmailInboxInsightsDomainMonitoring = <
@@ -9472,7 +9532,7 @@ export const createDomain = <ThrowOnError extends boolean = false>(
 /**
  * Delete a sending domain
  *
- * Removes the domain and revokes its sender authorization. New sends from a deleted domain are rejected. Historical statistics and events for past sends from this domain are preserved.
+ * Removes the domain and revokes its sender authorization. New sends from a deleted domain are rejected. Historical statistics and events for past sends from this domain are preserved. Returns `409` while this assignment owns receiving, or while deleting it would remove the organization's final assignment for a domain with a retained receiving claim. Disable receiving from the receiving workspace and poll the domain until `capabilities.inbound.status` is `not_configured` before retrying. Removing an ordinary sibling assignment leaves receiving unchanged.
  *
  */
 export const deleteDomain = <ThrowOnError extends boolean = false>(
@@ -9535,7 +9595,10 @@ export const getDomain = <ThrowOnError extends boolean = false>(
  * Invalid combinations are rejected. Enabling tracking toggles without a
  * tracking domain, or removing the tracking domain while a toggle is on,
  * returns `409`. Enabling inbound receiving has verification
- * prerequisites that return `422`. Each rule is detailed on its field.
+ * prerequisites that return `422`. When receiving has an assigned workspace,
+ * disabling it from a sibling returns `403`. Read `receiving.managed_elsewhere`
+ * before changing receiving and `receiving.state` to follow a turn-off request.
+ * Each rule is detailed on its field.
  *
  */
 export const updateDomain = <ThrowOnError extends boolean = false>(
@@ -9758,8 +9821,6 @@ export const getSuppression = <ThrowOnError extends boolean = false>(
  * `esp` and `list_size` are the exception, and are always `null` here. Read a
  * single brand to get them.
  *
- * API-key calls require Insights preview access for your organization.
- *
  */
 export const getEmailCompetitiveWatchlist = <
   ThrowOnError extends boolean = false,
@@ -9810,8 +9871,6 @@ export const getEmailCompetitiveWatchlist = <
  * This is a separate request from the watchlist on purpose, so a slow or degraded panel
  * read cannot delay the watchlist itself.
  *
- * API-key calls require Insights preview access for your organization.
- *
  */
 export const getEmailCompetitiveNotableCampaigns = <
   ThrowOnError extends boolean = false,
@@ -9855,8 +9914,6 @@ export const getEmailCompetitiveNotableCampaigns = <
  * every workspace it owns, so the same competitor watched from two workspaces
  * uses two of the allowance.
  *
- * API-key, OAuth, and service-account calls require Insights preview access for your organization.
- *
  */
 export const createEmailCompetitiveWatchlistBrand = <
   ThrowOnError extends boolean = false,
@@ -9894,8 +9951,6 @@ export const createEmailCompetitiveWatchlistBrand = <
  * Takes a brand off the workspace's watchlist and frees its place in the
  * organization's allowance. Nothing about the brand is retained, so adding it
  * again starts a fresh entry.
- *
- * API-key calls require Insights preview access for your organization.
  *
  */
 export const deleteEmailCompetitiveWatchlistBrand = <
@@ -9940,8 +9995,6 @@ export const deleteEmailCompetitiveWatchlistBrand = <
  * Every figure is an estimate from an email panel, fetched while the request runs,
  * except your own inbox rate where noted.
  *
- * API-key calls require Insights preview access for your organization.
- *
  */
 export const getEmailCompetitiveBrand = <ThrowOnError extends boolean = false>(
   options: Options<GetEmailCompetitiveBrandData, ThrowOnError>,
@@ -9984,8 +10037,6 @@ export const getEmailCompetitiveBrand = <ThrowOnError extends boolean = false>(
  * number of rows the panel holds and describes campaigns a person would recognise
  * as campaigns.
  *
- * API-key calls require Insights preview access for your organization.
- *
  */
 export const getEmailCompetitiveBrandCampaigns = <
   ThrowOnError extends boolean = false,
@@ -10027,8 +10078,6 @@ export const getEmailCompetitiveBrandCampaigns = <
  * The panel folds a day of low-volume sending into one synthetic entry, and the campaign
  * list leaves those out. They stand for a day of sending rather than for a campaign
  * anyone sent, so they come back as not found here as well.
- *
- * API-key calls require Insights preview access for your organization.
  *
  */
 export const getEmailCompetitiveBrandCampaign = <
@@ -10079,8 +10128,6 @@ export const getEmailCompetitiveBrandCampaign = <
  * with little variation down its rows is a real finding about how the brand mails
  * rather than a gap in the data.
  *
- * API-key calls require Insights preview access for your organization.
- *
  */
 export const getEmailCompetitiveBrandSendTime = <
   ThrowOnError extends boolean = false,
@@ -10119,8 +10166,6 @@ export const getEmailCompetitiveBrandSendTime = <
  * reported for them. Results are capped at eight and can omit matches whose
  * sending domain could not be resolved. An empty result means no watchable match
  * was returned for this query; try a more specific name or known sending domain.
- *
- * API-key calls require Insights preview access for your organization.
  *
  */
 export const searchEmailCompetitiveBrands = <
@@ -10168,8 +10213,6 @@ export const searchEmailCompetitiveBrands = <
  * point is the last whole UTC day, not the one in progress, so your own line and a
  * competitor's cover the same days. A line with no points at all has a `panel_status`
  * saying why.
- *
- * API-key calls require Insights preview access for your organization.
  *
  */
 export const getEmailCompetitiveVolumeSeries = <
@@ -10889,7 +10932,7 @@ export const listMailboxes = <ThrowOnError extends boolean = false>(
 /**
  * Create a mailbox
  *
- * Creates a mailbox. The address is `local_part@domain`. The domain defaults to `inbox.ai`, Bird's shared mailbox domain, where creating the mailbox claims the address for your organization. It is first come, first served, and reserved to your organization even after the mailbox is deleted. You may instead name one of your own domains that is enabled for receiving email. An omitted local part is generated. On a custom domain, addresses of deleted mailboxes are quarantined for 30 days and remain reserved for your workspace.
+ * Creates a mailbox. The address is `local_part@domain`. The domain defaults to `inbox.ai`, Bird's shared mailbox domain, where creating the mailbox claims the address for your organization. It is first come, first served, and reserved to your organization even after the mailbox is deleted. You may instead name one of your own domains. A domain enabled for receiving email delivers to the mailbox directly. A domain this workspace has verified (its `status` is `verified`) that is not set up for receiving gives the mailbox a `forwarding_address` to forward its mail to. If another workspace receives the domain's mail, creation fails with `E17009`. An omitted local part is generated. On a custom domain, addresses of deleted mailboxes are quarantined for 30 days and remain reserved for your workspace.
  *
  */
 export const createMailbox = <ThrowOnError extends boolean = false>(
@@ -13109,7 +13152,7 @@ export const createVoiceCall = <ThrowOnError extends boolean = false>(
 /**
  * List Voice destination countries
  *
- * Returns every country the Voice service supports, each annotated with whether your workspace has enabled calling to it and whether the country is currently callable. Use this to render and manage your destination allowlist.
+ * Returns every country the Voice service supports, each annotated with whether your workspace has enabled calling to it, whether the platform supports calling it (`status`), and any daily spend limit you set for it with today's usage. A supported, enabled country still refuses calls once its `daily_spend_limit.remaining` reaches zero. Use this to render and manage your destination allowlist.
  *
  */
 export const listVoiceDestinations = <ThrowOnError extends boolean = false>(
@@ -13139,7 +13182,7 @@ export const listVoiceDestinations = <ThrowOnError extends boolean = false>(
 /**
  * Update enabled Voice destination countries
  *
- * Enables or disables specific destination countries for your workspace. Only the countries listed in the request change; any country you do not list keeps its current setting. Each code must be a country the Voice service supports, or the request is rejected and nothing changes.
+ * Enables or disables specific destination countries for your workspace, and sets or removes their daily spend limits. Only the countries listed in the request change; any country you do not list keeps its current setting. Each code must be a country the Voice service supports, or the request is rejected and nothing changes; removing a daily spend limit is the exception and accepts any country code. A daily spend limit caps what your workspace spends on calls to a country each day, whether or not it is enabled.
  *
  */
 export const updateVoiceDestinations = <ThrowOnError extends boolean = false>(
@@ -13431,7 +13474,7 @@ export const cancelEsimOrder = <ThrowOnError extends boolean = false>(
 /**
  * Get eSIM checkout options
  *
- * Returns published one-time terms and automatic renewal availability for a new eSIM. Automatic renewal includes its own price and cadence when an eligible mobile network is available. Availability is checked again when purchasing; this read does not reserve a package.
+ * Returns published one-time terms and automatic renewal availability for a new eSIM, including tax-inclusive totals and current funding shortfalls. Automatic renewal includes its own price and cadence when an eligible mobile network is available. Availability and funding are checked again when purchasing; this read reserves no funds or package.
  */
 export const getEsimOfferCheckoutOptions = <
   ThrowOnError extends boolean = false,
@@ -14295,7 +14338,7 @@ export const getEsimSettings = <ThrowOnError extends boolean = false>(
 /**
  * Update the eSIM settings
  *
- * Applies partial changes to your workspace's eSIM settings and returns the effective result. Omit a field to leave it as it is. The change applies to the next send immediately.
+ * Applies partial changes to your workspace's eSIM settings and returns the effective result. Omit a field to leave it as it is. Automatic delivery is disabled initially. Enabling it applies to new eSIM purchases; disabling it also stops queued automatic sends. Manual sends are independent of this setting.
  *
  */
 export const updateEsimSettings = <ThrowOnError extends boolean = false>(

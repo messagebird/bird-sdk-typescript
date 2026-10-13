@@ -9,7 +9,7 @@ export type VoiceDestinationsUpdateParams = NonNullable<UpdateVoiceDestinationsD
 
 export class VoiceDestinationsResource extends Resource {
   /**
-   * Every country the Voice service supports, each marked with whether the workspace has enabled it and whether it is currently callable. A call to a country the workspace has not enabled is refused, so check here when a specific destination fails while others succeed.
+   * Every country the Voice service supports, each marked with whether the workspace has enabled it, whether the platform supports calling it (status), and its daily spend limit with today's usage. A call to a country the workspace has not enabled, or whose daily limit is spent, is refused, so check here when a specific destination fails while others succeed.
    *
    * @example See which countries you may call
    * const destinations = await bird.voice.destinations.list();
@@ -23,7 +23,7 @@ export class VoiceDestinationsResource extends Resource {
   }
 
   /**
-   * Enable or disable the countries this workspace may place voice calls to. Only the countries you list change; any country you omit keeps its current setting. Enabling one is what lets a call to it past the destination gate; disabling one refuses every call there, so confirm a disable with the user first. Read `voice.destinations.list` first for the current settings and whether Bird carries calls to the country at all.
+   * Enable or disable the countries this workspace may place voice calls to. Only the countries you list change; any country you omit keeps its current setting. Enabling one is what lets a call to it past the destination gate; disabling one refuses every call there, so confirm a disable with the user first. A destination's `daily_spend_limit` caps its daily spend, verification calls included, independently of whether it is enabled. Read `voice.destinations.list` first for the current settings and whether Bird carries calls to the country at all.
    *
    * @example Choose which countries you may call
    * const destinations = await bird.voice.destinations.update({

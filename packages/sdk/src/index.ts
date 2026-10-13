@@ -321,6 +321,7 @@ export type {
   BroadcastsListQuery,
   BroadcastsListEventsQuery,
   BroadcastsListRecipientsQuery,
+  BroadcastsSendQuotaQuery,
 } from "./resources/broadcasts.gen.js";
 export type {
   BroadcastCreateParams,
@@ -335,6 +336,8 @@ export type {
   EmailBroadcastClickedLink,
   EmailBroadcastStatus,
   EmailSendAllowanceWindow,
+  EmailSendAllowanceLimitReason,
+  EmailBroadcastCountAllowance,
   RecipientRole,
 } from "./generated/types.gen.js";
 export type {
@@ -355,6 +358,9 @@ export type {
   AudienceRemoveContactsParams,
   AudienceListQuery,
   AudienceListContactsQuery,
+  AudienceMembershipResponse,
+  AudienceMembershipStatisticsResponse,
+  AudienceMembershipHistoryQuery,
 } from "./resources/audiences.gen.js";
 export type {
   ContactProperty,
@@ -479,6 +485,7 @@ export {
   WhatsAppInteractiveReplyType,
   WhatsAppInteractiveType,
   WhatsAppKeywordOperation,
+  WhatsAppMessageOrigin,
   WhatsAppMetaHealthEntityType,
   WhatsAppNumberErrorCode,
   WhatsAppNumberMessagingLimit,
@@ -553,6 +560,7 @@ export type {
   WhatsAppInteractiveReplyTypeValue,
   WhatsAppInteractiveTypeValue,
   WhatsAppKeywordOperationValue,
+  WhatsAppMessageOriginValue,
   WhatsAppMetaHealthEntityTypeValue,
   WhatsAppNumberErrorCodeValue,
   WhatsAppNumberMessagingLimitValue,

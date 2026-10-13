@@ -26,11 +26,9 @@ placement rates cannot establish counts of your delivered messages in spam.
 Campaign cadence is not per-subscriber frequency. Interpret nulls by field:
 rates can be unavailable, while last_campaign can mean none was observed and
 overlap can mean no overlap was returned. Do not replace nulls with zeros.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example Read watchlist figures without replacing missing values
-   * // Requires Insights preview access for the organization.
+   * // Requires competitive:read permission in the target workspace.
    * const report = await bird.email.competitive.watchlist.get({ range: 30 });
    * console.log(report.data);
    */
@@ -45,11 +43,9 @@ A campaign can appear for multiple signals, each with its own evidence.
 truncated reports omitted eligible findings; this report has no cursor pages.
 Each finding carries the watched-brand and campaign IDs for
 `email.competitive.watchlist.brands.campaigns.get`.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example Read notable campaigns
-   * // Requires Insights preview access for the organization.
+   * // Requires competitive:read permission in the target workspace.
    * const report = await bird.email.competitive.watchlist.notable({ range: 30 });
    * console.log(report);
    */

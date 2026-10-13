@@ -1014,6 +1014,20 @@ export const WhatsAppKeywordOperation = {
 export type WhatsAppKeywordOperationValue = (typeof WhatsAppKeywordOperation)[keyof typeof WhatsAppKeywordOperation];
 
 /**
+ * Values of WhatsAppMessageOrigin known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppMessageOrigin = {
+  BusinessAgentEcho: "business_agent_echo",
+  BusinessAppEcho: "business_app_echo",
+  HistorySync: "history_sync",
+} as const;
+
+/** A known WhatsAppMessageOrigin value. */
+export type WhatsAppMessageOriginValue = (typeof WhatsAppMessageOrigin)[keyof typeof WhatsAppMessageOrigin];
+
+/**
  * Values of WhatsAppMetaHealthEntityType known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.

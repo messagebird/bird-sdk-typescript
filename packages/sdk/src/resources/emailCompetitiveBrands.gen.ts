@@ -16,11 +16,9 @@ with its highest-volume sending domain, not every domain a brand uses. Resolve
 ambiguous names against the intended domain before any authorized addition.
 An empty or limited result describes this search, not exhaustive panel coverage.
 The returned panel `brand_id` differs from a saved `watchlist_brand_id`.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example Find a competitor brand
-   * // Requires Insights preview access for the organization.
+   * // Requires competitive:read permission in the target workspace.
    * const report = await bird.email.competitive.brands.search({ q: "Everlane" });
    * console.log(report.data);
    */

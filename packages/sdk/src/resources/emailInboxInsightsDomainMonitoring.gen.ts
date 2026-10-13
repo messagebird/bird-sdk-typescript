@@ -14,11 +14,9 @@ domain or the domain that sent the most mail in the last 30 days is enabled; an 
 choice_required, and no verified domains returns no_verified_domains. Only enabled has a
 non-null domain. Read the domain list after already_on; ask the user to choose after
 choice_required. Reuse an idempotency key for retries of the same setup attempt.
-
-API-key and service-account calls require Insights preview access for your organization.
    *
    * @example Enable automatic monitoring and inspect the outcome
-   * // Requires Insights preview access for the organization.
+   * // Requires inbox_insights:write permission in the target workspace.
    * const result = await bird.email.inboxInsights.domainMonitoring.upsert();
    * console.log(result.outcome, result.domain);
    */

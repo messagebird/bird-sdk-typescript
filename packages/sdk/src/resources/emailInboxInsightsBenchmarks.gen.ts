@@ -16,11 +16,9 @@ windows. window_days and freshness describe the cohort's computed period;
 absent window_days means the period is unspecified. No date window or prior
 comparison is accepted. no_data can mean an unknown industry or too few
 measured senders. A gap is descriptive, not evidence of a particular cause.
-
-API-key calls require Insights preview access for your organization.
    *
    * @example Read industry figures including no-data status
-   * // Requires Insights preview access for the organization.
+   * // Requires inbox_insights:read permission in the target workspace.
    * let sendingDomain: string | undefined;
    * for await (const domain of bird.email.inboxInsights.domains.list({ search: "mail.example.com" })) {
    *   if (domain.domain === "mail.example.com") { sendingDomain = domain.domain; break; }
