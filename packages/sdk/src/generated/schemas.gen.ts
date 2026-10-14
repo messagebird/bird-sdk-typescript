@@ -2219,7 +2219,7 @@ export const EmailMessageSendRequestSchema = {
         maxLength: 998,
       },
       description:
-        "Custom email headers as key-value pairs (for example `References`, `In-Reply-To`, or your own `X-*` headers). Reserved headers are rejected with a `422`. Set the message's addressing and subject through the dedicated fields: `from`, `to`, `cc`, `bcc`, `reply_to`, and `subject`. The API automatically generates `Content-Type`, `Content-Transfer-Encoding`, `DKIM-Signature`, `Received`, and `Return-Path`. You cannot override these generated headers. `List-Unsubscribe` and `List-Unsubscribe-Post` are honored as-is on `transactional` sends. Marketing sends receive a compliant unsubscribe header, so supplying either one is rejected with a `422`. Header values may not contain carriage-return or line-feed characters. Up to 25 headers per send, each value up to 998 characters.\n",
+        "Custom email headers, such as `References`, `In-Reply-To`, and `X-*` headers. Reserved headers and values containing carriage returns or line feeds return `422`. Set addressing and subject through their dedicated fields. Transactional sends accept `List-Unsubscribe` and `List-Unsubscribe-Post`. Marketing sends use Bird-managed unsubscribe by default.\n",
     },
     tags: {
       type: "array",
@@ -19638,7 +19638,7 @@ export const AMBNativeInteractivePayloadSchema = {
       pattern:
         "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
       description:
-        "Correlation identifier for this interaction. Bird generates one when omitted.",
+        "Correlation identifier for this interaction. Bird generates one when omitted. Use a new value for each message. A reply is linked to its request only when no other sent message in the conversation uses the same identifier.",
     },
     images: {
       type: "array",
@@ -20538,6 +20538,10 @@ export const AMBErrorSchema = {
 export const AMBMessageSchema = {
   type: "object",
   additionalProperties: false,
+  dependentRequired: {
+    reply_message_id: ["replied_at"],
+    replied_at: ["reply_message_id"],
+  },
   required: [
     "id",
     "conversation_id",
@@ -20618,7 +20622,22 @@ export const AMBMessageSchema = {
       readOnly: true,
       $ref: "#/components/schemas/AMBMessageID",
       description:
-        "Original message matched through Apple’s request identifier within the same workspace, business, and conversation. Omitted when no verified match exists.",
+        "Original message matched through Apple’s request identifier within the same workspace, business, and conversation. Omitted when no verified match exists, including when more than one sent message in the conversation uses the reply's request identifier.",
+    },
+    reply_message_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBMessageID",
+      example: "amb_01krdgh7m2zq8w4x6y9b3c5d7e",
+      description:
+        "Latest customer reply whose `in_reply_to_message_id` names this message. Omitted until a reply is matched, and in webhook payloads.",
+    },
+    replied_at: {
+      type: "string",
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When Apple delivered the reply in `reply_message_id` to Bird. This can be slightly earlier than that reply's `created_at`, which records when Bird processed it. Omitted until a reply is matched, and in webhook payloads.",
+      example: "2026-10-13T10:09:00Z",
     },
     locale: {
       type: ["string", "null"],
@@ -20669,7 +20688,7 @@ export const AMBMessageSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "The moment this message was accepted (outbound) or received (inbound). This is the timestamp the outbound statistics families bucket and attribute on; there is no separate `accepted_at` field.",
+        "The moment this message was accepted (outbound), or recorded by Bird after Apple delivered it (inbound). This is the timestamp the outbound statistics families bucket and attribute on; there is no separate `accepted_at` field.",
     },
     sent_at: {
       type: ["string", "null"],
@@ -36343,6 +36362,32 @@ export const EventAMBAcceptedSchema = {
     },
     data: {
       $ref: "#/components/schemas/EventAMBMessageData",
+      example: {
+        workspace_id: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+        message: {
+          id: "amb_01krdgeqcxet5s7t44vh8rt9mg",
+          conversation_id: "acv_01krdgeqcxet5s7t44vh8rt9mg",
+          business_account_id: "abz_01krdgeqcxet5s7t44vh8rt9mg",
+          direction: "outbound",
+          status: "accepted",
+          kind: "text",
+          source: "operator",
+          content: {
+            type: "text",
+            body: "Your order has shipped.",
+          },
+          locale: "en_US",
+          category: "order_update",
+          tags: [
+            {
+              name: "category",
+              value: "welcome",
+            },
+          ],
+          cost: null,
+          created_at: "2026-09-25T11:59:59Z",
+        },
+      },
     },
   },
 } as const;
@@ -36525,6 +36570,24 @@ export const EventAMBReceivedSchema = {
     },
     data: {
       $ref: "#/components/schemas/EventAMBMessageData",
+      example: {
+        workspace_id: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+        message: {
+          id: "amb_01krdgh7m2zq8w4x6y9b3c5d7e",
+          conversation_id: "acv_01krdgeqcxet5s7t44vh8rt9mg",
+          business_account_id: "abz_01krdgeqcxet5s7t44vh8rt9mg",
+          direction: "inbound",
+          status: "received",
+          kind: "text",
+          content: {
+            type: "text",
+            body: "Where is my order?",
+          },
+          locale: "en_US",
+          cost: null,
+          created_at: "2026-09-25T12:00:00Z",
+        },
+      },
     },
   },
 } as const;
@@ -36557,6 +36620,38 @@ export const EventAMBRejectedSchema = {
     },
     data: {
       $ref: "#/components/schemas/EventAMBMessageData",
+      example: {
+        workspace_id: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+        message: {
+          id: "amb_01krdgeqcxet5s7t44vh8rt9mg",
+          conversation_id: "acv_01krdgeqcxet5s7t44vh8rt9mg",
+          business_account_id: "abz_01krdgeqcxet5s7t44vh8rt9mg",
+          direction: "outbound",
+          status: "rejected",
+          kind: "text",
+          source: "operator",
+          content: {
+            type: "text",
+            body: "Your order has shipped.",
+          },
+          locale: "en_US",
+          category: "order_update",
+          tags: [
+            {
+              name: "category",
+              value: "welcome",
+            },
+          ],
+          cost: null,
+          created_at: "2026-09-25T11:59:59Z",
+          last_error: {
+            code: "bird:price_missing",
+            description:
+              "Bird has no price for this message, so it was not sent.",
+            occurred_at: "2026-09-25T12:00:00Z",
+          },
+        },
+      },
     },
   },
 } as const;
@@ -36589,6 +36684,37 @@ export const EventAMBSendFailedSchema = {
     },
     data: {
       $ref: "#/components/schemas/EventAMBMessageData",
+      example: {
+        workspace_id: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+        message: {
+          id: "amb_01krdgeqcxet5s7t44vh8rt9mg",
+          conversation_id: "acv_01krdgeqcxet5s7t44vh8rt9mg",
+          business_account_id: "abz_01krdgeqcxet5s7t44vh8rt9mg",
+          direction: "outbound",
+          status: "send_failed",
+          kind: "text",
+          source: "operator",
+          content: {
+            type: "text",
+            body: "Your order has shipped.",
+          },
+          locale: "en_US",
+          category: "order_update",
+          tags: [
+            {
+              name: "category",
+              value: "welcome",
+            },
+          ],
+          cost: null,
+          created_at: "2026-09-25T11:59:59Z",
+          last_error: {
+            code: "apple:404",
+            description: "Apple refused the message with HTTP status 404.",
+            occurred_at: "2026-09-25T12:00:00Z",
+          },
+        },
+      },
     },
   },
 } as const;
@@ -36621,6 +36747,33 @@ export const EventAMBSentSchema = {
     },
     data: {
       $ref: "#/components/schemas/EventAMBMessageData",
+      example: {
+        workspace_id: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+        message: {
+          id: "amb_01krdgeqcxet5s7t44vh8rt9mg",
+          conversation_id: "acv_01krdgeqcxet5s7t44vh8rt9mg",
+          business_account_id: "abz_01krdgeqcxet5s7t44vh8rt9mg",
+          direction: "outbound",
+          status: "sent",
+          kind: "text",
+          source: "operator",
+          content: {
+            type: "text",
+            body: "Your order has shipped.",
+          },
+          locale: "en_US",
+          category: "order_update",
+          tags: [
+            {
+              name: "category",
+              value: "welcome",
+            },
+          ],
+          cost: null,
+          created_at: "2026-09-25T11:59:59Z",
+          sent_at: "2026-09-25T12:00:00Z",
+        },
+      },
     },
   },
 } as const;
@@ -50075,7 +50228,7 @@ export const AMBNativeInteractivePayloadWritableSchema = {
       pattern:
         "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
       description:
-        "Correlation identifier for this interaction. Bird generates one when omitted.",
+        "Correlation identifier for this interaction. Bird generates one when omitted. Use a new value for each message. A reply is linked to its request only when no other sent message in the conversation uses the same identifier.",
     },
     images: {
       type: "array",
@@ -50563,6 +50716,10 @@ export const AMBErrorWritableSchema = {
 export const AMBMessageWritableSchema = {
   type: "object",
   additionalProperties: false,
+  dependentRequired: {
+    reply_message_id: ["replied_at"],
+    replied_at: ["reply_message_id"],
+  },
 } as const;
 
 export const AMBMessageListWritableSchema = {
@@ -53599,6 +53756,32 @@ export const EventAMBAcceptedWritableSchema = {
     },
     data: {
       $ref: "#/components/schemas/EventAMBMessageDataWritable",
+      example: {
+        workspace_id: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+        message: {
+          id: "amb_01krdgeqcxet5s7t44vh8rt9mg",
+          conversation_id: "acv_01krdgeqcxet5s7t44vh8rt9mg",
+          business_account_id: "abz_01krdgeqcxet5s7t44vh8rt9mg",
+          direction: "outbound",
+          status: "accepted",
+          kind: "text",
+          source: "operator",
+          content: {
+            type: "text",
+            body: "Your order has shipped.",
+          },
+          locale: "en_US",
+          category: "order_update",
+          tags: [
+            {
+              name: "category",
+              value: "welcome",
+            },
+          ],
+          cost: null,
+          created_at: "2026-09-25T11:59:59Z",
+        },
+      },
     },
   },
 } as const;
@@ -53623,6 +53806,24 @@ export const EventAMBReceivedWritableSchema = {
     },
     data: {
       $ref: "#/components/schemas/EventAMBMessageDataWritable",
+      example: {
+        workspace_id: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+        message: {
+          id: "amb_01krdgh7m2zq8w4x6y9b3c5d7e",
+          conversation_id: "acv_01krdgeqcxet5s7t44vh8rt9mg",
+          business_account_id: "abz_01krdgeqcxet5s7t44vh8rt9mg",
+          direction: "inbound",
+          status: "received",
+          kind: "text",
+          content: {
+            type: "text",
+            body: "Where is my order?",
+          },
+          locale: "en_US",
+          cost: null,
+          created_at: "2026-09-25T12:00:00Z",
+        },
+      },
     },
   },
 } as const;
@@ -53647,6 +53848,38 @@ export const EventAMBRejectedWritableSchema = {
     },
     data: {
       $ref: "#/components/schemas/EventAMBMessageDataWritable",
+      example: {
+        workspace_id: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+        message: {
+          id: "amb_01krdgeqcxet5s7t44vh8rt9mg",
+          conversation_id: "acv_01krdgeqcxet5s7t44vh8rt9mg",
+          business_account_id: "abz_01krdgeqcxet5s7t44vh8rt9mg",
+          direction: "outbound",
+          status: "rejected",
+          kind: "text",
+          source: "operator",
+          content: {
+            type: "text",
+            body: "Your order has shipped.",
+          },
+          locale: "en_US",
+          category: "order_update",
+          tags: [
+            {
+              name: "category",
+              value: "welcome",
+            },
+          ],
+          cost: null,
+          created_at: "2026-09-25T11:59:59Z",
+          last_error: {
+            code: "bird:price_missing",
+            description:
+              "Bird has no price for this message, so it was not sent.",
+            occurred_at: "2026-09-25T12:00:00Z",
+          },
+        },
+      },
     },
   },
 } as const;
@@ -53671,6 +53904,37 @@ export const EventAMBSendFailedWritableSchema = {
     },
     data: {
       $ref: "#/components/schemas/EventAMBMessageDataWritable",
+      example: {
+        workspace_id: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+        message: {
+          id: "amb_01krdgeqcxet5s7t44vh8rt9mg",
+          conversation_id: "acv_01krdgeqcxet5s7t44vh8rt9mg",
+          business_account_id: "abz_01krdgeqcxet5s7t44vh8rt9mg",
+          direction: "outbound",
+          status: "send_failed",
+          kind: "text",
+          source: "operator",
+          content: {
+            type: "text",
+            body: "Your order has shipped.",
+          },
+          locale: "en_US",
+          category: "order_update",
+          tags: [
+            {
+              name: "category",
+              value: "welcome",
+            },
+          ],
+          cost: null,
+          created_at: "2026-09-25T11:59:59Z",
+          last_error: {
+            code: "apple:404",
+            description: "Apple refused the message with HTTP status 404.",
+            occurred_at: "2026-09-25T12:00:00Z",
+          },
+        },
+      },
     },
   },
 } as const;
@@ -53695,6 +53959,33 @@ export const EventAMBSentWritableSchema = {
     },
     data: {
       $ref: "#/components/schemas/EventAMBMessageDataWritable",
+      example: {
+        workspace_id: "ws_01krdgeqcxet5s7t44vh8rt9mg",
+        message: {
+          id: "amb_01krdgeqcxet5s7t44vh8rt9mg",
+          conversation_id: "acv_01krdgeqcxet5s7t44vh8rt9mg",
+          business_account_id: "abz_01krdgeqcxet5s7t44vh8rt9mg",
+          direction: "outbound",
+          status: "sent",
+          kind: "text",
+          source: "operator",
+          content: {
+            type: "text",
+            body: "Your order has shipped.",
+          },
+          locale: "en_US",
+          category: "order_update",
+          tags: [
+            {
+              name: "category",
+              value: "welcome",
+            },
+          ],
+          cost: null,
+          created_at: "2026-09-25T11:59:59Z",
+          sent_at: "2026-09-25T12:00:00Z",
+        },
+      },
     },
   },
 } as const;

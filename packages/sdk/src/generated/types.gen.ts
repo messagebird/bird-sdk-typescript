@@ -1240,7 +1240,7 @@ export type EmailMessageSendRequest = {
    */
   reply_to?: Array<EmailAddressInput>;
   /**
-   * Custom email headers as key-value pairs (for example `References`, `In-Reply-To`, or your own `X-*` headers). Reserved headers are rejected with a `422`. Set the message's addressing and subject through the dedicated fields: `from`, `to`, `cc`, `bcc`, `reply_to`, and `subject`. The API automatically generates `Content-Type`, `Content-Transfer-Encoding`, `DKIM-Signature`, `Received`, and `Return-Path`. You cannot override these generated headers. `List-Unsubscribe` and `List-Unsubscribe-Post` are honored as-is on `transactional` sends. Marketing sends receive a compliant unsubscribe header, so supplying either one is rejected with a `422`. Header values may not contain carriage-return or line-feed characters. Up to 25 headers per send, each value up to 998 characters.
+   * Custom email headers, such as `References`, `In-Reply-To`, and `X-*` headers. Reserved headers and values containing carriage returns or line feeds return `422`. Set addressing and subject through their dedicated fields. Transactional sends accept `List-Unsubscribe` and `List-Unsubscribe-Post`. Marketing sends use Bird-managed unsubscribe by default.
    *
    */
   headers?: {
@@ -10730,7 +10730,7 @@ export type AmbNativePayment = {
 
 export type AmbNativeInteractivePayload = unknown & {
   /**
-   * Correlation identifier for this interaction. Bird generates one when omitted.
+   * Correlation identifier for this interaction. Bird generates one when omitted. Use a new value for each message. A reply is linked to its request only when no other sent message in the conversation uses the same identifier.
    */
   request_identifier?: string;
   /**
@@ -11093,9 +11093,17 @@ export type AmbMessage = {
    */
   readonly content: AmbMessageContent | AmbInboundContent;
   /**
-   * Original message matched through Apple’s request identifier within the same workspace, business, and conversation. Omitted when no verified match exists.
+   * Original message matched through Apple’s request identifier within the same workspace, business, and conversation. Omitted when no verified match exists, including when more than one sent message in the conversation uses the reply's request identifier.
    */
   readonly in_reply_to_message_id?: AmbMessageId;
+  /**
+   * Latest customer reply whose `in_reply_to_message_id` names this message. Omitted until a reply is matched, and in webhook payloads.
+   */
+  readonly reply_message_id?: AmbMessageId;
+  /**
+   * When Apple delivered the reply in `reply_message_id` to Bird. This can be slightly earlier than that reply's `created_at`, which records when Bird processed it. Omitted until a reply is matched, and in webhook payloads.
+   */
+  readonly replied_at?: string;
   /**
    * Locale for this message, preserved in Apple’s format, for example en_US. Outbound messages use the request override, then the conversation locale, then the business default. Inbound messages preserve the locale in Apple’s callback. Null when unknown.
    */
@@ -11123,7 +11131,7 @@ export type AmbMessage = {
    */
   readonly last_error?: AmbError;
   /**
-   * The moment this message was accepted (outbound) or received (inbound). This is the timestamp the outbound statistics families bucket and attribute on; there is no separate `accepted_at` field.
+   * The moment this message was accepted (outbound), or recorded by Bird after Apple delivered it (inbound). This is the timestamp the outbound statistics families bucket and attribute on; there is no separate `accepted_at` field.
    */
   readonly created_at: string;
   /**
@@ -27789,7 +27797,7 @@ export type AmbRoutingRuleListWritable = {
 
 export type AmbNativeInteractivePayloadWritable = unknown & {
   /**
-   * Correlation identifier for this interaction. Bird generates one when omitted.
+   * Correlation identifier for this interaction. Bird generates one when omitted. Use a new value for each message. A reply is linked to its request only when no other sent message in the conversation uses the same identifier.
    */
   request_identifier?: string;
   /**
