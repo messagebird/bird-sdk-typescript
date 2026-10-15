@@ -7415,11 +7415,466 @@ export const AttachmentSchema = {
   ],
 } as const;
 
+export const AssetSortFieldSchema = {
+  type: "string",
+  description: "Field used to order media-library records.",
+  enum: ["created_at"],
+  default: "created_at",
+} as const;
+
+export const AssetKindFilterSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "The media category to select when listing assets.\n\n- `image`: covers PNG, JPEG, and GIF.\n- `video`: covers MP4, WebM, and QuickTime.\n- `audio`: covers MP3, M4A, Ogg, and WAV.\n- `document`: covers PDF.\n",
+  enum: ["image", "video", "audio", "document"],
+  example: "image",
+} as const;
+
+export const AssetContentTypeFilterSchema = {
+  type: "string",
+  description: "Stored media type to match.",
+  enum: [
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "video/mp4",
+    "video/webm",
+    "video/quicktime",
+    "audio/mpeg",
+    "audio/mp4",
+    "audio/ogg",
+    "audio/wav",
+    "application/pdf",
+  ],
+} as const;
+
+export const AssetDeletedFilterSchema = {
+  type: "string",
+  description: "Whether to include assets removed from the library.",
+  enum: ["exclude", "include", "only"],
+  default: "exclude",
+} as const;
+
+export const AssetFolderIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^asf_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "asf_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const AssetIDSchema = {
   type: "string",
   minLength: 1,
   pattern: "^ast_[0-9a-hjkmnp-tv-z]{26}$",
   example: "ast_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AssetKindSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "The category a media-library asset's type falls into. Use it to group or filter a\nmixed library.\n\n- `image`: covers PNG, JPEG, and GIF.\n- `video`: covers MP4, WebM, and QuickTime.\n- `audio`: covers MP3, M4A, Ogg, and WAV.\n- `document`: covers PDF.\n",
+  "x-extensible-enum": ["image", "video", "audio", "document"],
+  example: "image",
+} as const;
+
+export const AssetSchema = {
+  description:
+    "A file in the workspace's media library, hosted at a permanent public URL. Embed or link `url` anywhere hosted media is needed, including in email that has already been sent: an asset's bytes and URL never change.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+    {
+      type: "object",
+      required: [
+        "id",
+        "url",
+        "thumbnail_url",
+        "name",
+        "content_type",
+        "kind",
+        "size_bytes",
+        "width",
+        "height",
+        "alt_text",
+        "folder_id",
+        "deleted_at",
+      ],
+      properties: {
+        id: {
+          readOnly: true,
+          $ref: "#/components/schemas/AssetID",
+        },
+        url: {
+          type: "string",
+          format: "uri",
+          minLength: 1,
+          readOnly: true,
+          description:
+            "The asset's permanent public URL. Safe to embed or link in sent messages; for a document the usable form is a link.",
+        },
+        thumbnail_url: {
+          type: ["string", "null"],
+          format: "uri",
+          minLength: 1,
+          readOnly: true,
+          description:
+            "A small preview of the asset, for rendering a picker or a grid. Intended for your own interfaces rather than for embedding in messages. Null for every kind but `image`: generating a preview of a video, an audio file, or a document would mean rendering its contents, which the library does not do. Show an icon for the `kind` instead.",
+        },
+        name: {
+          type: "string",
+          minLength: 1,
+          description:
+            "The asset's display name. Defaults to the uploaded file's name.",
+        },
+        content_type: {
+          type: "string",
+          minLength: 1,
+          readOnly: true,
+          description:
+            "The stored file's media type, determined from its contents.",
+        },
+        kind: {
+          readOnly: true,
+          $ref: "#/components/schemas/AssetKind",
+        },
+        size_bytes: {
+          type: "integer",
+          format: "int64",
+          readOnly: true,
+          description:
+            "The stored file's size in bytes. Images are re-encoded on upload, so for those this can differ from the size of the file you sent. Every other kind is stored byte-for-byte.",
+        },
+        width: {
+          type: ["integer", "null"],
+          readOnly: true,
+          description:
+            "The stored image's width in pixels. Null for every kind but `image`.",
+        },
+        height: {
+          type: ["integer", "null"],
+          readOnly: true,
+          description:
+            "The stored image's height in pixels. Null for every kind but `image`.",
+        },
+        alt_text: {
+          type: ["string", "null"],
+          maxLength: 1000,
+          description:
+            "Default alternative text describing the asset, carried along whenever it is placed. Most mail clients block images by default, so for an image this is often the only thing a recipient reads.",
+        },
+        folder_id: {
+          oneOf: [
+            {
+              $ref: "#/components/schemas/AssetFolderID",
+            },
+            {
+              type: "null",
+            },
+          ],
+          description:
+            "The folder the asset is filed in, or null when it sits at the top level of the library. Filing an asset never changes its URL.",
+        },
+        deleted_at: {
+          type: ["string", "null"],
+          format: "date-time",
+          readOnly: true,
+          description:
+            "When the asset was removed from the library, or null if it is still listed. A removed asset keeps serving at its original URL.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const AssetListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/Asset",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const AssetUploadSchema = {
+  description:
+    "The file to upload, sent as a `multipart/form-data` body. Include each field at most once. Each text field is limited to 8 KiB before surrounding whitespace is trimmed; its character limit also applies.",
+  type: "object",
+  additionalProperties: false,
+  required: ["file"],
+  properties: {
+    file: {
+      type: "string",
+      format: "binary",
+      minLength: 1,
+      description:
+        "The file to upload. The file's contents determine its type; a declared content\ntype is ignored.\n\nImages: PNG, JPEG, GIF, or WebP, up to 5 MB. WebP is converted on upload, and\nevery image is re-encoded.\n\nVideo (MP4, WebM, QuickTime), audio (MP3, M4A, Ogg, WAV), and PDF: up to 25 MB,\nstored byte-for-byte.\n",
+    },
+    name: {
+      type: "string",
+      maxLength: 255,
+      description:
+        "A display name for the asset. Defaults to the uploaded file's name when omitted or empty after trimming.",
+    },
+    alt_text: {
+      type: "string",
+      maxLength: 1000,
+      description:
+        "Default alternative text describing the asset, carried along whenever it is placed.",
+    },
+    folder_id: {
+      $ref: "#/components/schemas/AssetFolderID",
+      description:
+        "The folder to file the asset in. Omit it to place the asset at the top level of the library. Ignored when the upload matches an existing asset, which is returned where it already sits.",
+    },
+  },
+} as const;
+
+export const AssetUpdateSchema = {
+  description:
+    "Fields to change on an asset. Omit a field to leave it as it is. The asset's bytes and URL are fixed and cannot be changed.",
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description: "The asset's display name.",
+    },
+    alt_text: {
+      type: ["string", "null"],
+      maxLength: 1000,
+      description:
+        "Default alternative text describing the image. Send null to clear it.",
+    },
+    folder_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AssetFolderID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The folder to file the asset in. Send null to move it to the top level of the library. Moving an asset never changes its URL.",
+    },
+  },
+  example: {
+    name: "Summer banner",
+    alt_text: "Sunset over the ocean",
+  },
+} as const;
+
+export const AssetReferenceUsageSchema = {
+  description:
+    "Which copy of a resource uses an asset.\n\n- `draft`: it is not reaching anyone yet.\n- `published`: the change has to be published before recipients see it.\n- `both`: the asset is used in both copies.\n",
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["draft", "published", "both"],
+} as const;
+
+export const AssetReferenceSchema = {
+  description:
+    "A resource that uses an asset, so you can find everything to update before replacing an image.",
+  type: "object",
+  additionalProperties: false,
+  required: ["resource_type", "resource_id", "resource_name", "usage"],
+  properties: {
+    resource_type: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": ["email_template"],
+      description:
+        "What kind of resource this is. New kinds appear as other products start using the media library, so treat an unfamiliar value as a resource this client does not know how to link to rather than as an error.",
+    },
+    resource_id: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The resource's own identifier, carrying that resource's prefix (`emt_` for an email template), for linking straight to it.",
+      example: "emt_01j9zyq8k7f0ra2m6c4x5w8pv3",
+    },
+    resource_name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The resource's current display name, read when you list references.",
+    },
+    usage: {
+      readOnly: true,
+      $ref: "#/components/schemas/AssetReferenceUsage",
+    },
+  },
+} as const;
+
+export const AssetReferenceListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data", "truncated"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AssetReference",
+      },
+    },
+    truncated: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "True when more resources use this asset than one response can carry, so the list is a partial answer. Replace the asset's usages you can see, then list again to find the rest.",
+    },
+  },
+} as const;
+
+export const AssetFolderSchema = {
+  description:
+    "A folder in the workspace's media library. Folders organize assets for the people browsing them and never appear in an asset's URL, so moving an asset between folders leaves every message that already embeds it untouched.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+    {
+      type: "object",
+      required: ["id", "name", "parent_id", "path"],
+      properties: {
+        id: {
+          readOnly: true,
+          $ref: "#/components/schemas/AssetFolderID",
+        },
+        name: {
+          type: "string",
+          minLength: 1,
+          maxLength: 255,
+          description:
+            "The folder's display name. Unique among folders sharing the same parent, compared without regard to case.",
+        },
+        parent_id: {
+          oneOf: [
+            {
+              $ref: "#/components/schemas/AssetFolderID",
+            },
+            {
+              type: "null",
+            },
+          ],
+          description:
+            "The folder this one sits in, or null when it sits at the top level of the library.",
+        },
+        path: {
+          type: "string",
+          minLength: 1,
+          readOnly: true,
+          description:
+            "The folder's location written out from the top level, such as `/Marketing/Logos`. Provided so a caller can display a folder without walking its parents.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const AssetFolderListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/AssetFolder",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const AssetFolderCreateSchema = {
+  description: "The folder to create.",
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The folder's display name. Must be unique among folders sharing the same parent, compared without regard to case. Cannot contain `/`.",
+    },
+    parent_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AssetFolderID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The folder to create this one in. Omit it, or send null, to create the folder at the top level of the library.",
+    },
+  },
+  example: {
+    name: "Campaign images",
+  },
+} as const;
+
+export const AssetFolderUpdateSchema = {
+  description:
+    "Fields to change on a folder. Omit a field to leave it as it is. Renaming a folder or moving it changes nothing about the assets inside it, including their URLs.",
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The folder's display name. Must be unique among folders sharing the same parent, compared without regard to case. Cannot contain `/`.",
+    },
+    parent_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AssetFolderID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The folder to move this one into. Send null to move it to the top level of the library. A folder cannot be moved into itself or into one of its own subfolders.",
+    },
+  },
+  example: {
+    name: "Brand images",
+  },
 } as const;
 
 export const ComplianceSubmissionIDSchema = {
@@ -11213,7 +11668,7 @@ export const WhatsAppMessageOriginSchema = {
     "history_sync",
   ],
   description:
-    "Where a message came from when it did not come through Bird live: its provenance. It does not say who answers the contact. On a number shared with the WhatsApp Business app, a message can come from the app while Bird keeps answering.\n\n- `business_agent_echo`: the Meta Business Agent on this number composed it.\n- `business_app_echo`: someone sent it from the WhatsApp Business app on a number shared with it.\n- `history_sync`: WhatsApp copied it, in either direction, from the WhatsApp Business app's chat history when the number was shared. `/v1/whatsapp/messages` does not return imported messages, so it never reports this value.\n",
+    "Where a message came from when it did not come through Bird live: its provenance. It does not say who answers the contact. On a number shared with the WhatsApp Business app, a message can come from the app while Bird keeps answering.\n\n- `business_agent_echo`: the Meta Business Agent on this number composed it.\n- `business_app_echo`: someone sent it from the WhatsApp Business app on a number shared with it.\n- `history_sync`: WhatsApp copied it, in either direction, from the WhatsApp Business app's chat history when the number was shared. Neither `/v1/whatsapp/messages` nor a webhook event reports an imported message, so neither carries this value.\n",
   example: "business_agent_echo",
 } as const;
 
@@ -18698,6 +19153,31 @@ export const AMBRichLinkReferenceSchema = {
   "x-sensitive": true,
 } as const;
 
+export const AMBRichLinkConstructSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["url"],
+  properties: {
+    url: {
+      type: "string",
+      minLength: 1,
+      format: "uri",
+      pattern: "^https://",
+      description:
+        "The App Clip, Apple Music, or Apple Maps URL to build a preview for. An `http://` URL is refused with a `422` `AMBEndpointNotHTTPS`. A URL Apple cannot build a preview for is refused with a `422` `AMBConstructPayloadFailed`; send `rich_link` content with your own `title` and `image` instead.",
+      example: "https://apps.apple.com/app/id123456789?clip=1",
+      "x-sensitive": true,
+    },
+    store_region: {
+      $ref: "#/components/schemas/CountryCode",
+      description:
+        "App Store storefront used to build an App Clip preview. Defaults to `US` when omitted.",
+    },
+  },
+  description:
+    "Asks Apple to build the rich link preview when the message is sent, rather than through a prior `POST /v1/amb/messages/construct-payload` call. No caller holds a signed reference until the send itself resolves one.",
+} as const;
+
 export const AMBNativeRichLinkContentSchema = {
   type: "object",
   additionalProperties: false,
@@ -18711,7 +19191,7 @@ export const AMBNativeRichLinkContentSchema = {
     body: {
       type: "string",
       description:
-        "Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.",
+        "Automatic introductions for rich links are enabled regionally in stages. When enabled for a new send, a nonblank body is sent as a separate text before the link. All parts belong to one message, which becomes sent after Apple accepts all parts. Before activation, and for retries retaining legacy behavior, body is included in the rich link request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the rich link. Use one U+FFFC object replacement character per attachment to control placement.",
       "x-sensitive": true,
     },
     subject: {
@@ -18733,6 +19213,9 @@ export const AMBNativeRichLinkContentSchema = {
     rich_link_data_ref: {
       $ref: "#/components/schemas/AMBRichLinkReference",
     },
+    rich_link_construct: {
+      $ref: "#/components/schemas/AMBRichLinkConstruct",
+    },
   },
   oneOf: [
     {
@@ -18740,8 +19223,9 @@ export const AMBNativeRichLinkContentSchema = {
       not: {
         properties: {
           rich_link_data_ref: {},
+          rich_link_construct: {},
         },
-        required: ["rich_link_data_ref"],
+        required: ["rich_link_data_ref", "rich_link_construct"],
       },
     },
     {
@@ -18749,8 +19233,19 @@ export const AMBNativeRichLinkContentSchema = {
       not: {
         properties: {
           rich_link_data: {},
+          rich_link_construct: {},
         },
-        required: ["rich_link_data"],
+        required: ["rich_link_data", "rich_link_construct"],
+      },
+    },
+    {
+      required: ["rich_link_construct"],
+      not: {
+        properties: {
+          rich_link_data: {},
+          rich_link_data_ref: {},
+        },
+        required: ["rich_link_data", "rich_link_data_ref"],
       },
     },
   ],
@@ -20535,6 +21030,30 @@ export const AMBErrorSchema = {
   },
 } as const;
 
+export const AMBTemplateIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^amt_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "amt_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AMBTemplateVersionIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^amv_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "amv_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AMBTemplateContentHashSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  description:
+    "A fingerprint of Apple Messages template content, prefixed with its algorithm. Compare it within this API version to identify the exact source without transferring it.\n",
+  example:
+    "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+} as const;
+
 export const AMBMessageSchema = {
   type: "object",
   additionalProperties: false,
@@ -20552,6 +21071,11 @@ export const AMBMessageSchema = {
     "content",
     "created_at",
     "cost",
+    "requested_language",
+    "resolved_language",
+    "template_id",
+    "template_version_id",
+    "template_content_hash",
   ],
   properties: {
     id: {
@@ -20717,6 +21241,71 @@ export const AMBMessageSchema = {
       description:
         "Apple purpose identifier carried by this message. Omitted when absent from the message or unavailable on a historical record.",
     },
+    requested_language: {
+      readOnly: true,
+      description:
+        "The template language requested by the send, in canonical form. Null when the send named no language or used no template.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    resolved_language: {
+      readOnly: true,
+      description:
+        "The template language whose text was rendered, in canonical form. Null when the send used no template. This can differ from `requested_language` when the template's fallback policy selects another language.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    template_id: {
+      readOnly: true,
+      description:
+        "The template rendered for this message, or null for a message sent with native content.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBTemplateID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    template_version_id: {
+      readOnly: true,
+      description:
+        "The workspace published version or synthetic built-in version rendered at acceptance, or null for a message sent with native content. For a built-in template, `template_content_hash` identifies the exact catalogue source.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    template_content_hash: {
+      readOnly: true,
+      description:
+        "The rendered language's source fingerprint, or null for a message sent with native content.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBTemplateContentHash",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
   },
 } as const;
 
@@ -20742,10 +21331,88 @@ export const AMBMessageListSchema = {
   ],
 } as const;
 
+export const AMBTemplateSendSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A send-by-template reference. Identify the template by `id` or `slug`. Supply exactly one reference, optionally select a language, and pass variable values in `parameters`.\n",
+  oneOf: [
+    {
+      required: ["id"],
+    },
+    {
+      required: ["slug"],
+    },
+  ],
+  properties: {
+    id: {
+      description: "The workspace or built-in template to send, by ID.",
+      $ref: "#/components/schemas/AMBTemplateID",
+    },
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      description:
+        "The workspace or built-in template to send, by its immutable slug. Read the template's live version to see its variables.\n",
+      example: "bird_order_update",
+    },
+    language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+      ],
+      description:
+        "Which of the template's languages to send. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not carry the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected.\n",
+      example: "fr",
+    },
+    parameters: {
+      type: "object",
+      additionalProperties: true,
+      description:
+        "Values for the template's variables, keyed by variable name. Read the live version to see the accepted keys and formats. A missing key, an undeclared key, an invalid value, or a serialized object over 16 KiB returns `422`.\n",
+      example: {
+        name: "Jamie",
+      },
+    },
+  },
+} as const;
+
 export const AMBMessageSendRequestSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["from", "to", "content"],
+  description:
+    "A message to send. Supply exactly one of `content` (native content) or `template` (a stored template, whose category is derived). Supplying both, or neither, is rejected.\n",
+  required: ["from", "to"],
+  anyOf: [
+    {
+      required: ["content"],
+    },
+    {
+      required: ["template"],
+    },
+  ],
+  not: {
+    anyOf: [
+      {
+        required: ["content", "template"],
+        properties: {
+          content: {},
+          template: {},
+        },
+      },
+      {
+        required: ["template", "category"],
+        properties: {
+          template: {},
+          category: {},
+        },
+      },
+    ],
+  },
   properties: {
     from: {
       type: "string",
@@ -20769,14 +21436,23 @@ export const AMBMessageSendRequestSchema = {
     content: {
       $ref: "#/components/schemas/AMBMessageContent",
       description:
-        "Message content in Apple’s native text, rich_link, or interactive family.",
+        "Message content in Apple’s native text, rich_link, or interactive family. Required unless `template` is supplied (the two are mutually exclusive).",
       "x-sensitive": true,
+    },
+    template: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBTemplateSend",
+        },
+      ],
+      description:
+        "Send using a stored template instead of native content. The category is derived from the template, so `category` is rejected alongside it.\n",
     },
     category: {
       type: "string",
       maxLength: 64,
       description:
-        "Free-form reporting label; it does not change sending or suppression policy, for example `order_update`. Omit it to send with the default empty category.",
+        "Free-form reporting label; it does not change sending or suppression policy, for example `order_update`. Omit it to send with the default empty category. Rejected alongside `template`, where the category is derived from the template.",
       example: "order_update",
     },
     metadata: {
@@ -22681,6 +23357,845 @@ export const AMBConversationStatsResponseSchema = {
         $ref: "#/components/schemas/AMBConversationStatsPoint",
       },
     },
+  },
+} as const;
+
+export const AMBTemplateCategorySchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["transactional", "marketing"],
+  description:
+    "Why messages use this template, fixed at creation. On Apple Messages the category describes intent and becomes the message's reporting `category`; it grants and restricts nothing. Use `marketing` for promotions and `transactional` for service messages.\n",
+} as const;
+
+export const AMBTemplateSortFieldSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Field to sort Apple Messages templates and their versions by.",
+} as const;
+
+export const AMBTemplateLanguageStateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Whether a language is live and whether its draft has unpublished changes.",
+  required: ["status"],
+  properties: {
+    status: {
+      readOnly: true,
+      $ref: "#/components/schemas/TemplateLanguageStatus",
+    },
+    draft: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether the draft has an unpublished change for this language. When true beside `live`, sends keep using the older published content until submit.\n",
+    },
+  },
+} as const;
+
+export const AMBTemplateSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An Apple Messages template without content or draft concurrency settings.",
+  required: [
+    "id",
+    "workspace_id",
+    "slug",
+    "name",
+    "description",
+    "scope",
+    "status",
+    "category",
+    "content_kind",
+    "default_language",
+    "available_languages",
+    "languages",
+    "draft_version_id",
+    "live_version_id",
+    "published_version_id",
+    "last_submitted_at",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      description: "Template ID.",
+      $ref: "#/components/schemas/AMBTemplateID",
+    },
+    workspace_id: {
+      readOnly: true,
+      description:
+        "The workspace that owns the template. Null for a built-in `system` template.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WorkspaceID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The immutable handle used to address and send the template.",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description: "The template's display name.",
+    },
+    description: {
+      type: ["string", "null"],
+      description: "What the template is for. Null if it has no description.",
+    },
+    scope: {
+      $ref: "#/components/schemas/TemplateScope",
+    },
+    status: {
+      $ref: "#/components/schemas/TemplateStatus",
+    },
+    category: {
+      $ref: "#/components/schemas/AMBTemplateCategory",
+    },
+    content_kind: {
+      readOnly: true,
+      description:
+        "Derived message classification, matching the default language's content.\n",
+      $ref: "#/components/schemas/AMBContentKind",
+    },
+    draft_version_id: {
+      readOnly: true,
+      description:
+        "The permanent editable draft version. Null for a built-in template.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    live_version_id: {
+      readOnly: true,
+      description:
+        "The version sends resolve to, or null before first publication.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    published_version_id: {
+      readOnly: true,
+      deprecated: true,
+      description:
+        "Deprecated. Use `live_version_id`, which carries the same value.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    languages: {
+      type: "object",
+      readOnly: true,
+      propertyNames: {
+        type: "string",
+        minLength: 2,
+        maxLength: 35,
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/AMBTemplateLanguageState",
+      },
+      description:
+        "Each language and its live or draft state, keyed by canonical BCP-47 tag.",
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description: "The draft's default language.",
+    },
+    available_languages: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      description:
+        "Languages the live version can currently send. Empty before first publication.",
+    },
+    last_submitted_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was last published. Null before first publication and for built-in templates.",
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was created. Null for built-in templates.",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was last modified. Null for built-in templates.",
+    },
+  },
+} as const;
+
+export const AMBTemplateListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "One page of Apple Messages templates.",
+          items: {
+            $ref: "#/components/schemas/AMBTemplateSummary",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const AMBTemplateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One Apple Messages template identity and its authoring state. Content and variables live on versions, so this resource stays shallow.\n",
+  required: [
+    "id",
+    "workspace_id",
+    "slug",
+    "name",
+    "description",
+    "scope",
+    "status",
+    "category",
+    "content_kind",
+    "default_language",
+    "available_languages",
+    "languages",
+    "on_missing_language",
+    "language_source_required",
+    "draft_version_id",
+    "live_version_id",
+    "published_version_id",
+    "revision",
+    "last_submitted_at",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      description: "Template ID.",
+      $ref: "#/components/schemas/AMBTemplateID",
+    },
+    workspace_id: {
+      readOnly: true,
+      description:
+        "The workspace that owns the template. Null for a built-in `system` template.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WorkspaceID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The immutable handle used to address and send the template. A built-in template's slug starts with `bird_`.\n",
+      example: "order-shipped",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The template's display name. It defaults to the slug and can be changed on workspace templates.",
+      example: "Order shipped",
+    },
+    description: {
+      type: ["string", "null"],
+      description: "What the template is for. Null if it has no description.",
+    },
+    scope: {
+      $ref: "#/components/schemas/TemplateScope",
+    },
+    status: {
+      $ref: "#/components/schemas/TemplateStatus",
+    },
+    category: {
+      $ref: "#/components/schemas/AMBTemplateCategory",
+    },
+    content_kind: {
+      readOnly: true,
+      description:
+        "Derived message classification, matching the default language's content. Every language of a version shares one content_kind; a translation changes wording, not message type.\n",
+      $ref: "#/components/schemas/AMBContentKind",
+    },
+    draft_version_id: {
+      readOnly: true,
+      description:
+        "The permanent editable draft version. Null for a built-in template.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    live_version_id: {
+      readOnly: true,
+      description:
+        "The version sends resolve to, or null before a workspace template is first published. A built-in template points to a synthetic published version that projects its current catalogue content.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    published_version_id: {
+      readOnly: true,
+      deprecated: true,
+      description:
+        "Deprecated. Use `live_version_id`, which carries the same value.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBTemplateVersionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    revision: {
+      type: ["integer", "null"],
+      minimum: 0,
+      readOnly: true,
+      description:
+        "The draft revision to use for concurrent-edit checks. Null for a built-in template.",
+    },
+    languages: {
+      type: "object",
+      readOnly: true,
+      propertyNames: {
+        type: "string",
+        minLength: 2,
+        maxLength: 35,
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/AMBTemplateLanguageState",
+      },
+      description:
+        "Each language the template has, keyed by canonical BCP-47 tag, with its live state and whether the draft contains unpublished changes. Content is available from version reads.\n",
+      example: {
+        en: {
+          status: "live",
+        },
+        nl: {
+          status: "live",
+          draft: true,
+        },
+      },
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description:
+        "The draft's default language. Sends continue using the live version's default until the draft is published.\n",
+    },
+    available_languages: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      description:
+        "Languages the live version can currently send. Empty before first publication.\n",
+      example: ["en"],
+    },
+    on_missing_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateOnMissingLanguage",
+        },
+      ],
+      readOnly: true,
+      description:
+        "How a send handles a requested language that the live version does not have.",
+    },
+    language_source_required: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether each send must name a language instead of using the live version's default.",
+    },
+    last_submitted_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was last published. Null before first publication and for built-in templates.",
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was created. Null for built-in templates.",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the template was last modified. Null for built-in templates.",
+    },
+  },
+} as const;
+
+export const AMBTemplateVersionStatusSchema = {
+  type: "string",
+  minLength: 1,
+  readOnly: true,
+  enum: ["draft", "published"],
+  description:
+    "Whether the version is the editable draft or published. Published workspace versions are immutable and remain `published` after a later version goes live. A built-in template's synthetic published version projects the current catalogue entry.\n",
+  example: "published",
+} as const;
+
+export const AMBTemplateVersionSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One Apple Messages template version without its content.",
+  required: [
+    "id",
+    "template_id",
+    "version_number",
+    "status",
+    "revision",
+    "variables",
+    "default_language",
+    "available_languages",
+    "created_at",
+    "published_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      description: "Template version ID.",
+      $ref: "#/components/schemas/AMBTemplateVersionID",
+    },
+    template_id: {
+      readOnly: true,
+      description: "The template this version belongs to.",
+      $ref: "#/components/schemas/AMBTemplateID",
+    },
+    version_number: {
+      type: ["integer", "null"],
+      minimum: 1,
+      readOnly: true,
+      description:
+        "Sequential publication number. Null for the draft; a built-in template reports 1.",
+    },
+    status: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBTemplateVersionStatus",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "The version's revision counter.",
+    },
+    variables: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/TemplateVariable",
+      },
+      description:
+        "Variables inferred from the version's content and shared by each language.",
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description: "The language this version treats as its default.",
+    },
+    available_languages: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      description: "Languages this version contains, without their content.",
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the version was created. Null for a built-in template's synthetic version.",
+    },
+    published_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the version was published. Null for the draft and for a built-in template's synthetic version.",
+    },
+  },
+  example: {
+    id: "amv_01krdgeqcxet5s7t44vh8rt9mg",
+    template_id: "amt_01krdgeqcxet5s7t44vh8rt9mg",
+    version_number: 1,
+    status: "published",
+    revision: 1,
+    variables: [
+      {
+        key: "order_number",
+        type: "text",
+        required: true,
+        constraint: "A string, number, or boolean.",
+      },
+    ],
+    default_language: "en",
+    created_at: "2026-09-10T09:00:00Z",
+    published_at: "2026-09-10T09:00:00Z",
+    available_languages: ["en"],
+  },
+} as const;
+
+export const AMBTemplateVersionListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "One page of the template's versions, newest first.",
+          items: {
+            $ref: "#/components/schemas/AMBTemplateVersionSummary",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const AMBTemplateVersionLanguageSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One language's content and revision metadata within a version.",
+  required: ["content", "revision", "content_hash", "updated_at"],
+  properties: {
+    content: {
+      $ref: "#/components/schemas/AMBMessageContent",
+      readOnly: true,
+      description:
+        "Stored template content, including its `{{ variable }}` placeholders.",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "This language's revision counter.",
+    },
+    content_hash: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBTemplateContentHash",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this language was last saved. Null for a built-in template.",
+    },
+  },
+  example: {
+    content: {
+      type: "text",
+      body: "Your order {{ order_number }} is on its way.",
+    },
+    revision: 1,
+    content_hash:
+      "sha256:3d948846f5f773fb7bed8ab81b57f3d0ff2cbff24cb549718f4d389f1ab0300a",
+    updated_at: "2026-09-10T09:00:00Z",
+  },
+} as const;
+
+export const AMBTemplateVersionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One Apple Messages template version with its content. A workspace template keeps one editable draft and immutable published versions. A built-in template exposes its current catalogue content as one synthetic published version.\n",
+  required: [
+    "id",
+    "template_id",
+    "version_number",
+    "status",
+    "revision",
+    "variables",
+    "languages",
+    "default_language",
+    "created_at",
+    "published_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      description: "Template version ID.",
+      $ref: "#/components/schemas/AMBTemplateVersionID",
+    },
+    template_id: {
+      readOnly: true,
+      description: "The template this version belongs to.",
+      $ref: "#/components/schemas/AMBTemplateID",
+    },
+    version_number: {
+      type: ["integer", "null"],
+      minimum: 1,
+      readOnly: true,
+      description:
+        "Sequential publication number. Null for the draft; a built-in template reports 1.",
+    },
+    status: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBTemplateVersionStatus",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "The version revision. A draft revision advances with each metadata or content change. Published workspace versions are frozen; a built-in template's synthetic version reports 0.\n",
+    },
+    variables: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/TemplateVariable",
+      },
+      description:
+        "Variables inferred from the version's content. Every language in a publishable Apple Messages version uses the same set. Built-in templates may apply additional typed constraints described by each variable.\n",
+    },
+    languages: {
+      type: "object",
+      readOnly: true,
+      propertyNames: {
+        type: "string",
+        minLength: 2,
+        maxLength: 35,
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/AMBTemplateVersionLanguage",
+      },
+      description:
+        "Full content for each language, keyed by canonical BCP-47 tag.",
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description: "The language this version treats as its default.",
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the version was created. Null for a built-in template's synthetic version.",
+    },
+    published_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the version was published. Null for the draft and for a built-in template's synthetic version.",
+    },
+  },
+  example: {
+    id: "amv_01krdgeqcxet5s7t44vh8rt9mg",
+    template_id: "amt_01krdgeqcxet5s7t44vh8rt9mg",
+    version_number: 1,
+    status: "published",
+    revision: 1,
+    variables: [
+      {
+        key: "order_number",
+        type: "text",
+        required: true,
+        constraint: "A string, number, or boolean.",
+      },
+    ],
+    languages: {
+      en: {
+        content: {
+          type: "text",
+          body: "Your order {{ order_number }} is on its way.",
+        },
+        revision: 1,
+        content_hash:
+          "sha256:3d948846f5f773fb7bed8ab81b57f3d0ff2cbff24cb549718f4d389f1ab0300a",
+        updated_at: "2026-09-10T09:00:00Z",
+      },
+    },
+    default_language: "en",
+    created_at: "2026-09-10T09:00:00Z",
+    published_at: "2026-09-10T09:00:00Z",
+  },
+} as const;
+
+export const AMBTemplateLanguageSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One language of an Apple Messages template version without its content.",
+  required: ["language", "revision", "content_hash", "updated_at"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description: "The language in canonical BCP-47 form.",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description: "This language's revision counter.",
+    },
+    content_hash: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBTemplateContentHash",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this language was last saved. Null for a built-in template.",
+    },
+  },
+  example: {
+    language: "en",
+    revision: 1,
+    content_hash:
+      "sha256:3d948846f5f773fb7bed8ab81b57f3d0ff2cbff24cb549718f4d389f1ab0300a",
+    updated_at: "2026-09-10T09:00:00Z",
+  },
+} as const;
+
+export const AMBTemplateLanguageListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "The version's languages ordered by canonical tag, without content.",
+      items: {
+        $ref: "#/components/schemas/AMBTemplateLanguageSummary",
+      },
+    },
+  },
+} as const;
+
+export const AMBTemplateLanguageSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One language's full Apple Messages template content and revision metadata.",
+  required: ["language", "content", "revision", "content_hash", "updated_at"],
+  properties: {
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      readOnly: true,
+      description: "The language in canonical BCP-47 form.",
+    },
+    content: {
+      $ref: "#/components/schemas/AMBMessageContent",
+      readOnly: true,
+      description:
+        "Stored template content, including its `{{ variable }}` placeholders.",
+    },
+    revision: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "This language's revision counter, used for concurrent-edit checks on draft writes.",
+    },
+    content_hash: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBTemplateContentHash",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this language was last saved. Null for a built-in template.",
+    },
+  },
+  example: {
+    language: "en",
+    content: {
+      type: "text",
+      body: "Your order {{ order_number }} is on its way.",
+    },
+    revision: 1,
+    content_hash:
+      "sha256:3d948846f5f773fb7bed8ab81b57f3d0ff2cbff24cb549718f4d389f1ab0300a",
+    updated_at: "2026-09-10T09:00:00Z",
   },
 } as const;
 
@@ -36039,7 +37554,7 @@ export const WebhookConnectorIDSchema = {
   maxLength: 64,
   pattern: "^[a-z][a-z0-9_]{0,63}$",
   description:
-    "The connector to deliver through. Each connector, its fields and the setup to do on its\nplatform first:\n\n- `claude_managed_agents`: Claude Managed Agents. Send each message you receive to your Claude managed agent.\n  - `agent_id` (`config`, required): Returned when you create the agent. Sessions use its latest version.\n  - `environment_id` (`config`, required): Returned when you create the environment.\n  - `api_key` (secret, in `credentials`, required): From the Claude workspace your agent runs in.\n  - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.\n  - Setup 1: First, set up your agent in Claude. In the Claude Console, create the agent, its environment and an API key in the same workspace, then come back here with their IDs and the key. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.\n  - Setup 2: Create an API key. In the Claude workspace your agent runs in. See https://platform.claude.com/settings/keys.\n  - Setup 3: Copy the agent and environment IDs. Each create returns its ID. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.\n- `grok_bot`: Grok Bot. Send each message you receive to a Grok Bot routine.\n  - `webhook_url` (`config`, required): The routine's webhook URL.\n  - `sender_key` (secret, in `credentials`, required): The routine's sender key. Bird sends it only as the Bearer token.\n  - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.\n  - Setup 1: First, ask Grok Bot to create a routine. Ask Grok Bot to create a routine with a webhook trigger, then paste the webhook URL and sender key it gives you below. See https://cursor.com/docs/cloud-agent/automations#webhook-triggers.\n",
+    "The connector to deliver through. Each connector, its fields and the setup to do on its\nplatform first:\n\n- `claude_managed_agents`: Claude Managed Agents. Send each message you receive to your Claude managed agent.\n  - `agent_id` (`config`, required): Returned when you create the agent. Sessions use its latest version.\n  - `environment_id` (`config`, required): Returned when you create the environment.\n  - `vault_id` (`config`, optional): A credential vault the agent uses, such as the one holding its Bird MCP credential, so it can reply through Bird.\n  - `api_key` (secret, in `credentials`, required): From the Claude workspace your agent runs in.\n  - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.\n  - Setup 1: First, set up your agent in Claude. In the Claude Console, create the agent, its environment and an API key in the same workspace, then come back here with their IDs and the key. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.\n  - Setup 2: Create an API key. In the Claude workspace your agent runs in. See https://platform.claude.com/settings/keys.\n  - Setup 3: Copy the agent and environment IDs. Each create returns its ID. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.\n  - Setup 4: Optionally, add a credential vault. To let the agent reply through Bird, store its Bird MCP credential in a Claude credential vault and give the vault ID here. Each session gets that vault. See https://platform.claude.com/docs/en/managed-agents/vaults.\n- `grok_bot`: Grok Bot. Send each message you receive to a Grok Bot routine.\n  - `webhook_url` (`config`, required): The routine's webhook URL.\n  - `sender_key` (secret, in `credentials`, required): The routine's sender key. Bird sends it only as the Bearer token.\n  - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.\n  - Setup 1: First, ask Grok Bot to create a routine. Ask Grok Bot to create a routine with a webhook trigger, then paste the webhook URL and sender key it gives you below. See https://cursor.com/docs/cloud-agent/automations#webhook-triggers.\n",
   example: "claude_managed_agents",
 } as const;
 
@@ -40014,13 +41529,13 @@ export const EventWhatsAppBaseSchema = {
         $ref: "#/components/schemas/Tag",
       },
       description:
-        "Tags provided on the send request, echoed on every event for the message. Null when the message carried no tags.\n",
+        "Tags from the send request, echoed on every event for the message. Null when the message was not sent through Bird, or its request carried no tags.\n",
     },
     metadata: {
       type: ["object", "null"],
       additionalProperties: true,
       description:
-        "The metadata object provided on the send request, echoed on every event for the message. Null when the message carried no metadata.\n",
+        "The metadata object from the send request, echoed on every event for the message. Null when the message was not sent through Bird, or its request carried no metadata.\n",
       example: {
         order_id: "ord_123",
       },
@@ -40032,7 +41547,16 @@ export const EventWhatsAppBaseSchema = {
         },
       ],
       description:
-        "The message this one answers. On an outbound message it is the `in_reply_to_message_id` the send request quoted. On an inbound message it is what WhatsApp reports as the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. Absent when the message answers nothing, and absent on an inbound message whose target we cannot match to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.\n",
+        "The message this one answers. On an outbound message it is the message it quoted: for a send request, its `in_reply_to_message_id`. On an inbound message it is what WhatsApp reports as the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. Absent when the message answers nothing, and absent on an inbound message whose target we cannot match to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.\n",
+    },
+    origin: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppMessageOrigin",
+        },
+      ],
+      description:
+        "Where the message came from when it did not come through Bird live, the same value `GET /v1/whatsapp/messages/{message_id}` returns. Absent when your workspace sent the message through Bird, or the contact sent it to Bird.\n",
     },
   },
 } as const;
@@ -40093,138 +41617,6 @@ export const EventWhatsAppDeliveredDataSchema = {
             "The participant delivery was confirmed to, on a group message. A group send raises this event once per participant, so this is what tells the deliveries apart. Absent on a one-to-one message, whose `to` already names its recipient.\n",
         },
       },
-    },
-  ],
-} as const;
-
-export const EventWhatsAppReadDataSchema = {
-  type: "object",
-  description: "Payload of the whatsapp.read event.",
-  allOf: [
-    {
-      $ref: "#/components/schemas/EventWhatsAppBase",
-    },
-    {
-      type: "object",
-      properties: {
-        recipient: {
-          allOf: [
-            {
-              $ref: "#/components/schemas/WhatsAppAddress",
-            },
-          ],
-          description:
-            "The participant who opened the message, on a group message. A group send raises this event once per participant, so this is what tells the deliveries apart. Absent on a one-to-one message, whose `to` already names its recipient.\n",
-        },
-      },
-    },
-  ],
-} as const;
-
-export const EventWhatsAppReceivedDataSchema = {
-  type: "object",
-  description:
-    "Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back.\n",
-  allOf: [
-    {
-      $ref: "#/components/schemas/EventWhatsAppBase",
-    },
-    {
-      type: "object",
-      properties: {
-        text: {
-          allOf: [
-            {
-              $ref: "#/components/schemas/WhatsAppText",
-            },
-          ],
-          description: "Text the contact sent.",
-        },
-        image: {
-          allOf: [
-            {
-              $ref: "#/components/schemas/WhatsAppImage",
-            },
-          ],
-          description: "Image the contact sent.",
-        },
-        video: {
-          allOf: [
-            {
-              $ref: "#/components/schemas/WhatsAppVideo",
-            },
-          ],
-          description: "Video the contact sent.",
-        },
-        audio: {
-          allOf: [
-            {
-              $ref: "#/components/schemas/WhatsAppAudio",
-            },
-          ],
-          description: "Audio the contact sent.",
-        },
-        sticker: {
-          allOf: [
-            {
-              $ref: "#/components/schemas/WhatsAppSticker",
-            },
-          ],
-          description: "Sticker the contact sent.",
-        },
-        document: {
-          allOf: [
-            {
-              $ref: "#/components/schemas/WhatsAppDocument",
-            },
-          ],
-          description: "Document the contact sent.",
-        },
-        location: {
-          allOf: [
-            {
-              $ref: "#/components/schemas/WhatsAppLocation",
-            },
-          ],
-          description: "Location the contact sent.",
-        },
-        contact_cards: {
-          type: "array",
-          description:
-            "Contact cards the contact shared, either by tapping a button that asked for their number or by sending a card from their address book.\n",
-          items: {
-            $ref: "#/components/schemas/WhatsAppContactCard",
-          },
-        },
-        interactive_reply: {
-          allOf: [
-            {
-              $ref: "#/components/schemas/WhatsAppInteractiveReply",
-            },
-          ],
-          description:
-            "What the contact tapped, when the message answers an interactive message or a template's quick-reply button.\n",
-        },
-        unsupported: {
-          allOf: [
-            {
-              $ref: "#/components/schemas/WhatsAppUnsupported",
-            },
-          ],
-          description:
-            "Set when the contact sent content the API does not model, naming the WhatsApp content type.\n",
-        },
-      },
-    },
-  ],
-} as const;
-
-export const EventWhatsAppSentDataSchema = {
-  type: "object",
-  description: "Payload of the whatsapp.sent event.",
-  allOf: [
-    {
-      $ref: "#/components/schemas/EventWhatsAppBase",
     },
   ],
 } as const;
@@ -40518,6 +41910,30 @@ export const EventWhatsAppReactedSchema = {
   },
 } as const;
 
+export const EventWhatsAppReadDataSchema = {
+  type: "object",
+  description: "Payload of the whatsapp.read event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventWhatsAppBase",
+    },
+    {
+      type: "object",
+      properties: {
+        recipient: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppAddress",
+            },
+          ],
+          description:
+            "The participant who opened the message, on a group message. A group send raises this event once per participant, so this is what tells the deliveries apart. Absent on a one-to-one message, whose `to` already names its recipient.\n",
+        },
+      },
+    },
+  ],
+} as const;
+
 export const EventWhatsAppReadSchema = {
   type: "object",
   additionalProperties: false,
@@ -40552,10 +41968,109 @@ export const WhatsAppReceivedEventTypeSchema = {
   example: "whatsapp.received",
 } as const;
 
+export const EventWhatsAppReceivedDataSchema = {
+  type: "object",
+  description:
+    "Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back.\n",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventWhatsAppBase",
+    },
+    {
+      type: "object",
+      properties: {
+        text: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppText",
+            },
+          ],
+          description: "Text the contact sent.",
+        },
+        image: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppImage",
+            },
+          ],
+          description: "Image the contact sent.",
+        },
+        video: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppVideo",
+            },
+          ],
+          description: "Video the contact sent.",
+        },
+        audio: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppAudio",
+            },
+          ],
+          description: "Audio the contact sent.",
+        },
+        sticker: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppSticker",
+            },
+          ],
+          description: "Sticker the contact sent.",
+        },
+        document: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppDocument",
+            },
+          ],
+          description: "Document the contact sent.",
+        },
+        location: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppLocation",
+            },
+          ],
+          description: "Location the contact sent.",
+        },
+        contact_cards: {
+          type: "array",
+          description:
+            "Contact cards the contact shared, either by tapping a button that asked for their number or by sending a card from their address book.\n",
+          items: {
+            $ref: "#/components/schemas/WhatsAppContactCard",
+          },
+        },
+        interactive_reply: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppInteractiveReply",
+            },
+          ],
+          description:
+            "What the contact tapped, when the message answers an interactive message or a template's quick-reply button.\n",
+        },
+        unsupported: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppUnsupported",
+            },
+          ],
+          description:
+            "Set when the contact sent content the API does not model, naming the WhatsApp content type.\n",
+        },
+      },
+    },
+  ],
+} as const;
+
 export const EventWhatsAppReceivedSchema = {
   type: "object",
   additionalProperties: false,
-  description: "A contact sent the business a WhatsApp message.",
+  description:
+    "A contact sent the business a WhatsApp message. Not raised while the Meta Business Agent holds the conversation; the message is still stored and returned by the message reads.\n",
   required: ["type", "timestamp", "data"],
   properties: {
     type: {
@@ -40622,10 +42137,21 @@ export const EventWhatsAppRejectedSchema = {
   },
 } as const;
 
+export const EventWhatsAppSentDataSchema = {
+  type: "object",
+  description: "Payload of the whatsapp.sent event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventWhatsAppBase",
+    },
+  ],
+} as const;
+
 export const EventWhatsAppSentSchema = {
   type: "object",
   additionalProperties: false,
-  description: "The API handed the message to Meta for delivery.",
+  description:
+    "The message was handed to Meta for delivery. Raised for a message your workspace sent through Bird, for one sent from the WhatsApp Business app on a number shared with it (`origin: business_app_echo`), and for one the Meta Business Agent sent on your number (`origin: business_agent_echo`).\n",
   required: ["type", "timestamp", "data"],
   properties: {
     type: {
@@ -40639,7 +42165,7 @@ export const EventWhatsAppSentSchema = {
       type: "string",
       minLength: 1,
       format: "date-time",
-      description: "Time the API handed the message to Meta for delivery.",
+      description: "Time the message was handed to Meta for delivery.",
       example: "2026-07-16T12:00:00Z",
     },
     data: {
@@ -48807,6 +50333,128 @@ export const SMSKeywordRuleListWritableSchema = {
   },
 } as const;
 
+export const AssetWritableSchema = {
+  description:
+    "A file in the workspace's media library, hosted at a permanent public URL. Embed or link `url` anywhere hosted media is needed, including in email that has already been sent: an asset's bytes and URL never change.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: ["name", "alt_text", "folder_id"],
+      properties: {
+        name: {
+          type: "string",
+          minLength: 1,
+          description:
+            "The asset's display name. Defaults to the uploaded file's name.",
+        },
+        alt_text: {
+          type: ["string", "null"],
+          maxLength: 1000,
+          description:
+            "Default alternative text describing the asset, carried along whenever it is placed. Most mail clients block images by default, so for an image this is often the only thing a recipient reads.",
+        },
+        folder_id: {
+          oneOf: [
+            {
+              $ref: "#/components/schemas/AssetFolderID",
+            },
+            {
+              type: "null",
+            },
+          ],
+          description:
+            "The folder the asset is filed in, or null when it sits at the top level of the library. Filing an asset never changes its URL.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const AssetListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/AssetWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const AssetReferenceListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+    },
+  },
+} as const;
+
+export const AssetFolderWritableSchema = {
+  description:
+    "A folder in the workspace's media library. Folders organize assets for the people browsing them and never appear in an asset's URL, so moving an asset between folders leaves every message that already embeds it untouched.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: ["name", "parent_id"],
+      properties: {
+        name: {
+          type: "string",
+          minLength: 1,
+          maxLength: 255,
+          description:
+            "The folder's display name. Unique among folders sharing the same parent, compared without regard to case.",
+        },
+        parent_id: {
+          oneOf: [
+            {
+              $ref: "#/components/schemas/AssetFolderID",
+            },
+            {
+              type: "null",
+            },
+          ],
+          description:
+            "The folder this one sits in, or null when it sits at the top level of the library.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const AssetFolderListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/AssetFolderWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
 export const SMSLatencyStatsWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -50747,7 +52395,35 @@ export const AMBMessageListWritableSchema = {
 export const AMBMessageSendRequestWritableSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["from", "to", "content"],
+  description:
+    "A message to send. Supply exactly one of `content` (native content) or `template` (a stored template, whose category is derived). Supplying both, or neither, is rejected.\n",
+  required: ["from", "to"],
+  anyOf: [
+    {
+      required: ["content"],
+    },
+    {
+      required: ["template"],
+    },
+  ],
+  not: {
+    anyOf: [
+      {
+        required: ["content", "template"],
+        properties: {
+          content: {},
+          template: {},
+        },
+      },
+      {
+        required: ["template", "category"],
+        properties: {
+          template: {},
+          category: {},
+        },
+      },
+    ],
+  },
   properties: {
     from: {
       type: "string",
@@ -50771,14 +52447,23 @@ export const AMBMessageSendRequestWritableSchema = {
     content: {
       $ref: "#/components/schemas/AMBMessageContentWritable",
       description:
-        "Message content in Apple’s native text, rich_link, or interactive family.",
+        "Message content in Apple’s native text, rich_link, or interactive family. Required unless `template` is supplied (the two are mutually exclusive).",
       "x-sensitive": true,
+    },
+    template: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBTemplateSend",
+        },
+      ],
+      description:
+        "Send using a stored template instead of native content. The category is derived from the template, so `category` is rejected alongside it.\n",
     },
     category: {
       type: "string",
       maxLength: 64,
       description:
-        "Free-form reporting label; it does not change sending or suppression policy, for example `order_update`. Omit it to send with the default empty category.",
+        "Free-form reporting label; it does not change sending or suppression policy, for example `order_update`. Omit it to send with the default empty category. Rejected alongside `template`, where the category is derived from the template.",
       example: "order_update",
     },
     metadata: {
@@ -51163,6 +52848,177 @@ export const AMBStatsByErrorCodeResponseWritableSchema = {
   additionalProperties: false,
   description:
     "Per-failure-reason breakdown for the requested period, ranked by `send_failed + rejected` descending and capped at the requested `limit` (default 50, max 200). Only messages carrying an error code appear: a `bird:` code is usually a rejection, an `apple:` code a send failure.",
+} as const;
+
+export const AMBTemplateSummaryWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An Apple Messages template without content or draft concurrency settings.",
+  required: ["name", "description", "category"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description: "The template's display name.",
+    },
+    description: {
+      type: ["string", "null"],
+      description: "What the template is for. Null if it has no description.",
+    },
+    category: {
+      $ref: "#/components/schemas/AMBTemplateCategory",
+    },
+  },
+} as const;
+
+export const AMBTemplateListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "One page of Apple Messages templates.",
+          items: {
+            $ref: "#/components/schemas/AMBTemplateSummaryWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const AMBTemplateWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One Apple Messages template identity and its authoring state. Content and variables live on versions, so this resource stays shallow.\n",
+  required: ["name", "description", "category"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The template's display name. It defaults to the slug and can be changed on workspace templates.",
+      example: "Order shipped",
+    },
+    description: {
+      type: ["string", "null"],
+      description: "What the template is for. Null if it has no description.",
+    },
+    category: {
+      $ref: "#/components/schemas/AMBTemplateCategory",
+    },
+  },
+} as const;
+
+export const AMBTemplateVersionListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "One page of the template's versions, newest first.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const AMBTemplateVersionLanguageWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One language's content and revision metadata within a version.",
+  example: {
+    content: {
+      type: "text",
+      body: "Your order {{ order_number }} is on its way.",
+    },
+    revision: 1,
+    content_hash:
+      "sha256:3d948846f5f773fb7bed8ab81b57f3d0ff2cbff24cb549718f4d389f1ab0300a",
+    updated_at: "2026-09-10T09:00:00Z",
+  },
+} as const;
+
+export const AMBTemplateVersionWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One Apple Messages template version with its content. A workspace template keeps one editable draft and immutable published versions. A built-in template exposes its current catalogue content as one synthetic published version.\n",
+  example: {
+    id: "amv_01krdgeqcxet5s7t44vh8rt9mg",
+    template_id: "amt_01krdgeqcxet5s7t44vh8rt9mg",
+    version_number: 1,
+    status: "published",
+    revision: 1,
+    variables: [
+      {
+        key: "order_number",
+        type: "text",
+        required: true,
+        constraint: "A string, number, or boolean.",
+      },
+    ],
+    languages: {
+      en: {
+        content: {
+          type: "text",
+          body: "Your order {{ order_number }} is on its way.",
+        },
+        revision: 1,
+        content_hash:
+          "sha256:3d948846f5f773fb7bed8ab81b57f3d0ff2cbff24cb549718f4d389f1ab0300a",
+        updated_at: "2026-09-10T09:00:00Z",
+      },
+    },
+    default_language: "en",
+    created_at: "2026-09-10T09:00:00Z",
+    published_at: "2026-09-10T09:00:00Z",
+  },
+} as const;
+
+export const AMBTemplateLanguageListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "The version's languages ordered by canonical tag, without content.",
+    },
+  },
+} as const;
+
+export const AMBTemplateLanguageWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One language's full Apple Messages template content and revision metadata.",
+  example: {
+    language: "en",
+    content: {
+      type: "text",
+      body: "Your order {{ order_number }} is on its way.",
+    },
+    revision: 1,
+    content_hash:
+      "sha256:3d948846f5f773fb7bed8ab81b57f3d0ff2cbff24cb549718f4d389f1ab0300a",
+    updated_at: "2026-09-10T09:00:00Z",
+  },
 } as const;
 
 export const WhatsAppBusinessAccountListWritableSchema = {
@@ -54507,6 +56363,52 @@ export const EventSMSUndeliveredWritableSchema = {
   },
 } as const;
 
+export const EventWhatsAppFailedDataWritableSchema = {
+  type: "object",
+  description: "Payload of the whatsapp.failed event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventWhatsAppBase",
+    },
+    {
+      type: "object",
+      required: ["error"],
+      properties: {
+        error: {
+          $ref: "#/components/schemas/WhatsAppErrorWritable",
+          description: "Why the message terminally failed.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EventWhatsAppFailedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "Message delivery failed permanently.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["whatsapp.failed"],
+      description: "Event type.",
+      example: "whatsapp.failed",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the failure was recorded.",
+      example: "2026-07-16T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventWhatsAppFailedDataWritable",
+    },
+  },
+} as const;
+
 export const EventWhatsAppReceivedDataWritableSchema = {
   type: "object",
   description:
@@ -54605,56 +56507,11 @@ export const EventWhatsAppReceivedDataWritableSchema = {
   ],
 } as const;
 
-export const EventWhatsAppFailedDataWritableSchema = {
-  type: "object",
-  description: "Payload of the whatsapp.failed event.",
-  allOf: [
-    {
-      $ref: "#/components/schemas/EventWhatsAppBase",
-    },
-    {
-      type: "object",
-      required: ["error"],
-      properties: {
-        error: {
-          $ref: "#/components/schemas/WhatsAppErrorWritable",
-          description: "Why the message terminally failed.",
-        },
-      },
-    },
-  ],
-} as const;
-
-export const EventWhatsAppFailedWritableSchema = {
-  type: "object",
-  additionalProperties: false,
-  description: "Message delivery failed permanently.",
-  required: ["type", "timestamp", "data"],
-  properties: {
-    type: {
-      type: "string",
-      minLength: 1,
-      enum: ["whatsapp.failed"],
-      description: "Event type.",
-      example: "whatsapp.failed",
-    },
-    timestamp: {
-      type: "string",
-      minLength: 1,
-      format: "date-time",
-      description: "Time the failure was recorded.",
-      example: "2026-07-16T12:00:00Z",
-    },
-    data: {
-      $ref: "#/components/schemas/EventWhatsAppFailedDataWritable",
-    },
-  },
-} as const;
-
 export const EventWhatsAppReceivedWritableSchema = {
   type: "object",
   additionalProperties: false,
-  description: "A contact sent the business a WhatsApp message.",
+  description:
+    "A contact sent the business a WhatsApp message. Not raised while the Meta Business Agent holds the conversation; the message is still stored and returned by the message reads.\n",
   required: ["type", "timestamp", "data"],
   properties: {
     type: {

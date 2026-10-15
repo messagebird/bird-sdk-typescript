@@ -137,6 +137,25 @@ export type {
   SmsTemplateLanguageList,
 } from "./resources/smsTemplatesVersionsLanguages.gen.js";
 export type {
+  AmbTemplate,
+  AmbTemplateSummary,
+  AmbTemplatesListQuery,
+} from "./resources/ambTemplates.gen.js";
+export type {
+  AmbTemplateList,
+  AmbTemplateVersionLanguage,
+  AmbTemplateLanguageSummary,
+} from "./generated/types.gen.js";
+export type {
+  AmbTemplateVersion,
+  AmbTemplateVersionSummary,
+  AmbTemplatesVersionsListQuery,
+} from "./resources/ambTemplatesVersions.gen.js";
+export type {
+  AmbTemplateLanguage,
+  AmbTemplateLanguageList,
+} from "./resources/ambTemplatesVersionsLanguages.gen.js";
+export type {
   SmsStatsSummary,
   SmsStatsResponse,
   SmsStatsByCountryResponse,
@@ -425,6 +444,8 @@ export type {
 export { WebhookEventType } from "./event-types.gen.js";
 export type { WebhookEventTypeValue } from "./event-types.gen.js";
 export {
+  AssetKind,
+  AssetReferenceUsage,
   EsimActionName,
   EsimActionUnavailableReason,
   AMBBusinessAccountReviewStatus,
@@ -500,6 +521,8 @@ export {
   WhatsAppUsernameStatus,
 } from "./open-enums.gen.js";
 export type {
+  AssetKindValue,
+  AssetReferenceUsageValue,
   EsimActionNameValue,
   EsimActionUnavailableReasonValue,
   AMBBusinessAccountReviewStatusValue,
@@ -852,3 +875,18 @@ export type {
   EsimZone,
   EsimZonesListQuery,
 } from "./resources/esimZones.gen.js";
+
+export type {
+  Asset,
+  AssetsListQuery,
+  AssetsUpdateParams,
+} from "./resources/assets.gen.js";
+export type {
+  AssetFolder,
+  AssetsFoldersCreateParams,
+  AssetsFoldersListQuery,
+  AssetsFoldersUpdateParams,
+} from "./resources/assetsFolders.gen.js";
+export type { AssetReferenceList } from "./resources/assetsReferences.gen.js";
+
+export type { AssetReference } from "./generated/types.gen.js";

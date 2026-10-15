@@ -4193,7 +4193,248 @@ export type Attachment = Timestamps & {
   readonly expires_at: string | null;
 };
 
+/**
+ * Field used to order media-library records.
+ */
+export type AssetSortField = "created_at";
+
+/**
+ * The media category to select when listing assets.
+ *
+ * - `image`: covers PNG, JPEG, and GIF.
+ * - `video`: covers MP4, WebM, and QuickTime.
+ * - `audio`: covers MP3, M4A, Ogg, and WAV.
+ * - `document`: covers PDF.
+ *
+ */
+export type AssetKindFilter = "image" | "video" | "audio" | "document";
+
+/**
+ * Stored media type to match.
+ */
+export type AssetContentTypeFilter =
+  | "image/png"
+  | "image/jpeg"
+  | "image/gif"
+  | "video/mp4"
+  | "video/webm"
+  | "video/quicktime"
+  | "audio/mpeg"
+  | "audio/mp4"
+  | "audio/ogg"
+  | "audio/wav"
+  | "application/pdf";
+
+/**
+ * Whether to include assets removed from the library.
+ */
+export type AssetDeletedFilter = "exclude" | "include" | "only";
+
+export type AssetFolderId = string;
+
 export type AssetId = string;
+
+/**
+ * The category a media-library asset's type falls into. Use it to group or filter a
+ * mixed library.
+ *
+ * - `image`: covers PNG, JPEG, and GIF.
+ * - `video`: covers MP4, WebM, and QuickTime.
+ * - `audio`: covers MP3, M4A, Ogg, and WAV.
+ * - `document`: covers PDF.
+ *
+ */
+export type AssetKind =
+  "image" | "video" | "audio" | "document" | (string & {});
+
+/**
+ * A file in the workspace's media library, hosted at a permanent public URL. Embed or link `url` anywhere hosted media is needed, including in email that has already been sent: an asset's bytes and URL never change.
+ */
+export type Asset = Timestamps & {
+  readonly id: AssetId;
+  /**
+   * The asset's permanent public URL. Safe to embed or link in sent messages; for a document the usable form is a link.
+   */
+  readonly url: string;
+  /**
+   * A small preview of the asset, for rendering a picker or a grid. Intended for your own interfaces rather than for embedding in messages. Null for every kind but `image`: generating a preview of a video, an audio file, or a document would mean rendering its contents, which the library does not do. Show an icon for the `kind` instead.
+   */
+  readonly thumbnail_url: string | null;
+  /**
+   * The asset's display name. Defaults to the uploaded file's name.
+   */
+  name: string;
+  /**
+   * The stored file's media type, determined from its contents.
+   */
+  readonly content_type: string;
+  readonly kind: AssetKind;
+  /**
+   * The stored file's size in bytes. Images are re-encoded on upload, so for those this can differ from the size of the file you sent. Every other kind is stored byte-for-byte.
+   */
+  readonly size_bytes: number;
+  /**
+   * The stored image's width in pixels. Null for every kind but `image`.
+   */
+  readonly width: number | null;
+  /**
+   * The stored image's height in pixels. Null for every kind but `image`.
+   */
+  readonly height: number | null;
+  /**
+   * Default alternative text describing the asset, carried along whenever it is placed. Most mail clients block images by default, so for an image this is often the only thing a recipient reads.
+   */
+  alt_text: string | null;
+  /**
+   * The folder the asset is filed in, or null when it sits at the top level of the library. Filing an asset never changes its URL.
+   */
+  folder_id: AssetFolderId | null;
+  /**
+   * When the asset was removed from the library, or null if it is still listed. A removed asset keeps serving at its original URL.
+   */
+  readonly deleted_at: string | null;
+};
+
+export type AssetList = {
+  data: Array<Asset>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * The file to upload, sent as a `multipart/form-data` body. Include each field at most once. Each text field is limited to 8 KiB before surrounding whitespace is trimmed; its character limit also applies.
+ */
+export type AssetUpload = {
+  /**
+   * The file to upload. The file's contents determine its type; a declared content
+   * type is ignored.
+   *
+   * Images: PNG, JPEG, GIF, or WebP, up to 5 MB. WebP is converted on upload, and
+   * every image is re-encoded.
+   *
+   * Video (MP4, WebM, QuickTime), audio (MP3, M4A, Ogg, WAV), and PDF: up to 25 MB,
+   * stored byte-for-byte.
+   *
+   */
+  file: Blob | File;
+  /**
+   * A display name for the asset. Defaults to the uploaded file's name when omitted or empty after trimming.
+   */
+  name?: string;
+  /**
+   * Default alternative text describing the asset, carried along whenever it is placed.
+   */
+  alt_text?: string;
+  /**
+   * The folder to file the asset in. Omit it to place the asset at the top level of the library. Ignored when the upload matches an existing asset, which is returned where it already sits.
+   */
+  folder_id?: AssetFolderId;
+};
+
+/**
+ * Fields to change on an asset. Omit a field to leave it as it is. The asset's bytes and URL are fixed and cannot be changed.
+ */
+export type AssetUpdate = {
+  /**
+   * The asset's display name.
+   */
+  name?: string;
+  /**
+   * Default alternative text describing the image. Send null to clear it.
+   */
+  alt_text?: string | null;
+  /**
+   * The folder to file the asset in. Send null to move it to the top level of the library. Moving an asset never changes its URL.
+   */
+  folder_id?: AssetFolderId | null;
+};
+
+/**
+ * Which copy of a resource uses an asset.
+ *
+ * - `draft`: it is not reaching anyone yet.
+ * - `published`: the change has to be published before recipients see it.
+ * - `both`: the asset is used in both copies.
+ *
+ */
+export type AssetReferenceUsage =
+  "draft" | "published" | "both" | (string & {});
+
+/**
+ * A resource that uses an asset, so you can find everything to update before replacing an image.
+ */
+export type AssetReference = {
+  /**
+   * What kind of resource this is. New kinds appear as other products start using the media library, so treat an unfamiliar value as a resource this client does not know how to link to rather than as an error.
+   */
+  readonly resource_type: string;
+  /**
+   * The resource's own identifier, carrying that resource's prefix (`emt_` for an email template), for linking straight to it.
+   */
+  readonly resource_id: string;
+  /**
+   * The resource's current display name, read when you list references.
+   */
+  readonly resource_name: string;
+  readonly usage: AssetReferenceUsage;
+};
+
+export type AssetReferenceList = {
+  data: Array<AssetReference>;
+  /**
+   * True when more resources use this asset than one response can carry, so the list is a partial answer. Replace the asset's usages you can see, then list again to find the rest.
+   */
+  readonly truncated: boolean;
+};
+
+/**
+ * A folder in the workspace's media library. Folders organize assets for the people browsing them and never appear in an asset's URL, so moving an asset between folders leaves every message that already embeds it untouched.
+ */
+export type AssetFolder = Timestamps & {
+  readonly id: AssetFolderId;
+  /**
+   * The folder's display name. Unique among folders sharing the same parent, compared without regard to case.
+   */
+  name: string;
+  /**
+   * The folder this one sits in, or null when it sits at the top level of the library.
+   */
+  parent_id: AssetFolderId | null;
+  /**
+   * The folder's location written out from the top level, such as `/Marketing/Logos`. Provided so a caller can display a folder without walking its parents.
+   */
+  readonly path: string;
+};
+
+export type AssetFolderList = {
+  data: Array<AssetFolder>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * The folder to create.
+ */
+export type AssetFolderCreate = {
+  /**
+   * The folder's display name. Must be unique among folders sharing the same parent, compared without regard to case. Cannot contain `/`.
+   */
+  name: string;
+  /**
+   * The folder to create this one in. Omit it, or send null, to create the folder at the top level of the library.
+   */
+  parent_id?: AssetFolderId | null;
+};
+
+/**
+ * Fields to change on a folder. Omit a field to leave it as it is. Renaming a folder or moving it changes nothing about the assets inside it, including their URLs.
+ */
+export type AssetFolderUpdate = {
+  /**
+   * The folder's display name. Must be unique among folders sharing the same parent, compared without regard to case. Cannot contain `/`.
+   */
+  name?: string;
+  /**
+   * The folder to move this one into. Send null to move it to the top level of the library. A folder cannot be moved into itself or into one of its own subfolders.
+   */
+  parent_id?: AssetFolderId | null;
+};
 
 export type ComplianceSubmissionId = string;
 
@@ -6403,7 +6644,7 @@ export type Actor = {
  *
  * - `business_agent_echo`: the Meta Business Agent on this number composed it.
  * - `business_app_echo`: someone sent it from the WhatsApp Business app on a number shared with it.
- * - `history_sync`: WhatsApp copied it, in either direction, from the WhatsApp Business app's chat history when the number was shared. `/v1/whatsapp/messages` does not return imported messages, so it never reports this value.
+ * - `history_sync`: WhatsApp copied it, in either direction, from the WhatsApp Business app's chat history when the number was shared. Neither `/v1/whatsapp/messages` nor a webhook event reports an imported message, so neither carries this value.
  *
  */
 export type WhatsAppMessageOrigin =
@@ -10274,13 +10515,27 @@ export type AmbRichLinkReference = unknown & {
   size: number;
 };
 
+/**
+ * Asks Apple to build the rich link preview when the message is sent, rather than through a prior `POST /v1/amb/messages/construct-payload` call. No caller holds a signed reference until the send itself resolves one.
+ */
+export type AmbRichLinkConstruct = {
+  /**
+   * The App Clip, Apple Music, or Apple Maps URL to build a preview for. An `http://` URL is refused with a `422` `AMBEndpointNotHTTPS`. A URL Apple cannot build a preview for is refused with a `422` `AMBConstructPayloadFailed`; send `rich_link` content with your own `title` and `image` instead.
+   */
+  url: string;
+  /**
+   * App Store storefront used to build an App Clip preview. Defaults to `US` when omitted.
+   */
+  store_region?: CountryCode;
+};
+
 export type AmbNativeRichLinkContent = unknown & {
   /**
    * Always rich_link.
    */
   type: AmbMessageType;
   /**
-   * Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.
+   * Automatic introductions for rich links are enabled regionally in stages. When enabled for a new send, a nonblank body is sent as a separate text before the link. All parts belong to one message, which becomes sent after Apple accepts all parts. Before activation, and for retries retaining legacy behavior, body is included in the rich link request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the rich link. Use one U+FFFC object replacement character per attachment to control placement.
    */
   body?: string;
   /**
@@ -10293,6 +10548,7 @@ export type AmbNativeRichLinkContent = unknown & {
   attachments?: Array<AmbNativeAttachment>;
   rich_link_data?: AmbNativeRichLinkData;
   rich_link_data_ref?: AmbRichLinkReference;
+  rich_link_construct?: AmbRichLinkConstruct;
 };
 
 /**
@@ -11057,6 +11313,16 @@ export type AmbError = {
   occurred_at: string;
 } | null;
 
+export type AmbTemplateId = string;
+
+export type AmbTemplateVersionId = string;
+
+/**
+ * A fingerprint of Apple Messages template content, prefixed with its algorithm. Compare it within this API version to identify the exact source without transferring it.
+ *
+ */
+export type AmbTemplateContentHash = string;
+
 export type AmbMessage = {
   /**
    * ID of the message, assigned when it is accepted or received. Pass it as `message_id` to the get-message and list-events endpoints.
@@ -11150,6 +11416,29 @@ export type AmbMessage = {
    * Apple purpose identifier carried by this message. Omitted when absent from the message or unavailable on a historical record.
    */
   readonly intent?: string;
+  /**
+   * The template language requested by the send, in canonical form. Null when the send named no language or used no template.
+   *
+   */
+  readonly requested_language: LanguageTag | null;
+  /**
+   * The template language whose text was rendered, in canonical form. Null when the send used no template. This can differ from `requested_language` when the template's fallback policy selects another language.
+   *
+   */
+  readonly resolved_language: LanguageTag | null;
+  /**
+   * The template rendered for this message, or null for a message sent with native content.
+   */
+  readonly template_id: AmbTemplateId | null;
+  /**
+   * The workspace published version or synthetic built-in version rendered at acceptance, or null for a message sent with native content. For a built-in template, `template_content_hash` identifies the exact catalogue source.
+   *
+   */
+  readonly template_version_id: AmbTemplateVersionId | null;
+  /**
+   * The rendered language's source fingerprint, or null for a message sent with native content.
+   */
+  readonly template_content_hash: AmbTemplateContentHash | null;
 };
 
 export type AmbMessageList = {
@@ -11159,7 +11448,31 @@ export type AmbMessageList = {
   data: Array<AmbMessage>;
 } & ListEnvelope;
 
-export type AmbMessageSendRequest = {
+export type AmbTemplateSend = unknown & {
+  /**
+   * The workspace or built-in template to send, by ID.
+   */
+  id?: AmbTemplateId;
+  /**
+   * The workspace or built-in template to send, by its immutable slug. Read the template's live version to see its variables.
+   *
+   */
+  slug?: TemplateSlug;
+  /**
+   * Which of the template's languages to send. Omit it to send the template's default language, unless the template sets `language_source_required`, in which case a send naming no language is rejected. When the template does not carry the language you ask for, its own `on_missing_language` setting decides whether the closest available language is sent instead or the send is rejected.
+   *
+   */
+  language?: LanguageTag;
+  /**
+   * Values for the template's variables, keyed by variable name. Read the live version to see the accepted keys and formats. A missing key, an undeclared key, an invalid value, or a serialized object over 16 KiB returns `422`.
+   *
+   */
+  parameters?: {
+    [key: string]: unknown;
+  };
+};
+
+export type AmbMessageSendRequest = unknown & {
   /**
    * Apple business identifier of the brand sending the message. Read it from the business’s apple_business_id. The customer must have opened the conversation with this business.
    */
@@ -11173,11 +11486,16 @@ export type AmbMessageSendRequest = {
    */
   source?: AmbMessageSource;
   /**
-   * Message content in Apple’s native text, rich_link, or interactive family.
+   * Message content in Apple’s native text, rich_link, or interactive family. Required unless `template` is supplied (the two are mutually exclusive).
    */
-  content: AmbMessageContent;
+  content?: AmbMessageContent;
   /**
-   * Free-form reporting label; it does not change sending or suppression policy, for example `order_update`. Omit it to send with the default empty category.
+   * Send using a stored template instead of native content. The category is derived from the template, so `category` is rejected alongside it.
+   *
+   */
+  template?: AmbTemplateSend;
+  /**
+   * Free-form reporting label; it does not change sending or suppression policy, for example `order_update`. Omit it to send with the default empty category. Rejected alongside `template`, where the category is derived from the template.
    */
   category?: string;
   /**
@@ -12213,6 +12531,374 @@ export type AmbConversationStatsResponse = {
    * One row per day or hour in chronological order. Buckets with no activity contain zero counts.
    */
   readonly data: Array<AmbConversationStatsPoint>;
+};
+
+/**
+ * Why messages use this template, fixed at creation. On Apple Messages the category describes intent and becomes the message's reporting `category`; it grants and restricts nothing. Use `marketing` for promotions and `transactional` for service messages.
+ *
+ */
+export type AmbTemplateCategory = "transactional" | "marketing";
+
+/**
+ * Field to sort Apple Messages templates and their versions by.
+ */
+export type AmbTemplateSortField = "created_at";
+
+/**
+ * Whether a language is live and whether its draft has unpublished changes.
+ */
+export type AmbTemplateLanguageState = {
+  readonly status: TemplateLanguageStatus;
+  /**
+   * Whether the draft has an unpublished change for this language. When true beside `live`, sends keep using the older published content until submit.
+   *
+   */
+  readonly draft?: boolean;
+};
+
+/**
+ * An Apple Messages template without content or draft concurrency settings.
+ */
+export type AmbTemplateSummary = {
+  /**
+   * Template ID.
+   */
+  readonly id: AmbTemplateId;
+  /**
+   * The workspace that owns the template. Null for a built-in `system` template.
+   */
+  readonly workspace_id: WorkspaceId | null;
+  /**
+   * The immutable handle used to address and send the template.
+   */
+  readonly slug: TemplateSlug;
+  /**
+   * The template's display name.
+   */
+  name: string;
+  /**
+   * What the template is for. Null if it has no description.
+   */
+  description: string | null;
+  scope: TemplateScope;
+  status: TemplateStatus;
+  category: AmbTemplateCategory;
+  /**
+   * Derived message classification, matching the default language's content.
+   *
+   */
+  readonly content_kind: AmbContentKind;
+  /**
+   * The permanent editable draft version. Null for a built-in template.
+   */
+  readonly draft_version_id: AmbTemplateVersionId | null;
+  /**
+   * The version sends resolve to, or null before first publication.
+   */
+  readonly live_version_id: AmbTemplateVersionId | null;
+  /**
+   * Deprecated. Use `live_version_id`, which carries the same value.
+   *
+   * @deprecated
+   */
+  readonly published_version_id: AmbTemplateVersionId | null;
+  /**
+   * Each language and its live or draft state, keyed by canonical BCP-47 tag.
+   */
+  readonly languages: {
+    [key: string]: AmbTemplateLanguageState;
+  };
+  /**
+   * The draft's default language.
+   */
+  readonly default_language: LanguageTag;
+  /**
+   * Languages the live version can currently send. Empty before first publication.
+   */
+  readonly available_languages: Array<LanguageTag>;
+  /**
+   * When the template was last published. Null before first publication and for built-in templates.
+   */
+  readonly last_submitted_at: string | null;
+  /**
+   * When the template was created. Null for built-in templates.
+   */
+  readonly created_at: string | null;
+  /**
+   * When the template was last modified. Null for built-in templates.
+   */
+  readonly updated_at: string | null;
+};
+
+export type AmbTemplateList = {
+  /**
+   * One page of Apple Messages templates.
+   */
+  data: Array<AmbTemplateSummary>;
+} & ListEnvelope;
+
+/**
+ * One Apple Messages template identity and its authoring state. Content and variables live on versions, so this resource stays shallow.
+ *
+ */
+export type AmbTemplate = {
+  /**
+   * Template ID.
+   */
+  readonly id: AmbTemplateId;
+  /**
+   * The workspace that owns the template. Null for a built-in `system` template.
+   */
+  readonly workspace_id: WorkspaceId | null;
+  /**
+   * The immutable handle used to address and send the template. A built-in template's slug starts with `bird_`.
+   *
+   */
+  readonly slug: TemplateSlug;
+  /**
+   * The template's display name. It defaults to the slug and can be changed on workspace templates.
+   */
+  name: string;
+  /**
+   * What the template is for. Null if it has no description.
+   */
+  description: string | null;
+  scope: TemplateScope;
+  status: TemplateStatus;
+  category: AmbTemplateCategory;
+  /**
+   * Derived message classification, matching the default language's content. Every language of a version shares one content_kind; a translation changes wording, not message type.
+   *
+   */
+  readonly content_kind: AmbContentKind;
+  /**
+   * The permanent editable draft version. Null for a built-in template.
+   */
+  readonly draft_version_id: AmbTemplateVersionId | null;
+  /**
+   * The version sends resolve to, or null before a workspace template is first published. A built-in template points to a synthetic published version that projects its current catalogue content.
+   *
+   */
+  readonly live_version_id: AmbTemplateVersionId | null;
+  /**
+   * Deprecated. Use `live_version_id`, which carries the same value.
+   *
+   * @deprecated
+   */
+  readonly published_version_id: AmbTemplateVersionId | null;
+  /**
+   * The draft revision to use for concurrent-edit checks. Null for a built-in template.
+   */
+  readonly revision: number | null;
+  /**
+   * Each language the template has, keyed by canonical BCP-47 tag, with its live state and whether the draft contains unpublished changes. Content is available from version reads.
+   *
+   */
+  readonly languages: {
+    [key: string]: AmbTemplateLanguageState;
+  };
+  /**
+   * The draft's default language. Sends continue using the live version's default until the draft is published.
+   *
+   */
+  readonly default_language: LanguageTag;
+  /**
+   * Languages the live version can currently send. Empty before first publication.
+   *
+   */
+  readonly available_languages: Array<LanguageTag>;
+  /**
+   * How a send handles a requested language that the live version does not have.
+   */
+  readonly on_missing_language: TemplateOnMissingLanguage;
+  /**
+   * Whether each send must name a language instead of using the live version's default.
+   */
+  readonly language_source_required: boolean;
+  /**
+   * When the template was last published. Null before first publication and for built-in templates.
+   */
+  readonly last_submitted_at: string | null;
+  /**
+   * When the template was created. Null for built-in templates.
+   */
+  readonly created_at: string | null;
+  /**
+   * When the template was last modified. Null for built-in templates.
+   */
+  readonly updated_at: string | null;
+};
+
+/**
+ * Whether the version is the editable draft or published. Published workspace versions are immutable and remain `published` after a later version goes live. A built-in template's synthetic published version projects the current catalogue entry.
+ *
+ */
+export type AmbTemplateVersionStatus = "draft" | "published";
+
+/**
+ * One Apple Messages template version without its content.
+ */
+export type AmbTemplateVersionSummary = {
+  /**
+   * Template version ID.
+   */
+  readonly id: AmbTemplateVersionId;
+  /**
+   * The template this version belongs to.
+   */
+  readonly template_id: AmbTemplateId;
+  /**
+   * Sequential publication number. Null for the draft; a built-in template reports 1.
+   */
+  readonly version_number: number | null;
+  readonly status: AmbTemplateVersionStatus;
+  /**
+   * The version's revision counter.
+   */
+  readonly revision: number;
+  /**
+   * Variables inferred from the version's content and shared by each language.
+   */
+  readonly variables: Array<TemplateVariable>;
+  /**
+   * The language this version treats as its default.
+   */
+  readonly default_language: LanguageTag;
+  /**
+   * Languages this version contains, without their content.
+   */
+  readonly available_languages: Array<LanguageTag>;
+  /**
+   * When the version was created. Null for a built-in template's synthetic version.
+   */
+  readonly created_at: string | null;
+  /**
+   * When the version was published. Null for the draft and for a built-in template's synthetic version.
+   */
+  readonly published_at: string | null;
+};
+
+export type AmbTemplateVersionList = {
+  /**
+   * One page of the template's versions, newest first.
+   */
+  data: Array<AmbTemplateVersionSummary>;
+} & ListEnvelope;
+
+/**
+ * One language's content and revision metadata within a version.
+ */
+export type AmbTemplateVersionLanguage = {
+  /**
+   * Stored template content, including its `{{ variable }}` placeholders.
+   */
+  readonly content: AmbMessageContent;
+  /**
+   * This language's revision counter.
+   */
+  readonly revision: number;
+  readonly content_hash: AmbTemplateContentHash;
+  /**
+   * When this language was last saved. Null for a built-in template.
+   */
+  readonly updated_at: string | null;
+};
+
+/**
+ * One Apple Messages template version with its content. A workspace template keeps one editable draft and immutable published versions. A built-in template exposes its current catalogue content as one synthetic published version.
+ *
+ */
+export type AmbTemplateVersion = {
+  /**
+   * Template version ID.
+   */
+  readonly id: AmbTemplateVersionId;
+  /**
+   * The template this version belongs to.
+   */
+  readonly template_id: AmbTemplateId;
+  /**
+   * Sequential publication number. Null for the draft; a built-in template reports 1.
+   */
+  readonly version_number: number | null;
+  readonly status: AmbTemplateVersionStatus;
+  /**
+   * The version revision. A draft revision advances with each metadata or content change. Published workspace versions are frozen; a built-in template's synthetic version reports 0.
+   *
+   */
+  readonly revision: number;
+  /**
+   * Variables inferred from the version's content. Every language in a publishable Apple Messages version uses the same set. Built-in templates may apply additional typed constraints described by each variable.
+   *
+   */
+  readonly variables: Array<TemplateVariable>;
+  /**
+   * Full content for each language, keyed by canonical BCP-47 tag.
+   */
+  readonly languages: {
+    [key: string]: AmbTemplateVersionLanguage;
+  };
+  /**
+   * The language this version treats as its default.
+   */
+  readonly default_language: LanguageTag;
+  /**
+   * When the version was created. Null for a built-in template's synthetic version.
+   */
+  readonly created_at: string | null;
+  /**
+   * When the version was published. Null for the draft and for a built-in template's synthetic version.
+   */
+  readonly published_at: string | null;
+};
+
+/**
+ * One language of an Apple Messages template version without its content.
+ */
+export type AmbTemplateLanguageSummary = {
+  /**
+   * The language in canonical BCP-47 form.
+   */
+  readonly language: LanguageTag;
+  /**
+   * This language's revision counter.
+   */
+  readonly revision: number;
+  readonly content_hash: AmbTemplateContentHash;
+  /**
+   * When this language was last saved. Null for a built-in template.
+   */
+  readonly updated_at: string | null;
+};
+
+export type AmbTemplateLanguageList = {
+  /**
+   * The version's languages ordered by canonical tag, without content.
+   */
+  data: Array<AmbTemplateLanguageSummary>;
+};
+
+/**
+ * One language's full Apple Messages template content and revision metadata.
+ */
+export type AmbTemplateLanguage = {
+  /**
+   * The language in canonical BCP-47 form.
+   */
+  readonly language: LanguageTag;
+  /**
+   * Stored template content, including its `{{ variable }}` placeholders.
+   */
+  readonly content: AmbMessageContent;
+  /**
+   * This language's revision counter, used for concurrent-edit checks on draft writes.
+   */
+  readonly revision: number;
+  readonly content_hash: AmbTemplateContentHash;
+  /**
+   * When this language was last saved. Null for a built-in template.
+   */
+  readonly updated_at: string | null;
 };
 
 /**
@@ -20020,11 +20706,13 @@ export type WebhookEndpointList = {
  * - `claude_managed_agents`: Claude Managed Agents. Send each message you receive to your Claude managed agent.
  * - `agent_id` (`config`, required): Returned when you create the agent. Sessions use its latest version.
  * - `environment_id` (`config`, required): Returned when you create the environment.
+ * - `vault_id` (`config`, optional): A credential vault the agent uses, such as the one holding its Bird MCP credential, so it can reply through Bird.
  * - `api_key` (secret, in `credentials`, required): From the Claude workspace your agent runs in.
  * - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.
  * - Setup 1: First, set up your agent in Claude. In the Claude Console, create the agent, its environment and an API key in the same workspace, then come back here with their IDs and the key. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.
  * - Setup 2: Create an API key. In the Claude workspace your agent runs in. See https://platform.claude.com/settings/keys.
  * - Setup 3: Copy the agent and environment IDs. Each create returns its ID. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.
+ * - Setup 4: Optionally, add a credential vault. To let the agent reply through Bird, store its Bird MCP credential in a Claude credential vault and give the vault ID here. Each session gets that vault. See https://platform.claude.com/docs/en/managed-agents/vaults.
  * - `grok_bot`: Grok Bot. Send each message you receive to a Grok Bot routine.
  * - `webhook_url` (`config`, required): The routine's webhook URL.
  * - `sender_key` (secret, in `credentials`, required): The routine's sender key. Bird sends it only as the Bearer token.
@@ -22203,22 +22891,27 @@ export type EventWhatsAppBase = {
    */
   to: WhatsAppAddress;
   /**
-   * Tags provided on the send request, echoed on every event for the message. Null when the message carried no tags.
+   * Tags from the send request, echoed on every event for the message. Null when the message was not sent through Bird, or its request carried no tags.
    *
    */
   tags: Array<Tag> | null;
   /**
-   * The metadata object provided on the send request, echoed on every event for the message. Null when the message carried no metadata.
+   * The metadata object from the send request, echoed on every event for the message. Null when the message was not sent through Bird, or its request carried no metadata.
    *
    */
   metadata: {
     [key: string]: unknown;
   } | null;
   /**
-   * The message this one answers. On an outbound message it is the `in_reply_to_message_id` the send request quoted. On an inbound message it is what WhatsApp reports as the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. Absent when the message answers nothing, and absent on an inbound message whose target we cannot match to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.
+   * The message this one answers. On an outbound message it is the message it quoted: for a send request, its `in_reply_to_message_id`. On an inbound message it is what WhatsApp reports as the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. Absent when the message answers nothing, and absent on an inbound message whose target we cannot match to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.
    *
    */
   in_reply_to_message_id?: WhatsAppMessageId;
+  /**
+   * Where the message came from when it did not come through Bird live, the same value `GET /v1/whatsapp/messages/{message_id}` returns. Absent when your workspace sent the message through Bird, or the contact sent it to Bird.
+   *
+   */
+  origin?: WhatsAppMessageOrigin;
 };
 
 /**
@@ -22251,72 +22944,6 @@ export type EventWhatsAppDeliveredData = EventWhatsAppBase & {
    */
   recipient?: WhatsAppAddress;
 };
-
-/**
- * Payload of the whatsapp.read event.
- */
-export type EventWhatsAppReadData = EventWhatsAppBase & {
-  /**
-   * The participant who opened the message, on a group message. A group send raises this event once per participant, so this is what tells the deliveries apart. Absent on a one-to-one message, whose `to` already names its recipient.
-   *
-   */
-  recipient?: WhatsAppAddress;
-};
-
-/**
- * Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back.
- *
- */
-export type EventWhatsAppReceivedData = EventWhatsAppBase & {
-  /**
-   * Text the contact sent.
-   */
-  text?: WhatsAppText;
-  /**
-   * Image the contact sent.
-   */
-  image?: WhatsAppImage;
-  /**
-   * Video the contact sent.
-   */
-  video?: WhatsAppVideo;
-  /**
-   * Audio the contact sent.
-   */
-  audio?: WhatsAppAudio;
-  /**
-   * Sticker the contact sent.
-   */
-  sticker?: WhatsAppSticker;
-  /**
-   * Document the contact sent.
-   */
-  document?: WhatsAppDocument;
-  /**
-   * Location the contact sent.
-   */
-  location?: WhatsAppLocation;
-  /**
-   * Contact cards the contact shared, either by tapping a button that asked for their number or by sending a card from their address book.
-   *
-   */
-  contact_cards?: Array<WhatsAppContactCard>;
-  /**
-   * What the contact tapped, when the message answers an interactive message or a template's quick-reply button.
-   *
-   */
-  interactive_reply?: WhatsAppInteractiveReply;
-  /**
-   * Set when the contact sent content the API does not model, naming the WhatsApp content type.
-   *
-   */
-  unsupported?: WhatsAppUnsupported;
-};
-
-/**
- * Payload of the whatsapp.sent event.
- */
-export type EventWhatsAppSentData = EventWhatsAppBase;
 
 /**
  * The message was delivered to the recipient's device.
@@ -22490,6 +23117,17 @@ export type EventWhatsAppReacted = {
 };
 
 /**
+ * Payload of the whatsapp.read event.
+ */
+export type EventWhatsAppReadData = EventWhatsAppBase & {
+  /**
+   * The participant who opened the message, on a group message. A group send raises this event once per participant, so this is what tells the deliveries apart. Absent on a one-to-one message, whose `to` already names its recipient.
+   *
+   */
+  recipient?: WhatsAppAddress;
+};
+
+/**
  * The recipient read the message.
  */
 export type EventWhatsAppRead = {
@@ -22510,7 +23148,58 @@ export type EventWhatsAppRead = {
 export type WhatsAppReceivedEventType = "whatsapp.received";
 
 /**
- * A contact sent the business a WhatsApp message.
+ * Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back.
+ *
+ */
+export type EventWhatsAppReceivedData = EventWhatsAppBase & {
+  /**
+   * Text the contact sent.
+   */
+  text?: WhatsAppText;
+  /**
+   * Image the contact sent.
+   */
+  image?: WhatsAppImage;
+  /**
+   * Video the contact sent.
+   */
+  video?: WhatsAppVideo;
+  /**
+   * Audio the contact sent.
+   */
+  audio?: WhatsAppAudio;
+  /**
+   * Sticker the contact sent.
+   */
+  sticker?: WhatsAppSticker;
+  /**
+   * Document the contact sent.
+   */
+  document?: WhatsAppDocument;
+  /**
+   * Location the contact sent.
+   */
+  location?: WhatsAppLocation;
+  /**
+   * Contact cards the contact shared, either by tapping a button that asked for their number or by sending a card from their address book.
+   *
+   */
+  contact_cards?: Array<WhatsAppContactCard>;
+  /**
+   * What the contact tapped, when the message answers an interactive message or a template's quick-reply button.
+   *
+   */
+  interactive_reply?: WhatsAppInteractiveReply;
+  /**
+   * Set when the contact sent content the API does not model, naming the WhatsApp content type.
+   *
+   */
+  unsupported?: WhatsAppUnsupported;
+};
+
+/**
+ * A contact sent the business a WhatsApp message. Not raised while the Meta Business Agent holds the conversation; the message is still stored and returned by the message reads.
+ *
  */
 export type EventWhatsAppReceived = {
   type: WhatsAppReceivedEventType;
@@ -22547,7 +23236,13 @@ export type EventWhatsAppRejected = {
 };
 
 /**
- * The API handed the message to Meta for delivery.
+ * Payload of the whatsapp.sent event.
+ */
+export type EventWhatsAppSentData = EventWhatsAppBase;
+
+/**
+ * The message was handed to Meta for delivery. Raised for a message your workspace sent through Bird, for one sent from the WhatsApp Business app on a number shared with it (`origin: business_app_echo`), and for one the Meta Business Agent sent on your number (`origin: business_agent_echo`).
+ *
  */
 export type EventWhatsAppSent = {
   /**
@@ -22555,7 +23250,7 @@ export type EventWhatsAppSent = {
    */
   type: "whatsapp.sent";
   /**
-   * Time the API handed the message to Meta for delivery.
+   * Time the message was handed to Meta for delivery.
    */
   timestamp: string;
   data: EventWhatsAppSentData;
@@ -26867,6 +27562,50 @@ export type SmsKeywordRuleListWritable = {
 };
 
 /**
+ * A file in the workspace's media library, hosted at a permanent public URL. Embed or link `url` anywhere hosted media is needed, including in email that has already been sent: an asset's bytes and URL never change.
+ */
+export type AssetWritable = {
+  /**
+   * The asset's display name. Defaults to the uploaded file's name.
+   */
+  name: string;
+  /**
+   * Default alternative text describing the asset, carried along whenever it is placed. Most mail clients block images by default, so for an image this is often the only thing a recipient reads.
+   */
+  alt_text: string | null;
+  /**
+   * The folder the asset is filed in, or null when it sits at the top level of the library. Filing an asset never changes its URL.
+   */
+  folder_id: AssetFolderId | null;
+};
+
+export type AssetListWritable = {
+  data: Array<AssetWritable>;
+} & ListEnvelopeWithTotal;
+
+export type AssetReferenceListWritable = {
+  data: Array<unknown>;
+};
+
+/**
+ * A folder in the workspace's media library. Folders organize assets for the people browsing them and never appear in an asset's URL, so moving an asset between folders leaves every message that already embeds it untouched.
+ */
+export type AssetFolderWritable = {
+  /**
+   * The folder's display name. Unique among folders sharing the same parent, compared without regard to case.
+   */
+  name: string;
+  /**
+   * The folder this one sits in, or null when it sits at the top level of the library.
+   */
+  parent_id: AssetFolderId | null;
+};
+
+export type AssetFolderListWritable = {
+  data: Array<AssetFolderWritable>;
+} & ListEnvelopeWithTotal;
+
+/**
  * Latency percentiles in milliseconds for the requested scope:
  *
  * - `processing`: From acceptance to carrier handoff.
@@ -27911,7 +28650,7 @@ export type AmbMessageListWritable = {
   data: Array<AmbMessageWritable>;
 } & ListEnvelope;
 
-export type AmbMessageSendRequestWritable = {
+export type AmbMessageSendRequestWritable = unknown & {
   /**
    * Apple business identifier of the brand sending the message. Read it from the business’s apple_business_id. The customer must have opened the conversation with this business.
    */
@@ -27925,11 +28664,16 @@ export type AmbMessageSendRequestWritable = {
    */
   source?: AmbMessageSource;
   /**
-   * Message content in Apple’s native text, rich_link, or interactive family.
+   * Message content in Apple’s native text, rich_link, or interactive family. Required unless `template` is supplied (the two are mutually exclusive).
    */
-  content: AmbMessageContentWritable;
+  content?: AmbMessageContentWritable;
   /**
-   * Free-form reporting label; it does not change sending or suppression policy, for example `order_update`. Omit it to send with the default empty category.
+   * Send using a stored template instead of native content. The category is derived from the template, so `category` is rejected alongside it.
+   *
+   */
+  template?: AmbTemplateSend;
+  /**
+   * Free-form reporting label; it does not change sending or suppression policy, for example `order_update`. Omit it to send with the default empty category. Rejected alongside `template`, where the category is derived from the template.
    */
   category?: string;
   /**
@@ -28187,6 +28931,80 @@ export type AmbErrorCodeStatsPointWritable = {
  * Per-failure-reason breakdown for the requested period, ranked by `send_failed + rejected` descending and capped at the requested `limit` (default 50, max 200). Only messages carrying an error code appear: a `bird:` code is usually a rejection, an `apple:` code a send failure.
  */
 export type AmbStatsByErrorCodeResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * An Apple Messages template without content or draft concurrency settings.
+ */
+export type AmbTemplateSummaryWritable = {
+  /**
+   * The template's display name.
+   */
+  name: string;
+  /**
+   * What the template is for. Null if it has no description.
+   */
+  description: string | null;
+  category: AmbTemplateCategory;
+};
+
+export type AmbTemplateListWritable = {
+  /**
+   * One page of Apple Messages templates.
+   */
+  data: Array<AmbTemplateSummaryWritable>;
+} & ListEnvelope;
+
+/**
+ * One Apple Messages template identity and its authoring state. Content and variables live on versions, so this resource stays shallow.
+ *
+ */
+export type AmbTemplateWritable = {
+  /**
+   * The template's display name. It defaults to the slug and can be changed on workspace templates.
+   */
+  name: string;
+  /**
+   * What the template is for. Null if it has no description.
+   */
+  description: string | null;
+  category: AmbTemplateCategory;
+};
+
+export type AmbTemplateVersionListWritable = {
+  /**
+   * One page of the template's versions, newest first.
+   */
+  data: Array<unknown>;
+} & ListEnvelope;
+
+/**
+ * One language's content and revision metadata within a version.
+ */
+export type AmbTemplateVersionLanguageWritable = {
+  [key: string]: never;
+};
+
+/**
+ * One Apple Messages template version with its content. A workspace template keeps one editable draft and immutable published versions. A built-in template exposes its current catalogue content as one synthetic published version.
+ *
+ */
+export type AmbTemplateVersionWritable = {
+  [key: string]: never;
+};
+
+export type AmbTemplateLanguageListWritable = {
+  /**
+   * The version's languages ordered by canonical tag, without content.
+   */
+  data: Array<unknown>;
+};
+
+/**
+ * One language's full Apple Messages template content and revision metadata.
+ */
+export type AmbTemplateLanguageWritable = {
   [key: string]: never;
 };
 
@@ -30116,6 +30934,31 @@ export type EventSmsUndeliveredWritable = {
 };
 
 /**
+ * Payload of the whatsapp.failed event.
+ */
+export type EventWhatsAppFailedDataWritable = EventWhatsAppBase & {
+  /**
+   * Why the message terminally failed.
+   */
+  error: WhatsAppErrorWritable;
+};
+
+/**
+ * Message delivery failed permanently.
+ */
+export type EventWhatsAppFailedWritable = {
+  /**
+   * Event type.
+   */
+  type: "whatsapp.failed";
+  /**
+   * Time the failure was recorded.
+   */
+  timestamp: string;
+  data: EventWhatsAppFailedDataWritable;
+};
+
+/**
  * Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back.
  *
  */
@@ -30166,32 +31009,8 @@ export type EventWhatsAppReceivedDataWritable = EventWhatsAppBase & {
 };
 
 /**
- * Payload of the whatsapp.failed event.
- */
-export type EventWhatsAppFailedDataWritable = EventWhatsAppBase & {
-  /**
-   * Why the message terminally failed.
-   */
-  error: WhatsAppErrorWritable;
-};
-
-/**
- * Message delivery failed permanently.
- */
-export type EventWhatsAppFailedWritable = {
-  /**
-   * Event type.
-   */
-  type: "whatsapp.failed";
-  /**
-   * Time the failure was recorded.
-   */
-  timestamp: string;
-  data: EventWhatsAppFailedDataWritable;
-};
-
-/**
- * A contact sent the business a WhatsApp message.
+ * A contact sent the business a WhatsApp message. Not raised while the Meta Business Agent holds the conversation; the message is still stored and returned by the message reads.
+ *
  */
 export type EventWhatsAppReceivedWritable = {
   type: WhatsAppReceivedEventType;
@@ -37467,6 +38286,929 @@ export type UpdateSmsKeywordRuleResponses = {
 
 export type UpdateSmsKeywordRuleResponse =
   UpdateSmsKeywordRuleResponses[keyof UpdateSmsKeywordRuleResponses];
+
+export type ListAssetsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by. Defaults to `created_at`.
+     */
+    sort?: AssetSortField;
+    /**
+     * Return only assets in this category. This groups exact `content_type` values into images, video, audio, and documents.
+     */
+    kind?: AssetKindFilter;
+    /**
+     * Return only assets stored with this media type.
+     */
+    content_type?: AssetContentTypeFilter;
+    /**
+     * Whether to include assets that have been removed from the library. Removed assets keep serving at their original URL, so they remain listable.
+     *
+     */
+    deleted?: AssetDeletedFilter;
+    /**
+     * A case-insensitive substring match against the asset's name.
+     */
+    q?: string;
+    /**
+     * Return only the assets filed directly in this folder. Subfolders are not included, and a folder that does not exist matches nothing. Cannot be combined with `root_only`.
+     */
+    folder_id?: AssetFolderId;
+    /**
+     * Return only the assets at the top level of the library, filed in no folder. Cannot be combined with `folder_id`.
+     */
+    root_only?: boolean;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+  };
+  url: "/v1/assets";
+};
+
+export type ListAssetsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+};
+
+export type ListAssetsError = ListAssetsErrors[keyof ListAssetsErrors];
+
+export type ListAssetsResponses = {
+  /**
+   * A page of assets.
+   */
+  200: AssetList;
+};
+
+export type ListAssetsResponse = ListAssetsResponses[keyof ListAssetsResponses];
+
+export type DeleteAssetData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the asset.
+     */
+    asset_id: AssetId;
+  };
+  query?: never;
+  url: "/v1/assets/{asset_id}";
+};
+
+export type DeleteAssetErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteAssetError = DeleteAssetErrors[keyof DeleteAssetErrors];
+
+export type DeleteAssetResponses = {
+  /**
+   * The asset was removed from the library.
+   */
+  204: void;
+};
+
+export type DeleteAssetResponse =
+  DeleteAssetResponses[keyof DeleteAssetResponses];
+
+export type GetAssetData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the asset.
+     */
+    asset_id: AssetId;
+  };
+  query?: never;
+  url: "/v1/assets/{asset_id}";
+};
+
+export type GetAssetErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+};
+
+export type GetAssetError = GetAssetErrors[keyof GetAssetErrors];
+
+export type GetAssetResponses = {
+  /**
+   * The asset.
+   */
+  200: Asset;
+};
+
+export type GetAssetResponse = GetAssetResponses[keyof GetAssetResponses];
+
+export type UpdateAssetData = {
+  body: AssetUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the asset.
+     */
+    asset_id: AssetId;
+  };
+  query?: never;
+  url: "/v1/assets/{asset_id}";
+};
+
+export type UpdateAssetErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateAssetError = UpdateAssetErrors[keyof UpdateAssetErrors];
+
+export type UpdateAssetResponses = {
+  /**
+   * The updated asset.
+   */
+  200: Asset;
+};
+
+export type UpdateAssetResponse =
+  UpdateAssetResponses[keyof UpdateAssetResponses];
+
+export type ListAssetReferencesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the asset.
+     */
+    asset_id: AssetId;
+  };
+  query?: never;
+  url: "/v1/assets/{asset_id}/references";
+};
+
+export type ListAssetReferencesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+};
+
+export type ListAssetReferencesError =
+  ListAssetReferencesErrors[keyof ListAssetReferencesErrors];
+
+export type ListAssetReferencesResponses = {
+  /**
+   * The resources that reference the asset.
+   */
+  200: AssetReferenceList;
+};
+
+export type ListAssetReferencesResponse =
+  ListAssetReferencesResponses[keyof ListAssetReferencesResponses];
+
+export type ListAssetFoldersData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by. Defaults to `created_at`.
+     */
+    sort?: AssetSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+  };
+  url: "/v1/asset-folders";
+};
+
+export type ListAssetFoldersErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+};
+
+export type ListAssetFoldersError =
+  ListAssetFoldersErrors[keyof ListAssetFoldersErrors];
+
+export type ListAssetFoldersResponses = {
+  /**
+   * A page of folders.
+   */
+  200: AssetFolderList;
+};
+
+export type ListAssetFoldersResponse =
+  ListAssetFoldersResponses[keyof ListAssetFoldersResponses];
+
+export type CreateAssetFolderData = {
+  body: AssetFolderCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/asset-folders";
+};
+
+export type CreateAssetFolderErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateAssetFolderError =
+  CreateAssetFolderErrors[keyof CreateAssetFolderErrors];
+
+export type CreateAssetFolderResponses = {
+  /**
+   * The created folder.
+   */
+  201: AssetFolder;
+};
+
+export type CreateAssetFolderResponse =
+  CreateAssetFolderResponses[keyof CreateAssetFolderResponses];
+
+export type DeleteAssetFolderData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the asset folder.
+     */
+    folder_id: AssetFolderId;
+  };
+  query?: never;
+  url: "/v1/asset-folders/{folder_id}";
+};
+
+export type DeleteAssetFolderErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteAssetFolderError =
+  DeleteAssetFolderErrors[keyof DeleteAssetFolderErrors];
+
+export type DeleteAssetFolderResponses = {
+  /**
+   * The folder was deleted and its contents moved up one level.
+   */
+  204: void;
+};
+
+export type DeleteAssetFolderResponse =
+  DeleteAssetFolderResponses[keyof DeleteAssetFolderResponses];
+
+export type GetAssetFolderData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the asset folder.
+     */
+    folder_id: AssetFolderId;
+  };
+  query?: never;
+  url: "/v1/asset-folders/{folder_id}";
+};
+
+export type GetAssetFolderErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+};
+
+export type GetAssetFolderError =
+  GetAssetFolderErrors[keyof GetAssetFolderErrors];
+
+export type GetAssetFolderResponses = {
+  /**
+   * The folder.
+   */
+  200: AssetFolder;
+};
+
+export type GetAssetFolderResponse =
+  GetAssetFolderResponses[keyof GetAssetFolderResponses];
+
+export type UpdateAssetFolderData = {
+  body: AssetFolderUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the asset folder.
+     */
+    folder_id: AssetFolderId;
+  };
+  query?: never;
+  url: "/v1/asset-folders/{folder_id}";
+};
+
+export type UpdateAssetFolderErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateAssetFolderError =
+  UpdateAssetFolderErrors[keyof UpdateAssetFolderErrors];
+
+export type UpdateAssetFolderResponses = {
+  /**
+   * The updated folder.
+   */
+  200: AssetFolder;
+};
+
+export type UpdateAssetFolderResponse =
+  UpdateAssetFolderResponses[keyof UpdateAssetFolderResponses];
 
 export type GetSmsStatsSummaryData = {
   body?: never;
@@ -47927,6 +49669,488 @@ export type GetAmbConversationStatsHourlyResponses = {
 
 export type GetAmbConversationStatsHourlyResponse =
   GetAmbConversationStatsHourlyResponses[keyof GetAmbConversationStatsHourlyResponses];
+
+export type ListAmbTemplatesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Filter by who owns the template. Use `system` for built-in templates and `workspace` for templates your workspace created.
+     */
+    scope?: TemplateScope;
+    /**
+     * Return templates in this category.
+     */
+    category?: AmbTemplateCategory;
+    /**
+     * Return templates with this lifecycle status.
+     */
+    status?: TemplateStatus;
+    /**
+     * Return templates whose live or draft content is this kind.
+     */
+    content_kind?: AmbContentKind;
+    /**
+     * Return templates whose published content contains this language, after the tag is canonicalized. Draft-only languages do not match.
+     */
+    language?: LanguageTag;
+    /**
+     * A case-insensitive substring search across slug, name, and description.
+     */
+    q?: string;
+    /**
+     * Field to sort by.
+     */
+    sort?: AmbTemplateSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/amb/templates";
+};
+
+export type ListAmbTemplatesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListAmbTemplatesError =
+  ListAmbTemplatesErrors[keyof ListAmbTemplatesErrors];
+
+export type ListAmbTemplatesResponses = {
+  /**
+   * Paginated list of Apple Messages templates.
+   */
+  200: AmbTemplateList;
+};
+
+export type ListAmbTemplatesResponse =
+  ListAmbTemplatesResponses[keyof ListAmbTemplatesResponses];
+
+export type GetAmbTemplateData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The template's ID (`amt_…`) or slug. Built-in templates use a `bird_` slug. Write operations accept workspace templates because built-in templates are read-only.
+     *
+     */
+    template_ref: string;
+  };
+  query?: never;
+  url: "/v1/amb/templates/{template_ref}";
+};
+
+export type GetAmbTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetAmbTemplateError =
+  GetAmbTemplateErrors[keyof GetAmbTemplateErrors];
+
+export type GetAmbTemplateResponses = {
+  /**
+   * The requested Apple Messages template.
+   */
+  200: AmbTemplate;
+};
+
+export type GetAmbTemplateResponse =
+  GetAmbTemplateResponses[keyof GetAmbTemplateResponses];
+
+export type ListAmbTemplateVersionsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The template's ID (`amt_…`) or slug.
+     */
+    template_ref: string;
+  };
+  query?: {
+    /**
+     * Field to sort by.
+     */
+    sort?: AmbTemplateSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/amb/templates/{template_ref}/versions";
+};
+
+export type ListAmbTemplateVersionsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListAmbTemplateVersionsError =
+  ListAmbTemplateVersionsErrors[keyof ListAmbTemplateVersionsErrors];
+
+export type ListAmbTemplateVersionsResponses = {
+  /**
+   * Paginated list of template versions.
+   */
+  200: AmbTemplateVersionList;
+};
+
+export type ListAmbTemplateVersionsResponse =
+  ListAmbTemplateVersionsResponses[keyof ListAmbTemplateVersionsResponses];
+
+export type GetAmbTemplateVersionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The template's ID (`amt_…`) or slug.
+     */
+    template_ref: string;
+    /**
+     * The version to read or reset.
+     */
+    version_id: AmbTemplateVersionId;
+  };
+  query?: never;
+  url: "/v1/amb/templates/{template_ref}/versions/{version_id}";
+};
+
+export type GetAmbTemplateVersionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetAmbTemplateVersionError =
+  GetAmbTemplateVersionErrors[keyof GetAmbTemplateVersionErrors];
+
+export type GetAmbTemplateVersionResponses = {
+  /**
+   * The requested Apple Messages template version.
+   */
+  200: AmbTemplateVersion;
+};
+
+export type GetAmbTemplateVersionResponse =
+  GetAmbTemplateVersionResponses[keyof GetAmbTemplateVersionResponses];
+
+export type ListAmbTemplateVersionLanguagesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The template's ID (`amt_…`) or slug.
+     */
+    template_ref: string;
+    /**
+     * The version whose languages to list.
+     */
+    version_id: AmbTemplateVersionId;
+  };
+  query?: never;
+  url: "/v1/amb/templates/{template_ref}/versions/{version_id}/languages";
+};
+
+export type ListAmbTemplateVersionLanguagesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListAmbTemplateVersionLanguagesError =
+  ListAmbTemplateVersionLanguagesErrors[keyof ListAmbTemplateVersionLanguagesErrors];
+
+export type ListAmbTemplateVersionLanguagesResponses = {
+  /**
+   * The version's language summaries.
+   */
+  200: AmbTemplateLanguageList;
+};
+
+export type ListAmbTemplateVersionLanguagesResponse =
+  ListAmbTemplateVersionLanguagesResponses[keyof ListAmbTemplateVersionLanguagesResponses];
+
+export type GetAmbTemplateVersionLanguageData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The template's ID (`amt_…`) or slug.
+     */
+    template_ref: string;
+    /**
+     * The version that holds the language.
+     */
+    version_id: AmbTemplateVersionId;
+    /**
+     * The language as a BCP-47 tag. Case and separator differences are accepted and canonicalized.
+     */
+    language: LanguageTag;
+  };
+  query?: never;
+  url: "/v1/amb/templates/{template_ref}/versions/{version_id}/languages/{language}";
+};
+
+export type GetAmbTemplateVersionLanguageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetAmbTemplateVersionLanguageError =
+  GetAmbTemplateVersionLanguageErrors[keyof GetAmbTemplateVersionLanguageErrors];
+
+export type GetAmbTemplateVersionLanguageResponses = {
+  /**
+   * The requested language and its text.
+   */
+  200: AmbTemplateLanguage;
+};
+
+export type GetAmbTemplateVersionLanguageResponse =
+  GetAmbTemplateVersionLanguageResponses[keyof GetAmbTemplateVersionLanguageResponses];
 
 export type ListWhatsAppBusinessAccountsData = {
   body?: never;

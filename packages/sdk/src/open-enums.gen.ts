@@ -118,6 +118,35 @@ export const AMBSuppressionReason = {
 export type AMBSuppressionReasonValue = (typeof AMBSuppressionReason)[keyof typeof AMBSuppressionReason];
 
 /**
+ * Values of AssetKind known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const AssetKind = {
+  Audio: "audio",
+  Document: "document",
+  Image: "image",
+  Video: "video",
+} as const;
+
+/** A known AssetKind value. */
+export type AssetKindValue = (typeof AssetKind)[keyof typeof AssetKind];
+
+/**
+ * Values of AssetReferenceUsage known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const AssetReferenceUsage = {
+  Both: "both",
+  Draft: "draft",
+  Published: "published",
+} as const;
+
+/** A known AssetReferenceUsage value. */
+export type AssetReferenceUsageValue = (typeof AssetReferenceUsage)[keyof typeof AssetReferenceUsage];
+
+/**
  * Values of DestinationRegion known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.

@@ -51,6 +51,9 @@ import type {
   CreateAmbSuppressionData,
   CreateAmbSuppressionErrors,
   CreateAmbSuppressionResponses,
+  CreateAssetFolderData,
+  CreateAssetFolderErrors,
+  CreateAssetFolderResponses,
   CreateAudienceData,
   CreateAudienceErrors,
   CreateAudienceResponses,
@@ -195,6 +198,12 @@ import type {
   DeleteAmbSuppressionData,
   DeleteAmbSuppressionErrors,
   DeleteAmbSuppressionResponses,
+  DeleteAssetData,
+  DeleteAssetErrors,
+  DeleteAssetFolderData,
+  DeleteAssetFolderErrors,
+  DeleteAssetFolderResponses,
+  DeleteAssetResponses,
   DeleteAudienceData,
   DeleteAudienceErrors,
   DeleteAudienceResponses,
@@ -357,6 +366,21 @@ import type {
   GetAmbSuppressionData,
   GetAmbSuppressionErrors,
   GetAmbSuppressionResponses,
+  GetAmbTemplateData,
+  GetAmbTemplateErrors,
+  GetAmbTemplateResponses,
+  GetAmbTemplateVersionData,
+  GetAmbTemplateVersionErrors,
+  GetAmbTemplateVersionLanguageData,
+  GetAmbTemplateVersionLanguageErrors,
+  GetAmbTemplateVersionLanguageResponses,
+  GetAmbTemplateVersionResponses,
+  GetAssetData,
+  GetAssetErrors,
+  GetAssetFolderData,
+  GetAssetFolderErrors,
+  GetAssetFolderResponses,
+  GetAssetResponses,
   GetAudienceData,
   GetAudienceErrors,
   GetAudienceMembershipData,
@@ -764,6 +788,24 @@ import type {
   ListAmbSuppressionsData,
   ListAmbSuppressionsErrors,
   ListAmbSuppressionsResponses,
+  ListAmbTemplatesData,
+  ListAmbTemplatesErrors,
+  ListAmbTemplatesResponses,
+  ListAmbTemplateVersionLanguagesData,
+  ListAmbTemplateVersionLanguagesErrors,
+  ListAmbTemplateVersionLanguagesResponses,
+  ListAmbTemplateVersionsData,
+  ListAmbTemplateVersionsErrors,
+  ListAmbTemplateVersionsResponses,
+  ListAssetFoldersData,
+  ListAssetFoldersErrors,
+  ListAssetFoldersResponses,
+  ListAssetReferencesData,
+  ListAssetReferencesErrors,
+  ListAssetReferencesResponses,
+  ListAssetsData,
+  ListAssetsErrors,
+  ListAssetsResponses,
   ListAudienceContactsData,
   ListAudienceContactsErrors,
   ListAudienceContactsResponses,
@@ -1046,6 +1088,12 @@ import type {
   UpdateAmbRoutingRuleData,
   UpdateAmbRoutingRuleErrors,
   UpdateAmbRoutingRuleResponses,
+  UpdateAssetData,
+  UpdateAssetErrors,
+  UpdateAssetFolderData,
+  UpdateAssetFolderErrors,
+  UpdateAssetFolderResponses,
+  UpdateAssetResponses,
   UpdateAudienceData,
   UpdateAudienceErrors,
   UpdateAudienceResponses,
@@ -3584,6 +3632,335 @@ export const updateSmsKeywordRule = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/sms/keyword-rules/{id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List workspace media-library assets
+ *
+ * Returns a cursor page of the workspace's media-library assets, most recently created first. Filters can narrow results by media type, name, deletion status, or folder placement.
+ *
+ */
+export const listAssets = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAssetsData, ThrowOnError>,
+): RequestResult<ListAssetsResponses, ListAssetsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListAssetsResponses,
+    ListAssetsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/assets",
+    ...options,
+  });
+
+/**
+ * Remove an asset from the media library
+ *
+ * Removes an asset from the library. The asset stops appearing in the library and cannot be added to new content, but its URL keeps serving so messages that already reference it continue to render. Deleting is idempotent.
+ *
+ */
+export const deleteAsset = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteAssetData, ThrowOnError>,
+): RequestResult<DeleteAssetResponses, DeleteAssetErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteAssetResponses,
+    DeleteAssetErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/assets/{asset_id}",
+    ...options,
+  });
+
+/**
+ * Get a media-library asset by ID
+ *
+ * Returns one media-library asset. An asset that has been removed from the library is returned with `deleted_at` set rather than as a missing resource, because its URL keeps serving and messages already sent still reference it.
+ *
+ */
+export const getAsset = <ThrowOnError extends boolean = false>(
+  options: Options<GetAssetData, ThrowOnError>,
+): RequestResult<GetAssetResponses, GetAssetErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetAssetResponses,
+    GetAssetErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/assets/{asset_id}",
+    ...options,
+  });
+
+/**
+ * Update asset metadata or folder placement
+ *
+ * Renames an asset, sets its default alternative text, or moves it to a folder. These changes preserve the asset's URL and bytes.
+ *
+ */
+export const updateAsset = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateAssetData, ThrowOnError>,
+): RequestResult<UpdateAssetResponses, UpdateAssetErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    UpdateAssetResponses,
+    UpdateAssetErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/assets/{asset_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List editable resources that use an asset
+ *
+ * Returns editable resources that reference this asset. Each entry indicates whether
+ * the reference appears in the resource's draft, published version, or both. Results
+ * reflect the latest saved versions, so they exclude unsaved editor changes and older
+ * published versions.
+ *
+ * Only resources you have permission to read are included. Email-template references
+ * require `email_management:read` in addition to `assets:read`. Hidden resources do not
+ * affect the `truncated` flag.
+ *
+ * Removing an asset does not break existing references because its original URL keeps
+ * serving. Use this list to find content that should reference a replacement asset.
+ *
+ */
+export const listAssetReferences = <ThrowOnError extends boolean = false>(
+  options: Options<ListAssetReferencesData, ThrowOnError>,
+): RequestResult<
+  ListAssetReferencesResponses,
+  ListAssetReferencesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListAssetReferencesResponses,
+    ListAssetReferencesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/assets/{asset_id}/references",
+    ...options,
+  });
+
+/**
+ * List workspace media-library folders
+ *
+ * Returns the workspace's media-library folders as a flat list, each carrying its
+ * `parent_id` and its resolved `path`, most recently created first.
+ *
+ * Assemble the tree from `parent_id`. The ordering is by creation time rather
+ * than by position in the tree, so a page can contain a folder whose parent has
+ * not arrived yet. Page through to the end before treating a missing parent as
+ * an orphan. A workspace supports up to 1,000 active folders and 10,000 retained
+ * folders, including deleted folders. Deletion frees an active slot but does not
+ * release retained capacity.
+ *
+ */
+export const listAssetFolders = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAssetFoldersData, ThrowOnError>,
+): RequestResult<
+  ListAssetFoldersResponses,
+  ListAssetFoldersErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListAssetFoldersResponses,
+    ListAssetFoldersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/asset-folders",
+    ...options,
+  });
+
+/**
+ * Create a folder in the media library
+ *
+ * Creates a folder in the workspace's media library. Omit `parent_id` to create it
+ * at the top level, or name another folder to nest it up to 10 levels deep.
+ * A workspace supports up to 1,000 active folders and 10,000 retained folders,
+ * including deleted folders. Deleting a folder frees an active slot but does
+ * not release retained capacity.
+ *
+ * Folders organize the library for the people browsing it. They are never part of
+ * an asset's URL, so filing an asset, renaming a folder, or moving a whole branch
+ * leaves every message that already embeds those assets rendering exactly as it did.
+ *
+ */
+export const createAssetFolder = <ThrowOnError extends boolean = false>(
+  options: Options<CreateAssetFolderData, ThrowOnError>,
+): RequestResult<
+  CreateAssetFolderResponses,
+  CreateAssetFolderErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateAssetFolderResponses,
+    CreateAssetFolderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/asset-folders",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a folder and move its contents up
+ *
+ * Deletes a folder. Its subfolders and its assets move up one level, to the folder
+ * it sat in, so nothing is removed from the library as a side effect and no URL
+ * changes.
+ *
+ * If a subfolder's name is already taken where it would land, the delete is refused
+ * and the response names the folders to resolve first. Deleting is idempotent.
+ *
+ */
+export const deleteAssetFolder = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteAssetFolderData, ThrowOnError>,
+): RequestResult<
+  DeleteAssetFolderResponses,
+  DeleteAssetFolderErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteAssetFolderResponses,
+    DeleteAssetFolderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/asset-folders/{folder_id}",
+    ...options,
+  });
+
+/**
+ * Get a media-library folder by ID
+ *
+ * Returns one folder from the workspace's media library, including its resolved path. A deleted folder is not returned.
+ *
+ */
+export const getAssetFolder = <ThrowOnError extends boolean = false>(
+  options: Options<GetAssetFolderData, ThrowOnError>,
+): RequestResult<GetAssetFolderResponses, GetAssetFolderErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetAssetFolderResponses,
+    GetAssetFolderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/asset-folders/{folder_id}",
+    ...options,
+  });
+
+/**
+ * Rename or move a media-library folder
+ *
+ * Renames a folder, moves it, or both. Send `parent_id` to move the folder into
+ * another folder, or `null` to move it to the top level.
+ *
+ * Moving a folder carries its subfolders and assets with it and changes no URLs, so
+ * messages that embed those assets are unaffected. A folder cannot be moved into
+ * itself or into one of its own subfolders, and the resulting tree cannot exceed 10
+ * levels.
+ *
+ */
+export const updateAssetFolder = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateAssetFolderData, ThrowOnError>,
+): RequestResult<
+  UpdateAssetFolderResponses,
+  UpdateAssetFolderErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateAssetFolderResponses,
+    UpdateAssetFolderErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/asset-folders/{folder_id}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -7891,6 +8268,192 @@ export const getAmbConversationStatsHourly = <
       },
     ],
     url: "/v1/amb/stats/conversations/hourly",
+    ...options,
+  });
+
+/**
+ * List Apple Messages templates
+ *
+ * Returns Apple Messages templates as a cursor-paginated list. The workspace's templates
+ * come first, newest first, followed by our built-in templates by default.
+ * Set `order=asc` to reverse this order.
+ *
+ * Filter by scope, category, status, content kind, or language. Use `q` for a
+ * case-insensitive substring match against slug, name, and description. The
+ * response is shallow; read a version to retrieve its content and variables.
+ *
+ */
+export const listAmbTemplates = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAmbTemplatesData, ThrowOnError>,
+): RequestResult<
+  ListAmbTemplatesResponses,
+  ListAmbTemplatesErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListAmbTemplatesResponses,
+    ListAmbTemplatesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/templates",
+    ...options,
+  });
+
+/**
+ * Get an Apple Messages template
+ *
+ * Returns one Apple Messages template's metadata, policies, language states, draft revision, and draft and live version IDs. The response is shallow; read a version to retrieve content and variables. An unknown or deleted template returns `404`.
+ *
+ */
+export const getAmbTemplate = <ThrowOnError extends boolean = false>(
+  options: Options<GetAmbTemplateData, ThrowOnError>,
+): RequestResult<GetAmbTemplateResponses, GetAmbTemplateErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetAmbTemplateResponses,
+    GetAmbTemplateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/templates/{template_ref}",
+    ...options,
+  });
+
+/**
+ * List an Apple Messages template's versions
+ *
+ * Returns a cursor-paginated version history, newest first. Each entry is shallow and names its variables and languages. Read a version item or one of its languages to retrieve text. A built-in template exposes its current catalogue content as one synthetic published version.
+ *
+ */
+export const listAmbTemplateVersions = <ThrowOnError extends boolean = false>(
+  options: Options<ListAmbTemplateVersionsData, ThrowOnError>,
+): RequestResult<
+  ListAmbTemplateVersionsResponses,
+  ListAmbTemplateVersionsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListAmbTemplateVersionsResponses,
+    ListAmbTemplateVersionsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/templates/{template_ref}/versions",
+    ...options,
+  });
+
+/**
+ * Get an Apple Messages template version
+ *
+ * Returns one version with its variables and text in every language. A workspace draft is editable, while published workspace versions are immutable. A built-in template exposes its current catalogue content through a synthetic published version.
+ *
+ */
+export const getAmbTemplateVersion = <ThrowOnError extends boolean = false>(
+  options: Options<GetAmbTemplateVersionData, ThrowOnError>,
+): RequestResult<
+  GetAmbTemplateVersionResponses,
+  GetAmbTemplateVersionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAmbTemplateVersionResponses,
+    GetAmbTemplateVersionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/templates/{template_ref}/versions/{version_id}",
+    ...options,
+  });
+
+/**
+ * List an Apple Messages template version's languages
+ *
+ * Returns the languages a version holds, ordered by canonical language tag, without their text. Each summary includes the revision and content hash needed to detect changes. A version holds at most 25 languages.
+ *
+ */
+export const listAmbTemplateVersionLanguages = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListAmbTemplateVersionLanguagesData, ThrowOnError>,
+): RequestResult<
+  ListAmbTemplateVersionLanguagesResponses,
+  ListAmbTemplateVersionLanguagesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListAmbTemplateVersionLanguagesResponses,
+    ListAmbTemplateVersionLanguagesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/templates/{template_ref}/versions/{version_id}/languages",
+    ...options,
+  });
+
+/**
+ * Get an Apple Messages template version's language
+ *
+ * Returns one language's full text, revision, content hash, and update time. The response echoes the language in its canonical BCP-47 form.
+ *
+ */
+export const getAmbTemplateVersionLanguage = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetAmbTemplateVersionLanguageData, ThrowOnError>,
+): RequestResult<
+  GetAmbTemplateVersionLanguageResponses,
+  GetAmbTemplateVersionLanguageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAmbTemplateVersionLanguageResponses,
+    GetAmbTemplateVersionLanguageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/templates/{template_ref}/versions/{version_id}/languages/{language}",
     ...options,
   });
 
