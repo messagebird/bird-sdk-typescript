@@ -10384,7 +10384,7 @@ export type AmbMessageType = "text" | "rich_link" | "interactive";
 
 export type AmbNativeAttachment = unknown & {
   /**
-   * HTTPS URL Bird downloads and uploads to Apple.
+   * HTTPS URL Bird downloads and uploads to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.
    */
   source_url?: string;
   /**
@@ -10443,7 +10443,7 @@ export type AmbNativeTextContent = (
 
 export type AmbNativeRichLinkImage = {
   /**
-   * HTTPS URL of a PNG preview image up to 200 kB. Bird fetches and encodes it when sending.
+   * HTTPS URL of a PNG preview image up to 200 kB. Bird fetches and encodes it when sending. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.
    */
   source_url: string;
   /**
@@ -10454,7 +10454,7 @@ export type AmbNativeRichLinkImage = {
 
 export type AmbNativeRichLinkVideo = {
   /**
-   * HTTPS video URL fetched by Apple.
+   * HTTPS video URL fetched by Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.
    */
   url: string;
   /**
@@ -10470,7 +10470,7 @@ export type AmbNativeRichLinkAssets = {
 
 export type AmbNativeRichLinkData = {
   /**
-   * HTTPS URL opened by the preview.
+   * HTTPS URL opened by the preview. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.
    */
   url: string;
   /**
@@ -10597,7 +10597,7 @@ export type AmbNativeImage = {
    */
   identifier: string;
   /**
-   * HTTPS URL of a PNG image up to 200 kB. Total interactive image data must not exceed 5 MB.
+   * HTTPS URL of a PNG image up to 200 kB. Total interactive image data must not exceed 5 MB. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.
    */
   source_url: string;
   /**
@@ -11035,7 +11035,7 @@ export type AmbNativeInteractiveData = unknown & {
    */
   reply_message?: AmbMessageBubble;
   /**
-   * Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple.
+   * Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.
    */
   app_icon_source_url?: string;
   data?: AmbNativeInteractivePayload;
@@ -28583,7 +28583,7 @@ export type AmbNativeInteractiveDataWritable = unknown & {
    */
   reply_message?: AmbMessageBubble;
   /**
-   * Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple.
+   * Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.
    */
   app_icon_source_url?: string;
   data?: AmbNativeInteractivePayloadWritable;

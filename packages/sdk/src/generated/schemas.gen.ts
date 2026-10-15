@@ -18864,9 +18864,8 @@ export const AMBNativeAttachmentSchema = {
     source_url: {
       type: "string",
       minLength: 1,
-      description: "HTTPS URL Bird downloads and uploads to Apple.",
-      format: "uri",
-      pattern: "^https://",
+      description:
+        "HTTPS URL Bird downloads and uploads to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.",
       "x-sensitive": true,
     },
     name: {
@@ -19012,9 +19011,7 @@ export const AMBNativeRichLinkImageSchema = {
     source_url: {
       type: "string",
       description:
-        "HTTPS URL of a PNG preview image up to 200 kB. Bird fetches and encodes it when sending.",
-      format: "uri",
-      pattern: "^https://",
+        "HTTPS URL of a PNG preview image up to 200 kB. Bird fetches and encodes it when sending. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.",
       minLength: 1,
       "x-sensitive": true,
     },
@@ -19034,9 +19031,8 @@ export const AMBNativeRichLinkVideoSchema = {
   properties: {
     url: {
       type: "string",
-      description: "HTTPS video URL fetched by Apple.",
-      format: "uri",
-      pattern: "^https://",
+      description:
+        "HTTPS video URL fetched by Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.",
       minLength: 1,
       "x-sensitive": true,
     },
@@ -19070,9 +19066,8 @@ export const AMBNativeRichLinkDataSchema = {
   properties: {
     url: {
       type: "string",
-      description: "HTTPS URL opened by the preview.",
-      format: "uri",
-      pattern: "^https://",
+      description:
+        "HTTPS URL opened by the preview. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.",
       minLength: 1,
       "x-sensitive": true,
     },
@@ -19161,8 +19156,6 @@ export const AMBRichLinkConstructSchema = {
     url: {
       type: "string",
       minLength: 1,
-      format: "uri",
-      pattern: "^https://",
       description:
         "The App Clip, Apple Music, or Apple Maps URL to build a preview for. An `http://` URL is refused with a `422` `AMBEndpointNotHTTPS`. A URL Apple cannot build a preview for is refused with a `422` `AMBConstructPayloadFailed`; send `rich_link` content with your own `title` and `image` instead.",
       example: "https://apps.apple.com/app/id123456789?clip=1",
@@ -19322,9 +19315,7 @@ export const AMBNativeImageSchema = {
     source_url: {
       type: "string",
       description:
-        "HTTPS URL of a PNG image up to 200 kB. Total interactive image data must not exceed 5 MB.",
-      format: "uri",
-      pattern: "^https://",
+        "HTTPS URL of a PNG image up to 200 kB. Total interactive image data must not exceed 5 MB. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.",
       minLength: 1,
       "x-sensitive": true,
     },
@@ -20440,10 +20431,8 @@ export const AMBNativeInteractiveDataSchema = {
     app_icon_source_url: {
       type: "string",
       minLength: 1,
-      format: "uri",
-      pattern: "^https://",
       description:
-        "Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple.",
+        "Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.",
       "x-sensitive": true,
     },
     data: {
@@ -52175,10 +52164,8 @@ export const AMBNativeInteractiveDataWritableSchema = {
     app_icon_source_url: {
       type: "string",
       minLength: 1,
-      format: "uri",
-      pattern: "^https://",
       description:
-        "Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple.",
+        "Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.",
       "x-sensitive": true,
     },
     data: {
