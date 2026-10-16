@@ -186,6 +186,81 @@ export const DestinationSuperRegion = {
 export type DestinationSuperRegionValue = (typeof DestinationSuperRegion)[keyof typeof DestinationSuperRegion];
 
 /**
+ * Values of EmailBroadcastParameterProblemCode known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailBroadcastParameterProblemCode = {
+  AudienceUnavailable: "audience_unavailable",
+  ContactPropertyUnknown: "contact_property_unknown",
+  LanguageUnavailable: "language_unavailable",
+  ParameterBytesExceeded: "parameter_bytes_exceeded",
+  ParameterDepthExceeded: "parameter_depth_exceeded",
+  ParameterDuplicateKey: "parameter_duplicate_key",
+  ParameterJsonInvalid: "parameter_json_invalid",
+  ParameterLanguageInvalid: "parameter_language_invalid",
+  ParameterMapInvalid: "parameter_map_invalid",
+  ParameterNameInvalid: "parameter_name_invalid",
+  ParameterNamesExceeded: "parameter_names_exceeded",
+  ParameterRequired: "parameter_required",
+  ParameterValueUnsupported: "parameter_value_unsupported",
+  RecipientRenderFailed: "recipient_render_failed",
+  RenderBudgetExceeded: "render_budget_exceeded",
+  RenderProfileUnsupported: "render_profile_unsupported",
+  RenderedEnvelopeInvalid: "rendered_envelope_invalid",
+  SenderUnavailable: "sender_unavailable",
+  SensitiveInputUnsupported: "sensitive_input_unsupported",
+  TemplateUnavailable: "template_unavailable",
+  TransportInvalid: "transport_invalid",
+  TransportMissing: "transport_missing",
+} as const;
+
+/** A known EmailBroadcastParameterProblemCode value. */
+export type EmailBroadcastParameterProblemCodeValue = (typeof EmailBroadcastParameterProblemCode)[keyof typeof EmailBroadcastParameterProblemCode];
+
+/**
+ * Values of EmailBroadcastParameterProblemPhase known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailBroadcastParameterProblemPhase = {
+  Execution: "execution",
+  Request: "request",
+  Validation: "validation",
+} as const;
+
+/** A known EmailBroadcastParameterProblemPhase value. */
+export type EmailBroadcastParameterProblemPhaseValue = (typeof EmailBroadcastParameterProblemPhase)[keyof typeof EmailBroadcastParameterProblemPhase];
+
+/**
+ * Values of EmailBroadcastParameterProblemSeverity known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailBroadcastParameterProblemSeverity = {
+  Error: "error",
+} as const;
+
+/** A known EmailBroadcastParameterProblemSeverity value. */
+export type EmailBroadcastParameterProblemSeverityValue = (typeof EmailBroadcastParameterProblemSeverity)[keyof typeof EmailBroadcastParameterProblemSeverity];
+
+/**
+ * Values of EmailBroadcastParameterProblemSite known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailBroadcastParameterProblemSite = {
+  FromName: "from_name",
+  Html: "html",
+  ReplyTo: "reply_to",
+  Subject: "subject",
+  Text: "text",
+} as const;
+
+/** A known EmailBroadcastParameterProblemSite value. */
+export type EmailBroadcastParameterProblemSiteValue = (typeof EmailBroadcastParameterProblemSite)[keyof typeof EmailBroadcastParameterProblemSite];
+
+/**
  * Values of EmailClientFamily known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -449,6 +524,38 @@ export const EmailLookupResult = {
 export type EmailLookupResultValue = (typeof EmailLookupResult)[keyof typeof EmailLookupResult];
 
 /**
+ * Values of EmailTemplateParameterType known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailTemplateParameterType = {
+  Amount: "amount",
+  Code: "code",
+  Count: "count",
+  Currency: "currency",
+  Date: "date",
+  DateTime: "date_time",
+  Ref: "ref",
+  Text: "text",
+  Ttl: "ttl",
+} as const;
+
+/** A known EmailTemplateParameterType value. */
+export type EmailTemplateParameterTypeValue = (typeof EmailTemplateParameterType)[keyof typeof EmailTemplateParameterType];
+
+/**
+ * Values of EmailTemplateParameterValueDomain known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailTemplateParameterValueDomain = {
+  Scalar: "scalar",
+} as const;
+
+/** A known EmailTemplateParameterValueDomain value. */
+export type EmailTemplateParameterValueDomainValue = (typeof EmailTemplateParameterValueDomain)[keyof typeof EmailTemplateParameterValueDomain];
+
+/**
  * Values of EmailTemplateSource known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -475,6 +582,46 @@ export const EmailTemplateTheme = {
 
 /** A known EmailTemplateTheme value. */
 export type EmailTemplateThemeValue = (typeof EmailTemplateTheme)[keyof typeof EmailTemplateTheme];
+
+/**
+ * Values of EmailTemplateUseKind known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailTemplateUseKind = {
+  Iterable: "iterable",
+  Value: "value",
+} as const;
+
+/** A known EmailTemplateUseKind value. */
+export type EmailTemplateUseKindValue = (typeof EmailTemplateUseKind)[keyof typeof EmailTemplateUseKind];
+
+/**
+ * Values of EmailTemplateUseSite known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailTemplateUseSite = {
+  Html: "html",
+  Subject: "subject",
+  Text: "text",
+} as const;
+
+/** A known EmailTemplateUseSite value. */
+export type EmailTemplateUseSiteValue = (typeof EmailTemplateUseSite)[keyof typeof EmailTemplateUseSite];
+
+/**
+ * Values of EmailTemplateVariableSource known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailTemplateVariableSource = {
+  Bird: "bird",
+  Contact: "contact",
+} as const;
+
+/** A known EmailTemplateVariableSource value. */
+export type EmailTemplateVariableSourceValue = (typeof EmailTemplateVariableSource)[keyof typeof EmailTemplateVariableSource];
 
 /**
  * Values of EsimActionName known at this SDK version. The wire value is an open

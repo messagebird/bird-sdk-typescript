@@ -8,12 +8,15 @@
 import {
   createEmailBroadcast,
   sendEmailBroadcast,
+  sendEmailBroadcastTest,
   updateEmailBroadcast,
 } from "../generated/sdk.gen.js";
 import type {
   EmailBroadcast,
   EmailBroadcastCreateRequest,
   EmailBroadcastUpdateRequest,
+  EmailBroadcastTestRequest,
+  EmailBroadcastTestResult,
 } from "../generated/types.gen.js";
 import { BroadcastsResourceBase } from "./broadcasts.gen.js";
 import { withDefaults, type EmailChannelDefaults } from "./emailDefaults.js";
@@ -111,7 +114,8 @@ export class BroadcastsResource extends BroadcastsResourceBase {
     // so a default filled there would overwrite a value the caller never named.
     const body = withDefaults(this.#defaults, merged, BROADCAST_FIELDS);
     return this.call<EmailBroadcast>("POST", options, ({ signal, headers }) =>
-      createEmailBroadcast({ client: this.client, body, headers, signal }));
+      createEmailBroadcast({ client: this.client, body, headers, signal }),
+    );
   }
 
   /**
@@ -143,7 +147,8 @@ export class BroadcastsResource extends BroadcastsResourceBase {
         body: params,
         headers,
         signal,
-      }));
+      }),
+    );
   }
 
   /**
@@ -171,6 +176,49 @@ export class BroadcastsResource extends BroadcastsResourceBase {
         body: scheduled_at === undefined ? {} : { scheduled_at },
         headers,
         signal,
-      }));
+      }),
+    );
+  }
+
+  /**
+   * Send a member test using the caller's intent key so retries of that intent remain stable.
+   * @example Send the content accepted by a fresh preview
+   * const broadcastId = "eb_01krdgeqcxet5s7t44vh8rt9mg";
+   * const overrides = {
+   *   contact_id: "con_01krdgeqcxet5s7t44vh8rt9mg",
+   *   template: { parameters: { title: "Welcome" } },
+   * };
+   * const preview = await bird.broadcasts.preview(broadcastId, overrides);
+   * await bird.broadcasts.test(broadcastId, {
+   *   ...overrides,
+   *   to: "member@example.com",
+   *   preview_fingerprint: preview.preview_fingerprint,
+   * }, { idempotencyKey: "member-test-intent" });
+   */
+  test(
+    broadcastId: string,
+    params: EmailBroadcastTestRequest,
+    options?: RequestOptions,
+  ): APIPromise<EmailBroadcastTestResult> {
+    if (!options?.idempotencyKey) {
+      throw new Error(
+        "broadcasts.test requires a nonempty caller idempotencyKey",
+      );
+    }
+    return this.call<EmailBroadcastTestResult>(
+      "POST",
+      options,
+      ({ signal, headers }) =>
+        sendEmailBroadcastTest({
+          client: this.client,
+          path: { broadcast_id: broadcastId },
+          body: params,
+          headers: {
+            ...headers,
+            "Idempotency-Key": headers["Idempotency-Key"]!,
+          },
+          signal,
+        }),
+    );
   }
 }

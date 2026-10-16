@@ -524,6 +524,9 @@ import type {
   GetEmailTemplateLanguageData,
   GetEmailTemplateLanguageErrors,
   GetEmailTemplateLanguageResponses,
+  GetEmailTemplateParametersData,
+  GetEmailTemplateParametersErrors,
+  GetEmailTemplateParametersResponses,
   GetEmailTemplatePreviewData,
   GetEmailTemplatePreviewErrors,
   GetEmailTemplatePreviewResponses,
@@ -1007,6 +1010,9 @@ import type {
   ListWorkspaceNumbersData,
   ListWorkspaceNumbersErrors,
   ListWorkspaceNumbersResponses,
+  PreviewEmailBroadcastData,
+  PreviewEmailBroadcastErrors,
+  PreviewEmailBroadcastResponses,
   PublishRealtimeAppBatchData,
   PublishRealtimeAppBatchErrors,
   PublishRealtimeAppBatchResponses,
@@ -1052,6 +1058,9 @@ import type {
   SendEmailBroadcastData,
   SendEmailBroadcastErrors,
   SendEmailBroadcastResponses,
+  SendEmailBroadcastTestData,
+  SendEmailBroadcastTestErrors,
+  SendEmailBroadcastTestResponses,
   SendRealtimeAppMemberEventData,
   SendRealtimeAppMemberEventErrors,
   SendRealtimeAppMemberEventResponses,
@@ -1172,6 +1181,9 @@ import type {
   UpsertWhatsAppMessageReactionData,
   UpsertWhatsAppMessageReactionErrors,
   UpsertWhatsAppMessageReactionResponses,
+  ValidateEmailBroadcastData,
+  ValidateEmailBroadcastErrors,
+  ValidateEmailBroadcastResponses,
   VerifyDomainData,
   VerifyDomainErrors,
   VerifyDomainResponses,
@@ -2005,6 +2017,105 @@ export const listEmailBroadcastClickedLinks = <
     ],
     url: "/v1/email/broadcasts/{broadcast_id}/clicked-links",
     ...options,
+  });
+
+/**
+ * Validate a broadcast
+ *
+ * Check the saved broadcast or the changes supplied in this request against the template's published content. This does not save changes, select a template version for sending or evaluate recipients. Requires template read permission in addition to broadcast read. Each call computes a fresh result. An Idempotency-Key header is accepted but does not replay an earlier result.
+ */
+export const validateEmailBroadcast = <ThrowOnError extends boolean = false>(
+  options: Options<ValidateEmailBroadcastData, ThrowOnError>,
+): RequestResult<
+  ValidateEmailBroadcastResponses,
+  ValidateEmailBroadcastErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    ValidateEmailBroadcastResponses,
+    ValidateEmailBroadcastErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}/validate",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Preview a broadcast for a contact
+ *
+ * Render the template's published content using the saved broadcast, the changes supplied in this request and contact values the caller can read. Supplied fields replace the saved values for this preview only. Requires template read permission. Supply contact_id when the template uses contact data. The preview's unsubscribe link does not unsubscribe a contact. This does not send mail. Each call renders a fresh result. An Idempotency-Key header is accepted but does not replay an earlier preview.
+ */
+export const previewEmailBroadcast = <ThrowOnError extends boolean = false>(
+  options: Options<PreviewEmailBroadcastData, ThrowOnError>,
+): RequestResult<
+  PreviewEmailBroadcastResponses,
+  PreviewEmailBroadcastErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    PreviewEmailBroadcastResponses,
+    PreviewEmailBroadcastErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}/preview",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Send a rendered broadcast test
+ *
+ * Supply the same changes, contact and fingerprint as a new preview to send the exact rendered content to an authorized current organization member with workspace access. Requires template read and emails write permission. Alternate-member and machine destinations also require members read. A change to template content, envelope fields, parameters or contact values returns E04089 (BroadcastPreviewChanged), a conflict_error. This does not send the campaign audience. A confirmed response replays unchanged for the same key and request within the configured idempotency window, with fresh authorization and member access checks. A replay sends no other test.
+ */
+export const sendEmailBroadcastTest = <ThrowOnError extends boolean = false>(
+  options: Options<SendEmailBroadcastTestData, ThrowOnError>,
+): RequestResult<
+  SendEmailBroadcastTestResponses,
+  SendEmailBroadcastTestErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    SendEmailBroadcastTestResponses,
+    SendEmailBroadcastTestErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}/test",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**
@@ -11035,6 +11146,37 @@ export const duplicateEmailTemplate = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Get published email template parameters
+ *
+ * Get the parameters and variables used by the template's published content in one language. The result describes the template and holds no saved values. Parameters are the names a broadcast supplies in `template.parameters`, and variables are the `bird.` references Bird fills in. The result identifies list values, which broadcast parameters cannot supply. It also includes a fingerprint that identifies the published content without exposing contact values. You cannot select an older template version. Requires email_marketing read permission in addition to email_management read. Parameter sites cover template subject, HTML and text; envelope overrides are checked by broadcast validation.
+ */
+export const getEmailTemplateParameters = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetEmailTemplateParametersData, ThrowOnError>,
+): RequestResult<
+  GetEmailTemplateParametersResponses,
+  GetEmailTemplateParametersErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailTemplateParametersResponses,
+    GetEmailTemplateParametersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/templates/{template_ref}/parameters",
+    ...options,
   });
 
 /**

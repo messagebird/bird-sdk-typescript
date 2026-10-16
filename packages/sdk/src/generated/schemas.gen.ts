@@ -2913,12 +2913,50 @@ export const AudienceIDSchema = {
   example: "adn_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const EmailBroadcastParameterNameSchema = {
+  type: "string",
+  pattern: "^[A-Za-z_][A-Za-z0-9_]*$",
+  not: {
+    const: "bird",
+  },
+  description:
+    "A bare template input name, such as `first_name` or `offer`, outside the reserved `bird` namespace.",
+  example: "offer",
+} as const;
+
+export const EmailBroadcastParametersSchema = {
+  type: "object",
+  "x-sensitive": true,
+  maxProperties: 128,
+  propertyNames: {
+    $ref: "#/components/schemas/EmailBroadcastParameterName",
+  },
+  additionalProperties: {
+    type: ["string", "number", "boolean", "null"],
+  },
+  description:
+    "Complete template input map. Each value is a string, number, boolean or null and is used exactly as given, so text containing braces or code-like syntax is never evaluated. Objects and lists are not accepted. Use bird.contact.first_name in the template for contact data. Names must be bare input names outside the bird namespace. Omission retains the map unless the template ID changes, which clears it; an empty object clears it, and null is invalid. The compact map is limited to 16384 UTF-8 bytes and 128 names. Individual email parameters keep their own format.",
+} as const;
+
+export const EmailBroadcastParameterOverridesSchema = {
+  type: "object",
+  "x-sensitive": true,
+  propertyNames: {
+    $ref: "#/components/schemas/LanguageTag",
+  },
+  additionalProperties: {
+    $ref: "#/components/schemas/EmailBroadcastParameters",
+  },
+  description:
+    "Complete map of per-language parameter values, keyed by a BCP-47 language tag of at most 35 characters such as `es` or `pt-BR`. Each language holds only the names whose value differs for that language; a name it leaves out uses the value in `parameters`, including later changes to it. A value that is present always applies, even when it is `\"\"`, `0`, `false`, `null` or equal to the `parameters` value. To return a name to the `parameters` value, send the map without it. Sending this map, even as `{}`, applies language rules to the broadcast: `parameters` must hold every input the default language's content, sender name, reply-to or headers use, and an input only the selected language uses may come from that language's entry instead. A broadcast that never sends it keeps the selected-language rules. Values for the default language, or for a language the broadcast does not send, are kept but not used. Omission retains the map unless the template ID changes, which clears it; an empty object removes every override, null is invalid and a language with no names is removed. Tags are stored in canonical BCP-47 form, so two spellings of one tag are refused. The compact map is limited to 16384 UTF-8 bytes, and `parameters` and every language together are limited to 128 distinct names.\n",
+} as const;
+
 export const EmailBroadcastTemplateSchema = {
   type: "object",
   additionalProperties: false,
   required: ["id"],
   description:
-    "The template a broadcast sends, the exact version of it the broadcast is fixed to, and which of that version's languages goes out.\n",
+    "The template a broadcast sends, the exact version of it the broadcast is fixed to, and which of that version's languages goes out.\n\n`parameters` and `parameter_overrides` are returned on customer detail and mutation responses when the caller has email_management read permission, and omitted without that permission and from list responses. They are also omitted from staff-only responses. Broadcasts created before parameters existed return `parameters` as an empty object. `parameter_overrides` is also omitted for a broadcast that has never sent it; an empty object means language rules apply with no overrides.\n",
   properties: {
     id: {
       $ref: "#/components/schemas/EmailTemplateID",
@@ -2949,6 +2987,168 @@ export const EmailBroadcastTemplateSchema = {
       readOnly: true,
       description:
         "The template version this broadcast is fixed to. It is chosen when the broadcast is prepared for sending, so publishing a new version while the broadcast is going out cannot change what the rest of the recipients get. Null until the broadcast is prepared.\n",
+    },
+    parameters: {
+      $ref: "#/components/schemas/EmailBroadcastParameters",
+    },
+    parameter_overrides: {
+      $ref: "#/components/schemas/EmailBroadcastParameterOverrides",
+    },
+  },
+} as const;
+
+export const EmailBroadcastParameterProblemCodeSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "What a broadcast input diagnostic found.\n\n- `parameter_json_invalid`: the request body or an input map is not valid JSON.\n- `parameter_map_invalid`: `template.parameters` or `template.parameter_overrides` is not a JSON object of input names.\n- `parameter_name_invalid`: an input name is not a bare name outside the `bird` namespace.\n- `parameter_value_unsupported`: an input value is an object or a list. Values must be a string, number, boolean or null.\n- `parameter_duplicate_key`: an input name, or two spellings of one language tag, appears twice.\n- `parameter_bytes_exceeded`: an input map is larger than 16384 UTF-8 bytes.\n- `parameter_names_exceeded`: `template.parameters` and every language together hold more than 128 distinct names.\n- `parameter_depth_exceeded`: an input value is nested too deeply.\n- `parameter_language_invalid`: a `template.parameter_overrides` key is not a valid BCP-47 language tag.\n- `parameter_required`: the template or envelope uses an input that has no value.\n- `sensitive_input_unsupported`: the template uses an input it marks sensitive, which a broadcast cannot supply.\n- `render_profile_unsupported`: the template uses a Liquid operation that rendering with broadcast inputs does not support.\n- `rendered_envelope_invalid`: the rendered subject, sender name, reply-to addresses or a header is not valid for an email, for example because it contains a line break.\n- `contact_property_unknown`: the template reads a contact property this workspace has not defined.\n- `template_unavailable`: the broadcast has no template, or its template no longer exists or has no published version.\n- `language_unavailable`: the published version has no content in the selected language.\n- `sender_unavailable`: the broadcast cannot send from its `from` address or IP pool.\n- `audience_unavailable`: the broadcast's audience cannot be used for this send.\n- `recipient_render_failed`: content could not be rendered for a recipient while the broadcast was sending.\n- `render_budget_exceeded`: rendering went over a limit, named by `budget` with its `limit`.\n- `transport_missing`: the saved content of a prepared broadcast is unavailable. Contact Bird support.\n- `transport_invalid`: the saved content of a prepared broadcast no longer matches what was prepared. Contact Bird support.\n",
+  "x-extensible-enum": [
+    "parameter_json_invalid",
+    "parameter_map_invalid",
+    "parameter_name_invalid",
+    "parameter_value_unsupported",
+    "parameter_duplicate_key",
+    "parameter_bytes_exceeded",
+    "parameter_names_exceeded",
+    "parameter_depth_exceeded",
+    "parameter_language_invalid",
+    "parameter_required",
+    "sensitive_input_unsupported",
+    "render_profile_unsupported",
+    "rendered_envelope_invalid",
+    "contact_property_unknown",
+    "template_unavailable",
+    "language_unavailable",
+    "sender_unavailable",
+    "audience_unavailable",
+    "recipient_render_failed",
+    "render_budget_exceeded",
+    "transport_missing",
+    "transport_invalid",
+  ],
+  example: "parameter_required",
+} as const;
+
+export const EmailBroadcastParameterProblemPhaseSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Where a broadcast input diagnostic was found.\n\n- `request`: in the inputs this request supplied, before the template was checked.\n- `validation`: while checking the inputs against the current published template, as validate, preview and send do.\n- `execution`: while the broadcast was being prepared or sent. This phase appears on `failure_parameters`.\n",
+  "x-extensible-enum": ["request", "validation", "execution"],
+  example: "validation",
+} as const;
+
+export const EmailBroadcastParameterProblemSeveritySchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "How a broadcast input diagnostic affects sending.\n\n- `error`: the broadcast cannot send until the problem is fixed.\n",
+  "x-extensible-enum": ["error"],
+  example: "error",
+} as const;
+
+export const EmailBroadcastParameterProblemSiteSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "The part of the email where the input is used.\n\n- `subject`: the subject line.\n- `html`: the HTML body, including its inbox preview text.\n- `text`: the plain-text body.\n- `from_name`: the sender display name.\n- `reply_to`: the reply-to addresses.\n\nA custom header is reported as `header:` followed by the header name as the broadcast sets it, for example `header:X-Campaign`.\n",
+  "x-extensible-enum": ["subject", "html", "text", "from_name", "reply_to"],
+  example: "subject",
+} as const;
+
+export const ContactIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^con_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "con_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const EmailBroadcastParameterProblemSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["code", "phase", "severity"],
+  description:
+    "One problem with a broadcast's template inputs. A diagnostic names the input or field it is about and never includes its value.",
+  properties: {
+    code: {
+      $ref: "#/components/schemas/EmailBroadcastParameterProblemCode",
+    },
+    phase: {
+      $ref: "#/components/schemas/EmailBroadcastParameterProblemPhase",
+    },
+    severity: {
+      $ref: "#/components/schemas/EmailBroadcastParameterProblemSeverity",
+    },
+    pointer: {
+      type: "string",
+      description:
+        "A JSON pointer to the request or broadcast field the problem is about, such as `/template/parameters/first_name` or `/from`. Absent when the problem is not about one field.",
+      example: "/template/parameters/first_name",
+    },
+    site: {
+      $ref: "#/components/schemas/EmailBroadcastParameterProblemSite",
+      description:
+        "Where in the email the input is used. Absent when the problem is not tied to one place.",
+    },
+    budget: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The rendering limit that was exceeded, such as `output_bytes` or `nesting`, when `code` is `render_budget_exceeded`. It is reported with `limit` on problems from sending a broadcast, in `failure_parameters`.",
+      example: "output_bytes",
+    },
+    limit: {
+      type: "integer",
+      format: "int64",
+      description: "The value of the limit named by `budget`.",
+    },
+    contact_id: {
+      $ref: "#/components/schemas/ContactID",
+      description:
+        "The contact whose values were being rendered, when the problem came from one recipient.",
+    },
+  },
+} as const;
+
+export const EmailBroadcastFailureParametersSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["code", "phase", "failure_count"],
+  description:
+    "Why a broadcast stopped because its template inputs could not be prepared or rendered. It names fields and contacts and never includes input or contact values.",
+  properties: {
+    code: {
+      $ref: "#/components/schemas/EmailBroadcastParameterProblemCode",
+    },
+    phase: {
+      $ref: "#/components/schemas/EmailBroadcastParameterProblemPhase",
+    },
+    pointer: {
+      type: "string",
+      description:
+        "A JSON pointer to the broadcast field the failure is about, such as `/template/parameters/first_name` or `/template`.",
+      example: "/template/parameters/first_name",
+    },
+    observed_version_id: {
+      $ref: "#/components/schemas/EmailTemplateVersionID",
+      description:
+        "The published template version the broadcast was using when it failed. Absent when no version had been selected.",
+    },
+    problems: {
+      type: "array",
+      maxItems: 20,
+      items: {
+        $ref: "#/components/schemas/EmailBroadcastParameterProblem",
+      },
+      description:
+        "Up to 20 of the problems found. A recipient problem names its contact in `contact_id`.",
+    },
+    failure_count: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "How many recipients failed to render, including those not listed in `problems`. It can be `0` when the broadcast failed while it was being prepared, before any recipient was rendered.",
     },
   },
 } as const;
@@ -3269,6 +3469,12 @@ export const EmailBroadcastSchema = {
       description:
         "When the broadcast was canceled, and absent if it never was. This is when cancellation was requested, so it is set as soon as the status is `canceling` and does not move while the remaining sends stop and the status becomes `canceled`.",
     },
+    failure_parameters: {
+      $ref: "#/components/schemas/EmailBroadcastFailureParameters",
+      readOnly: true,
+      description:
+        "Why the broadcast failed, when it could not prepare or render its template inputs. A failed broadcast cannot be updated or sent again. Correct the input or template that `pointer` and `problems` name, then create a new broadcast with the corrected inputs and send it. When `code` is `transport_missing` or `transport_invalid`, the broadcast's saved content cannot be used and changing an input does not fix it, so contact Bird support.\n\nAbsent when the broadcast did not fail this way. Returned on a single broadcast read and on the broadcast that creating, updating, sending or canceling one returns, and absent from the list.\n",
+    },
   },
 } as const;
 
@@ -3314,6 +3520,26 @@ export const EmailBroadcastTemplateCreateSchema = {
       description:
         "The BCP-47 language tag that goes to the whole audience, such as `en` or `pt-BR`. It must be an exact match for a language on the template's published version, so `fr-CA` does not select `fr`. If you leave it out, the broadcast uses the version's default language, unless the template has `language_source_required` set, in which case sending fails until you select a language. Send `template.language` in an update to change or clear it later.\n",
     },
+    parameters: {
+      $ref: "#/components/schemas/EmailBroadcastParameters",
+    },
+    parameter_overrides: {
+      $ref: "#/components/schemas/EmailBroadcastParameterOverrides",
+    },
+  },
+} as const;
+
+export const EmailBroadcastHeadersSchema = {
+  type: "object",
+  maxProperties: 25,
+  additionalProperties: {
+    type: "string",
+    maxLength: 998,
+  },
+  description:
+    "Custom email headers as name and value pairs. Up to 25 of them, each value up to 998 characters.",
+  example: {
+    "X-Campaign": "spring-launch",
   },
 } as const;
 
@@ -3349,12 +3575,7 @@ export const EmailBroadcastCreateRequestSchema = {
         "Where replies to this broadcast should go. Give each address as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name. You can list more than one.",
     },
     headers: {
-      type: "object",
-      maxProperties: 25,
-      additionalProperties: {
-        type: "string",
-        maxLength: 998,
-      },
+      $ref: "#/components/schemas/EmailBroadcastHeaders",
       description:
         "Custom email headers to set on the broadcast, as name and value pairs. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.\n",
     },
@@ -3433,7 +3654,7 @@ export const EmailBroadcastTemplateUpdateSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A change to the template a broadcast sends, the language it sends in, or both. Each property is independent: what you leave out keeps the value the broadcast already had.\n",
+    "A change to the template, language, or parameter maps a broadcast sends. Omitted properties retain their values unless the template ID changes. A changed ID clears the old language, parameters and parameter overrides before applying supplied replacements; repeating the same ID retains them.\n",
   properties: {
     id: {
       allOf: [
@@ -3442,7 +3663,7 @@ export const EmailBroadcastTemplateUpdateSchema = {
         },
       ],
       description:
-        "Move the broadcast to this template. Sending an `id` releases the version the broadcast was fixed to, so the next send fixes on the template's published version at that point; repeating the `id` the broadcast already has does the same thing, which is how you take a newly published version, and keeps the language already selected. Leave it out to keep the template and the version it is fixed to, and send a `language` on its own to change only the language. To take the template off a draft, set `template` itself to null.\n",
+        "Select this template. Changing the ID clears the old language, parameters and parameter overrides before supplied replacements. Repeating the same ID retains those values and clears the selected template version, so the next preparation uses the template's latest published version. Omit id to retain the selected template. Adding parameters to a draft created before parameters existed may clear its selected version so it uses the template's latest published version. To clear a draft's selection, set template itself to null.\n",
     },
     language: {
       oneOf: [
@@ -3455,6 +3676,12 @@ export const EmailBroadcastTemplateUpdateSchema = {
       ],
       description:
         "The BCP-47 language tag that goes to the whole audience, such as `en` or `pt-BR`. It must be an exact match for a language on the template's published version, so `fr-CA` does not select `fr`. Leave it out to keep the language already selected. If you change the template `id` in the same request, the old language is cleared with the old template. Set this to `null` to use the published version's default language, unless the template has `language_source_required` set.\n",
+    },
+    parameters: {
+      $ref: "#/components/schemas/EmailBroadcastParameters",
+    },
+    parameter_overrides: {
+      $ref: "#/components/schemas/EmailBroadcastParameterOverrides",
     },
   },
 } as const;
@@ -3498,12 +3725,7 @@ export const EmailBroadcastUpdateRequestSchema = {
         "Where replies to this broadcast should go. Set this to null to remove the addresses already set.",
     },
     headers: {
-      type: "object",
-      maxProperties: 25,
-      additionalProperties: {
-        type: "string",
-        maxLength: 998,
-      },
+      $ref: "#/components/schemas/EmailBroadcastHeaders",
       description:
         "Custom email headers to set on the broadcast, as name and value pairs. What you send replaces the headers the draft already had rather than adding to them. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.\n",
     },
@@ -3809,6 +4031,305 @@ export const EmailBroadcastClickedLinkListSchema = {
   },
 } as const;
 
+export const EmailBroadcastInputOverridesSchema = {
+  type: "object",
+  "x-sensitive": true,
+  properties: {
+    template: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastTemplateUpdate",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Replaces the template, language or parameters for this request. Null removes the template for this request.",
+    },
+    from: {
+      $ref: "#/components/schemas/EmailAddressInput",
+      description:
+        "Replaces the sender for this request. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name.",
+    },
+    reply_to: {
+      type: ["array", "null"],
+      items: {
+        $ref: "#/components/schemas/EmailAddressInput",
+      },
+      minItems: 1,
+      maxItems: 25,
+      description:
+        "Replaces the reply-to addresses for this request. Null removes them.",
+    },
+    headers: {
+      $ref: "#/components/schemas/EmailBroadcastHeaders",
+      description:
+        "Replaces the custom headers for this request rather than adding to them. Up to 25 of them, each value up to 998 characters. The header rules for updating a broadcast apply.\n",
+    },
+  },
+} as const;
+
+export const EmailBroadcastValidationRequestSchema = {
+  "x-sensitive": true,
+  description:
+    "Replacements over the saved broadcast for this validation only. A supplied field replaces the saved value and an omitted field keeps it; nothing is saved. A changed template ID clears the saved language and parameters before supplied replacements apply, and repeating the same ID keeps them.\n",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailBroadcastInputOverrides",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailBroadcastResolutionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "template_id",
+    "observed_version_id",
+    "effective_language",
+    "requirements_fingerprint",
+  ],
+  description:
+    "The published template version and language a validation or preview checked. It does not fix the version a later send uses.",
+  properties: {
+    template_id: {
+      $ref: "#/components/schemas/EmailTemplateID",
+      description: "The template the broadcast uses.",
+    },
+    observed_version_id: {
+      $ref: "#/components/schemas/EmailTemplateVersionID",
+      description: "The published template version that was checked.",
+    },
+    requested_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description:
+        "The language selected in `template.language`, by the broadcast or this request. Absent when none is selected and the published version's default language is used.",
+    },
+    effective_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description: "The language whose content was checked.",
+    },
+    requirements_fingerprint: {
+      type: "string",
+      minLength: 1,
+      description:
+        "An opaque value that changes when the checked version, its content or the inputs it uses change. Compare it with an earlier value to tell whether the requirements are still the same. Do not parse it.",
+    },
+    default_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description:
+        "The published version's default language. When the broadcast has `template.parameter_overrides`, `template.parameters` must hold every input this language's content and the broadcast's sender name, reply-to and headers use; without it the selected language's rules apply. Read the complete lists from `base_parameters` and `override_parameters` on the validation result. Template inputs describe template content only and do not include the sender name, reply-to or headers.\n",
+    },
+  },
+} as const;
+
+export const EmailBroadcastValidationResultSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["ready_for_admission", "problems", "unused_parameters"],
+  description:
+    "Whether the broadcast's current template and inputs pass validation. Validation does not save, fix a template version or evaluate recipients.",
+  properties: {
+    ready_for_admission: {
+      type: "boolean",
+      description:
+        "Whether the current template and supplied broadcast inputs pass validation, including checks that the sender and audience can be used. Sending also checks permissions, limits, the audience's recipients and their values, so `true` does not guarantee the broadcast sends.",
+    },
+    resolution: {
+      $ref: "#/components/schemas/EmailBroadcastResolution",
+      description:
+        "The published template version and language that were checked. Absent when no published template could be selected.",
+    },
+    problems: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailBroadcastParameterProblem",
+      },
+      description:
+        "The problems found. Empty when `ready_for_admission` is true.",
+    },
+    unused_parameters: {
+      type: "array",
+      items: {
+        type: "string",
+      },
+      description:
+        "Names supplied in `template.parameters`, or in the selected language's `template.parameter_overrides` entry, that the selected content and envelope do not use. Rendering the selected content ignores them. With `template.parameter_overrides`, this can include a name in `base_parameters` that only the default language uses, and `template.parameters` must still hold its value.\n",
+    },
+    base_parameters: {
+      type: "array",
+      items: {
+        type: "string",
+      },
+      description:
+        "Input names `template.parameters` must hold, returned with `resolution`. Without `template.parameter_overrides` these are the inputs the selected language uses. With it they are every input the default language's content or the envelope uses, including names the selected language does not use.",
+    },
+    override_parameters: {
+      type: "array",
+      items: {
+        type: "string",
+      },
+      description:
+        "Input names only the selected language uses, returned with `resolution`. Each may come from that language's entry in `template.parameter_overrides` or from `template.parameters`. Always empty without `template.parameter_overrides`.",
+    },
+  },
+} as const;
+
+export const EmailBroadcastPreviewContactSchema = {
+  type: "object",
+  properties: {
+    contact_id: {
+      $ref: "#/components/schemas/ContactID",
+      description:
+        "The workspace contact whose values fill `bird.contact.` inputs. Required when the template or envelope reads contact data. Present values are used as they are, and a property's fallback applies only when the contact has no value for it.",
+    },
+  },
+} as const;
+
+export const EmailBroadcastPreviewRequestSchema = {
+  "x-sensitive": true,
+  description:
+    "Replacements over the saved broadcast, and the contact to render this preview for. A supplied field replaces the saved value for this preview only and an omitted field keeps it; nothing is saved. A changed template ID clears the saved language and parameters before supplied replacements apply, and repeating the same ID keeps them.\n",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailBroadcastInputOverrides",
+    },
+    {
+      $ref: "#/components/schemas/EmailBroadcastPreviewContact",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailBroadcastResolvedParametersSchema = {
+  type: "object",
+  "x-sensitive": true,
+  maxProperties: 128,
+  propertyNames: {
+    $ref: "#/components/schemas/EmailBroadcastParameterName",
+  },
+  additionalProperties: {
+    type: ["string", "number", "boolean", "null"],
+  },
+  description:
+    "The broadcast inputs this render used, by name, each with the string, number, boolean or null value it used. It holds the values taken from `template.parameters` or the selected language's `template.parameter_overrides` entry, and only for names the rendered content or envelope uses. Contact values are never included. A number keeps the digits it was supplied with.\n",
+} as const;
+
+export const EmailBroadcastPreviewResultSchema = {
+  type: "object",
+  "x-sensitive": true,
+  additionalProperties: false,
+  required: [
+    "resolution",
+    "subject",
+    "preheader",
+    "html",
+    "text",
+    "resolved_parameters",
+    "problems",
+    "preview_fingerprint",
+  ],
+  description:
+    "A broadcast rendered for one contact, with the inputs it used. Preview sends nothing, and its unsubscribe link is a placeholder that unsubscribes no one.",
+  properties: {
+    resolution: {
+      $ref: "#/components/schemas/EmailBroadcastResolution",
+    },
+    contact_id: {
+      $ref: "#/components/schemas/ContactID",
+      description:
+        "The contact whose values personalized this preview. Absent when the request named none.",
+    },
+    subject: {
+      type: "string",
+      minLength: 0,
+      description: "The rendered subject line.",
+    },
+    preheader: {
+      type: "string",
+      minLength: 0,
+      description:
+        "The text of the hidden preview block that this render of `html` includes, which inbox clients can show beside the subject. It is empty when the template has no preview text, when the text renders empty, or when the rendered HTML does not include the block. A version published earlier can have preview text whose block its markup leaves out, escapes or removes; publishing the template again places the block. This value describes the rendered HTML and does not show how a provider or inbox displays it. Use it instead of reading the hidden block in `html`.\n",
+    },
+    html: {
+      type: "string",
+      minLength: 0,
+      description:
+        "The rendered HTML body. When `preheader` is not empty, it includes the hidden block that carries that text.",
+    },
+    text: {
+      type: "string",
+      minLength: 0,
+      description: "The rendered plain-text body.",
+    },
+    resolved_parameters: {
+      $ref: "#/components/schemas/EmailBroadcastResolvedParameters",
+    },
+    problems: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailBroadcastParameterProblem",
+      },
+      description:
+        "Problems with the broadcast's inputs found while rendering this preview.",
+    },
+    preview_fingerprint: {
+      type: "string",
+      minLength: 1,
+      description:
+        "An opaque value for this rendered content. It changes when the published version, an input, a contact value, a fallback or the envelope changes. To send this content as a test, repeat the same inputs with this value. Do not parse it.",
+    },
+  },
+} as const;
+
+export const EmailBroadcastTestRequestSchema = {
+  "x-sensitive": true,
+  description:
+    "The inputs of a preview, repeated with its fingerprint, and the member to send its rendered content to. Send the same template, envelope and contact fields the preview used; nothing is saved to the broadcast. A user may send to their own current member email; another destination, or a machine principal, also requires members read permission. The personalization contact and the destination are independent.\n",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailBroadcastInputOverrides",
+    },
+    {
+      $ref: "#/components/schemas/EmailBroadcastPreviewContact",
+    },
+    {
+      type: "object",
+      required: ["to", "preview_fingerprint"],
+      properties: {
+        to: {
+          type: "string",
+          format: "email",
+          example: "member@example.com",
+          minLength: 1,
+          description:
+            "The email address of a current organization member with access to this workspace.",
+        },
+        preview_fingerprint: {
+          type: "string",
+          example: "fingerprint_from_matching_preview",
+          minLength: 1,
+          description:
+            "The `preview_fingerprint` returned by the preview whose content you are sending.",
+        },
+      },
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const EmailBroadcastTestResultSchema = {
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailMessage",
+    },
+  ],
+  description:
+    "The email accepted for asynchronous test delivery. Acceptance does not confirm delivery.",
+} as const;
+
 export const EmailBroadcastSendNowRequestSchema = {
   type: "object",
   additionalProperties: false,
@@ -3830,13 +4351,6 @@ export const ContactIdentifierFilterSchema = {
   enum: ["email", "phone_number"],
   description:
     "Which identifier a contact has on file, `email` for an email address or `phone_number` for a phone number.",
-} as const;
-
-export const ContactIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^con_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "con_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const AudienceRefSchema = {
@@ -33980,6 +34494,212 @@ export const EmailTemplateDuplicateSchema = {
   },
 } as const;
 
+export const EmailTemplateParameterTypeSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "The value type the template declares for a parameter. A broadcast can still supply any scalar value; see `value_domain`.\n\n- `text`: any value. A parameter the template uses without declaring it is reported as a required `text` parameter.\n- `code`: 4 to 8 digits.\n- `ttl`: a whole number from 1 to 999.\n- `count`: a whole number from 1 to 999.\n- `ref`: up to 16 uppercase letters, digits or hyphens.\n- `date`: an ISO 8601 date (YYYY-MM-DD).\n- `date_time`: an ISO 8601 date and time, with an optional offset.\n- `amount`: a decimal amount in major units, with up to 4 decimal places.\n- `currency`: an ISO 4217 currency code of 3 uppercase letters.\n",
+  "x-extensible-enum": [
+    "text",
+    "code",
+    "ttl",
+    "count",
+    "ref",
+    "date",
+    "date_time",
+    "amount",
+    "currency",
+  ],
+  example: "text",
+} as const;
+
+export const EmailTemplateParameterValueDomainSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "The shape of value a broadcast may supply for a parameter, independent of the declared `type`.\n\n- `scalar`: a string, number, boolean or null, used as given.\n",
+  "x-extensible-enum": ["scalar"],
+  example: "scalar",
+} as const;
+
+export const EmailTemplateUseKindSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "How the template uses a parameter or variable at one place in its content.\n\n- `value`: the template outputs or compares the value.\n- `iterable`: the template loops over the value.\n",
+  "x-extensible-enum": ["value", "iterable"],
+  example: "value",
+} as const;
+
+export const EmailTemplateUseSiteSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "The part of the published content where a parameter or variable is used.\n\n- `subject`: the subject line.\n- `html`: the HTML body, including its inbox preview text.\n- `text`: the plain-text body.\n",
+  "x-extensible-enum": ["subject", "html", "text"],
+  example: "html",
+} as const;
+
+export const EmailTemplateUseConstraintSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["kind", "site"],
+  description:
+    "One place in the published content that uses a parameter or variable, and how it is used there.",
+  properties: {
+    kind: {
+      $ref: "#/components/schemas/EmailTemplateUseKind",
+    },
+    site: {
+      $ref: "#/components/schemas/EmailTemplateUseSite",
+    },
+    path: {
+      type: "string",
+      description:
+        "The parameter or variable path the template reads at this place, such as `offer` or `bird.contact.first_name`.",
+    },
+    operation: {
+      type: "string",
+      description:
+        "How the template uses the parameter or variable here, passed through from the template. `output` means it writes the value; other values name the Liquid tag that reads it, such as `if`, `case`, `for` or `assign`.",
+    },
+  },
+} as const;
+
+export const EmailTemplateParameterSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name", "type", "value_domain", "required", "use_constraints"],
+  description:
+    "A parameter the published content uses that the broadcast supplies in `template.parameters`, with what the template declares about it.",
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The parameter name to use as a key in `template.parameters`.",
+      example: "offer",
+    },
+    type: {
+      $ref: "#/components/schemas/EmailTemplateParameterType",
+    },
+    value_domain: {
+      $ref: "#/components/schemas/EmailTemplateParameterValueDomain",
+    },
+    required: {
+      type: "boolean",
+      description: "Whether the template declares the parameter required.",
+    },
+    sensitive: {
+      type: "boolean",
+      description:
+        "Whether the template marks the parameter sensitive. A broadcast cannot supply a sensitive parameter that its content uses.",
+    },
+    use_constraints: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailTemplateUseConstraint",
+      },
+      description: "Each place the content uses the parameter.",
+    },
+  },
+} as const;
+
+export const EmailTemplateVariableSourceSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Where Bird takes the value of a `bird.` variable from.\n\n- `contact`: a property of the recipient contact, read from `bird.contact.`.\n- `bird`: another value Bird fills in when it sends, such as `bird.unsubscribe_url`.\n",
+  "x-extensible-enum": ["contact", "bird"],
+  example: "contact",
+} as const;
+
+export const EmailTemplateVariableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["path", "source"],
+  description:
+    "A `bird.` variable the published content uses, which Bird fills in for each recipient. The broadcast does not supply it, and no contact value is returned.",
+  properties: {
+    path: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The variable as the template writes it, such as `bird.contact.first_name`.",
+      example: "bird.contact.first_name",
+    },
+    source: {
+      $ref: "#/components/schemas/EmailTemplateVariableSource",
+    },
+    source_type: {
+      type: "string",
+      description:
+        "The type of the contact property, from this workspace's current contact property definitions, such as `string`. Absent when the variable is not a defined contact property.",
+    },
+    use_constraints: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailTemplateUseConstraint",
+      },
+      description: "Each place the content uses the variable.",
+    },
+  },
+} as const;
+
+export const EmailTemplateParametersSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "template_id",
+    "observed_version_id",
+    "effective_language",
+    "requirements_fingerprint",
+    "parameters",
+    "variables",
+  ],
+  description:
+    "The parameters and variables a template's current published content uses in one exact language, across its subject, HTML and plain-text body. The HTML includes its inbox preview text. This describes the template and holds no parameter or contact values.",
+  properties: {
+    template_id: {
+      $ref: "#/components/schemas/EmailTemplateID",
+      description: "The template that was read.",
+    },
+    observed_version_id: {
+      $ref: "#/components/schemas/EmailTemplateVersionID",
+      description: "The published template version that was read.",
+    },
+    requested_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description:
+        "The language requested with `language`. Absent when none was requested and the published version's default language is used.",
+    },
+    effective_language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description: "The language whose content was read.",
+    },
+    requirements_fingerprint: {
+      type: "string",
+      minLength: 1,
+      description:
+        "An opaque value that changes when this content or the parameters and variables it uses change, including for built-in templates whose version ID stays the same. Compare it with an earlier value to tell whether they are still the same. Do not parse it.",
+    },
+    parameters: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailTemplateParameter",
+      },
+      description: "The parameters the broadcast supplies, sorted by name.",
+    },
+    variables: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailTemplateVariable",
+      },
+      description: "The `bird.` variables Bird fills in, sorted by path.",
+    },
+  },
+} as const;
+
 export const EmailTemplatePreviewRequestSchema = {
   type: "object",
   additionalProperties: false,
@@ -35219,6 +35939,13 @@ export const InboundAddressUpdateSchema = {
   },
 } as const;
 
+export const MailboxIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^mbx_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "mbx_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const InboundEmailMessageIDSchema = {
   type: "string",
   minLength: 1,
@@ -35279,6 +36006,7 @@ export const InboundEmailMessageSchema = {
     "subject",
     "message_id",
     "in_reply_to",
+    "mailbox_id",
     "thread_id",
     "authentication",
     "spf_pass",
@@ -35338,10 +36066,22 @@ export const InboundEmailMessageSchema = {
       description:
         "The References header, which holds every Message-ID in this conversation, oldest first. Left out when the message arrived without one.",
     },
+    mailbox_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/MailboxID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Mailbox that received this message, or `null` when it arrived on an inbound address or domain without a mailbox.",
+    },
     thread_id: {
       type: ["string", "null"],
       description:
-        "Conversation this message belongs to, or `null` when it is not grouped into one.",
+        "Mailbox conversation this message belongs to, or `null` when it was not received by a mailbox or has since been deleted from it.",
     },
     authentication: {
       type: ["string", "null"],
@@ -35443,13 +36183,6 @@ export const InboundAttachmentListSchema = {
       },
     },
   },
-} as const;
-
-export const MailboxIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^mbx_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "mbx_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const MailboxOwnerSchema = {
@@ -37372,6 +38105,21 @@ export const ConnectorActionIDSchema = {
   example: "trigger_run",
 } as const;
 
+export const ConnectionConfigSchema = {
+  type: "object",
+  maxProperties: 16,
+  additionalProperties: {
+    type: "string",
+    minLength: 1,
+    maxLength: 2048,
+  },
+  description:
+    "Values for the connector's nonsecret fields, keyed by field `name`, such as the URL the endpoint's requests go to. A URL must be HTTPS, on one of the connector's `allowed_origins`, and under its `path_prefix` when it has one. It cannot include user info, a fragment, an IP address as its host, dot segments, or encoded slashes.\n",
+  example: {
+    trigger_url: "https://agents.example.com/triggers/support",
+  },
+} as const;
+
 export const WebhookConnectorBindingSchema = {
   type: "object",
   additionalProperties: false,
@@ -37393,6 +38141,15 @@ export const WebhookConnectorBindingSchema = {
       minLength: 1,
       description: "Label of the credentials the endpoint delivers with.",
       example: "Support triage agent",
+    },
+    config: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ConnectionConfig",
+        },
+      ],
+      description:
+        "The connector's nonsecret fields as the endpoint delivers with them. Secret fields are never returned.\n",
     },
   },
 } as const;
@@ -37565,21 +38322,6 @@ export const ConnectionCredentialsSchema = {
   },
 } as const;
 
-export const ConnectionConfigSchema = {
-  type: "object",
-  maxProperties: 16,
-  additionalProperties: {
-    type: "string",
-    minLength: 1,
-    maxLength: 2048,
-  },
-  description:
-    "Values for the connector's nonsecret fields, keyed by field `name`, such as the URL the endpoint's requests go to. A URL must be HTTPS, on one of the connector's `allowed_origins`, and under its `path_prefix` when it has one. It cannot include user info, a fragment, an IP address as its host, dot segments, or encoded slashes.\n",
-  example: {
-    trigger_url: "https://agents.example.com/triggers/support",
-  },
-} as const;
-
 export const WebhookConnectorSetupSchema = {
   type: "object",
   additionalProperties: false,
@@ -37732,6 +38474,82 @@ export const WebhookEndpointCreatedSchema = {
   ],
 } as const;
 
+export const WebhookDestinationTypeSchema = {
+  type: "string",
+  enum: ["webhook", "connector"],
+  description:
+    "How deliveries to the webhook endpoint are built: `webhook` posts the signed event unchanged to the endpoint URL; `connector` builds the delivery using the configured connector action. An existing endpoint's type cannot change; a different value returns a `422`.\n",
+} as const;
+
+export const ConnectionConfigPatchSchema = {
+  type: "object",
+  maxProperties: 16,
+  additionalProperties: {
+    type: ["string", "null"],
+    minLength: 1,
+    maxLength: 2048,
+  },
+  description:
+    "Changes to the connector's nonsecret fields, keyed by field `name`. A key given replaces that field, `null` clears an optional one, and a key left out keeps its stored value. A required field cannot be cleared, and the result is checked as at creation.\n",
+  example: {
+    vault_id: "vlt_011CZkZDLs7fYzm1hXNPeRjv",
+  },
+} as const;
+
+export const WebhookConnectorSetupUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    connector_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WebhookConnectorID",
+        },
+      ],
+      description:
+        "The endpoint's connector. It cannot change, so a different value returns a `422`.",
+    },
+    action: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ConnectorActionID",
+        },
+      ],
+      description:
+        "The endpoint's action. It cannot change, so a different value returns a `422`.",
+    },
+    credentials: {
+      description:
+        "New values for the connector's secret fields, merged over the stored ones: a key given replaces that field and an omitted key keeps its value. The next delivery, retries included, uses them.\n",
+    },
+    config: {
+      $ref: "#/components/schemas/ConnectionConfigPatch",
+    },
+  },
+  description:
+    "Changes to the endpoint's connector, nested as on creation. A field the endpoint's URL is built from moves the URL with it. New deliveries are prepared with the current config. Queued deliveries keep their prepared body, but every send attempt, including retries, uses the current destination URL and credentials.\n",
+} as const;
+
+export const WebhookDestinationUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    type: {
+      $ref: "#/components/schemas/WebhookDestinationType",
+    },
+    connector: {
+      "x-sensitive": true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/WebhookConnectorSetupUpdate",
+        },
+      ],
+    },
+  },
+  description:
+    "Changes to how deliveries are built, shaped as at creation. Only a `connector` destination takes `connector`; on any other endpoint it returns a `422`. Omit to keep the destination.\n",
+} as const;
+
 export const WebhookEndpointUpdateSchema = {
   type: "object",
   additionalProperties: false,
@@ -37774,9 +38592,8 @@ export const WebhookEndpointUpdateSchema = {
         "Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`.\n",
       example: ["email.delivered", "email.bounced", "email.complained"],
     },
-    credentials: {
-      description:
-        "New values for a `connector` destination's secret fields, merged over the stored ones: a key given replaces that field and an omitted key keeps its value. The merged set is checked as at creation, and the next delivery, retries included, uses it. On an endpoint without a `connector` destination this returns a `422`. Omit to keep the current credentials.\n",
+    destination: {
+      $ref: "#/components/schemas/WebhookDestinationUpdate",
     },
     status: {
       type: "string",
@@ -49506,12 +50323,39 @@ export const EmailEventListWritableSchema = {
   ],
 } as const;
 
+export const EmailBroadcastParametersWritableSchema = {
+  type: "object",
+  "x-sensitive": true,
+  maxProperties: 128,
+  propertyNames: {
+    $ref: "#/components/schemas/EmailBroadcastParameterName",
+  },
+  additionalProperties: {
+    type: ["string", "number", "boolean", "null"],
+  },
+  description:
+    "Complete template input map. Each value is a string, number, boolean or null and is used exactly as given, so text containing braces or code-like syntax is never evaluated. Objects and lists are not accepted. Use bird.contact.first_name in the template for contact data. Names must be bare input names outside the bird namespace. Omission retains the map unless the template ID changes, which clears it; an empty object clears it, and null is invalid. The compact map is limited to 16384 UTF-8 bytes and 128 names. Individual email parameters keep their own format.",
+} as const;
+
+export const EmailBroadcastParameterOverridesWritableSchema = {
+  type: "object",
+  "x-sensitive": true,
+  propertyNames: {
+    $ref: "#/components/schemas/LanguageTag",
+  },
+  additionalProperties: {
+    $ref: "#/components/schemas/EmailBroadcastParametersWritable",
+  },
+  description:
+    "Complete map of per-language parameter values, keyed by a BCP-47 language tag of at most 35 characters such as `es` or `pt-BR`. Each language holds only the names whose value differs for that language; a name it leaves out uses the value in `parameters`, including later changes to it. A value that is present always applies, even when it is `\"\"`, `0`, `false`, `null` or equal to the `parameters` value. To return a name to the `parameters` value, send the map without it. Sending this map, even as `{}`, applies language rules to the broadcast: `parameters` must hold every input the default language's content, sender name, reply-to or headers use, and an input only the selected language uses may come from that language's entry instead. A broadcast that never sends it keeps the selected-language rules. Values for the default language, or for a language the broadcast does not send, are kept but not used. Omission retains the map unless the template ID changes, which clears it; an empty object removes every override, null is invalid and a language with no names is removed. Tags are stored in canonical BCP-47 form, so two spellings of one tag are refused. The compact map is limited to 16384 UTF-8 bytes, and `parameters` and every language together are limited to 128 distinct names.\n",
+} as const;
+
 export const EmailBroadcastTemplateWritableSchema = {
   type: "object",
   additionalProperties: false,
   required: ["id"],
   description:
-    "The template a broadcast sends, the exact version of it the broadcast is fixed to, and which of that version's languages goes out.\n",
+    "The template a broadcast sends, the exact version of it the broadcast is fixed to, and which of that version's languages goes out.\n\n`parameters` and `parameter_overrides` are returned on customer detail and mutation responses when the caller has email_management read permission, and omitted without that permission and from list responses. They are also omitted from staff-only responses. Broadcasts created before parameters existed return `parameters` as an empty object. `parameter_overrides` is also omitted for a broadcast that has never sent it; an empty object means language rules apply with no overrides.\n",
   properties: {
     id: {
       $ref: "#/components/schemas/EmailTemplateID",
@@ -49529,6 +50373,12 @@ export const EmailBroadcastTemplateWritableSchema = {
       ],
       description:
         "The BCP-47 language tag selected for the whole audience, such as `en` or `pt-BR`. `null` means no language is selected, so the broadcast uses the published version's default language, unless the template has `language_source_required` set. Send `template.language` in an update to change or clear the selection.\n",
+    },
+    parameters: {
+      $ref: "#/components/schemas/EmailBroadcastParametersWritable",
+    },
+    parameter_overrides: {
+      $ref: "#/components/schemas/EmailBroadcastParameterOverridesWritable",
     },
   },
 } as const;
@@ -49663,6 +50513,30 @@ export const EmailBroadcastClickedLinkListWritableSchema = {
         "The broadcast's clicked URLs, most-clicked first, capped at 100 rows.",
     },
   },
+} as const;
+
+export const EmailBroadcastResolvedParametersWritableSchema = {
+  type: "object",
+  "x-sensitive": true,
+  maxProperties: 128,
+  propertyNames: {
+    $ref: "#/components/schemas/EmailBroadcastParameterName",
+  },
+  additionalProperties: {
+    type: ["string", "number", "boolean", "null"],
+  },
+  description:
+    "The broadcast inputs this render used, by name, each with the string, number, boolean or null value it used. It holds the values taken from `template.parameters` or the selected language's `template.parameter_overrides` entry, and only for names the rendered content or envelope uses. Contact values are never included. A number keeps the digits it was supplied with.\n",
+} as const;
+
+export const EmailBroadcastTestResultWritableSchema = {
+  allOf: [
+    {
+      $ref: "#/components/schemas/EmailMessageWritable",
+    },
+  ],
+  description:
+    "The email accepted for asynchronous test delivery. Acceptance does not confirm delivery.",
 } as const;
 
 export const AudienceRefWritableSchema = {
@@ -54747,6 +55621,7 @@ export const InboundEmailMessageWritableSchema = {
     "subject",
     "message_id",
     "in_reply_to",
+    "mailbox_id",
     "thread_id",
     "authentication",
     "spf_pass",
@@ -54800,10 +55675,22 @@ export const InboundEmailMessageWritableSchema = {
       description:
         "The References header, which holds every Message-ID in this conversation, oldest first. Left out when the message arrived without one.",
     },
+    mailbox_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/MailboxID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Mailbox that received this message, or `null` when it arrived on an inbound address or domain without a mailbox.",
+    },
     thread_id: {
       type: ["string", "null"],
       description:
-        "Conversation this message belongs to, or `null` when it is not grouped into one.",
+        "Mailbox conversation this message belongs to, or `null` when it was not received by a mailbox or has since been deleted from it.",
     },
     authentication: {
       type: ["string", "null"],
@@ -55500,6 +56387,65 @@ export const WebhookEndpointCreatedWritableSchema = {
   ],
 } as const;
 
+export const WebhookConnectorSetupUpdateWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    connector_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WebhookConnectorID",
+        },
+      ],
+      description:
+        "The endpoint's connector. It cannot change, so a different value returns a `422`.",
+    },
+    action: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ConnectorActionID",
+        },
+      ],
+      description:
+        "The endpoint's action. It cannot change, so a different value returns a `422`.",
+    },
+    credentials: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ConnectionCredentials",
+        },
+      ],
+      description:
+        "New values for the connector's secret fields, merged over the stored ones: a key given replaces that field and an omitted key keeps its value. The next delivery, retries included, uses them.\n",
+    },
+    config: {
+      $ref: "#/components/schemas/ConnectionConfigPatch",
+    },
+  },
+  description:
+    "Changes to the endpoint's connector, nested as on creation. A field the endpoint's URL is built from moves the URL with it. New deliveries are prepared with the current config. Queued deliveries keep their prepared body, but every send attempt, including retries, uses the current destination URL and credentials.\n",
+} as const;
+
+export const WebhookDestinationUpdateWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    type: {
+      $ref: "#/components/schemas/WebhookDestinationType",
+    },
+    connector: {
+      "x-sensitive": true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/WebhookConnectorSetupUpdateWritable",
+        },
+      ],
+    },
+  },
+  description:
+    "Changes to how deliveries are built, shaped as at creation. Only a `connector` destination takes `connector`; on any other endpoint it returns a `422`. Omit to keep the destination.\n",
+} as const;
+
 export const WebhookEndpointUpdateWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -55542,14 +56488,8 @@ export const WebhookEndpointUpdateWritableSchema = {
         "Replaces all event subscriptions with this list. Omit to keep the current set. Types outside the event catalog return a `422`.\n",
       example: ["email.delivered", "email.bounced", "email.complained"],
     },
-    credentials: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/ConnectionCredentials",
-        },
-      ],
-      description:
-        "New values for a `connector` destination's secret fields, merged over the stored ones: a key given replaces that field and an omitted key keeps its value. The merged set is checked as at creation, and the next delivery, retries included, uses it. On an endpoint without a `connector` destination this returns a `422`. Omit to keep the current credentials.\n",
+    destination: {
+      $ref: "#/components/schemas/WebhookDestinationUpdateWritable",
     },
     status: {
       type: "string",

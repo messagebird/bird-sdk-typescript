@@ -1719,7 +1719,29 @@ export type EmailBroadcastStatus =
 export type AudienceId = string;
 
 /**
+ * A bare template input name, such as `first_name` or `offer`, outside the reserved `bird` namespace.
+ */
+export type EmailBroadcastParameterName = string;
+
+/**
+ * Complete template input map. Each value is a string, number, boolean or null and is used exactly as given, so text containing braces or code-like syntax is never evaluated. Objects and lists are not accepted. Use bird.contact.first_name in the template for contact data. Names must be bare input names outside the bird namespace. Omission retains the map unless the template ID changes, which clears it; an empty object clears it, and null is invalid. The compact map is limited to 16384 UTF-8 bytes and 128 names. Individual email parameters keep their own format.
+ */
+export type EmailBroadcastParameters = {
+  [key in EmailBroadcastParameterName]?: string | number | boolean | null;
+};
+
+/**
+ * Complete map of per-language parameter values, keyed by a BCP-47 language tag of at most 35 characters such as `es` or `pt-BR`. Each language holds only the names whose value differs for that language; a name it leaves out uses the value in `parameters`, including later changes to it. A value that is present always applies, even when it is `""`, `0`, `false`, `null` or equal to the `parameters` value. To return a name to the `parameters` value, send the map without it. Sending this map, even as `{}`, applies language rules to the broadcast: `parameters` must hold every input the default language's content, sender name, reply-to or headers use, and an input only the selected language uses may come from that language's entry instead. A broadcast that never sends it keeps the selected-language rules. Values for the default language, or for a language the broadcast does not send, are kept but not used. Omission retains the map unless the template ID changes, which clears it; an empty object removes every override, null is invalid and a language with no names is removed. Tags are stored in canonical BCP-47 form, so two spellings of one tag are refused. The compact map is limited to 16384 UTF-8 bytes, and `parameters` and every language together are limited to 128 distinct names.
+ *
+ */
+export type EmailBroadcastParameterOverrides = {
+  [key in LanguageTag]?: EmailBroadcastParameters;
+};
+
+/**
  * The template a broadcast sends, the exact version of it the broadcast is fixed to, and which of that version's languages goes out.
+ *
+ * `parameters` and `parameter_overrides` are returned on customer detail and mutation responses when the caller has email_management read permission, and omitted without that permission and from list responses. They are also omitted from staff-only responses. Broadcasts created before parameters existed return `parameters` as an empty object. `parameter_overrides` is also omitted for a broadcast that has never sent it; an empty object means language rules apply with no overrides.
  *
  */
 export type EmailBroadcastTemplate = {
@@ -1738,6 +1760,149 @@ export type EmailBroadcastTemplate = {
    *
    */
   readonly version_id?: EmailTemplateVersionId | null;
+  parameters?: EmailBroadcastParameters;
+  parameter_overrides?: EmailBroadcastParameterOverrides;
+};
+
+/**
+ * What a broadcast input diagnostic found.
+ *
+ * - `parameter_json_invalid`: the request body or an input map is not valid JSON.
+ * - `parameter_map_invalid`: `template.parameters` or `template.parameter_overrides` is not a JSON object of input names.
+ * - `parameter_name_invalid`: an input name is not a bare name outside the `bird` namespace.
+ * - `parameter_value_unsupported`: an input value is an object or a list. Values must be a string, number, boolean or null.
+ * - `parameter_duplicate_key`: an input name, or two spellings of one language tag, appears twice.
+ * - `parameter_bytes_exceeded`: an input map is larger than 16384 UTF-8 bytes.
+ * - `parameter_names_exceeded`: `template.parameters` and every language together hold more than 128 distinct names.
+ * - `parameter_depth_exceeded`: an input value is nested too deeply.
+ * - `parameter_language_invalid`: a `template.parameter_overrides` key is not a valid BCP-47 language tag.
+ * - `parameter_required`: the template or envelope uses an input that has no value.
+ * - `sensitive_input_unsupported`: the template uses an input it marks sensitive, which a broadcast cannot supply.
+ * - `render_profile_unsupported`: the template uses a Liquid operation that rendering with broadcast inputs does not support.
+ * - `rendered_envelope_invalid`: the rendered subject, sender name, reply-to addresses or a header is not valid for an email, for example because it contains a line break.
+ * - `contact_property_unknown`: the template reads a contact property this workspace has not defined.
+ * - `template_unavailable`: the broadcast has no template, or its template no longer exists or has no published version.
+ * - `language_unavailable`: the published version has no content in the selected language.
+ * - `sender_unavailable`: the broadcast cannot send from its `from` address or IP pool.
+ * - `audience_unavailable`: the broadcast's audience cannot be used for this send.
+ * - `recipient_render_failed`: content could not be rendered for a recipient while the broadcast was sending.
+ * - `render_budget_exceeded`: rendering went over a limit, named by `budget` with its `limit`.
+ * - `transport_missing`: the saved content of a prepared broadcast is unavailable. Contact Bird support.
+ * - `transport_invalid`: the saved content of a prepared broadcast no longer matches what was prepared. Contact Bird support.
+ *
+ */
+export type EmailBroadcastParameterProblemCode =
+  | "parameter_json_invalid"
+  | "parameter_map_invalid"
+  | "parameter_name_invalid"
+  | "parameter_value_unsupported"
+  | "parameter_duplicate_key"
+  | "parameter_bytes_exceeded"
+  | "parameter_names_exceeded"
+  | "parameter_depth_exceeded"
+  | "parameter_language_invalid"
+  | "parameter_required"
+  | "sensitive_input_unsupported"
+  | "render_profile_unsupported"
+  | "rendered_envelope_invalid"
+  | "contact_property_unknown"
+  | "template_unavailable"
+  | "language_unavailable"
+  | "sender_unavailable"
+  | "audience_unavailable"
+  | "recipient_render_failed"
+  | "render_budget_exceeded"
+  | "transport_missing"
+  | "transport_invalid"
+  | (string & {});
+
+/**
+ * Where a broadcast input diagnostic was found.
+ *
+ * - `request`: in the inputs this request supplied, before the template was checked.
+ * - `validation`: while checking the inputs against the current published template, as validate, preview and send do.
+ * - `execution`: while the broadcast was being prepared or sent. This phase appears on `failure_parameters`.
+ *
+ */
+export type EmailBroadcastParameterProblemPhase =
+  "request" | "validation" | "execution" | (string & {});
+
+/**
+ * How a broadcast input diagnostic affects sending.
+ *
+ * - `error`: the broadcast cannot send until the problem is fixed.
+ *
+ */
+export type EmailBroadcastParameterProblemSeverity = "error" | (string & {});
+
+/**
+ * The part of the email where the input is used.
+ *
+ * - `subject`: the subject line.
+ * - `html`: the HTML body, including its inbox preview text.
+ * - `text`: the plain-text body.
+ * - `from_name`: the sender display name.
+ * - `reply_to`: the reply-to addresses.
+ *
+ * A custom header is reported as `header:` followed by the header name as the broadcast sets it, for example `header:X-Campaign`.
+ *
+ */
+export type EmailBroadcastParameterProblemSite =
+  "subject" | "html" | "text" | "from_name" | "reply_to" | (string & {});
+
+export type ContactId = string;
+
+/**
+ * One problem with a broadcast's template inputs. A diagnostic names the input or field it is about and never includes its value.
+ */
+export type EmailBroadcastParameterProblem = {
+  code: EmailBroadcastParameterProblemCode;
+  phase: EmailBroadcastParameterProblemPhase;
+  severity: EmailBroadcastParameterProblemSeverity;
+  /**
+   * A JSON pointer to the request or broadcast field the problem is about, such as `/template/parameters/first_name` or `/from`. Absent when the problem is not about one field.
+   */
+  pointer?: string;
+  /**
+   * Where in the email the input is used. Absent when the problem is not tied to one place.
+   */
+  site?: EmailBroadcastParameterProblemSite;
+  /**
+   * The rendering limit that was exceeded, such as `output_bytes` or `nesting`, when `code` is `render_budget_exceeded`. It is reported with `limit` on problems from sending a broadcast, in `failure_parameters`.
+   */
+  budget?: string;
+  /**
+   * The value of the limit named by `budget`.
+   */
+  limit?: number;
+  /**
+   * The contact whose values were being rendered, when the problem came from one recipient.
+   */
+  contact_id?: ContactId;
+};
+
+/**
+ * Why a broadcast stopped because its template inputs could not be prepared or rendered. It names fields and contacts and never includes input or contact values.
+ */
+export type EmailBroadcastFailureParameters = {
+  code: EmailBroadcastParameterProblemCode;
+  phase: EmailBroadcastParameterProblemPhase;
+  /**
+   * A JSON pointer to the broadcast field the failure is about, such as `/template/parameters/first_name` or `/template`.
+   */
+  pointer?: string;
+  /**
+   * The published template version the broadcast was using when it failed. Absent when no version had been selected.
+   */
+  observed_version_id?: EmailTemplateVersionId;
+  /**
+   * Up to 20 of the problems found. A recipient problem names its contact in `contact_id`.
+   */
+  problems?: Array<EmailBroadcastParameterProblem>;
+  /**
+   * How many recipients failed to render, including those not listed in `problems`. It can be `0` when the broadcast failed while it was being prepared, before any recipient was rendered.
+   */
+  failure_count: number;
 };
 
 export type EmailBroadcast = {
@@ -1919,6 +2084,13 @@ export type EmailBroadcast = {
    * When the broadcast was canceled, and absent if it never was. This is when cancellation was requested, so it is set as soon as the status is `canceling` and does not move while the remaining sends stop and the status becomes `canceled`.
    */
   readonly canceled_at?: string;
+  /**
+   * Why the broadcast failed, when it could not prepare or render its template inputs. A failed broadcast cannot be updated or sent again. Correct the input or template that `pointer` and `problems` name, then create a new broadcast with the corrected inputs and send it. When `code` is `transport_missing` or `transport_invalid`, the broadcast's saved content cannot be used and changing an input does not fix it, so contact Bird support.
+   *
+   * Absent when the broadcast did not fail this way. Returned on a single broadcast read and on the broadcast that creating, updating, sending or canceling one returns, and absent from the list.
+   *
+   */
+  readonly failure_parameters?: EmailBroadcastFailureParameters;
 };
 
 export type EmailBroadcastList = {
@@ -1943,6 +2115,15 @@ export type EmailBroadcastTemplateCreate = {
    *
    */
   language?: LanguageTag;
+  parameters?: EmailBroadcastParameters;
+  parameter_overrides?: EmailBroadcastParameterOverrides;
+};
+
+/**
+ * Custom email headers as name and value pairs. Up to 25 of them, each value up to 998 characters.
+ */
+export type EmailBroadcastHeaders = {
+  [key: string]: string;
 };
 
 /**
@@ -1972,9 +2153,7 @@ export type EmailBroadcastCreateRequest = {
    * Custom email headers to set on the broadcast, as name and value pairs. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.
    *
    */
-  headers?: {
-    [key: string]: string;
-  };
+  headers?: EmailBroadcastHeaders;
   /**
    * Labels on this broadcast, each one a `name` and a `value`, up to 20 of them. You can filter the broadcast list by a tag, break your stats down by one, and read them back off webhook payloads. Use tags for anything you want to find broadcasts by later, and `metadata` for data you only want handed back to you.
    */
@@ -2016,12 +2195,12 @@ export type EmailBroadcastCreateRequest = {
 };
 
 /**
- * A change to the template a broadcast sends, the language it sends in, or both. Each property is independent: what you leave out keeps the value the broadcast already had.
+ * A change to the template, language, or parameter maps a broadcast sends. Omitted properties retain their values unless the template ID changes. A changed ID clears the old language, parameters and parameter overrides before applying supplied replacements; repeating the same ID retains them.
  *
  */
 export type EmailBroadcastTemplateUpdate = {
   /**
-   * Move the broadcast to this template. Sending an `id` releases the version the broadcast was fixed to, so the next send fixes on the template's published version at that point; repeating the `id` the broadcast already has does the same thing, which is how you take a newly published version, and keeps the language already selected. Leave it out to keep the template and the version it is fixed to, and send a `language` on its own to change only the language. To take the template off a draft, set `template` itself to null.
+   * Select this template. Changing the ID clears the old language, parameters and parameter overrides before supplied replacements. Repeating the same ID retains those values and clears the selected template version, so the next preparation uses the template's latest published version. Omit id to retain the selected template. Adding parameters to a draft created before parameters existed may clear its selected version so it uses the template's latest published version. To clear a draft's selection, set template itself to null.
    *
    */
   id?: EmailTemplateId;
@@ -2030,6 +2209,8 @@ export type EmailBroadcastTemplateUpdate = {
    *
    */
   language?: LanguageTag | null;
+  parameters?: EmailBroadcastParameters;
+  parameter_overrides?: EmailBroadcastParameterOverrides;
 };
 
 /**
@@ -2058,9 +2239,7 @@ export type EmailBroadcastUpdateRequest = {
    * Custom email headers to set on the broadcast, as name and value pairs. What you send replaces the headers the draft already had rather than adding to them. Up to 25 of them, each value up to 998 characters. Two names are ours and cannot be set here: `List-Unsubscribe` and `List-Unsubscribe-Post` are dropped if you send them, whatever the category. We add the one-click unsubscribe pair to a marketing broadcast ourselves, and a transactional broadcast has neither header.
    *
    */
-  headers?: {
-    [key: string]: string;
-  };
+  headers?: EmailBroadcastHeaders;
   /**
    * Labels on this broadcast, each one a `name` and a `value`, that you can filter and search broadcasts by. What you send replaces the tags the draft already had rather than adding to them.
    */
@@ -2270,6 +2449,174 @@ export type EmailBroadcastClickedLinkList = {
   readonly total: number;
 };
 
+export type EmailBroadcastInputOverrides = {
+  /**
+   * Replaces the template, language or parameters for this request. Null removes the template for this request.
+   */
+  template?: EmailBroadcastTemplateUpdate | null;
+  /**
+   * Replaces the sender for this request. Give it as a plain address, as `Jane <jane@acme.com>` to include a display name, or as an object with an address and a name.
+   */
+  from?: EmailAddressInput;
+  /**
+   * Replaces the reply-to addresses for this request. Null removes them.
+   */
+  reply_to?: Array<EmailAddressInput> | null;
+  /**
+   * Replaces the custom headers for this request rather than adding to them. Up to 25 of them, each value up to 998 characters. The header rules for updating a broadcast apply.
+   *
+   */
+  headers?: EmailBroadcastHeaders;
+};
+
+/**
+ * Replacements over the saved broadcast for this validation only. A supplied field replaces the saved value and an omitted field keeps it; nothing is saved. A changed template ID clears the saved language and parameters before supplied replacements apply, and repeating the same ID keeps them.
+ *
+ */
+export type EmailBroadcastValidationRequest = EmailBroadcastInputOverrides;
+
+/**
+ * The published template version and language a validation or preview checked. It does not fix the version a later send uses.
+ */
+export type EmailBroadcastResolution = {
+  /**
+   * The template the broadcast uses.
+   */
+  template_id: EmailTemplateId;
+  /**
+   * The published template version that was checked.
+   */
+  observed_version_id: EmailTemplateVersionId;
+  /**
+   * The language selected in `template.language`, by the broadcast or this request. Absent when none is selected and the published version's default language is used.
+   */
+  requested_language?: LanguageTag;
+  /**
+   * The language whose content was checked.
+   */
+  effective_language: LanguageTag;
+  /**
+   * An opaque value that changes when the checked version, its content or the inputs it uses change. Compare it with an earlier value to tell whether the requirements are still the same. Do not parse it.
+   */
+  requirements_fingerprint: string;
+  /**
+   * The published version's default language. When the broadcast has `template.parameter_overrides`, `template.parameters` must hold every input this language's content and the broadcast's sender name, reply-to and headers use; without it the selected language's rules apply. Read the complete lists from `base_parameters` and `override_parameters` on the validation result. Template inputs describe template content only and do not include the sender name, reply-to or headers.
+   *
+   */
+  default_language?: LanguageTag;
+};
+
+/**
+ * Whether the broadcast's current template and inputs pass validation. Validation does not save, fix a template version or evaluate recipients.
+ */
+export type EmailBroadcastValidationResult = {
+  /**
+   * Whether the current template and supplied broadcast inputs pass validation, including checks that the sender and audience can be used. Sending also checks permissions, limits, the audience's recipients and their values, so `true` does not guarantee the broadcast sends.
+   */
+  ready_for_admission: boolean;
+  /**
+   * The published template version and language that were checked. Absent when no published template could be selected.
+   */
+  resolution?: EmailBroadcastResolution;
+  /**
+   * The problems found. Empty when `ready_for_admission` is true.
+   */
+  problems: Array<EmailBroadcastParameterProblem>;
+  /**
+   * Names supplied in `template.parameters`, or in the selected language's `template.parameter_overrides` entry, that the selected content and envelope do not use. Rendering the selected content ignores them. With `template.parameter_overrides`, this can include a name in `base_parameters` that only the default language uses, and `template.parameters` must still hold its value.
+   *
+   */
+  unused_parameters: Array<string>;
+  /**
+   * Input names `template.parameters` must hold, returned with `resolution`. Without `template.parameter_overrides` these are the inputs the selected language uses. With it they are every input the default language's content or the envelope uses, including names the selected language does not use.
+   */
+  base_parameters?: Array<string>;
+  /**
+   * Input names only the selected language uses, returned with `resolution`. Each may come from that language's entry in `template.parameter_overrides` or from `template.parameters`. Always empty without `template.parameter_overrides`.
+   */
+  override_parameters?: Array<string>;
+};
+
+export type EmailBroadcastPreviewContact = {
+  /**
+   * The workspace contact whose values fill `bird.contact.` inputs. Required when the template or envelope reads contact data. Present values are used as they are, and a property's fallback applies only when the contact has no value for it.
+   */
+  contact_id?: ContactId;
+};
+
+/**
+ * Replacements over the saved broadcast, and the contact to render this preview for. A supplied field replaces the saved value for this preview only and an omitted field keeps it; nothing is saved. A changed template ID clears the saved language and parameters before supplied replacements apply, and repeating the same ID keeps them.
+ *
+ */
+export type EmailBroadcastPreviewRequest = EmailBroadcastInputOverrides &
+  EmailBroadcastPreviewContact;
+
+/**
+ * The broadcast inputs this render used, by name, each with the string, number, boolean or null value it used. It holds the values taken from `template.parameters` or the selected language's `template.parameter_overrides` entry, and only for names the rendered content or envelope uses. Contact values are never included. A number keeps the digits it was supplied with.
+ *
+ */
+export type EmailBroadcastResolvedParameters = {
+  [key in EmailBroadcastParameterName]?: string | number | boolean | null;
+};
+
+/**
+ * A broadcast rendered for one contact, with the inputs it used. Preview sends nothing, and its unsubscribe link is a placeholder that unsubscribes no one.
+ */
+export type EmailBroadcastPreviewResult = {
+  resolution: EmailBroadcastResolution;
+  /**
+   * The contact whose values personalized this preview. Absent when the request named none.
+   */
+  contact_id?: ContactId;
+  /**
+   * The rendered subject line.
+   */
+  subject: string;
+  /**
+   * The text of the hidden preview block that this render of `html` includes, which inbox clients can show beside the subject. It is empty when the template has no preview text, when the text renders empty, or when the rendered HTML does not include the block. A version published earlier can have preview text whose block its markup leaves out, escapes or removes; publishing the template again places the block. This value describes the rendered HTML and does not show how a provider or inbox displays it. Use it instead of reading the hidden block in `html`.
+   *
+   */
+  preheader: string;
+  /**
+   * The rendered HTML body. When `preheader` is not empty, it includes the hidden block that carries that text.
+   */
+  html: string;
+  /**
+   * The rendered plain-text body.
+   */
+  text: string;
+  resolved_parameters: EmailBroadcastResolvedParameters;
+  /**
+   * Problems with the broadcast's inputs found while rendering this preview.
+   */
+  problems: Array<EmailBroadcastParameterProblem>;
+  /**
+   * An opaque value for this rendered content. It changes when the published version, an input, a contact value, a fallback or the envelope changes. To send this content as a test, repeat the same inputs with this value. Do not parse it.
+   */
+  preview_fingerprint: string;
+};
+
+/**
+ * The inputs of a preview, repeated with its fingerprint, and the member to send its rendered content to. Send the same template, envelope and contact fields the preview used; nothing is saved to the broadcast. A user may send to their own current member email; another destination, or a machine principal, also requires members read permission. The personalization contact and the destination are independent.
+ *
+ */
+export type EmailBroadcastTestRequest = EmailBroadcastInputOverrides &
+  EmailBroadcastPreviewContact & {
+    /**
+     * The email address of a current organization member with access to this workspace.
+     */
+    to: string;
+    /**
+     * The `preview_fingerprint` returned by the preview whose content you are sending.
+     */
+    preview_fingerprint: string;
+  };
+
+/**
+ * The email accepted for asynchronous test delivery. Acceptance does not confirm delivery.
+ */
+export type EmailBroadcastTestResult = EmailMessage;
+
 export type EmailBroadcastSendNowRequest = {
   /**
    * When to send the broadcast. It has to be at least 30 seconds and at most 365 days from now. Leave it out to send straight away.
@@ -2281,8 +2628,6 @@ export type EmailBroadcastSendNowRequest = {
  * Which identifier a contact has on file, `email` for an email address or `phone_number` for a phone number.
  */
 export type ContactIdentifierFilter = "email" | "phone_number";
-
-export type ContactId = string;
 
 /**
  * A compact reference to an audience, carrying its ID and display name.
@@ -18600,6 +18945,161 @@ export type EmailTemplateDuplicate = {
 };
 
 /**
+ * The value type the template declares for a parameter. A broadcast can still supply any scalar value; see `value_domain`.
+ *
+ * - `text`: any value. A parameter the template uses without declaring it is reported as a required `text` parameter.
+ * - `code`: 4 to 8 digits.
+ * - `ttl`: a whole number from 1 to 999.
+ * - `count`: a whole number from 1 to 999.
+ * - `ref`: up to 16 uppercase letters, digits or hyphens.
+ * - `date`: an ISO 8601 date (YYYY-MM-DD).
+ * - `date_time`: an ISO 8601 date and time, with an optional offset.
+ * - `amount`: a decimal amount in major units, with up to 4 decimal places.
+ * - `currency`: an ISO 4217 currency code of 3 uppercase letters.
+ *
+ */
+export type EmailTemplateParameterType =
+  | "text"
+  | "code"
+  | "ttl"
+  | "count"
+  | "ref"
+  | "date"
+  | "date_time"
+  | "amount"
+  | "currency"
+  | (string & {});
+
+/**
+ * The shape of value a broadcast may supply for a parameter, independent of the declared `type`.
+ *
+ * - `scalar`: a string, number, boolean or null, used as given.
+ *
+ */
+export type EmailTemplateParameterValueDomain = "scalar" | (string & {});
+
+/**
+ * How the template uses a parameter or variable at one place in its content.
+ *
+ * - `value`: the template outputs or compares the value.
+ * - `iterable`: the template loops over the value.
+ *
+ */
+export type EmailTemplateUseKind = "value" | "iterable" | (string & {});
+
+/**
+ * The part of the published content where a parameter or variable is used.
+ *
+ * - `subject`: the subject line.
+ * - `html`: the HTML body, including its inbox preview text.
+ * - `text`: the plain-text body.
+ *
+ */
+export type EmailTemplateUseSite = "subject" | "html" | "text" | (string & {});
+
+/**
+ * One place in the published content that uses a parameter or variable, and how it is used there.
+ */
+export type EmailTemplateUseConstraint = {
+  kind: EmailTemplateUseKind;
+  site: EmailTemplateUseSite;
+  /**
+   * The parameter or variable path the template reads at this place, such as `offer` or `bird.contact.first_name`.
+   */
+  path?: string;
+  /**
+   * How the template uses the parameter or variable here, passed through from the template. `output` means it writes the value; other values name the Liquid tag that reads it, such as `if`, `case`, `for` or `assign`.
+   */
+  operation?: string;
+};
+
+/**
+ * A parameter the published content uses that the broadcast supplies in `template.parameters`, with what the template declares about it.
+ */
+export type EmailTemplateParameter = {
+  /**
+   * The parameter name to use as a key in `template.parameters`.
+   */
+  name: string;
+  type: EmailTemplateParameterType;
+  value_domain: EmailTemplateParameterValueDomain;
+  /**
+   * Whether the template declares the parameter required.
+   */
+  required: boolean;
+  /**
+   * Whether the template marks the parameter sensitive. A broadcast cannot supply a sensitive parameter that its content uses.
+   */
+  sensitive?: boolean;
+  /**
+   * Each place the content uses the parameter.
+   */
+  use_constraints: Array<EmailTemplateUseConstraint>;
+};
+
+/**
+ * Where Bird takes the value of a `bird.` variable from.
+ *
+ * - `contact`: a property of the recipient contact, read from `bird.contact.`.
+ * - `bird`: another value Bird fills in when it sends, such as `bird.unsubscribe_url`.
+ *
+ */
+export type EmailTemplateVariableSource = "contact" | "bird" | (string & {});
+
+/**
+ * A `bird.` variable the published content uses, which Bird fills in for each recipient. The broadcast does not supply it, and no contact value is returned.
+ */
+export type EmailTemplateVariable = {
+  /**
+   * The variable as the template writes it, such as `bird.contact.first_name`.
+   */
+  path: string;
+  source: EmailTemplateVariableSource;
+  /**
+   * The type of the contact property, from this workspace's current contact property definitions, such as `string`. Absent when the variable is not a defined contact property.
+   */
+  source_type?: string;
+  /**
+   * Each place the content uses the variable.
+   */
+  use_constraints?: Array<EmailTemplateUseConstraint>;
+};
+
+/**
+ * The parameters and variables a template's current published content uses in one exact language, across its subject, HTML and plain-text body. The HTML includes its inbox preview text. This describes the template and holds no parameter or contact values.
+ */
+export type EmailTemplateParameters = {
+  /**
+   * The template that was read.
+   */
+  template_id: EmailTemplateId;
+  /**
+   * The published template version that was read.
+   */
+  observed_version_id: EmailTemplateVersionId;
+  /**
+   * The language requested with `language`. Absent when none was requested and the published version's default language is used.
+   */
+  requested_language?: LanguageTag;
+  /**
+   * The language whose content was read.
+   */
+  effective_language: LanguageTag;
+  /**
+   * An opaque value that changes when this content or the parameters and variables it uses change, including for built-in templates whose version ID stays the same. Compare it with an earlier value to tell whether they are still the same. Do not parse it.
+   */
+  requirements_fingerprint: string;
+  /**
+   * The parameters the broadcast supplies, sorted by name.
+   */
+  parameters: Array<EmailTemplateParameter>;
+  /**
+   * The `bird.` variables Bird fills in, sorted by path.
+   */
+  variables: Array<EmailTemplateVariable>;
+};
+
+/**
  * Sample values and options for rendering a template preview. Omit the body entirely to preview the current draft: `bird.contact.` tokens then fill from stand-in values, and a parameter you give no value for renders as empty.
  *
  */
@@ -19393,6 +19893,8 @@ export type InboundAddressUpdate = {
   label?: string | null;
 };
 
+export type MailboxId = string;
+
 export type InboundEmailMessageId = string;
 
 export type InboundAttachmentId = string;
@@ -19458,7 +19960,11 @@ export type InboundEmailMessage = {
    */
   references?: Array<string>;
   /**
-   * Conversation this message belongs to, or `null` when it is not grouped into one.
+   * Mailbox that received this message, or `null` when it arrived on an inbound address or domain without a mailbox.
+   */
+  mailbox_id: MailboxId | null;
+  /**
+   * Mailbox conversation this message belongs to, or `null` when it was not received by a mailbox or has since been deleted from it.
    */
   thread_id: string | null;
   /**
@@ -19528,8 +20034,6 @@ export type InboundAttachmentList = {
    */
   data: Array<InboundAttachment>;
 };
-
-export type MailboxId = string;
 
 /**
  * The principal that owns the mailbox. Always the workspace.
@@ -20617,6 +21121,14 @@ export type ConnectorId = string;
  */
 export type ConnectorActionId = string;
 
+/**
+ * Values for the connector's nonsecret fields, keyed by field `name`, such as the URL the endpoint's requests go to. A URL must be HTTPS, on one of the connector's `allowed_origins`, and under its `path_prefix` when it has one. It cannot include user info, a fragment, an IP address as its host, dot segments, or encoded slashes.
+ *
+ */
+export type ConnectionConfig = {
+  [key: string]: string;
+};
+
 export type WebhookConnectorBinding = {
   connector_id: ConnectorId;
   /**
@@ -20627,6 +21139,11 @@ export type WebhookConnectorBinding = {
    * Label of the credentials the endpoint delivers with.
    */
   connection_name: string;
+  /**
+   * The connector's nonsecret fields as the endpoint delivers with them. Secret fields are never returned.
+   *
+   */
+  config?: ConnectionConfig;
 };
 
 /**
@@ -20731,14 +21248,6 @@ export type ConnectionCredentials = {
 };
 
 /**
- * Values for the connector's nonsecret fields, keyed by field `name`, such as the URL the endpoint's requests go to. A URL must be HTTPS, on one of the connector's `allowed_origins`, and under its `path_prefix` when it has one. It cannot include user info, a fragment, an IP address as its host, dot segments, or encoded slashes.
- *
- */
-export type ConnectionConfig = {
-  [key: string]: string;
-};
-
-/**
  * The connector to deliver through and the values it needs. Omit the endpoint's `url`: Bird builds it from the connector's URL and these `config` values, and a URL given anyway must equal that. The credentials belong to this endpoint alone, and deleting the endpoint erases them.
  *
  */
@@ -20808,6 +21317,50 @@ export type WebhookEndpointCreated = WebhookEndpoint & {
   readonly next?: Array<NextAction>;
 };
 
+/**
+ * How deliveries to the webhook endpoint are built: `webhook` posts the signed event unchanged to the endpoint URL; `connector` builds the delivery using the configured connector action. An existing endpoint's type cannot change; a different value returns a `422`.
+ *
+ */
+export type WebhookDestinationType = "webhook" | "connector";
+
+/**
+ * Changes to the connector's nonsecret fields, keyed by field `name`. A key given replaces that field, `null` clears an optional one, and a key left out keeps its stored value. A required field cannot be cleared, and the result is checked as at creation.
+ *
+ */
+export type ConnectionConfigPatch = {
+  [key: string]: string | null;
+};
+
+/**
+ * Changes to the endpoint's connector, nested as on creation. A field the endpoint's URL is built from moves the URL with it. New deliveries are prepared with the current config. Queued deliveries keep their prepared body, but every send attempt, including retries, uses the current destination URL and credentials.
+ *
+ */
+export type WebhookConnectorSetupUpdate = {
+  /**
+   * The endpoint's connector. It cannot change, so a different value returns a `422`.
+   */
+  connector_id?: WebhookConnectorId;
+  /**
+   * The endpoint's action. It cannot change, so a different value returns a `422`.
+   */
+  action?: ConnectorActionId;
+  /**
+   * New values for the connector's secret fields, merged over the stored ones: a key given replaces that field and an omitted key keeps its value. The next delivery, retries included, uses them.
+   *
+   */
+  credentials?: unknown;
+  config?: ConnectionConfigPatch;
+};
+
+/**
+ * Changes to how deliveries are built, shaped as at creation. Only a `connector` destination takes `connector`; on any other endpoint it returns a `422`. Omit to keep the destination.
+ *
+ */
+export type WebhookDestinationUpdate = {
+  type?: WebhookDestinationType;
+  connector?: WebhookConnectorSetupUpdate;
+};
+
 export type WebhookEndpointUpdate = {
   /**
    * Replacement delivery URL. Same rules as at creation: HTTPS, at most 2048 characters, and the host must be publicly reachable (private, loopback, and link-local addresses return a `422`). Omit to keep the current URL. A connector endpoint's URL comes from its connector and cannot be replaced: any value returns a `422`.
@@ -20827,11 +21380,7 @@ export type WebhookEndpointUpdate = {
    *
    */
   events?: Array<WebhookEventType>;
-  /**
-   * New values for a `connector` destination's secret fields, merged over the stored ones: a key given replaces that field and an omitted key keeps its value. The merged set is checked as at creation, and the next delivery, retries included, uses it. On an endpoint without a `connector` destination this returns a `422`. Omit to keep the current credentials.
-   *
-   */
-  credentials?: unknown;
+  destination?: WebhookDestinationUpdate;
   /**
    * `paused` stops all deliveries; `active` re-enables a paused endpoint. Omit to leave the status unchanged. Events that fire while paused are not delivered and a replay cannot recover them, because they were never attempted; after re-enabling, [Replay failed deliveries](/docs/api/reference/create-webhook-replay) reaches only the deliveries that failed before the pause. A `degraded` endpoint cannot be reset through this field: it returns to `active` automatically once deliveries succeed again.
    *
@@ -27129,7 +27678,24 @@ export type EmailEventListWritable = {
 } & ListEnvelope;
 
 /**
+ * Complete template input map. Each value is a string, number, boolean or null and is used exactly as given, so text containing braces or code-like syntax is never evaluated. Objects and lists are not accepted. Use bird.contact.first_name in the template for contact data. Names must be bare input names outside the bird namespace. Omission retains the map unless the template ID changes, which clears it; an empty object clears it, and null is invalid. The compact map is limited to 16384 UTF-8 bytes and 128 names. Individual email parameters keep their own format.
+ */
+export type EmailBroadcastParametersWritable = {
+  [key in EmailBroadcastParameterName]?: string | number | boolean | null;
+};
+
+/**
+ * Complete map of per-language parameter values, keyed by a BCP-47 language tag of at most 35 characters such as `es` or `pt-BR`. Each language holds only the names whose value differs for that language; a name it leaves out uses the value in `parameters`, including later changes to it. A value that is present always applies, even when it is `""`, `0`, `false`, `null` or equal to the `parameters` value. To return a name to the `parameters` value, send the map without it. Sending this map, even as `{}`, applies language rules to the broadcast: `parameters` must hold every input the default language's content, sender name, reply-to or headers use, and an input only the selected language uses may come from that language's entry instead. A broadcast that never sends it keeps the selected-language rules. Values for the default language, or for a language the broadcast does not send, are kept but not used. Omission retains the map unless the template ID changes, which clears it; an empty object removes every override, null is invalid and a language with no names is removed. Tags are stored in canonical BCP-47 form, so two spellings of one tag are refused. The compact map is limited to 16384 UTF-8 bytes, and `parameters` and every language together are limited to 128 distinct names.
+ *
+ */
+export type EmailBroadcastParameterOverridesWritable = {
+  [key in LanguageTag]?: EmailBroadcastParametersWritable;
+};
+
+/**
  * The template a broadcast sends, the exact version of it the broadcast is fixed to, and which of that version's languages goes out.
+ *
+ * `parameters` and `parameter_overrides` are returned on customer detail and mutation responses when the caller has email_management read permission, and omitted without that permission and from list responses. They are also omitted from staff-only responses. Broadcasts created before parameters existed return `parameters` as an empty object. `parameter_overrides` is also omitted for a broadcast that has never sent it; an empty object means language rules apply with no overrides.
  *
  */
 export type EmailBroadcastTemplateWritable = {
@@ -27143,6 +27709,8 @@ export type EmailBroadcastTemplateWritable = {
    *
    */
   language?: LanguageTag | null;
+  parameters?: EmailBroadcastParametersWritable;
+  parameter_overrides?: EmailBroadcastParameterOverridesWritable;
 };
 
 export type EmailBroadcastWritable = {
@@ -27233,6 +27801,19 @@ export type EmailBroadcastClickedLinkListWritable = {
    */
   data: Array<unknown>;
 };
+
+/**
+ * The broadcast inputs this render used, by name, each with the string, number, boolean or null value it used. It holds the values taken from `template.parameters` or the selected language's `template.parameter_overrides` entry, and only for names the rendered content or envelope uses. Contact values are never included. A number keeps the digits it was supplied with.
+ *
+ */
+export type EmailBroadcastResolvedParametersWritable = {
+  [key in EmailBroadcastParameterName]?: string | number | boolean | null;
+};
+
+/**
+ * The email accepted for asynchronous test delivery. Acceptance does not confirm delivery.
+ */
+export type EmailBroadcastTestResultWritable = EmailMessageWritable;
 
 /**
  * A compact reference to an audience, carrying its ID and display name.
@@ -30194,7 +30775,11 @@ export type InboundEmailMessageWritable = {
    */
   references?: Array<string>;
   /**
-   * Conversation this message belongs to, or `null` when it is not grouped into one.
+   * Mailbox that received this message, or `null` when it arrived on an inbound address or domain without a mailbox.
+   */
+  mailbox_id: MailboxId | null;
+  /**
+   * Mailbox conversation this message belongs to, or `null` when it was not received by a mailbox or has since been deleted from it.
    */
   thread_id: string | null;
   /**
@@ -30555,6 +31140,36 @@ export type WebhookEndpointCreatedWritable = WebhookEndpointWritable & {
   secret: string;
 };
 
+/**
+ * Changes to the endpoint's connector, nested as on creation. A field the endpoint's URL is built from moves the URL with it. New deliveries are prepared with the current config. Queued deliveries keep their prepared body, but every send attempt, including retries, uses the current destination URL and credentials.
+ *
+ */
+export type WebhookConnectorSetupUpdateWritable = {
+  /**
+   * The endpoint's connector. It cannot change, so a different value returns a `422`.
+   */
+  connector_id?: WebhookConnectorId;
+  /**
+   * The endpoint's action. It cannot change, so a different value returns a `422`.
+   */
+  action?: ConnectorActionId;
+  /**
+   * New values for the connector's secret fields, merged over the stored ones: a key given replaces that field and an omitted key keeps its value. The next delivery, retries included, uses them.
+   *
+   */
+  credentials?: ConnectionCredentials;
+  config?: ConnectionConfigPatch;
+};
+
+/**
+ * Changes to how deliveries are built, shaped as at creation. Only a `connector` destination takes `connector`; on any other endpoint it returns a `422`. Omit to keep the destination.
+ *
+ */
+export type WebhookDestinationUpdateWritable = {
+  type?: WebhookDestinationType;
+  connector?: WebhookConnectorSetupUpdateWritable;
+};
+
 export type WebhookEndpointUpdateWritable = {
   /**
    * Replacement delivery URL. Same rules as at creation: HTTPS, at most 2048 characters, and the host must be publicly reachable (private, loopback, and link-local addresses return a `422`). Omit to keep the current URL. A connector endpoint's URL comes from its connector and cannot be replaced: any value returns a `422`.
@@ -30574,11 +31189,7 @@ export type WebhookEndpointUpdateWritable = {
    *
    */
   events?: Array<WebhookEventType>;
-  /**
-   * New values for a `connector` destination's secret fields, merged over the stored ones: a key given replaces that field and an omitted key keeps its value. The merged set is checked as at creation, and the next delivery, retries included, uses it. On an endpoint without a `connector` destination this returns a `422`. Omit to keep the current credentials.
-   *
-   */
-  credentials?: ConnectionCredentials;
+  destination?: WebhookDestinationUpdateWritable;
   /**
    * `paused` stops all deliveries; `active` re-enables a paused endpoint. Omit to leave the status unchanged. Events that fire while paused are not delivered and a replay cannot recover them, because they were never attempted; after re-enabling, [Replay failed deliveries](/docs/api/reference/create-webhook-replay) reaches only the deliveries that failed before the pause. A `degraded` endpoint cannot be reset through this field: it returns to `active` automatically once deliveries succeed again.
    *
@@ -31806,6 +32417,23 @@ export type EmailBroadcastTagFilter = string;
  * Case-insensitive literal substring match against the broadcast's tags or the referenced template's name. With `email_management` read access, also matches the subject in the effective language of the template version resolved when this broadcast's execution starts. Draft and scheduled broadcasts have no execution subject to search. Percent signs, underscores, and backslashes are literal characters.
  */
 export type EmailBroadcastSearchFilter = string;
+
+/**
+ * Required key for one logical broadcast test send, scoped to the workspace, the authenticated
+ * caller and this operation. Reuse the same key and the exact same request when retrying.
+ *
+ * - A confirmed `202` response replays unchanged for the same key and request within the
+ * configured window, 3 hours by default. Authorization and the destination's member access are
+ * checked again on every retry.
+ * - `409 request_in_progress` (E01004) or `503 IdempotencyUnavailable` (E01033): retry with
+ * backoff using the same key. Switching keys can send another test.
+ * - `409 idempotency_key_reuse` (E01005): the key was used for a different request or
+ * broadcast. Use a new key for a different test send.
+ * - After the window, saved results and unresolved requests can be removed. Reusing the key
+ * after removal can send another test, even if the earlier response was not confirmed.
+ *
+ */
+export type BroadcastTestIdempotencyKey = string;
 
 /**
  * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
@@ -33873,6 +34501,294 @@ export type ListEmailBroadcastClickedLinksResponses = {
 
 export type ListEmailBroadcastClickedLinksResponse =
   ListEmailBroadcastClickedLinksResponses[keyof ListEmailBroadcastClickedLinksResponses];
+
+export type ValidateEmailBroadcastData = {
+  body?: EmailBroadcastValidationRequest;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Broadcast identifier.
+     */
+    broadcast_id: EmailBroadcastId;
+  };
+  query?: never;
+  url: "/v1/email/broadcasts/{broadcast_id}/validate";
+};
+
+export type ValidateEmailBroadcastErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ValidateEmailBroadcastError =
+  ValidateEmailBroadcastErrors[keyof ValidateEmailBroadcastErrors];
+
+export type ValidateEmailBroadcastResponses = {
+  /**
+   * Broadcast input validation result.
+   */
+  200: EmailBroadcastValidationResult;
+};
+
+export type ValidateEmailBroadcastResponse =
+  ValidateEmailBroadcastResponses[keyof ValidateEmailBroadcastResponses];
+
+export type PreviewEmailBroadcastData = {
+  body?: EmailBroadcastPreviewRequest;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Broadcast identifier.
+     */
+    broadcast_id: EmailBroadcastId;
+  };
+  query?: never;
+  url: "/v1/email/broadcasts/{broadcast_id}/preview";
+};
+
+export type PreviewEmailBroadcastErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type PreviewEmailBroadcastError =
+  PreviewEmailBroadcastErrors[keyof PreviewEmailBroadcastErrors];
+
+export type PreviewEmailBroadcastResponses = {
+  /**
+   * Rendered broadcast preview.
+   */
+  200: EmailBroadcastPreviewResult;
+};
+
+export type PreviewEmailBroadcastResponse =
+  PreviewEmailBroadcastResponses[keyof PreviewEmailBroadcastResponses];
+
+export type SendEmailBroadcastTestData = {
+  body: EmailBroadcastTestRequest;
+  headers: {
+    /**
+     * Required key for one logical broadcast test send, scoped to the workspace, the authenticated
+     * caller and this operation. Reuse the same key and the exact same request when retrying.
+     *
+     * - A confirmed `202` response replays unchanged for the same key and request within the
+     * configured window, 3 hours by default. Authorization and the destination's member access are
+     * checked again on every retry.
+     * - `409 request_in_progress` (E01004) or `503 IdempotencyUnavailable` (E01033): retry with
+     * backoff using the same key. Switching keys can send another test.
+     * - `409 idempotency_key_reuse` (E01005): the key was used for a different request or
+     * broadcast. Use a new key for a different test send.
+     * - After the window, saved results and unresolved requests can be removed. Reusing the key
+     * after removal can send another test, even if the earlier response was not confirmed.
+     *
+     */
+    "Idempotency-Key": string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Broadcast identifier.
+     */
+    broadcast_id: EmailBroadcastId;
+  };
+  query?: never;
+  url: "/v1/email/broadcasts/{broadcast_id}/test";
+};
+
+export type SendEmailBroadcastTestErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type SendEmailBroadcastTestError =
+  SendEmailBroadcastTestErrors[keyof SendEmailBroadcastTestErrors];
+
+export type SendEmailBroadcastTestResponses = {
+  /**
+   * Test email accepted.
+   */
+  202: EmailBroadcastTestResult;
+};
+
+export type SendEmailBroadcastTestResponse =
+  SendEmailBroadcastTestResponses[keyof SendEmailBroadcastTestResponses];
 
 export type SendEmailBroadcastData = {
   body?: EmailBroadcastSendNowRequest;
@@ -56446,6 +57362,83 @@ export type DuplicateEmailTemplateResponses = {
 
 export type DuplicateEmailTemplateResponse =
   DuplicateEmailTemplateResponses[keyof DuplicateEmailTemplateResponses];
+
+export type GetEmailTemplateParametersData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Workspace template ID, workspace template slug, or built-in template slug.
+     */
+    template_ref: string;
+  };
+  query?: {
+    /**
+     * Language of the template's published content. Omission uses the template's default language.
+     */
+    language?: LanguageTag;
+  };
+  url: "/v1/email/templates/{template_ref}/parameters";
+};
+
+export type GetEmailTemplateParametersErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailTemplateParametersError =
+  GetEmailTemplateParametersErrors[keyof GetEmailTemplateParametersErrors];
+
+export type GetEmailTemplateParametersResponses = {
+  /**
+   * The parameters and variables of the current published content.
+   */
+  200: EmailTemplateParameters;
+};
+
+export type GetEmailTemplateParametersResponse =
+  GetEmailTemplateParametersResponses[keyof GetEmailTemplateParametersResponses];
 
 export type GetEmailTemplatePreviewData = {
   body?: EmailTemplatePreviewRequest;

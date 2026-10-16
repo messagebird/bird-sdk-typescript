@@ -13,7 +13,15 @@ export async function broadcastsCreate() {
   const broadcast = await bird.broadcasts.create({
     from: "newsletter@example.com",
     audience_id: "adn_01krdgeqcxet5s7t44vh8rt9mg",
-    template: { id: "emt_01krdgeqcxet5s7t44vh8rt9mg" },
+    template: {
+      id: "emt_01krdgeqcxet5s7t44vh8rt9mg",
+      parameters: {
+        title: "Welcome",
+        offer: "OCTOBER20",
+        discount: 20,
+        featured: false,
+      },
+    },
   });
   console.log(broadcast.id, broadcast.status); // "eb_…" "draft"
 }
@@ -24,9 +32,12 @@ export async function broadcastsGet() {
 }
 
 export async function broadcastsUpdate() {
-  const broadcast = await bird.broadcasts.update("eb_01krdgeqcxet5s7t44vh8rt9mg", {
-    template: { id: "emt_01krdgeqcxet5s7t44vh8rt9mg" },
-  });
+  const broadcast = await bird.broadcasts.update(
+    "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    {
+      template: { id: "emt_01krdgeqcxet5s7t44vh8rt9mg", parameters: {} },
+    },
+  );
   console.log(broadcast.status);
 }
 
@@ -79,4 +90,76 @@ export async function broadcastsListEvents() {
 export async function broadcastsListClickedLinks() {
   const links = await bird.broadcasts.listClickedLinks("eb_01krdgeqcxet5s7t44vh8rt9mg");
   for (const link of links.data) console.log(link.url, link.click_count, link.recipient_count);
+}
+
+export async function broadcastsValidate() {
+  const params = {
+    template: {
+      parameters: {
+        title: "Welcome",
+        offer: "OCTOBER20",
+        discount: 20,
+        featured: false,
+      },
+    },
+  };
+  const result = await bird.broadcasts.validate(
+    "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    params,
+  );
+  console.log(result.ready_for_admission, result.problems);
+}
+
+export async function broadcastsPreview() {
+  const params = {
+    template: {
+      parameters: {
+        title: "Welcome",
+        offer: "OCTOBER20",
+        discount: 20,
+        featured: false,
+      },
+    },
+    contact_id: "con_01krdgeqcxet5s7t44vh8rt9mg",
+  };
+  const preview = await bird.broadcasts.preview(
+    "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    params,
+  );
+  console.log(preview.subject, preview.preview_fingerprint);
+}
+
+export async function broadcastsTest() {
+  const params = {
+    template: {
+      parameters: {
+        title: "Welcome",
+        offer: "OCTOBER20",
+        discount: 20,
+        featured: false,
+      },
+    },
+    contact_id: "con_01krdgeqcxet5s7t44vh8rt9mg",
+  };
+  const preview = await bird.broadcasts.preview(
+    "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    params,
+  );
+  const accepted = await bird.broadcasts.test(
+    "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    {
+      ...params,
+      to: "member@example.com",
+      preview_fingerprint: preview.preview_fingerprint,
+    },
+    { idempotencyKey: "broadcast-preview-intent-1" },
+  );
+  console.log(accepted.id, accepted.status);
+}
+
+export async function emailTemplateParameters() {
+  const discovery = await bird.email.templates.parameters(
+    "emt_01krdgeqcxet5s7t44vh8rt9mg",
+  );
+  console.log(discovery.parameters, discovery.variables);
 }

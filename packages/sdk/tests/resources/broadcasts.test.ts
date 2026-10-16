@@ -3,7 +3,9 @@ import { describe, it, expect } from "vitest";
 import { BirdClient } from "../../src/client.js";
 
 function capture() {
-  return recordFetch(() => jsonResponse(202, { id: "eb_1", status: "scheduled" }));
+  return recordFetch(() =>
+    jsonResponse(202, { id: "eb_1", status: "scheduled" }),
+  );
 }
 
 function bird(fn: typeof fetch) {
@@ -16,20 +18,32 @@ function bird(fn: typeof fetch) {
 describe("broadcasts scheduled_at conversion", () => {
   it("writes a whole-second Date as a bare Z, matching the other three SDKs", async () => {
     const { fn, calls } = capture();
-    await bird(fn).broadcasts.send("eb_1", { scheduled_at: new Date("2026-08-01T09:00:00Z") });
-    expect((await calls[0].clone().json()).scheduled_at).toBe("2026-08-01T09:00:00Z");
+    await bird(fn).broadcasts.send("eb_1", {
+      scheduled_at: new Date("2026-08-01T09:00:00Z"),
+    });
+    expect((await calls[0].clone().json()).scheduled_at).toBe(
+      "2026-08-01T09:00:00Z",
+    );
   });
 
   it("keeps a sub-second component when the caller supplies one", async () => {
     const { fn, calls } = capture();
-    await bird(fn).broadcasts.send("eb_1", { scheduled_at: new Date("2026-08-01T09:00:00.250Z") });
-    expect((await calls[0].clone().json()).scheduled_at).toBe("2026-08-01T09:00:00.250Z");
+    await bird(fn).broadcasts.send("eb_1", {
+      scheduled_at: new Date("2026-08-01T09:00:00.250Z"),
+    });
+    expect((await calls[0].clone().json()).scheduled_at).toBe(
+      "2026-08-01T09:00:00.250Z",
+    );
   });
 
   it("passes a caller's own string through unchanged", async () => {
     const { fn, calls } = capture();
-    await bird(fn).broadcasts.send("eb_1", { scheduled_at: "2026-08-01T09:00:00+02:00" });
-    expect((await calls[0].clone().json()).scheduled_at).toBe("2026-08-01T09:00:00+02:00");
+    await bird(fn).broadcasts.send("eb_1", {
+      scheduled_at: "2026-08-01T09:00:00+02:00",
+    });
+    expect((await calls[0].clone().json()).scheduled_at).toBe(
+      "2026-08-01T09:00:00+02:00",
+    );
   });
 
   it("converts the same way on create", async () => {
@@ -41,6 +55,25 @@ describe("broadcasts scheduled_at conversion", () => {
       send: true,
       scheduled_at: new Date("2026-08-01T09:00:00Z"),
     });
-    expect((await calls[0].clone().json()).scheduled_at).toBe("2026-08-01T09:00:00Z");
+    expect((await calls[0].clone().json()).scheduled_at).toBe(
+      "2026-08-01T09:00:00Z",
+    );
   });
+});
+
+describe("broadcasts test caller intent", () => {
+  it.each([undefined, { idempotencyKey: "" }])(
+    "refuses a missing or empty intent key before transport",
+    async (options) => {
+      const { fn, calls } = capture();
+      await expect(async () => {
+        await bird(fn).broadcasts.test(
+          "eb_1",
+          { to: "member@example.com", preview_fingerprint: "matching" },
+          options,
+        );
+      }).rejects.toThrow("idempotency");
+      expect(calls).toHaveLength(0);
+    },
+  );
 });
