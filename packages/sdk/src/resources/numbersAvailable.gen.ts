@@ -9,7 +9,7 @@ export type NumbersAvailableListQuery = NonNullable<ListAvailableNumbersData["qu
 
 export class NumbersAvailableResource extends Resource {
   /**
-   * Searches one country's numbers on sale. Our own inventory answers first and pages; the last page can carry a live carrier snapshot, so a number seen here may be gone by the time it is ordered.
+   * Searches one country's numbers on sale, each with the setup and recurring price for your organization. Our own inventory answers first and pages; the last page can carry a live carrier snapshot, so a number seen here may be gone by the time it is ordered.
    *
    * @example Find a number to buy in one country
    * // The search is always country-scoped, so country_code is required.
@@ -27,7 +27,7 @@ export class NumbersAvailableResource extends Resource {
   }
 
   /**
-   * Re-checks one number from `numbers.available.list` against the carrier, so a stale search result is caught before it is ordered.
+   * Re-checks one number from `numbers.available.list` against the carrier, so a stale search result is caught before it is ordered, and returns its setup and recurring price for your organization.
    *
    * @example Check one number is still for sale
    * // A number a carrier supplies is only on sale while the carrier still has it,

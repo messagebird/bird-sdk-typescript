@@ -10,7 +10,7 @@ export type NumbersOrdersListQuery = NonNullable<ListNumbersOrdersData["query"]>
 
 export class NumbersOrdersResource extends Resource {
   /**
-   * Buys a number and starts its monthly charge. Most orders settle inline; one waiting on a carrier comes back pending and is followed with `numbers.orders.get`. A setup fee already taken is not refunded if the order then fails.
+   * Buys a number and starts its recurring charge. The available number's `pricing` is a current price, not a quote: the order resolves the price again when it charges. Most orders settle inline; one waiting on a carrier comes back pending and is followed with `numbers.orders.get`. A setup fee already taken is not refunded if the order then fails.
    *
    * @example Buy a number
    * const order = await bird.numbers.orders.create({ number: "+447700900201" });

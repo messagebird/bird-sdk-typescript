@@ -357,6 +357,11 @@ export type SortOrder = "asc" | "desc";
 export type UserId = string;
 
 /**
+ * Must include at least one letter or number.
+ */
+export type TenantName = string;
+
+/**
  * Deployment region identifier.
  */
 export type Region = "us1" | "eu1";
@@ -490,6 +495,10 @@ export type Workspace = {
    */
   readonly logo_url?: string | null;
 } & Timestamps;
+
+export type WorkspaceCreate = {
+  name: TenantName;
+};
 
 export type RealtimeRegion = {
   /**
@@ -24375,6 +24384,25 @@ export type VoiceLeg = {
 export type WalletTransactionId = string;
 
 /**
+ * The recurring interval one subscription charge covers.
+ */
+export type BillingInterval = "day" | "month" | "year";
+
+/**
+ * A period: a unit and a count. A day is a fixed 24-hour UTC period. A larger `count` lengthens the period without multiplying the amount quoted for it.
+ */
+export type BillingPricingInterval = {
+  /**
+   * The calendar unit the period is counted in.
+   */
+  unit: BillingInterval;
+  /**
+   * Number of units in the period.
+   */
+  count: number;
+};
+
+/**
  * URL-safe identifier for a billing product. Lowercase letters and digits, separated by underscores. Must start with a letter.
  */
 export type BillingProductSlug = string;
@@ -24445,6 +24473,28 @@ export type NumberOwnership = {
   next: Array<NextAction>;
 };
 
+/**
+ * What your organization pays for a number it holds, net of tax.
+ */
+export type NumberPricing = {
+  /**
+   * What your organization is charged for this number per `recurring_period`, net of tax, in the currency this number is charged in: your billing currency, unless this number's subscription predates a change of your billing currency, in which case its own currency is returned. `null` when no price applies.
+   */
+  recurring_price: Money | null;
+  /**
+   * The rate's interval, or a fixed price's whole renewal period. `null` when `recurring_price` is `null`.
+   */
+  recurring_period: BillingPricingInterval | null;
+  /**
+   * How many `recurring_period`s one renewal charges. When `releases_at` is set no renewal follows, and the value still describes the subscription's cadence until the release. `1` for a fixed price. `null` when `recurring_price` is `null`.
+   */
+  intervals_per_charge: number | null;
+  /**
+   * A retryable failure to read the price. Retry a GET of the number; do not repeat a completed write. `null` when the price was read or no price applies.
+   */
+  error: ErrorBody | null;
+};
+
 export type Number = {
   /**
    * The name you gave this number in your workspace. Null when no name is set.
@@ -24508,11 +24558,37 @@ export type Number = {
    *
    */
   ownership?: NumberOwnership | null;
+  /**
+   * What your organization pays for this number. `null` for a `shared` number, and, when the price was read, for a number with no live subscription. Otherwise its prices are `null` when no price applies. When the price could not be read, every dedicated number carries this object with `error` set, whether or not it has a live subscription.
+   */
+  pricing: NumberPricing | null;
 };
 
 export type NumberList = {
   data: Array<Number>;
 } & ListEnvelope;
+
+/**
+ * What your organization pays for an available number, net of tax, in your billing currency.
+ */
+export type AvailableNumberPricing = {
+  /**
+   * One-off setup fee for your organization, net of tax, in your billing currency. Its `amount` is `"0"` when the published fee is zero. `null` when no setup fee applies to this country and number type, and whenever `recurring_price` is `null`.
+   */
+  setup_price: Money | null;
+  /**
+   * What your organization is charged for this number per `recurring_period`, net of tax, in your billing currency, after your agreed prices are applied. `null` when the number cannot be priced for your organization, because its recurring price or a required setup fee has no price; it cannot be ordered then.
+   */
+  recurring_price: Money | null;
+  /**
+   * The period `recurring_price` covers. `null` when `recurring_price` is `null`.
+   */
+  recurring_period: BillingPricingInterval | null;
+  /**
+   * How many `recurring_period`s one charge bills at once. Your organization is charged `recurring_price` multiplied by this at purchase and at each renewal. `null` when `recurring_price` is `null`.
+   */
+  intervals_per_charge: number | null;
+};
 
 export type AvailableNumber = {
   /**
@@ -24529,7 +24605,7 @@ export type AvailableNumber = {
    */
   capabilities: Array<NumberCapability>;
   /**
-   * Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any setup fee is charged during purchase. Monthly billing starts at assignment even while approval is pending; assignment may follow completion of a pending supplier order.
+   * Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any `pricing.setup_price` is charged during purchase, plus any tax. The recurring charge, net of tax `pricing.recurring_price` multiplied by `pricing.intervals_per_charge`, is taken with any tax at assignment and at each renewal, even while approval is pending; assignment may follow completion of a pending supplier order.
    */
   ownership_registration_required: boolean;
   /**
@@ -24545,6 +24621,10 @@ export type AvailableNumber = {
    *
    */
   ownership_address_scope?: string;
+  /**
+   * What your organization pays for this number. Omitted on admin supplier searches, which have no organization to price for.
+   */
+  pricing?: AvailableNumberPricing;
 };
 
 export type AvailableNumberList = {
@@ -31804,6 +31884,28 @@ export type NumberOwnershipWritable = {
   next: Array<NextAction>;
 };
 
+/**
+ * What your organization pays for a number it holds, net of tax.
+ */
+export type NumberPricingWritable = {
+  /**
+   * What your organization is charged for this number per `recurring_period`, net of tax, in the currency this number is charged in: your billing currency, unless this number's subscription predates a change of your billing currency, in which case its own currency is returned. `null` when no price applies.
+   */
+  recurring_price: Money | null;
+  /**
+   * The rate's interval, or a fixed price's whole renewal period. `null` when `recurring_price` is `null`.
+   */
+  recurring_period: BillingPricingInterval | null;
+  /**
+   * How many `recurring_period`s one renewal charges. When `releases_at` is set no renewal follows, and the value still describes the subscription's cadence until the release. `1` for a fixed price. `null` when `recurring_price` is `null`.
+   */
+  intervals_per_charge: number | null;
+  /**
+   * A retryable failure to read the price. Retry a GET of the number; do not repeat a completed write. `null` when the price was read or no price applies.
+   */
+  error: ErrorBody | null;
+};
+
 export type NumberWritable = {
   /**
    * The name you gave this number in your workspace. Null when no name is set.
@@ -31867,11 +31969,37 @@ export type NumberWritable = {
    *
    */
   ownership?: NumberOwnershipWritable | null;
+  /**
+   * What your organization pays for this number. `null` for a `shared` number, and, when the price was read, for a number with no live subscription. Otherwise its prices are `null` when no price applies. When the price could not be read, every dedicated number carries this object with `error` set, whether or not it has a live subscription.
+   */
+  pricing: NumberPricingWritable | null;
 };
 
 export type NumberListWritable = {
   data: Array<NumberWritable>;
 } & ListEnvelope;
+
+/**
+ * What your organization pays for an available number, net of tax, in your billing currency.
+ */
+export type AvailableNumberPricingWritable = {
+  /**
+   * One-off setup fee for your organization, net of tax, in your billing currency. Its `amount` is `"0"` when the published fee is zero. `null` when no setup fee applies to this country and number type, and whenever `recurring_price` is `null`.
+   */
+  setup_price: Money | null;
+  /**
+   * What your organization is charged for this number per `recurring_period`, net of tax, in your billing currency, after your agreed prices are applied. `null` when the number cannot be priced for your organization, because its recurring price or a required setup fee has no price; it cannot be ordered then.
+   */
+  recurring_price: Money | null;
+  /**
+   * The period `recurring_price` covers. `null` when `recurring_price` is `null`.
+   */
+  recurring_period: BillingPricingInterval | null;
+  /**
+   * How many `recurring_period`s one charge bills at once. Your organization is charged `recurring_price` multiplied by this at purchase and at each renewal. `null` when `recurring_price` is `null`.
+   */
+  intervals_per_charge: number | null;
+};
 
 export type AvailableNumberWritable = {
   /**
@@ -31888,7 +32016,7 @@ export type AvailableNumberWritable = {
    */
   capabilities: Array<NumberCapability>;
   /**
-   * Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any setup fee is charged during purchase. Monthly billing starts at assignment even while approval is pending; assignment may follow completion of a pending supplier order.
+   * Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any `pricing.setup_price` is charged during purchase, plus any tax. The recurring charge, net of tax `pricing.recurring_price` multiplied by `pricing.intervals_per_charge`, is taken with any tax at assignment and at each renewal, even while approval is pending; assignment may follow completion of a pending supplier order.
    */
   ownership_registration_required: boolean;
   /**
@@ -31904,6 +32032,10 @@ export type AvailableNumberWritable = {
    *
    */
   ownership_address_scope?: string;
+  /**
+   * What your organization pays for this number. Omitted on admin supplier searches, which have no organization to price for.
+   */
+  pricing?: AvailableNumberPricingWritable;
 };
 
 export type AvailableNumberListWritable = {
@@ -61533,6 +61665,11 @@ export type ListAvailableNumbersErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type ListAvailableNumbersError =
@@ -61600,6 +61737,11 @@ export type GetAvailableNumberErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type GetAvailableNumberError =

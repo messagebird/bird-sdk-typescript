@@ -516,6 +516,14 @@ export const UserIDSchema = {
   example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const TenantNameSchema = {
+  type: "string",
+  minLength: 3,
+  maxLength: 100,
+  description: "Must include at least one letter or number.",
+  example: "Acme Corp",
+} as const;
+
 export const RegionSchema = {
   type: "string",
   minLength: 1,
@@ -825,6 +833,18 @@ export const WorkspaceSchema = {
       $ref: "#/components/schemas/Timestamps",
     },
   ],
+} as const;
+
+export const WorkspaceCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  properties: {
+    name: {
+      $ref: "#/components/schemas/TenantName",
+      example: "Production",
+    },
+  },
 } as const;
 
 export const RealtimeRegionSchema = {
@@ -43945,6 +43965,35 @@ export const WalletTransactionIDSchema = {
   example: "wtx_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const BillingIntervalSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["day", "month", "year"],
+  description: "The recurring interval one subscription charge covers.",
+  example: "month",
+} as const;
+
+export const BillingPricingIntervalSchema = {
+  type: "object",
+  description:
+    "A period: a unit and a count. A day is a fixed 24-hour UTC period. A larger `count` lengthens the period without multiplying the amount quoted for it.",
+  additionalProperties: false,
+  required: ["unit", "count"],
+  properties: {
+    unit: {
+      $ref: "#/components/schemas/BillingInterval",
+      description: "The calendar unit the period is counted in.",
+    },
+    count: {
+      type: "integer",
+      minimum: 1,
+      maximum: 366,
+      description: "Number of units in the period.",
+      example: 3,
+    },
+  },
+} as const;
+
 export const BillingProductSlugSchema = {
   type: "string",
   minLength: 1,
@@ -44037,6 +44086,69 @@ export const NumberOwnershipSchema = {
   },
 } as const;
 
+export const NumberPricingSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description: "What your organization pays for a number it holds, net of tax.",
+  required: [
+    "recurring_price",
+    "recurring_period",
+    "intervals_per_charge",
+    "error",
+  ],
+  properties: {
+    recurring_price: {
+      description:
+        "What your organization is charged for this number per `recurring_period`, net of tax, in the currency this number is charged in: your billing currency, unless this number's subscription predates a change of your billing currency, in which case its own currency is returned. `null` when no price applies.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    recurring_period: {
+      description:
+        "The rate's interval, or a fixed price's whole renewal period. `null` when `recurring_price` is `null`.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BillingPricingInterval",
+        },
+        {
+          type: "null",
+        },
+      ],
+      example: {
+        unit: "month",
+        count: 1,
+      },
+    },
+    intervals_per_charge: {
+      description:
+        "How many `recurring_period`s one renewal charges. When `releases_at` is set no renewal follows, and the value still describes the subscription's cadence until the release. `1` for a fixed price. `null` when `recurring_price` is `null`.",
+      type: ["integer", "null"],
+      minimum: 1,
+      example: 12,
+    },
+    error: {
+      example: null,
+      description:
+        "A retryable failure to read the price. Retry a GET of the number; do not repeat a completed write. `null` when the price was read or no price applies.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/ErrorBody",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+  },
+} as const;
+
 export const NumberSchema = {
   type: "object",
   readOnly: true,
@@ -44054,6 +44166,7 @@ export const NumberSchema = {
     "allocated_at",
     "releases_at",
     "released_at",
+    "pricing",
   ],
   properties: {
     name: {
@@ -44150,6 +44263,18 @@ export const NumberSchema = {
         },
       ],
     },
+    pricing: {
+      description:
+        "What your organization pays for this number. `null` for a `shared` number, and, when the price was read, for a number with no live subscription. Otherwise its prices are `null` when no price applies. When the price could not be read, every dedicated number carries this object with `error` set, whether or not it has a live subscription.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/NumberPricing",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
   },
 } as const;
 
@@ -44171,6 +44296,69 @@ export const NumberListSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
+} as const;
+
+export const AvailableNumberPricingSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "What your organization pays for an available number, net of tax, in your billing currency.",
+  required: [
+    "setup_price",
+    "recurring_price",
+    "recurring_period",
+    "intervals_per_charge",
+  ],
+  properties: {
+    setup_price: {
+      description:
+        'One-off setup fee for your organization, net of tax, in your billing currency. Its `amount` is `"0"` when the published fee is zero. `null` when no setup fee applies to this country and number type, and whenever `recurring_price` is `null`.',
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    recurring_price: {
+      description:
+        "What your organization is charged for this number per `recurring_period`, net of tax, in your billing currency, after your agreed prices are applied. `null` when the number cannot be priced for your organization, because its recurring price or a required setup fee has no price; it cannot be ordered then.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    recurring_period: {
+      description:
+        "The period `recurring_price` covers. `null` when `recurring_price` is `null`.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BillingPricingInterval",
+        },
+        {
+          type: "null",
+        },
+      ],
+      example: {
+        unit: "month",
+        count: 1,
+      },
+    },
+    intervals_per_charge: {
+      description:
+        "How many `recurring_period`s one charge bills at once. Your organization is charged `recurring_price` multiplied by this at purchase and at each renewal. `null` when `recurring_price` is `null`.",
+      type: ["integer", "null"],
+      minimum: 1,
+      example: 12,
+    },
+  },
 } as const;
 
 export const AvailableNumberSchema = {
@@ -44211,13 +44399,22 @@ export const AvailableNumberSchema = {
     ownership_registration_required: {
       type: "boolean",
       description:
-        "Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any setup fee is charged during purchase. Monthly billing starts at assignment even while approval is pending; assignment may follow completion of a pending supplier order.",
+        "Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any `pricing.setup_price` is charged during purchase, plus any tax. The recurring charge, net of tax `pricing.recurring_price` multiplied by `pricing.intervals_per_charge`, is taken with any tax at assignment and at each renewal, even while approval is pending; assignment may follow completion of a pending supplier order.",
     },
     ownership_address_scope: {
       type: "string",
       "x-extensible-enum": ["anywhere", "country", "number_area"],
       description:
         "Where the carrier requires the business address on this number's ownership registration\nto be. Present only when the carrier itself registers the number before it carries\ntraffic and states a rule; omitted otherwise. An address that does not meet the rule\nis refused after purchase, and only an address that meets it can fix the registration.\n\n- `anywhere`: any business address.\n- `country`: a business address in the number's country.\n- `number_area`: a business address inside the number's own area code, for example in\n  Amsterdam for an Amsterdam (020) number.\n",
+    },
+    pricing: {
+      description:
+        "What your organization pays for this number. Omitted on admin supplier searches, which have no organization to price for.",
+      allOf: [
+        {
+          $ref: "#/components/schemas/AvailableNumberPricing",
+        },
+      ],
     },
   },
 } as const;
@@ -57740,6 +57937,69 @@ export const NumberOwnershipWritableSchema = {
   },
 } as const;
 
+export const NumberPricingWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description: "What your organization pays for a number it holds, net of tax.",
+  required: [
+    "recurring_price",
+    "recurring_period",
+    "intervals_per_charge",
+    "error",
+  ],
+  properties: {
+    recurring_price: {
+      description:
+        "What your organization is charged for this number per `recurring_period`, net of tax, in the currency this number is charged in: your billing currency, unless this number's subscription predates a change of your billing currency, in which case its own currency is returned. `null` when no price applies.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    recurring_period: {
+      description:
+        "The rate's interval, or a fixed price's whole renewal period. `null` when `recurring_price` is `null`.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BillingPricingInterval",
+        },
+        {
+          type: "null",
+        },
+      ],
+      example: {
+        unit: "month",
+        count: 1,
+      },
+    },
+    intervals_per_charge: {
+      description:
+        "How many `recurring_period`s one renewal charges. When `releases_at` is set no renewal follows, and the value still describes the subscription's cadence until the release. `1` for a fixed price. `null` when `recurring_price` is `null`.",
+      type: ["integer", "null"],
+      minimum: 1,
+      example: 12,
+    },
+    error: {
+      example: null,
+      description:
+        "A retryable failure to read the price. Retry a GET of the number; do not repeat a completed write. `null` when the price was read or no price applies.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/ErrorBody",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+  },
+} as const;
+
 export const NumberWritableSchema = {
   type: "object",
   readOnly: true,
@@ -57757,6 +58017,7 @@ export const NumberWritableSchema = {
     "allocated_at",
     "releases_at",
     "released_at",
+    "pricing",
   ],
   properties: {
     name: {
@@ -57853,6 +58114,18 @@ export const NumberWritableSchema = {
         },
       ],
     },
+    pricing: {
+      description:
+        "What your organization pays for this number. `null` for a `shared` number, and, when the price was read, for a number with no live subscription. Otherwise its prices are `null` when no price applies. When the price could not be read, every dedicated number carries this object with `error` set, whether or not it has a live subscription.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/NumberPricingWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
   },
 } as const;
 
@@ -57874,6 +58147,69 @@ export const NumberListWritableSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
+} as const;
+
+export const AvailableNumberPricingWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "What your organization pays for an available number, net of tax, in your billing currency.",
+  required: [
+    "setup_price",
+    "recurring_price",
+    "recurring_period",
+    "intervals_per_charge",
+  ],
+  properties: {
+    setup_price: {
+      description:
+        'One-off setup fee for your organization, net of tax, in your billing currency. Its `amount` is `"0"` when the published fee is zero. `null` when no setup fee applies to this country and number type, and whenever `recurring_price` is `null`.',
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    recurring_price: {
+      description:
+        "What your organization is charged for this number per `recurring_period`, net of tax, in your billing currency, after your agreed prices are applied. `null` when the number cannot be priced for your organization, because its recurring price or a required setup fee has no price; it cannot be ordered then.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/Money",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    recurring_period: {
+      description:
+        "The period `recurring_price` covers. `null` when `recurring_price` is `null`.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BillingPricingInterval",
+        },
+        {
+          type: "null",
+        },
+      ],
+      example: {
+        unit: "month",
+        count: 1,
+      },
+    },
+    intervals_per_charge: {
+      description:
+        "How many `recurring_period`s one charge bills at once. Your organization is charged `recurring_price` multiplied by this at purchase and at each renewal. `null` when `recurring_price` is `null`.",
+      type: ["integer", "null"],
+      minimum: 1,
+      example: 12,
+    },
+  },
 } as const;
 
 export const AvailableNumberWritableSchema = {
@@ -57914,13 +58250,22 @@ export const AvailableNumberWritableSchema = {
     ownership_registration_required: {
       type: "boolean",
       description:
-        "Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any setup fee is charged during purchase. Monthly billing starts at assignment even while approval is pending; assignment may follow completion of a pending supplier order.",
+        "Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any `pricing.setup_price` is charged during purchase, plus any tax. The recurring charge, net of tax `pricing.recurring_price` multiplied by `pricing.intervals_per_charge`, is taken with any tax at assignment and at each renewal, even while approval is pending; assignment may follow completion of a pending supplier order.",
     },
     ownership_address_scope: {
       type: "string",
       "x-extensible-enum": ["anywhere", "country", "number_area"],
       description:
         "Where the carrier requires the business address on this number's ownership registration\nto be. Present only when the carrier itself registers the number before it carries\ntraffic and states a rule; omitted otherwise. An address that does not meet the rule\nis refused after purchase, and only an address that meets it can fix the registration.\n\n- `anywhere`: any business address.\n- `country`: a business address in the number's country.\n- `number_area`: a business address inside the number's own area code, for example in\n  Amsterdam for an Amsterdam (020) number.\n",
+    },
+    pricing: {
+      description:
+        "What your organization pays for this number. Omitted on admin supplier searches, which have no organization to price for.",
+      allOf: [
+        {
+          $ref: "#/components/schemas/AvailableNumberPricingWritable",
+        },
+      ],
     },
   },
 } as const;

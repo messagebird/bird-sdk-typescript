@@ -53,7 +53,6 @@ export async function numbersOrdersList() {
 
 export async function numbersList() {
   for await (const allocated of bird.numbers.list({ country_code: "GB" })) {
-    // kind distinguishes a number you bought from one Bird manages.
     console.log(allocated.number, allocated.kind, allocated.status);
   }
 }
@@ -65,7 +64,7 @@ export async function numbersGet() {
 }
 
 export async function numbersRelease() {
-  // Releasing stops the monthly charge and the number stops working for you.
+  // Releasing stops the recurring charge and the number stops working for you.
   // Only a dedicated number can be released; a shared one answers E14002.
   await bird.numbers.release("nda_01krdgeqcxet5s7t44vh8rt9mg");
 }

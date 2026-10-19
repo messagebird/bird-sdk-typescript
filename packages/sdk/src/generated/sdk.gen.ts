@@ -7626,7 +7626,7 @@ export const listAmbConversationMessages = <
 /**
  * Send a typing indicator
  *
- * Sends a typing indicator to the customer's device on this conversation. Send `typing_start` before the reply it precedes; sending it again before that reply is not meaningful and may be dropped. Apple's own behavior for `typing_end` sent with no reply following is unproven, so treat it as best-effort. This conversation must be open: the same checks that gate a message on this conversation gate a typing indicator, other than the content checks, since a typing indicator has no content.
+ * Sends a typing indicator to the customer's device on this conversation. Send `typing_start` before the reply it precedes; sending it again before that reply is not meaningful and may be dropped. Apple's own behavior for `typing_end` sent with no reply following is unproven, so treat it as best-effort. This conversation must be open: the same checks that gate a message on this conversation gate a typing indicator, other than the content checks, since a typing indicator has no content. Apple can still refuse the indicator for this customer: `AMBRecipientUnreachable` means none of their devices can receive it, and `AMBConversationClosed` can also mean Apple reports that the customer left the conversation, which then closes when the next message is sent.
  *
  */
 export const createAmbConversationTyping = <
@@ -12717,7 +12717,9 @@ export const listNumbersOrders = <ThrowOnError extends boolean = false>(
 /**
  * Create a number order
  *
- * Orders a number for your workspace and starts its monthly charge. Pass a
+ * Orders a number for your workspace and starts its recurring charge. The available number's
+ * `pricing` is the current price, not a quote: the order resolves the price again when it
+ * charges, so a price published in between applies. Pass a
  * number from `GET /v1/numbers/available`. Whether the number is already in
  * inventory or acquired from a supplier, the response contains an order.
  *
@@ -12884,7 +12886,7 @@ export const updateWorkspaceNumber = <ThrowOnError extends boolean = false>(
 /**
  * Release a dedicated number
  *
- * Releases one of your workspace's dedicated numbers now and stops its monthly charge. Your workspace can no longer use the number after release, and the rest of the current billing period is not refunded. This also releases a number already scheduled for cancellation. While a renewal payment for the number is overdue, the request answers `409` until it is paid. To keep the number until the end of the period you paid for, use `DELETE /v1/numbers/{number_id}` instead. Shared numbers belong to Bird-managed shared infrastructure and cannot be released from your workspace.
+ * Releases one of your workspace's dedicated numbers now and stops its recurring charge. Your workspace can no longer use the number after release, and the rest of the current billing period is not refunded. This also releases a number already scheduled for cancellation. While a renewal payment for the number is overdue, the request answers `409` until it is paid. To keep the number until the end of the period you paid for, use `DELETE /v1/numbers/{number_id}` instead. Shared numbers belong to Bird-managed shared infrastructure and cannot be released from your workspace.
  */
 export const releaseWorkspaceNumber = <ThrowOnError extends boolean = false>(
   options: Options<ReleaseWorkspaceNumberData, ThrowOnError>,

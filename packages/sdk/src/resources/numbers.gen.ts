@@ -11,11 +11,10 @@ export type NumbersUpdateParams = NonNullable<UpdateWorkspaceNumberData["body"]>
 
 export class NumbersResourceBase extends Resource {
   /**
-   * Pages the numbers allocated to the workspace, dedicated and shared alike. Narrows on country, type, prefix and capability, so one number is reached without walking every page.
+   * Pages the numbers allocated to the workspace, dedicated and shared alike, each with its `pricing` for your organization: `null` for a shared number or, when the price read succeeds, one with no live subscription, and `error` set with null prices when it fails. Narrows on country, type, prefix and capability, so one number is reached without walking every page.
    *
    * @example List the numbers allocated to you
    * for await (const allocated of bird.numbers.list({ country_code: "GB" })) {
-   *   // kind distinguishes a number you bought from one Bird manages.
    *   console.log(allocated.number, allocated.kind, allocated.status);
    * }
    */
@@ -25,7 +24,7 @@ export class NumbersResourceBase extends Resource {
   }
 
   /**
-   * Reads one allocated number by the id `numbers.list` returns. Carries its status and, where a country demands ownership paperwork, what is still outstanding on it.
+   * Reads one allocated number by the id `numbers.list` returns. Carries its status, its `pricing` for your organization (`null` for a shared number or, when the price read succeeds, one with no live subscription; `error` set with null prices when it fails) and, where a country demands ownership paperwork, what is still outstanding on it.
    *
    * @example Read one number allocated to you
    * const allocated = await bird.numbers.get("nda_01krdgeqcxet5s7t44vh8rt9mg");
@@ -53,10 +52,10 @@ export class NumbersResourceBase extends Resource {
   }
 
   /**
-   * Gives a dedicated number back now and stops its monthly charge, forfeiting the rest of the period already paid for. Irreversible: the number leaves the workspace and the channels built on it stop sending. A shared number cannot be released. To keep the number until the paid period ends, use `numbers.cancel` instead.
+   * Gives a dedicated number back now and stops its recurring charge, forfeiting the rest of the period already paid for. Irreversible: the number leaves the workspace and the channels built on it stop sending. A shared number cannot be released. To keep the number until the paid period ends, use `numbers.cancel` instead.
    *
    * @example Give a dedicated number back
-   * // Releasing stops the monthly charge and the number stops working for you.
+   * // Releasing stops the recurring charge and the number stops working for you.
    * // Only a dedicated number can be released; a shared one answers E14002.
    * await bird.numbers.release("nda_01krdgeqcxet5s7t44vh8rt9mg");
    */
