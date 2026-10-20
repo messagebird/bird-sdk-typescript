@@ -1062,6 +1062,9 @@ import type {
   ListWorkspaceNumbersData,
   ListWorkspaceNumbersErrors,
   ListWorkspaceNumbersResponses,
+  ListWorkspaceQuotasData,
+  ListWorkspaceQuotasErrors,
+  ListWorkspaceQuotasResponses,
   ListWorkspaceSmsSenderRequirementsData,
   ListWorkspaceSmsSenderRequirementsErrors,
   ListWorkspaceSmsSenderRequirementsResponses,
@@ -1301,6 +1304,44 @@ export const getCurrentWorkspace = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/workspace",
+    ...options,
+  });
+
+/**
+ * List workspace quotas
+ *
+ * Returns each resource and value quota as it applies to the current workspace: the organization limit shared by
+ * all workspaces, the workspace's own limit when one is set, and this workspace's current usage.
+ * Organization usage and shared remaining capacity are withheld: `organization_used`,
+ * `organization_remaining` and `remaining` are always `null` on this endpoint.
+ *
+ * A workspace limit is a ceiling, not reserved capacity. Each quota's `enforcement` says how both limits apply:
+ * `create` refuses a creation that would pass either one, `outbound_send` refuses outbound sends once the bytes
+ * already held reach either one, and `value` bounds a setting when it is chosen. `usage` is `null` for a `value`
+ * quota. When usage cannot be read, `usage.status` is `unavailable` and the counts are `null`.
+ *
+ */
+export const listWorkspaceQuotas = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWorkspaceQuotasData, ThrowOnError>,
+): RequestResult<
+  ListWorkspaceQuotasResponses,
+  ListWorkspaceQuotasErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListWorkspaceQuotasResponses,
+    ListWorkspaceQuotasErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/workspace/quotas",
     ...options,
   });
 
@@ -10216,6 +10257,10 @@ export const getEmailInboxInsightsDomains = <
  * Setting the value it already has changes nothing and answers normally, so this
  * is safe to repeat.
  *
+ * Switching on answers `412` when the measurement provider declines to measure the
+ * domain. Nothing is saved, and repeating the request returns the same answer
+ * until support has the domain added, so contact support with the domain name.
+ *
  */
 export const updateEmailInboxInsightsDomain = <
   ThrowOnError extends boolean = false,
@@ -10266,6 +10311,11 @@ export const updateEmailInboxInsightsDomain = <
  * This chooses a starting point, not a permanent setting: the domain it picks
  * is switched on the same way as one chosen by hand, and can be switched off
  * or added to at any time.
+ *
+ * The call answers `412` when the measurement provider declines to measure the
+ * chosen domain. Nothing is switched on, and repeating the request returns the
+ * same answer until support has the domain added, so contact support with the
+ * domain name.
  *
  */
 export const upsertEmailInboxInsightsDomainMonitoring = <

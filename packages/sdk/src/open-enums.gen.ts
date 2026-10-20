@@ -833,6 +833,20 @@ export const PreferenceOrigin = {
 export type PreferenceOriginValue = (typeof PreferenceOrigin)[keyof typeof PreferenceOrigin];
 
 /**
+ * Values of QuotaSource known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const QuotaSource = {
+  Default: "default",
+  Override: "override",
+  Plan: "plan",
+} as const;
+
+/** A known QuotaSource value. */
+export type QuotaSourceValue = (typeof QuotaSource)[keyof typeof QuotaSource];
+
+/**
  * Values of SMSErrorCode known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.

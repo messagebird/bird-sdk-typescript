@@ -2725,3 +2725,10 @@ export async function _ex_370() {
 const workspace = await bird.workspace.get();
 console.log(workspace.id, workspace.name); // "ws_…" "Production"
 }
+
+export async function _ex_371() {
+const { data } = await bird.workspace.quotas.list();
+for (const quota of data) {
+  console.log(quota.key, quota.limit, quota.organization_limit);
+}
+}

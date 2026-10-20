@@ -355,6 +355,33 @@ export const NextActionSchema = {
   },
 } as const;
 
+export const QuotaScopeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["organization", "workspace"],
+  description:
+    "Which limit refused the request.\n\n- `organization`: the limit shared by every workspace in the organization.\n- `workspace`: the limit set for this workspace.\n",
+} as const;
+
+export const QuotaErrorContextSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The quota limit that refused a resource change. A change in a workspace is checked against its organization's limit and any limit set for its workspace; the organization limit is reported when both refuse. When scope is workspace, follow the response remediation instead of the error code's organization-wide recovery guidance. An organization administrator can raise or remove the workspace ceiling; the shared organization limit still applies.\n",
+  required: ["quota_key", "scope"],
+  properties: {
+    quota_key: {
+      type: "string",
+      minLength: 1,
+      example: "email_mailboxes_max",
+      description: "Stable key of the quota that refused the change.",
+    },
+    scope: {
+      $ref: "#/components/schemas/QuotaScope",
+    },
+  },
+} as const;
+
 export const ErrorBodySchema = {
   type: "object",
   additionalProperties: false,
@@ -447,6 +474,9 @@ export const ErrorBodySchema = {
       items: {
         $ref: "#/components/schemas/NextAction",
       },
+    },
+    quota: {
+      $ref: "#/components/schemas/QuotaErrorContext",
     },
   },
 } as const;
@@ -865,6 +895,271 @@ export const WorkspaceSchema = {
       $ref: "#/components/schemas/Timestamps",
     },
   ],
+} as const;
+
+export const WorkspaceQuotaKindSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["counted", "value"],
+  description:
+    "What the quota limits.\n\n- `counted`: an amount the workspace accumulates, such as mailboxes or stored bytes. Usage is reported.\n- `value`: the largest setting a resource may be given, such as a retention period. No usage is counted.\n",
+} as const;
+
+export const WorkspaceQuotaEnforcementSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["create", "outbound_send", "value"],
+  description:
+    "When the limits are applied.\n\n- `create`: a request that would add more than the limits allow is refused, and nothing is created.\n- `outbound_send`: sending is refused once the bytes already stored reach a limit. The size of the message being sent is not counted in advance, and incoming mail is still accepted.\n- `value`: a setting above the limit is refused when it is chosen. Existing resources keep their settings.\n",
+} as const;
+
+export const QuotaSourceSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["default", "plan", "override"],
+  description:
+    "Where the organization limit comes from.\n\n- `default`: Bird's standard limit.\n- `plan`: the organization's plan.\n- `override`: a limit Bird set for the organization.\n",
+} as const;
+
+export const WorkspaceQuotaCeilingStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["active", "expired"],
+  description:
+    "Whether the workspace limit applies.\n\n- `active`: the limit applies alongside the organization limit.\n- `expired`: the limit passed its expiry and no longer applies. It stays visible until it is replaced or removed.\n",
+} as const;
+
+export const WorkspaceQuotaCeilingSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "A workspace's own limit for a quota. It is a ceiling, not reserved capacity; the organization limit still applies.",
+  required: ["value", "status", "expires_at", "updated_at"],
+  properties: {
+    value: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "The workspace limit, in the quota's unit. It can exceed the organization limit. Zero allows nothing more.",
+    },
+    status: {
+      $ref: "#/components/schemas/WorkspaceQuotaCeilingStatus",
+    },
+    expires_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When the workspace limit stops applying. `null` means it has no expiry.",
+    },
+    updated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "When the workspace limit was last set.",
+    },
+  },
+} as const;
+
+export const WorkspaceQuotaUsageStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["available", "unavailable"],
+  description:
+    "Whether current usage could be read.\n\n- `available`: the counts reflect usage at `observed_at`.\n- `unavailable`: usage could not be read. The counts are unknown, not zero.\n",
+} as const;
+
+export const WorkspaceQuotaUsageSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "Current usage, measured against the organization limit that requests were checked against when it was read. That limit can briefly differ from the configured `organization_limit` after it changes.",
+  required: [
+    "status",
+    "observed_at",
+    "organization_limit",
+    "organization_used",
+    "workspace_used",
+    "organization_remaining",
+    "workspace_remaining",
+    "remaining",
+  ],
+  properties: {
+    status: {
+      $ref: "#/components/schemas/WorkspaceQuotaUsageStatus",
+    },
+    observed_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "When usage was read.",
+    },
+    organization_limit: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "The organization limit requests were checked against when usage was read.",
+    },
+    organization_used: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "The organization's total usage across all its workspaces. `null` on the current-workspace endpoint or when usage is unavailable.",
+    },
+    workspace_used: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description: "This workspace's usage. `null` when usage is unavailable.",
+    },
+    organization_remaining: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "How much more the whole organization can add, shared by all its workspaces. `null` on the current-workspace endpoint or when usage is unavailable.",
+    },
+    workspace_remaining: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "How much more this workspace can add under its own limit. `null` when no workspace limit applies or usage is unavailable.",
+    },
+    remaining: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "How much more this workspace can add now, the lower of `organization_remaining` and any `workspace_remaining`. `null` on the current-workspace endpoint or when usage is unavailable.",
+    },
+  },
+} as const;
+
+export const WorkspaceQuotaSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description: "A resource or value quota as it applies to one workspace.",
+  required: [
+    "key",
+    "name",
+    "description",
+    "unit",
+    "kind",
+    "enforcement",
+    "maximum_value",
+    "organization_limit",
+    "organization_source",
+    "workspace_limit",
+    "limit",
+    "usage",
+  ],
+  properties: {
+    key: {
+      type: "string",
+      minLength: 1,
+      example: "email_mailboxes_max",
+      description: "Stable key of the quota.",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+    },
+    unit: {
+      type: "string",
+      minLength: 1,
+      example: "mailboxes",
+      description:
+        "What the limit counts, such as `mailboxes`, `bytes` or `days`.",
+    },
+    kind: {
+      $ref: "#/components/schemas/WorkspaceQuotaKind",
+    },
+    enforcement: {
+      $ref: "#/components/schemas/WorkspaceQuotaEnforcement",
+    },
+    maximum_value: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "The largest workspace limit this quota accepts, in its unit.",
+    },
+    organization_limit: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "The organization's limit, shared by all its workspaces.",
+    },
+    organization_source: {
+      $ref: "#/components/schemas/QuotaSource",
+    },
+    workspace_limit: {
+      description:
+        "The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WorkspaceQuotaCeiling",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    limit: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "The lower of the organization limit currently applied to requests and any active workspace limit. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.",
+    },
+    usage: {
+      description:
+        "Current usage. `null` for a `value` quota, which counts nothing.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WorkspaceQuotaUsage",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+  },
+} as const;
+
+export const WorkspaceQuotaConfigurationStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["available", "unavailable"],
+  description:
+    "Whether workspace limits can be set.\n\n- `available`: workspace limits can be set and changed.\n- `unavailable`: new workspace limits cannot be set in this region yet. Existing workspace limits still apply and can be removed.\n",
+} as const;
+
+export const WorkspaceQuotaListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data", "configuration"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/WorkspaceQuota",
+      },
+    },
+    configuration: {
+      $ref: "#/components/schemas/WorkspaceQuotaConfigurationStatus",
+    },
+  },
 } as const;
 
 export const ComplianceIdentityIDSchema = {
@@ -46506,6 +46801,13 @@ export const AutomationPortKeySchema = {
   example: "success",
 } as const;
 
+export const VoiceNumberIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^vnu_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vnu_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const BillingResolvedPriceSchema = {
   type: "object",
   additionalProperties: false,
@@ -47273,13 +47575,6 @@ export const VoiceNumberSortFieldSchema = {
   enum: ["phone_number"],
   default: "phone_number",
   description: "Field used to sort the list.",
-} as const;
-
-export const VoiceNumberIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^vnu_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "vnu_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const VoiceNumberProviderAllocationSchema = {
@@ -52167,6 +52462,223 @@ export const WorkspaceWritableSchema = {
       },
     },
   ],
+} as const;
+
+export const WorkspaceQuotaCeilingWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "A workspace's own limit for a quota. It is a ceiling, not reserved capacity; the organization limit still applies.",
+  required: ["value", "status", "expires_at", "updated_at"],
+  properties: {
+    value: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "The workspace limit, in the quota's unit. It can exceed the organization limit. Zero allows nothing more.",
+    },
+    status: {
+      $ref: "#/components/schemas/WorkspaceQuotaCeilingStatus",
+    },
+    expires_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When the workspace limit stops applying. `null` means it has no expiry.",
+    },
+    updated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "When the workspace limit was last set.",
+    },
+  },
+} as const;
+
+export const WorkspaceQuotaUsageWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "Current usage, measured against the organization limit that requests were checked against when it was read. That limit can briefly differ from the configured `organization_limit` after it changes.",
+  required: [
+    "status",
+    "observed_at",
+    "organization_limit",
+    "organization_used",
+    "workspace_used",
+    "organization_remaining",
+    "workspace_remaining",
+    "remaining",
+  ],
+  properties: {
+    status: {
+      $ref: "#/components/schemas/WorkspaceQuotaUsageStatus",
+    },
+    observed_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "When usage was read.",
+    },
+    organization_limit: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "The organization limit requests were checked against when usage was read.",
+    },
+    organization_used: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "The organization's total usage across all its workspaces. `null` on the current-workspace endpoint or when usage is unavailable.",
+    },
+    workspace_used: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description: "This workspace's usage. `null` when usage is unavailable.",
+    },
+    organization_remaining: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "How much more the whole organization can add, shared by all its workspaces. `null` on the current-workspace endpoint or when usage is unavailable.",
+    },
+    workspace_remaining: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "How much more this workspace can add under its own limit. `null` when no workspace limit applies or usage is unavailable.",
+    },
+    remaining: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "How much more this workspace can add now, the lower of `organization_remaining` and any `workspace_remaining`. `null` on the current-workspace endpoint or when usage is unavailable.",
+    },
+  },
+} as const;
+
+export const WorkspaceQuotaWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description: "A resource or value quota as it applies to one workspace.",
+  required: [
+    "key",
+    "name",
+    "description",
+    "unit",
+    "kind",
+    "enforcement",
+    "maximum_value",
+    "organization_limit",
+    "organization_source",
+    "workspace_limit",
+    "limit",
+    "usage",
+  ],
+  properties: {
+    key: {
+      type: "string",
+      minLength: 1,
+      example: "email_mailboxes_max",
+      description: "Stable key of the quota.",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+    },
+    unit: {
+      type: "string",
+      minLength: 1,
+      example: "mailboxes",
+      description:
+        "What the limit counts, such as `mailboxes`, `bytes` or `days`.",
+    },
+    kind: {
+      $ref: "#/components/schemas/WorkspaceQuotaKind",
+    },
+    enforcement: {
+      $ref: "#/components/schemas/WorkspaceQuotaEnforcement",
+    },
+    maximum_value: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "The largest workspace limit this quota accepts, in its unit.",
+    },
+    organization_limit: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "The organization's limit, shared by all its workspaces.",
+    },
+    organization_source: {
+      $ref: "#/components/schemas/QuotaSource",
+    },
+    workspace_limit: {
+      description:
+        "The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WorkspaceQuotaCeilingWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    limit: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "The lower of the organization limit currently applied to requests and any active workspace limit. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.",
+    },
+    usage: {
+      description:
+        "Current usage. `null` for a `value` quota, which counts nothing.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WorkspaceQuotaUsageWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+  },
+} as const;
+
+export const WorkspaceQuotaListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data", "configuration"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/WorkspaceQuotaWritable",
+      },
+    },
+    configuration: {
+      $ref: "#/components/schemas/WorkspaceQuotaConfigurationStatus",
+    },
+  },
 } as const;
 
 export const RealtimeAppWritableSchema = {

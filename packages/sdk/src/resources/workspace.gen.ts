@@ -6,7 +6,7 @@ import type { APIPromise, RequestOptions } from "../core/result.js";
 
 export type { Workspace };
 
-export class WorkspaceResource extends Resource {
+export class WorkspaceResourceBase extends Resource {
   /**
    * Fetch the current workspace's ID, name, and the ID of the organization owning it. This is the workspace the current credentials are scoped to.
    *

@@ -28,6 +28,7 @@ export {
   BirdMissingApiKeyError,
   type ErrorDetail,
   type NextAction,
+  type QuotaContext,
 } from "./errors.js";
 export { regionFromApiKey, baseUrlForRegion } from "./region.js";
 export type {
@@ -370,6 +371,7 @@ export type {
   BroadcastSendParams,
 } from "./resources/broadcasts.js";
 export type { Workspace } from "./resources/workspace.gen.js";
+export type { WorkspaceQuotaList } from "./resources/workspaceQuotas.gen.js";
 export type {
   PreferenceStatus,
   PreferenceCoverage,
@@ -519,6 +521,7 @@ export {
   NumbersOrderStatus,
   PreferenceChannel,
   PreferenceOrigin,
+  QuotaSource,
   SMSErrorCode,
   SMSKeywordOperation,
   SMSSuppressionCoverage,
@@ -613,6 +616,7 @@ export type {
   NumbersOrderStatusValue,
   PreferenceChannelValue,
   PreferenceOriginValue,
+  QuotaSourceValue,
   SMSErrorCodeValue,
   SMSKeywordOperationValue,
   SMSSuppressionCoverageValue,

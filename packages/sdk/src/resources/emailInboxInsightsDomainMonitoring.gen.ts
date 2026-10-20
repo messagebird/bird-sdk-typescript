@@ -14,6 +14,7 @@ domain or the domain that sent the most mail in the last 30 days is enabled; an 
 choice_required, and no verified domains returns no_verified_domains. Only enabled has a
 non-null domain. Read the domain list after already_on; ask the user to choose after
 choice_required. Reuse an idempotency key for retries of the same setup attempt.
+A 412 means eDataSource declined to measure the chosen domain; nothing was switched on and a retry gets the same answer, so tell the user to contact support with the domain name.
    *
    * @example Enable automatic monitoring and inspect the outcome
    * // Requires inbox_insights:write permission in the target workspace.

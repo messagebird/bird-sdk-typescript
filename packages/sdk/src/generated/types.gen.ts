@@ -260,6 +260,27 @@ export type NextAction = {
   url?: string;
 };
 
+/**
+ * Which limit refused the request.
+ *
+ * - `organization`: the limit shared by every workspace in the organization.
+ * - `workspace`: the limit set for this workspace.
+ *
+ */
+export type QuotaScope = "organization" | "workspace";
+
+/**
+ * The quota limit that refused a resource change. A change in a workspace is checked against its organization's limit and any limit set for its workspace; the organization limit is reported when both refuse. When scope is workspace, follow the response remediation instead of the error code's organization-wide recovery guidance. An organization administrator can raise or remove the workspace ceiling; the shared organization limit still applies.
+ *
+ */
+export type QuotaErrorContext = {
+  /**
+   * Stable key of the quota that refused the change.
+   */
+  quota_key: string;
+  scope: QuotaScope;
+};
+
 export type ErrorBody = {
   /**
    * Broad category for coarse client branching.
@@ -324,6 +345,7 @@ export type ErrorBody = {
    *
    */
   next?: Array<NextAction>;
+  quota?: QuotaErrorContext;
 };
 
 export type Error = {
@@ -530,6 +552,160 @@ export type Workspace = {
    */
   readonly logo_url?: string | null;
 } & Timestamps;
+
+/**
+ * What the quota limits.
+ *
+ * - `counted`: an amount the workspace accumulates, such as mailboxes or stored bytes. Usage is reported.
+ * - `value`: the largest setting a resource may be given, such as a retention period. No usage is counted.
+ *
+ */
+export type WorkspaceQuotaKind = "counted" | "value";
+
+/**
+ * When the limits are applied.
+ *
+ * - `create`: a request that would add more than the limits allow is refused, and nothing is created.
+ * - `outbound_send`: sending is refused once the bytes already stored reach a limit. The size of the message being sent is not counted in advance, and incoming mail is still accepted.
+ * - `value`: a setting above the limit is refused when it is chosen. Existing resources keep their settings.
+ *
+ */
+export type WorkspaceQuotaEnforcement = "create" | "outbound_send" | "value";
+
+/**
+ * Where the organization limit comes from.
+ *
+ * - `default`: Bird's standard limit.
+ * - `plan`: the organization's plan.
+ * - `override`: a limit Bird set for the organization.
+ *
+ */
+export type QuotaSource = "default" | "plan" | "override" | (string & {});
+
+/**
+ * Whether the workspace limit applies.
+ *
+ * - `active`: the limit applies alongside the organization limit.
+ * - `expired`: the limit passed its expiry and no longer applies. It stays visible until it is replaced or removed.
+ *
+ */
+export type WorkspaceQuotaCeilingStatus = "active" | "expired";
+
+/**
+ * A workspace's own limit for a quota. It is a ceiling, not reserved capacity; the organization limit still applies.
+ */
+export type WorkspaceQuotaCeiling = {
+  /**
+   * The workspace limit, in the quota's unit. It can exceed the organization limit. Zero allows nothing more.
+   */
+  value: number;
+  status: WorkspaceQuotaCeilingStatus;
+  /**
+   * When the workspace limit stops applying. `null` means it has no expiry.
+   */
+  expires_at: string | null;
+  /**
+   * When the workspace limit was last set.
+   */
+  updated_at: string;
+};
+
+/**
+ * Whether current usage could be read.
+ *
+ * - `available`: the counts reflect usage at `observed_at`.
+ * - `unavailable`: usage could not be read. The counts are unknown, not zero.
+ *
+ */
+export type WorkspaceQuotaUsageStatus = "available" | "unavailable";
+
+/**
+ * Current usage, measured against the organization limit that requests were checked against when it was read. That limit can briefly differ from the configured `organization_limit` after it changes.
+ */
+export type WorkspaceQuotaUsage = {
+  status: WorkspaceQuotaUsageStatus;
+  /**
+   * When usage was read.
+   */
+  observed_at: string;
+  /**
+   * The organization limit requests were checked against when usage was read.
+   */
+  organization_limit: number;
+  /**
+   * The organization's total usage across all its workspaces. `null` on the current-workspace endpoint or when usage is unavailable.
+   */
+  organization_used: number | null;
+  /**
+   * This workspace's usage. `null` when usage is unavailable.
+   */
+  workspace_used: number | null;
+  /**
+   * How much more the whole organization can add, shared by all its workspaces. `null` on the current-workspace endpoint or when usage is unavailable.
+   */
+  organization_remaining: number | null;
+  /**
+   * How much more this workspace can add under its own limit. `null` when no workspace limit applies or usage is unavailable.
+   */
+  workspace_remaining: number | null;
+  /**
+   * How much more this workspace can add now, the lower of `organization_remaining` and any `workspace_remaining`. `null` on the current-workspace endpoint or when usage is unavailable.
+   */
+  remaining: number | null;
+};
+
+/**
+ * A resource or value quota as it applies to one workspace.
+ */
+export type WorkspaceQuota = {
+  /**
+   * Stable key of the quota.
+   */
+  key: string;
+  name: string;
+  description: string;
+  /**
+   * What the limit counts, such as `mailboxes`, `bytes` or `days`.
+   */
+  unit: string;
+  kind: WorkspaceQuotaKind;
+  enforcement: WorkspaceQuotaEnforcement;
+  /**
+   * The largest workspace limit this quota accepts, in its unit.
+   */
+  maximum_value: number;
+  /**
+   * The organization's limit, shared by all its workspaces.
+   */
+  organization_limit: number;
+  organization_source: QuotaSource;
+  /**
+   * The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.
+   */
+  workspace_limit: WorkspaceQuotaCeiling | null;
+  /**
+   * The lower of the organization limit currently applied to requests and any active workspace limit. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.
+   */
+  limit: number;
+  /**
+   * Current usage. `null` for a `value` quota, which counts nothing.
+   */
+  usage: WorkspaceQuotaUsage | null;
+};
+
+/**
+ * Whether workspace limits can be set.
+ *
+ * - `available`: workspace limits can be set and changed.
+ * - `unavailable`: new workspace limits cannot be set in this region yet. Existing workspace limits still apply and can be removed.
+ *
+ */
+export type WorkspaceQuotaConfigurationStatus = "available" | "unavailable";
+
+export type WorkspaceQuotaList = {
+  data: Array<WorkspaceQuota>;
+  configuration: WorkspaceQuotaConfigurationStatus;
+};
 
 export type ComplianceIdentityId = string;
 
@@ -25772,6 +25948,8 @@ export type NumberUpdate = {
  */
 export type AutomationPortKey = string;
 
+export type VoiceNumberId = string;
+
 export type BillingResolvedPrice = {
   /**
    * The net unit price, before tax.
@@ -26262,8 +26440,6 @@ export type VoiceCallRouteType = "reject" | "trunk" | "forward" | "sequence";
  * Field used to sort the list.
  */
 export type VoiceNumberSortField = "phone_number";
-
-export type VoiceNumberId = string;
 
 export type VoiceNumberProviderAllocation = {
   /**
@@ -28665,6 +28841,104 @@ export type WorkspaceWritable = {
   organization_id: OrganizationId;
   name: string;
   notification_emails: WorkspaceNotificationEmails;
+};
+
+/**
+ * A workspace's own limit for a quota. It is a ceiling, not reserved capacity; the organization limit still applies.
+ */
+export type WorkspaceQuotaCeilingWritable = {
+  /**
+   * The workspace limit, in the quota's unit. It can exceed the organization limit. Zero allows nothing more.
+   */
+  value: number;
+  status: WorkspaceQuotaCeilingStatus;
+  /**
+   * When the workspace limit stops applying. `null` means it has no expiry.
+   */
+  expires_at: string | null;
+  /**
+   * When the workspace limit was last set.
+   */
+  updated_at: string;
+};
+
+/**
+ * Current usage, measured against the organization limit that requests were checked against when it was read. That limit can briefly differ from the configured `organization_limit` after it changes.
+ */
+export type WorkspaceQuotaUsageWritable = {
+  status: WorkspaceQuotaUsageStatus;
+  /**
+   * When usage was read.
+   */
+  observed_at: string;
+  /**
+   * The organization limit requests were checked against when usage was read.
+   */
+  organization_limit: number;
+  /**
+   * The organization's total usage across all its workspaces. `null` on the current-workspace endpoint or when usage is unavailable.
+   */
+  organization_used: number | null;
+  /**
+   * This workspace's usage. `null` when usage is unavailable.
+   */
+  workspace_used: number | null;
+  /**
+   * How much more the whole organization can add, shared by all its workspaces. `null` on the current-workspace endpoint or when usage is unavailable.
+   */
+  organization_remaining: number | null;
+  /**
+   * How much more this workspace can add under its own limit. `null` when no workspace limit applies or usage is unavailable.
+   */
+  workspace_remaining: number | null;
+  /**
+   * How much more this workspace can add now, the lower of `organization_remaining` and any `workspace_remaining`. `null` on the current-workspace endpoint or when usage is unavailable.
+   */
+  remaining: number | null;
+};
+
+/**
+ * A resource or value quota as it applies to one workspace.
+ */
+export type WorkspaceQuotaWritable = {
+  /**
+   * Stable key of the quota.
+   */
+  key: string;
+  name: string;
+  description: string;
+  /**
+   * What the limit counts, such as `mailboxes`, `bytes` or `days`.
+   */
+  unit: string;
+  kind: WorkspaceQuotaKind;
+  enforcement: WorkspaceQuotaEnforcement;
+  /**
+   * The largest workspace limit this quota accepts, in its unit.
+   */
+  maximum_value: number;
+  /**
+   * The organization's limit, shared by all its workspaces.
+   */
+  organization_limit: number;
+  organization_source: QuotaSource;
+  /**
+   * The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.
+   */
+  workspace_limit: WorkspaceQuotaCeilingWritable | null;
+  /**
+   * The lower of the organization limit currently applied to requests and any active workspace limit. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.
+   */
+  limit: number;
+  /**
+   * Current usage. `null` for a `value` quota, which counts nothing.
+   */
+  usage: WorkspaceQuotaUsageWritable | null;
+};
+
+export type WorkspaceQuotaListWritable = {
+  data: Array<WorkspaceQuotaWritable>;
+  configuration: WorkspaceQuotaConfigurationStatus;
 };
 
 export type RealtimeAppWritable = {
@@ -34075,6 +34349,68 @@ export type GetCurrentWorkspaceResponses = {
 
 export type GetCurrentWorkspaceResponse =
   GetCurrentWorkspaceResponses[keyof GetCurrentWorkspaceResponses];
+
+export type ListWorkspaceQuotasData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/workspace/quotas";
+};
+
+export type ListWorkspaceQuotasErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWorkspaceQuotasError =
+  ListWorkspaceQuotasErrors[keyof ListWorkspaceQuotasErrors];
+
+export type ListWorkspaceQuotasResponses = {
+  /**
+   * The workspace's quotas.
+   */
+  200: WorkspaceQuotaList;
+};
+
+export type ListWorkspaceQuotasResponse =
+  ListWorkspaceQuotasResponses[keyof ListWorkspaceQuotasResponses];
 
 export type PublishRealtimeAppEventData = {
   body: RealtimePublish;
@@ -56189,6 +56525,10 @@ export type UpdateEmailInboxInsightsDomainErrors = {
    */
   409: Error;
   /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -56283,6 +56623,10 @@ export type UpsertEmailInboxInsightsDomainMonitoringErrors = {
    * Resource conflict
    */
   409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *

@@ -136,6 +136,18 @@ describe("mapResponseToError", () => {
       ).toBe(true);
     }
   });
+
+  it("surfaces the refusing quota limit and leaves it absent when none was sent", () => {
+    const refused = mapResponseToError(422, {
+      type: "validation_error",
+      code: "E06009",
+      message: "x",
+      quota: { quota_key: "webhook_subscriptions_max", scope: "workspace" },
+    });
+    expect(refused).toBeInstanceOf(BirdValidationError);
+    expect(refused.quota).toEqual({ quota_key: "webhook_subscriptions_max", scope: "workspace" });
+    expect(mapResponseToError(422, { type: "validation_error", code: "E06009", message: "x" }).quota).toBeUndefined();
+  });
 });
 
 describe("parseRetryAfter", () => {

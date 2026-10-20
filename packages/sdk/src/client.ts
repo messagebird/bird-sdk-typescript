@@ -28,7 +28,7 @@ import { ContactsResource } from "./resources/contacts.js";
 import { PreferencesResource } from "./resources/preferences.js";
 import { AssetsResource } from "./resources/assets.js";
 import { BroadcastsResource } from "./resources/broadcasts.js";
-import { WorkspaceResource } from "./resources/workspace.gen.js";
+import { WorkspaceResource } from "./resources/workspace.js";
 import { AmbResource } from "./resources/amb.js";
 import { EsimResource } from "./resources/esim.js";
 import { SmsResource } from "./resources/sms.js";
@@ -250,7 +250,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
   readonly broadcasts: BroadcastsResource;
   readonly assets: AssetsResource;
 
-  /** Workspace: `bird.workspace.get()` — the workspace this credential is scoped to. */
+  /** Read the current workspace with `bird.workspace.get()` and its quotas with `bird.workspace.quotas.list()`. */
   readonly workspace: WorkspaceResource;
 
   /** Audiences: `bird.audiences.create(...)`, `.list(...)`, `.addContacts(...)`, … */
