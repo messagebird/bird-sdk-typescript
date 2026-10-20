@@ -45,6 +45,16 @@ import {
 } from "./resources/realtime.js";
 import { LookupResource } from "./resources/lookup.gen.js";
 import { NumbersResource } from "./resources/numbers.js";
+import { ComplianceRequirementsResource } from "./resources/complianceRequirements.gen.js";
+import { ComplianceSubmissionsResource } from "./resources/complianceSubmissions.gen.js";
+import { SmsSendersResource } from "./resources/smsSenders.gen.js";
+import { SmsSenderRequirementsResource } from "./resources/smsSenderRequirements.gen.js";
+import { SmsSenderRegistrationsResource } from "./resources/smsSenderRegistrations.gen.js";
+import { BillingPricesResource } from "./resources/billingPrices.gen.js";
+import { BillingWalletsResource } from "./resources/billingWallets.gen.js";
+import { ComplianceAttachmentsResource } from "./resources/complianceAttachments.js";
+import { ComplianceDocumentTemplatesResource } from "./resources/complianceDocumentTemplates.js";
+import { ComplianceIdentitiesResource } from "./resources/complianceIdentities.gen.js";
 import { BirdError, BirdMissingApiKeyError } from "./errors.js";
 
 // The SDK's own version, sent as User-Agent. Injected at build time from
@@ -260,6 +270,17 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
   /** Numbers: `bird.numbers.available.list(...)`, `.orders.create(...)`, `.list(...)`, `.release(...)`. */
   readonly numbers: NumbersResource;
 
+  readonly complianceRequirements: ComplianceRequirementsResource;
+  readonly complianceSubmissions: ComplianceSubmissionsResource;
+  readonly complianceAttachments: ComplianceAttachmentsResource;
+  readonly complianceIdentities: ComplianceIdentitiesResource;
+  readonly billingWallets: BillingWalletsResource;
+  readonly billingPrices: BillingPricesResource;
+  readonly smsSenderRegistrations: SmsSenderRegistrationsResource;
+  readonly smsSenderRequirements: SmsSenderRequirementsResource;
+  readonly smsSenders: SmsSendersResource;
+  readonly complianceDocumentTemplates: ComplianceDocumentTemplatesResource;
+
   /** Webhooks: `bird.webhooks.unwrap(payload, headers)` verifies an inbound delivery. */
   readonly webhooks: WebhooksResource;
 
@@ -414,6 +435,31 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
     this.suppressions = new SuppressionsResource(this.core, this.#client);
     this.lookup = new LookupResource(this.core, this.#client);
     this.numbers = new NumbersResource(this.core, this.#client);
+    this.complianceRequirements = new ComplianceRequirementsResource(
+      this.core,
+      this.#client,
+    );
+    this.complianceSubmissions = new ComplianceSubmissionsResource(
+      this.core,
+      this.#client,
+    );
+    this.complianceAttachments = new ComplianceAttachmentsResource(
+      this.core,
+      this.#client,
+    );
+    this.complianceIdentities = new ComplianceIdentitiesResource(
+      this.core,
+      this.#client,
+    );
+    this.smsSenders = new SmsSendersResource(this.core, this.#client);
+    this.smsSenderRequirements = new SmsSenderRequirementsResource(this.core, this.#client);
+    this.smsSenderRegistrations = new SmsSenderRegistrationsResource(this.core, this.#client);
+    this.billingPrices = new BillingPricesResource(this.core, this.#client);
+    this.billingWallets = new BillingWalletsResource(this.core, this.#client);
+    this.complianceDocumentTemplates = new ComplianceDocumentTemplatesResource(
+      this.core,
+      this.#client,
+    );
     this.webhooks = new WebhooksResource(
       this.core,
       this.#client,

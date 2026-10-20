@@ -366,6 +366,8 @@ export type TenantName = string;
  */
 export type Region = "us1" | "eu1";
 
+export type ProductId = string;
+
 export type OrganizationId = string;
 
 /**
@@ -452,7 +454,7 @@ export type DocsPage = {
    */
   readonly url: string;
   /**
-   * The page's full content as Markdown.
+   * The requested page content as Markdown, limited to the selected view for API references.
    */
   readonly markdown: string;
 };
@@ -467,6 +469,39 @@ export type CurrencyCode = string;
  *
  */
 export type DestinationRegion = string | null;
+
+/**
+ * Whether the sender type has a registration path for this destination.
+ *
+ * - `none`: no country registration is needed. Where sender IDs are overwritten, registration is unavailable.
+ * - `optional`: registration is available, but unregistered sending remains possible.
+ * - `required`: registration must be approved before sending.
+ *
+ */
+export type SmsRegistrationMode = "none" | "optional" | "required";
+
+/**
+ * What carriers do with the sender ID for this destination.
+ *
+ * - `unknown`: the outcome has not been confirmed.
+ * - `preserved`: the submitted sender ID reaches the recipient unchanged.
+ * - `overwritten`: the submitted sender ID is overwritten before delivery.
+ *
+ */
+export type SmsSenderIdBehavior = "unknown" | "preserved" | "overwritten";
+
+/**
+ * The registration program a country runs for a sender type.
+ *
+ * - `10dlc`: US A2P brand and campaign registration.
+ * - `tfn`: US toll-free verification.
+ * - `alpha`: registers an alphanumeric sender.
+ * - `numeric`: registers a long code.
+ * - `short_code`: a short-code application, filed and maintained by Bird.
+ *
+ */
+export type SmsRegistrationProgram =
+  "10dlc" | "tfn" | "alpha" | "numeric" | "short_code" | (string & {});
 
 /**
  * ISO 3166-1 alpha-2 country code.
@@ -495,6 +530,8 @@ export type Workspace = {
    */
   readonly logo_url?: string | null;
 } & Timestamps;
+
+export type ComplianceIdentityId = string;
 
 export type WorkspaceCreate = {
   name: TenantName;
@@ -4496,7 +4533,191 @@ export type SmsKeywordRuleUpdate = {
   confirmed_self_managed?: boolean;
 };
 
+/**
+ * The kind of value a requirement takes. The `string` value is a single line, while `text` runs to several. The `enum` value accepts only the values listed with the requirement. The `number`, `boolean`, and `date` values take their corresponding data types. The `url` value takes a link. The `country` value takes an uppercase ISO 3166-1 alpha-2 code, such as `NL`. The `document` value means a file you upload first and then reference. All other values are supplied inline.
+ *
+ */
+export type ComplianceDataType =
+  | "string"
+  | "text"
+  | "enum"
+  | "number"
+  | "boolean"
+  | "date"
+  | "url"
+  | "country"
+  | "document";
+
+export type ComplianceRequirementFieldOption = {
+  /**
+   * What to send.
+   */
+  value: string;
+  /**
+   * What to show.
+   */
+  label: string;
+};
+
+/**
+ * Constraints a value must satisfy, where the requirement sets any. Which of these apply follows from its data type: `pattern`, `min_length` and `max_length` constrain `string` and `text` values, `minimum` and `maximum` constrain `number` values, and everything else is `null`. Check these before submitting and you avoid a round trip.
+ *
+ */
+export type ComplianceFieldValidation = {
+  /**
+   * A regular expression the value must match. `null` when the requirement takes neither `string` nor `text`, or sets no pattern.
+   */
+  pattern?: string | null;
+  /**
+   * Shortest accepted value. `null` when the requirement takes neither `string` nor `text`, or sets no minimum length.
+   */
+  min_length?: number | null;
+  /**
+   * Longest accepted value. `null` when the requirement takes neither `string` nor `text`, or sets no maximum length.
+   */
+  max_length?: number | null;
+  /**
+   * Smallest accepted number. `null` when the requirement does not take `number`, or sets no minimum.
+   */
+  minimum?: number | null;
+  /**
+   * Largest accepted number. `null` when the requirement does not take `number`, or sets no maximum.
+   */
+  maximum?: number | null;
+};
+
 export type AttachmentId = string;
+
+/**
+ * Where one requirement stands. The `not_supplied` state means nothing has been
+ * given for it yet. The `supplied` state means we have your answer and review
+ * has not started. The `in_review` state means someone is looking at it. The
+ * `approved` and `rejected` states are decisions. You can replace a rejected
+ * item without refiling the rest. The `not_applicable` state means this
+ * requirement does not apply to you. The `expired` state means the value was
+ * accepted but has since gone stale.
+ *
+ * An item only ever reports its state. Treat this as an open set because review
+ * can gain stages. A value you do not recognise is a valid state that this
+ * server added.
+ *
+ */
+export type ComplianceItemState =
+  | "not_supplied"
+  | "supplied"
+  | "in_review"
+  | "approved"
+  | "rejected"
+  | "not_applicable"
+  | "expired"
+  | (string & {});
+
+export type ComplianceRequirementField = {
+  /**
+   * Parent field grouping this named document. Absent for an ordinary field.
+   */
+  readonly parent_key?: string;
+  /**
+   * Stable document key within the parent field. Absent for an ordinary field.
+   */
+  readonly document_key?: string;
+  /**
+   * Display name of the parent field grouping this document. Absent for an ordinary field.
+   */
+  readonly parent_label?: string;
+  /**
+   * The parent field's own description, shared by every document in the group. Each document's `help_text` describes that document alone. Absent for an ordinary field and when the parent has no description.
+   *
+   */
+  readonly parent_help_text?: string;
+  /**
+   * Identifies this requirement. Use it as the key when you submit a value.
+   */
+  readonly key: string;
+  /**
+   * What to call this requirement when you ask someone for it.
+   */
+  readonly label: string;
+  /**
+   * Guidance on what a good answer looks like, including anything the destination country expects. `null` when the label speaks for itself.
+   *
+   */
+  readonly help_text: string | null;
+  readonly data_type: ComplianceDataType;
+  /**
+   * Whether an answer is needed before the registration can be approved. Optional requirements are still reviewed when you supply them.
+   *
+   */
+  readonly required: boolean;
+  /**
+   * A stable key grouping related requirements together. Use it to keep your own grouping consistent across requests; use section_label for what to show someone.
+   *
+   */
+  readonly section: string;
+  /**
+   * What to call this requirement's group when you present it.
+   */
+  readonly section_label: string;
+  /**
+   * The accepted values, already resolved, when the data type is `enum`. Empty for every other type.
+   *
+   */
+  readonly options: Array<ComplianceRequirementFieldOption>;
+  readonly validation: ComplianceFieldValidation;
+  /**
+   * A blank form to download, complete and upload back, for requirements that need a signed document. `null` when the requirement has no form to download.
+   *
+   */
+  readonly template_url: string | null;
+  /**
+   * How many answers this requirement takes, when it takes more than one. `null` for a requirement answered once, which is most of them. Where it is set, answer with `values` or `attachment_ids` and read your answer back from the same pair; `value` and `attachment_id` stay `null`. Order is kept as you send it, and it is part of the answer: a keyword list beginning with `STOP` is not the same declaration as one ending with it.
+   *
+   */
+  readonly max_items: number | null;
+  /**
+   * Your answer, for a requirement answered inline. Every answer travels as a string whatever its data type, so a number reads back as `"1500"` and a yes-or-no as `"true"`. Use the data type to parse it. `null` for a requirement that takes a document, and before you have answered.
+   *
+   */
+  readonly value: string | null;
+  /**
+   * `true` when `value` comes from the party this registration is for. Accept it as it stands or replace it; either way it becomes your answer when you submit. Only a requirement that asks about the party is ever prefilled.
+   *
+   */
+  readonly prefilled: boolean;
+  /**
+   * The document you supplied, for a requirement that takes one. `null` otherwise.
+   *
+   */
+  readonly attachment_id: AttachmentId | null;
+  /**
+   * Your answers, for a requirement that takes several and is answered inline. Set only when `max_items` is, and `null` otherwise, including before you have answered. Each answer travels as a string whatever the data type, the same as `value`.
+   *
+   */
+  readonly values: Array<string> | null;
+  /**
+   * The documents you supplied, for a requirement that takes several. Set only when `max_items` is and the requirement takes documents, and `null` otherwise.
+   *
+   */
+  readonly attachment_ids: Array<AttachmentId> | null;
+  readonly state: ComplianceItemState;
+  /**
+   * When this was decided. `null` while no decision has been made.
+   */
+  readonly decided_at: string | null;
+  /**
+   * When this answer goes stale and must be supplied again. `null` when it does not expire.
+   */
+  readonly expires_at: string | null;
+  /**
+   * Whether you may replace this accepted answer to correct the submission after external verification. This permission does not change its `state` or `reason`. Submit only answers whose content or attachment identity you change.
+   *
+   */
+  readonly editable_for_verifier_repair: boolean;
+  /**
+   * Why this requirement was rejected, when it was. `null` otherwise.
+   */
+  readonly reason: string | null;
+};
 
 /**
  * Lifecycle of an attachment. `draft` is a file that has been uploaded but nothing
@@ -4508,7 +4729,7 @@ export type AttachmentId = string;
 export type AttachmentStatus = "draft" | "attached";
 
 /**
- * A supporting document uploaded for an SMS registration (10DLC campaign evidence, toll-free verification opt-in screenshots). Reference it from the registration's own attachment-id field to submit it as evidence.
+ * A supporting document uploaded for compliance answers or SMS registrations, including number ownership evidence, 10DLC campaign evidence and toll-free verification opt-in screenshots. Reference its ID from the relevant answer or registration attachment field to submit it as evidence.
  */
 export type Attachment = Timestamps & {
   readonly id: AttachmentId;
@@ -4545,6 +4766,108 @@ export type Attachment = Timestamps & {
    * When this attachment is discarded if nothing is registered or submitted with it. Null once its status is `attached`.
    */
   readonly expires_at: string | null;
+};
+
+export type SmsSenderId = string;
+
+/**
+ * Field to sort identities by.
+ */
+export type ComplianceIdentitySortField = "created_at" | "name";
+
+/**
+ * One business detail this party last submitted, and when it was filed.
+ */
+export type ComplianceIdentityAnswer = {
+  /**
+   * The detail as last submitted. Every value travels as a string whatever the requirement's data type, so a number reads back as `"1500"`.
+   */
+  readonly value: string;
+  /**
+   * When this party last filed the detail. Filing it is what records it here, so it is never a statement that a reviewer agreed with the value. Filing the same value again can carry a previous approval of it forward instead of putting it in front of a reviewer. `null` for a detail recorded before the container began tracking submissions.
+   */
+  readonly submitted_at: string | null;
+  /**
+   * Where review has got to on this exact value. Absent when no registration has ruled on it, which covers a detail nobody has reached yet and one filed before the container recorded which submission it came from.
+   * One value can be filed on several registrations and decided differently on each, and one verdict is reported for it. A live approval wins, because it is proof the value is acceptable. Failing that a refusal wins over a registration still waiting, since waiting is nobody having looked yet rather than evidence against a refusal. An approval past its validity period is neither: it reads as `expired` and ranks below a refusal, above anything still waiting. `not_applicable` is reported last, because it is a statement about a requirement rather than about the value.
+   */
+  readonly state?: ComplianceItemState;
+  /**
+   * What has to change, when `state` is one a reviewer refused. `null` otherwise, and `null` on a refusal recorded without one.
+   */
+  readonly reason?: string | null;
+  /**
+   * When the verdict in `state` was reached. `null` while nobody has decided, and on a state no reviewer set.
+   */
+  readonly decided_at?: string | null;
+};
+
+/**
+ * A party you register on behalf of: your own business, or one of your clients. Reusing an identity across registrations is what stops you retyping the same business details for every country, and lets a fact reviewed once stand for the registrations that follow.
+ */
+export type ComplianceIdentity = {
+  id: ComplianceIdentityId;
+  /**
+   * What you call this party. Yours to choose; it is never sent to a carrier.
+   */
+  name: string;
+  /**
+   * The business details this party has supplied, keyed by requirement. Filled in for you: a single-value detail lands here the moment you file it on one of your registrations, so the next one prefills it rather than asking again. Only requirements a country marks as being about the party appear; anything about a specific sender is asked fresh each time.
+   */
+  readonly answers: {
+    [key: string]: ComplianceIdentityAnswer;
+  };
+  created_at: string;
+  updated_at: string;
+};
+
+export type ComplianceIdentityList = {
+  data: Array<ComplianceIdentity>;
+} & ListEnvelopeWithTotal;
+
+export type ComplianceIdentityCreate = {
+  /**
+   * What you call this party. Yours to choose; it is never sent to a carrier.
+   */
+  name: string;
+};
+
+/**
+ * Field validation error. Uses the standard error envelope with `type` set to `validation_error` and `details` always present.
+ */
+export type ValidationError = Error;
+
+/**
+ * Renames the party. Single-value identity answers are filled in when you submit or resupply a registration, regardless of its review outcome. Edit those answers through the registration.
+ */
+export type ComplianceIdentityUpdate = {
+  /**
+   * What you call this party. Yours to choose; it is never sent to a carrier.
+   */
+  name: string;
+};
+
+/**
+ * Field to sort registration attachments by.
+ */
+export type AttachmentSortField = "created_at";
+
+export type AttachmentList = {
+  data: Array<Attachment>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * The file to upload, sent as a `multipart/form-data` body.
+ */
+export type AttachmentUpload = {
+  /**
+   * The file to attach. PNG, JPEG, or PDF, up to 10 MB. The file's contents determine its type; a declared content type is ignored.
+   */
+  file: Blob | File;
+  /**
+   * A short note describing what the file shows.
+   */
+  description?: string;
 };
 
 /**
@@ -4790,7 +5113,350 @@ export type AssetFolderUpdate = {
   parent_id?: AssetFolderId | null;
 };
 
+/**
+ * What is being registered.
+ *
+ * - `sms_sender`: a sender registered to send to one country.
+ * - `number`: a phone number you hold that needs ownership paperwork before it
+ * can carry traffic.
+ * - `identity`: a business you operate as, registered once and reused by
+ * later registrations that name it.
+ *
+ */
+export type ComplianceSubjectKind = "sms_sender" | "number" | "identity";
+
+/**
+ * What is being registered. For `sms_sender` this is the `scr_` id returned when you register a sender for a country. For `number` it is the `nda_` id of a dedicated number you hold, as returned by `GET /v1/numbers`. A shared short code (`nal_`) is not accepted: it is shared, so its ownership paperwork is not yours to file. For `identity` it is the `cid_` id of the party being registered, picked from the parties your workspace holds, as returned by `GET /v1/compliance/identities`.
+ *
+ */
+export type ComplianceSubjectId = string;
+
+/**
+ * The registration program a country runs. Available programs depend on the registered resource. An SMS sender registers under an authority regime (`alpha` or `numeric`). A phone number proves ownership under its number type (`mobile`, `local`, `national`, `short_code`, `short_code_fteu`, or `toll_free`), matching the values of `NumberType`. An identity registers your business itself under `business`, internationally: its coordinate's country is always `ZZ`. A value is therefore only meaningful alongside the subject it describes. More are added as coverage grows, so treat this as an open set rather than a fixed list.
+ *
+ */
+export type ComplianceProgram =
+  | "alpha"
+  | "numeric"
+  | "mobile"
+  | "local"
+  | "national"
+  | "short_code"
+  | "short_code_fteu"
+  | "toll_free"
+  | "business"
+  | (string & {});
+
 export type ComplianceSubmissionId = string;
+
+/**
+ * Why a registration that is already authorised has been asked for something
+ * more.
+ *
+ * - `policy_change` means the country published a newer version of its form and
+ * your answers were given under an older one.
+ * - `evidence_expiry` means an answer we accepted has gone stale and needs
+ * supplying again.
+ * - `verdict_withdrawn` means this registration was relying on an approval earned
+ * on another registration, and that approval has since been taken back, so the
+ * answer needs checking again here. Your answer has not changed and has not
+ * expired.
+ * - `verifier_rejected` means an outside party we filed your details with reviewed
+ * them and refused them. Your answer has not changed and has not expired, and
+ * we did not overrule it.
+ *
+ * Treat this as an open set rather than a fixed list. More reasons are added as
+ * more of a registration is kept under review, so a value you do not recognise is
+ * one this server added rather than an error.
+ *
+ */
+export type ComplianceObligationReason =
+  | "policy_change"
+  | "evidence_expiry"
+  | "verdict_withdrawn"
+  | "verifier_rejected"
+  | (string & {});
+
+/**
+ * Where an obligation stands.
+ *
+ * - `open`: the due date has not passed and nothing has been supplied.
+ * - `satisfied`: you supplied what was asked.
+ * - `lapsed`: the date passed unmet and the registration is no longer
+ * authorised.
+ * - `extended`: someone here gave you more time, and `due_at` reports the later
+ * date.
+ *
+ */
+export type ComplianceObligationState =
+  "open" | "satisfied" | "lapsed" | "extended" | (string & {});
+
+export type ComplianceObligation = {
+  readonly reason: ComplianceObligationReason;
+  readonly state: ComplianceObligationState;
+  /**
+   * The date to supply this by. Where more time has been given, this is the later date rather than the one first asked for.
+   *
+   */
+  readonly due_at: string;
+  /**
+   * The version of the country's form your answers have to reach. For an expiry it is the version you already answered, filled in again.
+   *
+   */
+  readonly target_version: number;
+};
+
+/**
+ * Feedback about the submission as a whole from an external verifier. It can remain visible while corrections are under review. Empty when no unresolved verifier feedback applies. On requirements responses, read `needs_input` to determine whether action is needed and `editable_for_verifier_repair` on each field to determine whether an approved or not-applicable answer can be replaced.
+ *
+ */
+export type ComplianceGeneralReasons = Array<string>;
+
+export type ComplianceRequirement = {
+  /**
+   * What to do next about this country's requirements, given the state it is in. Each entry names one action and says
+   * why it is worth taking, so you can act on this response without working out the order
+   * yourself. Present on reads that compute it: an empty list means there is nothing to do,
+   * and the field is absent entirely on responses that do not report next actions.
+   *
+   * Whether anything is asked of you is `needs_input`, and this says what to do about it: send your
+   * answers where none have been filed, or replace the ones that were refused. Which items those
+   * are, and why each was refused, is on the item in `fields`. For feedback about the
+   * whole submission, read `reason` and `general_reasons` and update the details that need correction.
+   *
+   */
+  readonly next?: Array<NextAction>;
+  readonly subject_kind: ComplianceSubjectKind;
+  /**
+   * The registration these requirements are for, the same one you asked about. `null` when you asked without one, which is how a form read on its own says it is answering for nothing yet.
+   *
+   */
+  readonly subject_id: ComplianceSubjectId | null;
+  /**
+   * The registration program these requirements belong to. `null` when the country runs no registration program at all, in which case nothing is required and the field list is empty.
+   *
+   */
+  readonly program: ComplianceProgram | null;
+  readonly country_code: CountryCode;
+  /**
+   * Whether this country's requirements are met. `true` when no requirements apply, or once the submission is approved and every required requirement is approved or marked not applicable. This can remain true when an external verifier requests a correction. Once you submit that correction, it must pass review before this becomes true again, including any optional answers you change.
+   *
+   */
+  readonly satisfied: boolean;
+  /**
+   * Whether anything is waiting on you. True when a required requirement has no answer, its answer was refused or has gone stale, or the registration needs correction as described by `reason`. False does not imply that review is pending: a closed verifier correction can leave the requirements unsatisfied with no editable answers. Read `review_pending` to determine whether an answer is awaiting review. Read this independently of `satisfied`, which reports whether your paperwork is accepted. An unresolved verifier correction also sets it while the matching grant is live and the correction deadline has not passed, until you supply updated details. At the deadline or after grant withdrawal, an unresolved rejection alone does not set it because accepted answers can no longer be replaced. A corrected optional answer that is rejected or expires still needs your input through ordinary resupply, including after that deadline.
+   *
+   */
+  readonly needs_input: boolean;
+  /**
+   * Whether any submitted answer is awaiting or undergoing review. False after all answers have received verdicts. A closed verifier correction can remain unsatisfied with no review pending and no editable answers.
+   *
+   */
+  readonly review_pending: boolean;
+  /**
+   * What to correct about the registration as a whole, or null when no registration-wide correction is requested. Reasons about individual answers are on the entries in fields.
+   *
+   */
+  readonly reason: string | null;
+  /**
+   * What this country expects of you before and while you fill in the form, written by Bird's compliance team. It may point you to a registration you must complete elsewhere first. `null` when the form needs no introduction, or when no program applies.
+   *
+   */
+  readonly guidance: string | null;
+  /**
+   * The submission carrying your answers, once you have made one. `null` before that.
+   */
+  readonly submission_id: ComplianceSubmissionId | null;
+  /**
+   * What this registration has to do to keep sending, and by when. Null when nothing is outstanding. An obligation does not stop you sending: the registration stays authorised until the date passes, and supplying what is asked for before then closes it with no interruption.
+   *
+   */
+  readonly obligation: ComplianceObligation | null;
+  readonly general_reasons: ComplianceGeneralReasons;
+  /**
+   * Every requirement for this country, in the order to present them.
+   */
+  readonly fields: Array<ComplianceRequirementField>;
+  /**
+   * When the submission for these requirements was closed. Null while open or not yet submitted.
+   */
+  readonly closed_at?: string | null;
+};
+
+export type ComplianceTemplateId = string;
+
+/**
+ * Registers this on behalf of a party you have not stored yet, creating it as part
+ * of the submission so you do not need a separate call. Exclusive with
+ * `identity_id`.
+ *
+ * Each time you send this you get a new party. Single-value identity answers filed for one
+ * are reused by registrations naming the same party. Documents and lists are
+ * supplied separately for each registration. Send this once and use the
+ * `identity_id` from the response for the countries that follow.
+ *
+ */
+export type ComplianceSubmissionIdentity = {
+  /**
+   * What to call the party. Optional: left out, it takes the legal entity name you supplied. If this country's form does not ask for one, send a name here.
+   */
+  name?: string;
+};
+
+export type ComplianceAnswer = unknown & {
+  /**
+   * The requirement this answers, as given by its key in the requirements read.
+   */
+  key: string;
+  /**
+   * The answer, for a requirement answered inline. Send every answer as a string whatever its data type, so a number goes as `"1500"` and a yes-or-no as `"true"`.
+   *
+   */
+  value?: string;
+  /**
+   * The uploaded document, for a requirement that takes one. Upload the file as an attachment first, then send the id it returns.
+   *
+   */
+  attachment_id?: AttachmentId;
+  /**
+   * The answers, for a requirement whose `max_items` is set and which is answered inline. Send each as a string whatever its data type, and send them in the order you mean them to be read. At most `max_items` of them.
+   *
+   */
+  values?: Array<string>;
+  /**
+   * The uploaded documents, for a requirement whose `max_items` is set and which takes documents. Upload each file first and send the ids it returns, in order. At most `max_items` of them.
+   *
+   */
+  attachment_ids?: Array<AttachmentId>;
+};
+
+export type ComplianceSubmissionCreate = {
+  subject_kind: ComplianceSubjectKind;
+  subject_id: ComplianceSubjectId;
+  program: ComplianceProgram;
+  country_code: CountryCode;
+  /**
+   * An existing party this registration is for. It fills in the business details you left out from what that party already holds, and each single-value answer you file about the party is written back onto it for next time, whatever the verdict. Documents and multi-value answers are asked fresh each time. Send this or `identity`, never both. An id belonging to another organization is rejected; nothing is created here. When `subject_kind` is `identity`, send neither: `subject_id` already names the party.
+   */
+  identity_id?: ComplianceIdentityId;
+  identity?: ComplianceSubmissionIdentity;
+  /**
+   * Every answer at once. Because submissions have no multi-call draft, send a complete set. Anything missing or malformed comes back named. A requirement the named party already answers may be left out; one you send anyway wins over what the party holds.
+   *
+   */
+  answers: Array<ComplianceAnswer>;
+};
+
+export type ComplianceItemId = string;
+
+export type ComplianceSubmissionItem = {
+  /**
+   * `true` when this answer was accepted without a fresh review, because the same answer to the same requirement had already been approved for this party in this country. It carries the original verdict, including when that verdict expires.
+   *
+   */
+  readonly inherited: boolean;
+  readonly id: ComplianceItemId;
+  /**
+   * The requirement this answers.
+   */
+  readonly key: string;
+  readonly state: ComplianceItemState;
+  /**
+   * Your answer, for a requirement answered inline. Every answer travels as a string whatever its data type, so a number reads back as `"1500"` and a yes-or-no as `"true"`. Use the data type to parse it. `null` for a requirement that takes a document.
+   *
+   */
+  readonly value: string | null;
+  /**
+   * The document you supplied, for a requirement that takes one. `null` otherwise.
+   */
+  readonly attachment_id: AttachmentId | null;
+  /**
+   * Your answers, for a requirement that takes several and is answered inline. `null` for one answered once. Order is as you sent it.
+   *
+   */
+  readonly values: Array<string> | null;
+  /**
+   * The documents you supplied, for a requirement that takes several. `null` otherwise.
+   *
+   */
+  readonly attachment_ids: Array<AttachmentId> | null;
+  /**
+   * Why this was rejected, when it was. `null` otherwise.
+   */
+  readonly reason: string | null;
+  /**
+   * When this was decided. `null` while no decision has been made.
+   */
+  readonly decided_at: string | null;
+  /**
+   * When this answer goes stale and must be supplied again. `null` when it does not expire.
+   */
+  readonly expires_at: string | null;
+};
+
+export type ComplianceSubmission = {
+  /**
+   * What to do next about this submission, given the state it is in. Each entry names one action and says
+   * why it is worth taking, so you can act on this response without working out the order
+   * yourself. Present on reads that compute it: an empty list means there is nothing to do,
+   * and the field is absent entirely on responses that do not report next actions.
+   *
+   * A submission reports the answers you filed; whether the country's requirements are met is
+   * reported by the requirements read. So this points there rather than repeating a verdict it
+   * does not own.
+   *
+   */
+  readonly next?: Array<NextAction>;
+  readonly id: ComplianceSubmissionId;
+  readonly subject_kind: ComplianceSubjectKind;
+  readonly subject_id: ComplianceSubjectId;
+  readonly program: ComplianceProgram;
+  readonly country_code: CountryCode;
+  /**
+   * The party this registration was filed for, or `null` if none was named.
+   */
+  readonly identity_id: ComplianceIdentityId | null;
+  /**
+   * Whether this country's requirements are met. `true` once the submission is approved and every required requirement is approved or marked not applicable. This can remain true when an external verifier requests a correction. Once you submit that correction, it must pass review before this becomes true again, including any optional answers you change.
+   *
+   */
+  readonly satisfied: boolean;
+  /**
+   * Every answer and where it stands. Each is decided on its own.
+   */
+  readonly items: Array<ComplianceSubmissionItem>;
+  /**
+   * When this was submitted.
+   */
+  readonly created_at: string;
+  /**
+   * When it last changed.
+   */
+  readonly updated_at: string;
+  /**
+   * When this submission was closed. Null while it remains open.
+   */
+  readonly closed_at?: string | null;
+  /**
+   * The decline reason for a closed submission, or null while open.
+   */
+  readonly closure_reason?: string | null;
+};
+
+/**
+ * Replacement answers for an existing submission. Rejected, expired, or missing answers can
+ * be supplied again; accepted answers normally cannot be changed.
+ *
+ * When the requirements response marks an accepted answer as `editable_for_verifier_repair`,
+ * you can replace it during that open correction and before its deadline. Accepted-answer
+ * repairs must change content; unchanged accepted entries are ignored. Rejected, expired,
+ * or missing answers follow the ordinary resupply rules, including same-value retries
+ * after a grant is withdrawn. Supplied replacements are reviewed again.
+ *
+ */
+export type ComplianceSubmissionResupply = {
+  answers: Array<ComplianceAnswer>;
+};
 
 /**
  * Set to `previous_period` to also return the same figures for the immediately preceding window of equal length, plus the change between the two, so you can show "+X% vs last period" without a second request.
@@ -5512,9 +6178,367 @@ export type SmsInboundStatsByNumberResponse = {
 export type DestinationSuperRegion = string | null;
 
 /**
+ * What backs an SMS sender: a dedicated number, a shared shortcode, or an alphanumeric sender string.
+ *
+ */
+export type SmsSenderSourceKind =
+  "number" | "shared_number" | "alpha" | (string & {});
+
+/**
  * Identifier of a number allocated to your workspace, as returned in the id field of `GET /v1/numbers`.
  */
 export type AllocatedNumberId = string;
+
+export type SmsSenderSortField = "created_at" | "sender";
+
+/**
+ * The kind of sender identity a message was sent from: a standard long-code number, a short code, an alphanumeric sender ID, or a toll-free number. Toll-free is its own value rather than a kind of long code, because it carries a separate regulatory regime and both sending policy and pricing key on it directly.
+ *
+ */
+export type SmsSenderType =
+  "long_code" | "short_code" | "alphanumeric" | "toll_free";
+
+/**
+ * Where a sender stands on its own setup: the ownership paperwork its number owes, and the
+ * registrations it holds.
+ *
+ * - `active`: nothing this sender holds is outstanding.
+ * - `pending_number_ownership`: the paperwork proving you own this sender's number is not in
+ * place, either because it has not been supplied or because the country that issued the
+ * number has not accepted it yet. Every send from this sender is refused until it does.
+ * - `pending_registrations`: the sender holds country registrations and none is approved yet.
+ * That covers a registration under review and one that was refused, so read `next` for which.
+ *
+ * This is not whether a message will be accepted. That is decided per destination country, and
+ * [Get sender requirements](/docs/api/reference/list-workspace-sms-sender-requirements) is the
+ * only read that answers it. A sender that has registered nowhere is `active`, even where every
+ * country it can reach wants a registration first. Read `next` for where to go from here.
+ *
+ */
+export type SmsSenderStatus =
+  "active" | "pending_number_ownership" | "pending_registrations";
+
+/**
+ * Where this sender stands with the destinations it is set up for, grouped by whose move is
+ * next.
+ *
+ * These are not every country the sender could reach. `pending` and `needs_attention` cover
+ * only countries you hold a registration for, so a country you could register for but have not,
+ * or one you have simply not switched on, appears in none of the three: there is nothing
+ * outstanding there. To see everything reachable and what each country would take, read
+ * [Get sender requirements](/docs/api/reference/list-workspace-sms-sender-requirements).
+ *
+ */
+export type SmsSenderDestinations = {
+  /**
+   * Countries you can send to today: switched on in your SMS destination settings, and either asking for no registration or holding an approved one. A country counts here however it became usable, including one enabled for you automatically when your organization set its business address.
+   *
+   */
+  readonly active: Array<CountryCode>;
+  /**
+   * Countries whose registration is under way and waiting on us or on a carrier. Nothing is asked of you for these; they move to `active` when the registration is approved.
+   *
+   */
+  readonly pending: Array<CountryCode>;
+  /**
+   * Countries you have registered for that are not working, and so are waiting on you: the registration was refused or withdrawn, or it is approved but the destination is switched off in your SMS destination settings. While this sender's number is missing the paperwork proving you own it, every country you have registered for is listed here, because none of them can carry a message until that is settled.
+   *
+   */
+  readonly needs_attention: Array<CountryCode>;
+};
+
+export type SmsSender = {
+  /**
+   * Identifier of this sender.
+   */
+  readonly id: SmsSenderId;
+  /**
+   * The value messages are sent from: a number in E.164 format, a shortcode, or an alphanumeric sender string.
+   *
+   */
+  readonly sender: string;
+  readonly source_kind: SmsSenderSourceKind;
+  /**
+   * The kind of sender identity this is, which decides what each destination country asks of it. It is finer than source_kind: a short code and an ordinary long code are both numbers but follow different rules.
+   *
+   */
+  readonly sender_type?: SmsSenderType;
+  /**
+   * The country of the number this sender sends from. Null for an alphanumeric sender.
+   */
+  readonly country_code?: CountryCode | null;
+  /**
+   * The number this sender sends from, as returned in the `id` field of `GET /v1/numbers`. Present only when `source_kind` is `number` or `shared_number`; an alphanumeric sender has no number behind it. Exactly one sender exists per number, so this is also how you go the other way: `GET /v1/sms/senders?number_id={id}` returns this sender.
+   *
+   */
+  readonly number_id?: AllocatedNumberId;
+  readonly status: SmsSenderStatus;
+  /**
+   * What to do next about this sender, given the state it is in. Present on reads that
+   * compute it: an empty list means there is nothing to do, and the field is absent entirely
+   * on responses that do not report next actions.
+   *
+   * This routes rather than advises. A sender only knows about itself, so where the work is
+   * per-country it names the requirements read rather than guessing which country you meant.
+   *
+   */
+  readonly next?: Array<NextAction>;
+  readonly destinations: SmsSenderDestinations;
+  readonly created_at: string;
+  readonly updated_at: string;
+};
+
+export type SmsSenderList = {
+  /**
+   * Your workspace's dedicated numbers and alphanumeric senders, newest first.
+   */
+  data: Array<SmsSender>;
+} & ListEnvelopeWithTotal;
+
+export type SmsSenderCreate = {
+  /**
+   * The kind of sender to create. Only `alpha` (an alphanumeric sender string) is customer-creatable. Dedicated numbers become senders when you allocate them from inventory. This endpoint cannot create their senders.
+   *
+   */
+  type: "alpha";
+  /**
+   * The alphanumeric sender string to create, for example "BIRD". 3–11 letters, digits, spaces, dashes, underscores, or dots, at least one of them a letter, and no separator at either end.
+   *
+   */
+  sender: string;
+};
+
+/**
+ * Country-registration lifecycle state:
+ *
+ * - `pending`: Registration work has started.
+ * - `under_review`: Everything this country requires has been submitted and is being reviewed. Nothing is asked of you while it is.
+ * - `bird_approved`: Our review passed and carrier approval is still pending.
+ * - `carrier_pending`: Submitted to the approving carrier or registry.
+ * - `approved`: Approved for sending.
+ * - `rejected`: Registration was refused.
+ * - `suspended`: A previously active registration is suspended.
+ * - `registration_required`: No required registration has been started.
+ * - `not_required`: The country does not require registration.
+ *
+ */
+export type SmsRegistrationStatus =
+  | "pending"
+  | "under_review"
+  | "bird_approved"
+  | "carrier_pending"
+  | "approved"
+  | "rejected"
+  | "suspended"
+  | "registration_required"
+  | "not_required"
+  | (string & {});
+
+export type SmsCountryRegistrationId = string;
+
+/**
+ * The resource this country's walk continues at. `none` means the first one is still to be
+ * created; every other value names what to read next, whose id is `program_entry_ref`.
+ *
+ * Every programme names its entry. US 10DLC enters at a `10dlc_brand` or a `10dlc_campaign` and
+ * continues at the `10dlc_campaign_number_link` a number hangs off. US toll-free both enters and
+ * continues at its `tfn_verification`. A programme answered by filling in a form enters at the
+ * `compliance_submission` holding your answers, the only entry that names something you filled in
+ * rather than something a carrier holds. Read the entry whenever you need the detail behind a
+ * country: it carries why a registration was refused, which this row reports only as a status.
+ *
+ * The values are programme-prefixed where a programme owns them, so one vocabulary reads the same
+ * wherever an entry is reported. Tolerate a value you do not recognize: read `program_entry_ref`
+ * as the id of a resource to fetch, and read `next` for what to do about the country.
+ *
+ * Computed on this read, so it is never stale and never absent. That matters most where a row
+ * cannot answer for itself: a toll-free verification you have started but not submitted is named
+ * here even though no registration exists for it yet, which is what tells you to finish that one
+ * rather than start a second.
+ *
+ */
+export type SmsSenderProgramEntry =
+  | "none"
+  | "10dlc_brand"
+  | "10dlc_campaign"
+  | "10dlc_campaign_number_link"
+  | "tfn_verification"
+  | "compliance_submission"
+  | (string & {});
+
+export type SmsSenderRequirement = {
+  /**
+   * The sender these requirements are for, the same one you asked about. It is repeated on every row so a row is complete on its own: what a country needs is addressed by the sender and the country together, and a step that registers this sender needs both.
+   *
+   */
+  readonly sender_id: SmsSenderId;
+  readonly country_code: CountryCode;
+  /**
+   * Whether country registration is absent, optional, or required before sending.
+   */
+  readonly registration_mode: SmsRegistrationMode;
+  /**
+   * The effective sender ID behavior for this sender and destination. An approved optional registration changes `overwritten` to `preserved` for its permitted message categories. Required registration does not change the configured sender ID behavior after approval. `unknown` means no behavior is published. This is expected behavior, not confirmation of what a recipient saw. Overwrite details are published in the country messaging context.
+   *
+   */
+  readonly sender_id_behavior: SmsSenderIdBehavior;
+  /**
+   * The registration program available for this destination, including optional registration. An existing registration retains its own program.
+   *
+   */
+  readonly program?: SmsRegistrationProgram | null;
+  /**
+   * Where this sender stands with this country's registration programme. The `approved` and `not_required` statuses satisfy it. Every other status leaves it unsatisfied: the `registration_required` status means the required registration has not started, the `pending` status means something required is still owed by you, and `under_review` means it is all with us. Read `next` for what to do about any of it.
+   *
+   * Registration blocks sending when `registration_mode` is `required`. Optional registration can be pending while sending remains available with `sender_id_behavior` set to `overwritten`. Check `destination_enabled` too, which is independent of registration progress.
+   *
+   */
+  readonly status: SmsRegistrationStatus;
+  /**
+   * What to do next about this country, given the state it is in. Each entry names one action
+   * and says why it is worth taking, so you can act on this response without working out the
+   * order yourself. Present on reads that compute it: an empty list means there is nothing to
+   * do, and the field is absent entirely on responses that do not report next actions.
+   *
+   * This routes rather than advises: it names where to go to act on this country, and the
+   * resource it names carries what to do there. So a country under carrier review names the
+   * verification to read, rather than restating a verdict that resource owns.
+   *
+   */
+  readonly next?: Array<NextAction>;
+  /**
+   * Whether your workspace has this destination country turned on. This is a workspace setting rather than anything about this sender, and it is checked before the sender is even considered, so a country can be fully registered and still refuse your messages because it is switched off here. Turn it on with [Update SMS destinations](/docs/api/reference/update-workspace-sms-destinations).
+   *
+   */
+  readonly destination_enabled: boolean;
+  /**
+   * Whether registering this sender for this country continues at compliance requirements you answer with a submission. When true, read them with [Get what a registration needs](/docs/api/reference/get-workspace-compliance-requirements) once the registration exists; the one-off setup fee is charged when you submit, and the monthly charge starts once the registration is approved. False in three cases: the country takes no registration (`registration_mode` is `none`); its programme runs its own flow, such as US 10DLC, toll-free, and short codes, which `next` routes to; or the registration goes to review with nothing to submit, and both charges are made once it is approved.
+   *
+   */
+  readonly has_compliance_requirements: boolean;
+  /**
+   * Message category the registration covering this country is approved for. Null when the registration admits any category, and null before you register.
+   *
+   */
+  readonly category?: string | null;
+  /**
+   * The registration covering this country, once one exists. Null before you register. Where the country's requirements are collected as a form, this is the `subject_id` to pass to `GET /v1/compliance/requirements`.
+   *
+   */
+  readonly registration_id?: SmsCountryRegistrationId | null;
+  program_entry: SmsSenderProgramEntry;
+  /**
+   * The id of the resource `program_entry` names, or null when it names none. Where the workspace holds several to choose from, this is the one to start from: the only brand or campaign if there is one, otherwise the most recently approved, and otherwise the most recent.
+   *
+   */
+  readonly program_entry_ref?: string | null;
+  /**
+   * Why the registration was rejected, when it was. Null otherwise.
+   */
+  readonly rejection_reason?: string | null;
+  /**
+   * When this country's registration must be brought up to date by, if it must. Null when nothing is outstanding, which is the ordinary case. The sender keeps sending until the date passes; `GET /v1/compliance/requirements` says what is being asked for.
+   *
+   */
+  readonly obligation_due_at?: string | null;
+  /**
+   * Shortest time approval usually takes, in business days. Null when the country publishes no estimate.
+   */
+  readonly timeline_min_days?: number | null;
+  /**
+   * Longest time approval usually takes, in business days. Null when the country publishes no estimate.
+   */
+  readonly timeline_max_days?: number | null;
+  /**
+   * Registration categories this country's program accepts.
+   */
+  readonly registration_types?: Array<string>;
+};
+
+export type SmsSenderProgram = {
+  /**
+   * The program this registration runs. Null for the countries that asked for no registration at all, which are grouped together because the only thing they have in common is that you registered nothing for them.
+   *
+   */
+  readonly program: SmsRegistrationProgram | null;
+  /**
+   * The resource this registration produced, which `program` tells you how to read: a toll-free verification for `tfn`, or a campaign number link for `10dlc`. The link connects this number to its campaign. Get the campaign from `GET /v1/sms/10dlc/campaign-number-links/{link_id}`. Null for a program that issues none, and for one you have not registered yet. Follow it when the status is under_review, because only that resource distinguishes a carrier still reviewing from one waiting on more information from you.
+   *
+   */
+  readonly program_ref: string | null;
+  /**
+   * Every country this one registration covers. Some programs open several at once, so a single toll-free verification or campaign registration can be what permits four destinations.
+   *
+   */
+  readonly countries: Array<CountryCode>;
+  /**
+   * Where this registration stands, for all of the countries it covers. `registration_required` means you have not made it yet and every country listed is waiting on it. Null in the one case where the countries have diverged and no single answer is true: read those countries individually.
+   *
+   */
+  readonly status: SmsRegistrationStatus | null;
+};
+
+export type SmsSenderRequirementList = {
+  /**
+   * One entry per destination country this sender can reach, which is the level the decision to carry your message is made at. Ask this list whether you can send somewhere, and what it takes first. A country missing from it is one this sender has no route to at all, so no registration would open it.
+   *
+   */
+  data: Array<SmsSenderRequirement>;
+  /**
+   * The same countries seen as the registrations they belong to, one entry per registration, with the countries each one covers. Ask this list what to do next: an entry whose status is `registration_required` is a registration you still have to make, and its countries are the ones it would open. Every other entry is a registration you have already made, so this list is the whole picture rather than only the part you have finished.
+   *
+   */
+  programs: Array<SmsSenderProgram>;
+};
+
+export type SmsCountryRegistrationCreate = {
+  country_code: CountryCode;
+  /**
+   * Message category to register the sender for. Omit to register the sender for all categories.
+   *
+   */
+  category?: SmsMessageCategory;
+};
+
+export type SmsCountryRegistration = {
+  /**
+   * Identifier of this country registration.
+   */
+  readonly id: SmsCountryRegistrationId;
+  readonly country_code: CountryCode;
+  /**
+   * Current registration policy for this destination and sender type. Omitted if the policy or sender is no longer available.
+   */
+  readonly registration_mode?: SmsRegistrationMode;
+  /**
+   * Expected sender ID behavior for this registration's message categories. Optional registration preserves the sender ID once approved. Required registration can still use an overwritten sender ID after approval. Omitted if the policy or sender is no longer available.
+   *
+   */
+  readonly sender_id_behavior?: SmsSenderIdBehavior;
+  /**
+   * The registration program behind this row. Null for a country that required none, which is the state a row records rather than a program called "none".
+   *
+   */
+  readonly program?: SmsRegistrationProgram | null;
+  /**
+   * Message category this registration is approved for. Null means the registration is unrestricted and admits any category.
+   *
+   */
+  readonly category?: string | null;
+  readonly status: SmsRegistrationStatus;
+  /**
+   * The program artifact that decided this registration, null where none produced it. Which resource it names follows from `program`, and its id prefix tells you too: a toll-free verification for `tfn`, or a campaign number link for `10dlc`. The link connects this number to its campaign. Get the campaign from [Get a 10DLC campaign number link](/docs/api/reference/get-tcr-campaign-number-link). Worth following when the status is `under_review`, because that value covers both the carrier still reviewing and the carrier waiting on more information from you, and only the program's own resource tells those apart.
+   *
+   */
+  readonly program_ref?: string | null;
+  /**
+   * Reason the registration was rejected, shown when the status is `rejected`. Null for registrations that were never rejected.
+   *
+   */
+  readonly rejection_reason?: string | null;
+  readonly created_at: string;
+  readonly updated_at: string;
+};
 
 /**
  * An intelligence property you can add to a base phone number lookup.
@@ -8594,7 +9618,7 @@ export type WhatsAppTemplateComponent = {
  * Language review and health status:
  *
  * - `approved`: Passed review and can be sent.
- * - `pending`: Under review.
+ * - `pending`: Under review, or submitted while Bird confirms the result with WhatsApp.
  * - `rejected`: Failed review.
  * - `paused` or `disabled`: Sending is suspended.
  * - `in_appeal`: A decision is being appealed.
@@ -8603,7 +9627,6 @@ export type WhatsAppTemplateComponent = {
  * - `archived`: Reclaimed after 12 months without use; recoverable for 28 days.
  * - `deleted`: Permanently deleted.
  * - `submit_failed`: A submission or a deletion did not complete and will not be retried. `error.description` says why, and `error.meta_error_code` is set only where WhatsApp itself refused.
- * - `outcome_unknown`: A create or an edit reached WhatsApp but no response came back, so the outcome is still being resolved against WhatsApp. An unanswered deletion is retried instead of landing here. `error.description` says so, and `error.meta_error_code` is absent, since nothing was refused.
  *
  * This is an open enum. Accept unrecognized values.
  *
@@ -8620,7 +9643,6 @@ export type WhatsAppTemplateLanguageStatus =
   | "archived"
   | "deleted"
   | "submit_failed"
-  | "outcome_unknown"
   | (string & {});
 
 /**
@@ -8697,7 +9719,7 @@ export type WhatsAppTemplateLanguageState = {
    */
   rejection?: WhatsAppTemplateRejection;
   /**
-   * Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: WhatsAppTemplateSubmissionError;
@@ -8906,7 +9928,7 @@ export type WhatsAppTemplateVersionLanguage = {
    */
   rejection?: WhatsAppTemplateRejection;
   /**
-   * Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: WhatsAppTemplateSubmissionError;
@@ -9068,7 +10090,7 @@ export type WhatsAppTemplateLanguage = {
    */
   rejection?: WhatsAppTemplateRejection;
   /**
-   * Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: WhatsAppTemplateSubmissionError;
@@ -23064,11 +24086,11 @@ export type EventVerifyAttemptDeliveredData = EventVerifyBase & {
    */
   address: string;
   /**
-   * Carrier that delivered the message, when the carrier network reports it. Always null for email, WhatsApp, and Telegram.
+   * Carrier that delivered the message, when the carrier network reports it. Always null for email, WhatsApp, Telegram, and voice.
    */
   carrier: string | null;
   /**
-   * Mobile country code and mobile network code of the delivering carrier, when reported. Always null for email, WhatsApp, and Telegram.
+   * Mobile country code and mobile network code of the delivering carrier, when reported. Always null for email, WhatsApp, Telegram, and voice.
    */
   mcc_mnc: string | null;
   /**
@@ -24381,6 +25403,8 @@ export type VoiceLeg = {
   readonly cost?: VoiceLegCost;
 };
 
+export type WalletId = string;
+
 export type WalletTransactionId = string;
 
 /**
@@ -24406,6 +25430,24 @@ export type BillingPricingInterval = {
  * URL-safe identifier for a billing product. Lowercase letters and digits, separated by underscores. Must start with a letter.
  */
 export type BillingProductSlug = string;
+
+/**
+ * How this product is priced.
+ *
+ * - `plan`: it comes with the organization's subscribed plan, with usage tracked
+ * against that plan's included allowance.
+ * - `metered`: it is billed per unit beyond any included allowance.
+ * - `rate_card`: the per-unit price varies by attributes of the usage, such as
+ * destination, instead of being flat.
+ * - `unit_subscription`: it is a standalone add-on billed as its own recurring
+ * subscription, independent of the plan.
+ * - `custom`: a pricing arrangement that does not fit the other models.
+ * - `counter`: usage is recorded without enforcing a spending cap or blocking
+ * requests.
+ *
+ */
+export type BillingPricingModel =
+  "plan" | "metered" | "rate_card" | "unit_subscription" | "custom" | "counter";
 
 /**
  * Physical type of a phone number. New number types may be added over time, so treat unrecognized values as supported types rather than errors.
@@ -24686,6 +25728,22 @@ export type NumbersOrderList = {
   data: Array<NumbersOrder>;
 } & ListEnvelope;
 
+/**
+ * Ownership paperwork for a number being ordered, where its country requires any. Optional always: the order completes and the number is yours either way, and supplying this only decides whether it can carry traffic sooner. Read `GET /v1/compliance/requirements` for the number to learn what is asked for, or file it after the order with `POST /v1/compliance/submissions`. Filing this cannot fail your order: if it is refused, the number is still yours and you can file again. The answers are a legal representation filed under the name of the business they describe. Sending this block uses the order's existing `numbers` scope at write level.
+ *
+ */
+export type NumbersOrderCompliance = {
+  /**
+   * Every answer at once, in the same shape `POST /v1/compliance/submissions` takes. There is no draft to fill in over several calls, so send a complete set.
+   *
+   */
+  answers: Array<ComplianceAnswer>;
+  /**
+   * An existing party this number is held for. It fills in the business details you left out from what that party already holds, and each single-value answer you file about the party is written back onto it for next time, whatever the verdict. Documents and multi-value answers are asked fresh each time. An id belonging to another organization is rejected.
+   */
+  identity_id?: ComplianceIdentityId;
+};
+
 export type NumbersOrderCreate = {
   /**
    * The number to acquire, in E.164 format, as returned by `GET /v1/numbers/available`.
@@ -24695,6 +25753,7 @@ export type NumbersOrderCreate = {
    * Your own reference to set on the number when this purchase completes. Leading and trailing whitespace is removed. A pending order keeps the reference until the number is allocated.
    */
   reference?: string;
+  compliance?: NumbersOrderCompliance;
 };
 
 export type NumberUpdate = {
@@ -24712,6 +25771,132 @@ export type NumberUpdate = {
  * Stable named input or output declared by a node-type version.
  */
 export type AutomationPortKey = string;
+
+export type BillingResolvedPrice = {
+  /**
+   * The net unit price, before tax.
+   */
+  unit_price: Money;
+  /**
+   * The tax rate applied to this price for your organization, as a decimal (for example `0.21` for 21%). `0` if your organization is tax-exempt or no tax applies.
+   */
+  tax_rate: string;
+  /**
+   * The tax charged on one unit, computed from `unit_price` and `tax_rate`.
+   */
+  tax_amount: Money;
+  /**
+   * The total your organization is charged per unit, that is, `unit_price` plus `tax_amount`.
+   */
+  gross_price: Money;
+  /**
+   * Number of units that form one chargeable block. Overage usage is ceiling-rounded to the nearest multiple of this value before the unit price is applied. A value of 1 charges per individual unit.
+   */
+  billing_unit_size: number;
+  /**
+   * The billing rounding window for time-based products, expressed as `{initial_seconds}/{continuation_seconds}`. For example, `60/60` means each unit covers 60 seconds. `null` for per-unit products.
+   */
+  increment?: string | null;
+  /**
+   * Pricing dimensions that determined this price (for example, `country_code`, `sender_type`).
+   */
+  dimensions: {
+    [key: string]: string;
+  };
+  /**
+   * Display name of the product this price was resolved for.
+   */
+  name: string;
+  /**
+   * Customer-facing description of the product this price was resolved for, when set.
+   */
+  readonly external_description?: string | null;
+  pricing_model: BillingPricingModel;
+  /**
+   * Compatibility alias for `pricing_interval.unit`. Only present when `pricing_model` is `unit_subscription`, or `plan` with configured recurring terms. Omitted for other pricing models and plans without configured terms.
+   *
+   * @deprecated
+   */
+  readonly billing_interval?: BillingInterval;
+  /**
+   * Compatibility alias for `intervals_per_charge`. Only present when `pricing_model` is `unit_subscription`, or `plan` with configured recurring terms. Omitted for other pricing models and plans without configured terms.
+   *
+   * @deprecated
+   */
+  readonly billing_interval_count?: number;
+  /**
+   * Period covered by the resolved recurring rate. Present for `unit_subscription` products and plans with configured recurring terms. Omitted for other pricing models and plans without configured terms.
+   */
+  pricing_interval?: BillingPricingInterval;
+  /**
+   * Number of complete pricing intervals bought by each recurring charge. Renewal duration is `pricing_interval.count` multiplied by this value. Present alongside `pricing_interval` for `unit_subscription` products and plans with configured recurring terms; omitted otherwise.
+   */
+  intervals_per_charge?: number;
+};
+
+/**
+ * Automatic collection state:
+ * - `none`: No retained collection run.
+ * - `in_progress`: Collection is active, though payment may still require customer action.
+ * - `exhausted`: Automatic retries have stopped and customer action is needed.
+ */
+export type BillingWalletCollectionStatus =
+  "none" | "in_progress" | "exhausted";
+
+export type BillingWallet = {
+  id: WalletId;
+  /**
+   * ISO 4217 currency code.
+   */
+  currency_code: CurrencyCode;
+  /**
+   * Balance you can spend, in currency units. Usage is charged as it happens, so this drops within seconds of sending and can be lower than the balance the wallet transactions add up to, which only reflects charges that have settled. Funds held for upcoming renewals are also excluded. Credit headroom is reported separately in `credit_limit`, and postpaid accounts can keep spending past a zero balance up to that limit.
+   */
+  balance: string;
+  /**
+   * Settled wallet balance in currency units, before active reservations are deducted.
+   */
+  settled_balance: string;
+  /**
+   * Amount currently held for prepared subscription renewals and scheduled plan changes, in currency units.
+   */
+  renewal_reserved: string;
+  /**
+   * Total amount required for prepared subscription renewals and scheduled plan changes, including tax, in currency units.
+   */
+  renewal_required: string;
+  collection_status: BillingWalletCollectionStatus;
+  /**
+   * Part of collection_required needed for unfunded renewal fees, in exact currency units.
+   */
+  collection_renewal: string;
+  /**
+   * Total wallet funding still required by the current automatic collection run, in exact currency units.
+   */
+  collection_required: string;
+  /**
+   * Part of collection_required needed for the configured auto-topup amount, in currency units.
+   */
+  collection_usage_buffer: string;
+  /**
+   * Part of collection_required needed to cover the wallet shortfall after reservations and approved credit, in currency units.
+   */
+  collection_deficit: string;
+  /**
+   * Credit limit in currency units. `0.00` for prepaid wallets.
+   */
+  credit_limit: string;
+  /**
+   * When `true`, the wallet currency has not yet been committed and can be changed once. When `false`, the currency is permanent.
+   */
+  provisional: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BillingWalletList = {
+  data: Array<BillingWallet>;
+};
 
 /**
  * Field used to sort the list.
@@ -26998,6 +28183,27 @@ export type EsimAssignmentCreate = {
 };
 
 /**
+ * The status of the eSIM's one recurring subscription that has not ended, or `none` when it has no such subscription. The values are every `EsimRecurringSubscriptionStatus` except `ended`, plus `none`. This is subscription state, not a promise of another renewal: read the subscription's `cancel_at_period_end` for that.
+ *
+ * - `pending`: enrollment or the initial purchase is still being processed.
+ * - `active`: the subscription is in service. One canceled at the end of its paid period stays `active` until that boundary; read the subscription's `cancel_at_period_end` to tell them apart.
+ * - `needs_attention`: a delivery or a related credit remains unresolved.
+ * - `none`: the eSIM has no recurring subscription, or only ended ones.
+ *
+ */
+export type EsimRenewalState =
+  "pending" | "active" | "needs_attention" | "none";
+
+/**
+ * The eSIM's recurring subscription that has not ended. Fetch the subscription by id for its price, cadence, next charge and period history.
+ *
+ */
+export type EsimRecurringSubscriptionSummary = {
+  subscription_id: EsimRecurringSubscriptionId;
+  status: EsimRecurringSubscriptionStatus;
+};
+
+/**
  * Compact eSIM representation used in lists. Fetch the eSIM by id for the full aggregate with packages, balances, and installation state.
  *
  */
@@ -27022,6 +28228,10 @@ export type EsimSummary = {
    * Free-text label for your own reference.
    */
   readonly display_name: string | null;
+  /**
+   * The eSIM's recurring subscription that has not ended, or null when it has none. The single-eSIM read does not carry it; list the eSIM's subscriptions with `esim_id` for the full renewal history.
+   */
+  readonly renewal: EsimRecurringSubscriptionSummary | null;
   readonly created_at: string;
 };
 
@@ -28222,6 +29432,31 @@ export type SmsKeywordRuleListWritable = {
   data: Array<SmsKeywordRuleWritable>;
 };
 
+export type ComplianceRequirementFieldWritable = {
+  [key: string]: never;
+};
+
+/**
+ * A party you register on behalf of: your own business, or one of your clients. Reusing an identity across registrations is what stops you retyping the same business details for every country, and lets a fact reviewed once stand for the registrations that follow.
+ */
+export type ComplianceIdentityWritable = {
+  id: ComplianceIdentityId;
+  /**
+   * What you call this party. Yours to choose; it is never sent to a carrier.
+   */
+  name: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ComplianceIdentityListWritable = {
+  data: Array<ComplianceIdentityWritable>;
+} & ListEnvelopeWithTotal;
+
+export type AttachmentListWritable = {
+  data: Array<unknown>;
+} & ListEnvelopeWithTotal;
+
 /**
  * A file in the workspace's media library, hosted at a permanent public URL. Embed or link `url` anywhere hosted media is needed, including in email that has already been sent: an asset's bytes and URL never change.
  */
@@ -28265,6 +29500,14 @@ export type AssetFolderWritable = {
 export type AssetFolderListWritable = {
   data: Array<AssetFolderWritable>;
 } & ListEnvelopeWithTotal;
+
+export type ComplianceRequirementWritable = {
+  [key: string]: never;
+};
+
+export type ComplianceSubmissionWritable = {
+  [key: string]: never;
+};
 
 /**
  * Latency percentiles in milliseconds for the requested scope:
@@ -28444,6 +29687,34 @@ export type SmsInboundStatsByOperatorResponseWritable = {
  */
 export type SmsInboundStatsByNumberResponseWritable = {
   [key: string]: never;
+};
+
+export type SmsSenderWritable = {
+  [key: string]: never;
+};
+
+export type SmsSenderListWritable = {
+  /**
+   * Your workspace's dedicated numbers and alphanumeric senders, newest first.
+   */
+  data: Array<SmsSenderWritable>;
+} & ListEnvelopeWithTotal;
+
+export type SmsSenderRequirementWritable = {
+  program_entry: SmsSenderProgramEntry;
+};
+
+export type SmsSenderRequirementListWritable = {
+  /**
+   * One entry per destination country this sender can reach, which is the level the decision to carry your message is made at. Ask this list whether you can send somewhere, and what it takes first. A country missing from it is one this sender has no route to at all, so no registration would open it.
+   *
+   */
+  data: Array<SmsSenderRequirementWritable>;
+  /**
+   * The same countries seen as the registrations they belong to, one entry per registration, with the countries each one covers. Ask this list what to do next: an entry whose status is `registration_required` is a registration you still have to make, and its countries are the ones it would open. Every other entry is a registration you have already made, so this list is the whole picture rather than only the part you have finished.
+   *
+   */
+  programs: Array<unknown>;
 };
 
 export type VerificationWritable = unknown;
@@ -28695,7 +29966,7 @@ export type WhatsAppTemplateLanguageStateWritable = {
    */
   rejection?: WhatsAppTemplateRejectionWritable;
   /**
-   * Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: unknown;
@@ -28779,7 +30050,7 @@ export type WhatsAppTemplateVersionLanguageWritable = {
    */
   rejection?: WhatsAppTemplateRejectionWritable;
   /**
-   * Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: unknown;
@@ -28874,7 +30145,7 @@ export type WhatsAppTemplateLanguageWritable = {
    */
   rejection?: WhatsAppTemplateRejectionWritable;
   /**
-   * Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: unknown;
@@ -32046,6 +33317,107 @@ export type NumbersOrderListWritable = {
   data: Array<unknown>;
 } & ListEnvelope;
 
+export type BillingResolvedPriceWritable = {
+  /**
+   * The net unit price, before tax.
+   */
+  unit_price: Money;
+  /**
+   * The tax rate applied to this price for your organization, as a decimal (for example `0.21` for 21%). `0` if your organization is tax-exempt or no tax applies.
+   */
+  tax_rate: string;
+  /**
+   * The tax charged on one unit, computed from `unit_price` and `tax_rate`.
+   */
+  tax_amount: Money;
+  /**
+   * The total your organization is charged per unit, that is, `unit_price` plus `tax_amount`.
+   */
+  gross_price: Money;
+  /**
+   * Number of units that form one chargeable block. Overage usage is ceiling-rounded to the nearest multiple of this value before the unit price is applied. A value of 1 charges per individual unit.
+   */
+  billing_unit_size: number;
+  /**
+   * The billing rounding window for time-based products, expressed as `{initial_seconds}/{continuation_seconds}`. For example, `60/60` means each unit covers 60 seconds. `null` for per-unit products.
+   */
+  increment?: string | null;
+  /**
+   * Pricing dimensions that determined this price (for example, `country_code`, `sender_type`).
+   */
+  dimensions: {
+    [key: string]: string;
+  };
+  /**
+   * Display name of the product this price was resolved for.
+   */
+  name: string;
+  pricing_model: BillingPricingModel;
+  /**
+   * Period covered by the resolved recurring rate. Present for `unit_subscription` products and plans with configured recurring terms. Omitted for other pricing models and plans without configured terms.
+   */
+  pricing_interval?: BillingPricingInterval;
+  /**
+   * Number of complete pricing intervals bought by each recurring charge. Renewal duration is `pricing_interval.count` multiplied by this value. Present alongside `pricing_interval` for `unit_subscription` products and plans with configured recurring terms; omitted otherwise.
+   */
+  intervals_per_charge?: number;
+};
+
+export type BillingWalletWritable = {
+  id: WalletId;
+  /**
+   * ISO 4217 currency code.
+   */
+  currency_code: CurrencyCode;
+  /**
+   * Balance you can spend, in currency units. Usage is charged as it happens, so this drops within seconds of sending and can be lower than the balance the wallet transactions add up to, which only reflects charges that have settled. Funds held for upcoming renewals are also excluded. Credit headroom is reported separately in `credit_limit`, and postpaid accounts can keep spending past a zero balance up to that limit.
+   */
+  balance: string;
+  /**
+   * Settled wallet balance in currency units, before active reservations are deducted.
+   */
+  settled_balance: string;
+  /**
+   * Amount currently held for prepared subscription renewals and scheduled plan changes, in currency units.
+   */
+  renewal_reserved: string;
+  /**
+   * Total amount required for prepared subscription renewals and scheduled plan changes, including tax, in currency units.
+   */
+  renewal_required: string;
+  collection_status: BillingWalletCollectionStatus;
+  /**
+   * Part of collection_required needed for unfunded renewal fees, in exact currency units.
+   */
+  collection_renewal: string;
+  /**
+   * Total wallet funding still required by the current automatic collection run, in exact currency units.
+   */
+  collection_required: string;
+  /**
+   * Part of collection_required needed for the configured auto-topup amount, in currency units.
+   */
+  collection_usage_buffer: string;
+  /**
+   * Part of collection_required needed to cover the wallet shortfall after reservations and approved credit, in currency units.
+   */
+  collection_deficit: string;
+  /**
+   * Credit limit in currency units. `0.00` for prepaid wallets.
+   */
+  credit_limit: string;
+  /**
+   * When `true`, the wallet currency has not yet been committed and can be changed once. When `false`, the currency is permanent.
+   */
+  provisional: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BillingWalletListWritable = {
+  data: Array<BillingWalletWritable>;
+};
+
 export type VoiceTrunkIpaclWritable = {
   /**
    * Optional human-readable label for this ACL entry.
@@ -32363,11 +33735,19 @@ export type EsimAssignmentWritable = {
   esim_id: EsimId;
 };
 
+/**
+ * Compact eSIM representation used in lists. Fetch the eSIM by id for the full aggregate with packages, balances, and installation state.
+ *
+ */
+export type EsimSummaryWritable = {
+  [key: string]: never;
+};
+
 export type EsimListWritable = {
   /**
    * eSIMs, newest first, in compact form; fetch one by id for the full aggregate.
    */
-  data: Array<unknown>;
+  data: Array<EsimSummaryWritable>;
 } & ListEnvelope;
 
 /**
@@ -39335,6 +40715,808 @@ export type UpdateSmsKeywordRuleResponses = {
 export type UpdateSmsKeywordRuleResponse =
   UpdateSmsKeywordRuleResponses[keyof UpdateSmsKeywordRuleResponses];
 
+export type ListComplianceIdentitiesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by. Defaults to `created_at`.
+     */
+    sort?: ComplianceIdentitySortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+  };
+  url: "/v1/compliance/identities";
+};
+
+export type ListComplianceIdentitiesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListComplianceIdentitiesError =
+  ListComplianceIdentitiesErrors[keyof ListComplianceIdentitiesErrors];
+
+export type ListComplianceIdentitiesResponses = {
+  /**
+   * The identities.
+   */
+  200: ComplianceIdentityList;
+};
+
+export type ListComplianceIdentitiesResponse =
+  ListComplianceIdentitiesResponses[keyof ListComplianceIdentitiesResponses];
+
+export type CreateComplianceIdentityData = {
+  body: ComplianceIdentityCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/compliance/identities";
+};
+
+export type CreateComplianceIdentityErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Validation failed
+   */
+  422: ValidationError;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateComplianceIdentityError =
+  CreateComplianceIdentityErrors[keyof CreateComplianceIdentityErrors];
+
+export type CreateComplianceIdentityResponses = {
+  /**
+   * The identity.
+   */
+  201: ComplianceIdentity;
+};
+
+export type CreateComplianceIdentityResponse =
+  CreateComplianceIdentityResponses[keyof CreateComplianceIdentityResponses];
+
+export type DeleteComplianceIdentityData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Identity ID.
+     */
+    identity_id: ComplianceIdentityId;
+  };
+  query?: never;
+  url: "/v1/compliance/identities/{identity_id}";
+};
+
+export type DeleteComplianceIdentityErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteComplianceIdentityError =
+  DeleteComplianceIdentityErrors[keyof DeleteComplianceIdentityErrors];
+
+export type DeleteComplianceIdentityResponses = {
+  /**
+   * The identity was deleted.
+   */
+  204: void;
+};
+
+export type DeleteComplianceIdentityResponse =
+  DeleteComplianceIdentityResponses[keyof DeleteComplianceIdentityResponses];
+
+export type GetComplianceIdentityData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Identity ID.
+     */
+    identity_id: ComplianceIdentityId;
+  };
+  query?: never;
+  url: "/v1/compliance/identities/{identity_id}";
+};
+
+export type GetComplianceIdentityErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetComplianceIdentityError =
+  GetComplianceIdentityErrors[keyof GetComplianceIdentityErrors];
+
+export type GetComplianceIdentityResponses = {
+  /**
+   * The identity.
+   */
+  200: ComplianceIdentity;
+};
+
+export type GetComplianceIdentityResponse =
+  GetComplianceIdentityResponses[keyof GetComplianceIdentityResponses];
+
+export type UpdateComplianceIdentityData = {
+  body: ComplianceIdentityUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Identity ID.
+     */
+    identity_id: ComplianceIdentityId;
+  };
+  query?: never;
+  url: "/v1/compliance/identities/{identity_id}";
+};
+
+export type UpdateComplianceIdentityErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Validation failed
+   */
+  422: ValidationError;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateComplianceIdentityError =
+  UpdateComplianceIdentityErrors[keyof UpdateComplianceIdentityErrors];
+
+export type UpdateComplianceIdentityResponses = {
+  /**
+   * The updated identity.
+   */
+  200: ComplianceIdentity;
+};
+
+export type UpdateComplianceIdentityResponse =
+  UpdateComplianceIdentityResponses[keyof UpdateComplianceIdentityResponses];
+
+export type ListComplianceAttachmentsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by. Defaults to `created_at`.
+     */
+    sort?: AttachmentSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+  };
+  url: "/v1/compliance/attachments";
+};
+
+export type ListComplianceAttachmentsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListComplianceAttachmentsError =
+  ListComplianceAttachmentsErrors[keyof ListComplianceAttachmentsErrors];
+
+export type ListComplianceAttachmentsResponses = {
+  /**
+   * A page of attachments.
+   */
+  200: AttachmentList;
+};
+
+export type ListComplianceAttachmentsResponse =
+  ListComplianceAttachmentsResponses[keyof ListComplianceAttachmentsResponses];
+
+export type CreateComplianceAttachmentData = {
+  body: AttachmentUpload;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/compliance/attachments";
+};
+
+export type CreateComplianceAttachmentErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Request body or message size exceeds the allowed limit
+   */
+  413: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateComplianceAttachmentError =
+  CreateComplianceAttachmentErrors[keyof CreateComplianceAttachmentErrors];
+
+export type CreateComplianceAttachmentResponses = {
+  /**
+   * An attachment with identical contents already existed and was returned unchanged.
+   */
+  200: Attachment;
+  /**
+   * The uploaded attachment.
+   */
+  201: Attachment;
+};
+
+export type CreateComplianceAttachmentResponse =
+  CreateComplianceAttachmentResponses[keyof CreateComplianceAttachmentResponses];
+
+export type DeleteComplianceAttachmentData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Attachment ID.
+     */
+    attachment_id: AttachmentId;
+  };
+  query?: never;
+  url: "/v1/compliance/attachments/{attachment_id}";
+};
+
+export type DeleteComplianceAttachmentErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteComplianceAttachmentError =
+  DeleteComplianceAttachmentErrors[keyof DeleteComplianceAttachmentErrors];
+
+export type DeleteComplianceAttachmentResponses = {
+  /**
+   * Attachment deleted.
+   */
+  204: void;
+};
+
+export type DeleteComplianceAttachmentResponse =
+  DeleteComplianceAttachmentResponses[keyof DeleteComplianceAttachmentResponses];
+
+export type GetComplianceAttachmentData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Attachment ID.
+     */
+    attachment_id: AttachmentId;
+  };
+  query?: never;
+  url: "/v1/compliance/attachments/{attachment_id}";
+};
+
+export type GetComplianceAttachmentErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetComplianceAttachmentError =
+  GetComplianceAttachmentErrors[keyof GetComplianceAttachmentErrors];
+
+export type GetComplianceAttachmentResponses = {
+  /**
+   * The raw attachment bytes.
+   */
+  200: Blob | File;
+};
+
+export type GetComplianceAttachmentResponse =
+  GetComplianceAttachmentResponses[keyof GetComplianceAttachmentResponses];
+
 export type ListAssetsData = {
   body?: never;
   headers?: {
@@ -40257,6 +42439,431 @@ export type UpdateAssetFolderResponses = {
 
 export type UpdateAssetFolderResponse =
   UpdateAssetFolderResponses[keyof UpdateAssetFolderResponses];
+
+export type GetWorkspaceComplianceRequirementsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query: {
+    /**
+     * What you are registering.
+     */
+    subject_kind: ComplianceSubjectKind;
+    /**
+     * The registration to answer for. Omit it to read the form on its own, before you hold anything to register: the requirements come back unanswered, which is what to do when you are deciding whether to take a number or a sender on in the first place. Omitting it makes `program` required, since the coordinate is otherwise resolved from the subject. When you do supply it, it is an `scr_` id when `subject_kind` is `sms_sender`, an `nda_` id when it is `number`, and a `cid_` party id when it is `identity`.
+     */
+    subject_id?: ComplianceSubjectId;
+    /**
+     * The destination country. For `identity` send `ZZ`, the international coordinate: your business registers once, not per country.
+     */
+    country_code: CountryCode;
+    /**
+     * The programme to read. Optional alongside `subject_id`, because a registration is under exactly one programme and that is the one used; supply it there only to confirm the programme you expect, since one that is not the registration's own returns a 422, as does supplying one at all for a country that runs no registration programme. Required when `subject_id` is omitted, because there is then no registration to resolve it from and a country can run more than one.
+     */
+    program?: ComplianceProgram;
+    /**
+     * Prefill the business details from a party you have already described. Requirements that ask about the party come back carrying its answers, marked `prefilled`; requirements about this sender never prefill because you write the sender's intended use fresh each time. Anything you have already filed for this registration wins over the party's answer.
+     */
+    identity_id?: ComplianceIdentityId;
+  };
+  url: "/v1/compliance/requirements";
+};
+
+export type GetWorkspaceComplianceRequirementsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWorkspaceComplianceRequirementsError =
+  GetWorkspaceComplianceRequirementsErrors[keyof GetWorkspaceComplianceRequirementsErrors];
+
+export type GetWorkspaceComplianceRequirementsResponses = {
+  /**
+   * What this country requires, and where you stand with it.
+   */
+  200: ComplianceRequirement;
+};
+
+export type GetWorkspaceComplianceRequirementsResponse =
+  GetWorkspaceComplianceRequirementsResponses[keyof GetWorkspaceComplianceRequirementsResponses];
+
+export type GetComplianceDocumentTemplateData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Blank compliance form ID.
+     */
+    template_id: ComplianceTemplateId;
+  };
+  query?: never;
+  url: "/v1/compliance/document-templates/{template_id}";
+};
+
+export type GetComplianceDocumentTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetComplianceDocumentTemplateError =
+  GetComplianceDocumentTemplateErrors[keyof GetComplianceDocumentTemplateErrors];
+
+export type GetComplianceDocumentTemplateResponses = {
+  /**
+   * The blank form bytes.
+   */
+  200: Blob | File;
+};
+
+export type GetComplianceDocumentTemplateResponse =
+  GetComplianceDocumentTemplateResponses[keyof GetComplianceDocumentTemplateResponses];
+
+export type CreateWorkspaceComplianceSubmissionData = {
+  body: ComplianceSubmissionCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/compliance/submissions";
+};
+
+export type CreateWorkspaceComplianceSubmissionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateWorkspaceComplianceSubmissionError =
+  CreateWorkspaceComplianceSubmissionErrors[keyof CreateWorkspaceComplianceSubmissionErrors];
+
+export type CreateWorkspaceComplianceSubmissionResponses = {
+  /**
+   * The new submission, with every answer on it.
+   */
+  201: ComplianceSubmission;
+};
+
+export type CreateWorkspaceComplianceSubmissionResponse =
+  CreateWorkspaceComplianceSubmissionResponses[keyof CreateWorkspaceComplianceSubmissionResponses];
+
+export type GetWorkspaceComplianceSubmissionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Submission ID.
+     */
+    submission_id: ComplianceSubmissionId;
+  };
+  query?: never;
+  url: "/v1/compliance/submissions/{submission_id}";
+};
+
+export type GetWorkspaceComplianceSubmissionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWorkspaceComplianceSubmissionError =
+  GetWorkspaceComplianceSubmissionErrors[keyof GetWorkspaceComplianceSubmissionErrors];
+
+export type GetWorkspaceComplianceSubmissionResponses = {
+  /**
+   * The submission, with every answer and where it stands.
+   */
+  200: ComplianceSubmission;
+};
+
+export type GetWorkspaceComplianceSubmissionResponse =
+  GetWorkspaceComplianceSubmissionResponses[keyof GetWorkspaceComplianceSubmissionResponses];
+
+export type UpdateWorkspaceComplianceSubmissionData = {
+  body: ComplianceSubmissionResupply;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Submission ID.
+     */
+    submission_id: ComplianceSubmissionId;
+  };
+  query?: never;
+  url: "/v1/compliance/submissions/{submission_id}/resupply";
+};
+
+export type UpdateWorkspaceComplianceSubmissionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateWorkspaceComplianceSubmissionError =
+  UpdateWorkspaceComplianceSubmissionErrors[keyof UpdateWorkspaceComplianceSubmissionErrors];
+
+export type UpdateWorkspaceComplianceSubmissionResponses = {
+  /**
+   * The submission, with your replacement answers on it.
+   */
+  200: ComplianceSubmission;
+};
+
+export type UpdateWorkspaceComplianceSubmissionResponse =
+  UpdateWorkspaceComplianceSubmissionResponses[keyof UpdateWorkspaceComplianceSubmissionResponses];
 
 export type GetSmsStatsSummaryData = {
   body?: never;
@@ -41747,6 +44354,445 @@ export type GetSmsInboundStatsByNumberResponses = {
 
 export type GetSmsInboundStatsByNumberResponse =
   GetSmsInboundStatsByNumberResponses[keyof GetSmsInboundStatsByNumberResponses];
+
+export type ListWorkspaceSmsSendersData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Filter senders by source type: a dedicated number, shared shortcode, or alphanumeric sender string.
+     */
+    type?: SmsSenderSourceKind;
+    /**
+     * Return the sender for one number you hold, using the ID from [List workspace numbers](/docs/api/reference/list-workspace-numbers). Exactly one sender exists per number, so this returns at most one result.
+     */
+    number_id?: AllocatedNumberId;
+    /**
+     * Field to sort by. `created_at` (the default) sorts newest first with the default `order`. `sender` sorts alphabetically by the sender's own value (phone number, short code, or alphanumeric sender string), all treated as plain text.
+     *
+     */
+    sort?: SmsSenderSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+  };
+  url: "/v1/sms/senders";
+};
+
+export type ListWorkspaceSmsSendersErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWorkspaceSmsSendersError =
+  ListWorkspaceSmsSendersErrors[keyof ListWorkspaceSmsSendersErrors];
+
+export type ListWorkspaceSmsSendersResponses = {
+  /**
+   * Paginated list of your SMS senders with their registrations.
+   */
+  200: SmsSenderList;
+};
+
+export type ListWorkspaceSmsSendersResponse =
+  ListWorkspaceSmsSendersResponses[keyof ListWorkspaceSmsSendersResponses];
+
+export type CreateWorkspaceSmsSenderData = {
+  body: SmsSenderCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/sms/senders";
+};
+
+export type CreateWorkspaceSmsSenderErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateWorkspaceSmsSenderError =
+  CreateWorkspaceSmsSenderErrors[keyof CreateWorkspaceSmsSenderErrors];
+
+export type CreateWorkspaceSmsSenderResponses = {
+  /**
+   * The claimed sender.
+   */
+  201: SmsSender;
+};
+
+export type CreateWorkspaceSmsSenderResponse =
+  CreateWorkspaceSmsSenderResponses[keyof CreateWorkspaceSmsSenderResponses];
+
+export type GetWorkspaceSmsSenderData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the SMS sender (`snd_` prefix), as returned when the sender was created.
+     */
+    sender_id: SmsSenderId;
+  };
+  query?: never;
+  url: "/v1/sms/senders/{sender_id}";
+};
+
+export type GetWorkspaceSmsSenderErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWorkspaceSmsSenderError =
+  GetWorkspaceSmsSenderErrors[keyof GetWorkspaceSmsSenderErrors];
+
+export type GetWorkspaceSmsSenderResponses = {
+  /**
+   * The requested sender with its registrations.
+   */
+  200: SmsSender;
+};
+
+export type GetWorkspaceSmsSenderResponse =
+  GetWorkspaceSmsSenderResponses[keyof GetWorkspaceSmsSenderResponses];
+
+export type ListWorkspaceSmsSenderRequirementsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the SMS sender (`snd_` prefix), as returned when the sender was created.
+     */
+    sender_id: SmsSenderId;
+  };
+  query?: {
+    /**
+     * Ask about one destination country. Omit to return every country relevant to the sender.
+     */
+    country_code?: CountryCode;
+  };
+  url: "/v1/sms/senders/{sender_id}/requirements";
+};
+
+export type ListWorkspaceSmsSenderRequirementsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWorkspaceSmsSenderRequirementsError =
+  ListWorkspaceSmsSenderRequirementsErrors[keyof ListWorkspaceSmsSenderRequirementsErrors];
+
+export type ListWorkspaceSmsSenderRequirementsResponses = {
+  /**
+   * What this sender needs, per country.
+   */
+  200: SmsSenderRequirementList;
+};
+
+export type ListWorkspaceSmsSenderRequirementsResponse =
+  ListWorkspaceSmsSenderRequirementsResponses[keyof ListWorkspaceSmsSenderRequirementsResponses];
+
+export type CreateWorkspaceSmsSenderRegistrationData = {
+  body: SmsCountryRegistrationCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the SMS sender (`snd_` prefix), as returned when the sender was created.
+     */
+    sender_id: SmsSenderId;
+  };
+  query?: never;
+  url: "/v1/sms/senders/{sender_id}/registrations";
+};
+
+export type CreateWorkspaceSmsSenderRegistrationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateWorkspaceSmsSenderRegistrationError =
+  CreateWorkspaceSmsSenderRegistrationErrors[keyof CreateWorkspaceSmsSenderRegistrationErrors];
+
+export type CreateWorkspaceSmsSenderRegistrationResponses = {
+  /**
+   * The sender's new country registration.
+   */
+  201: SmsCountryRegistration;
+};
+
+export type CreateWorkspaceSmsSenderRegistrationResponse =
+  CreateWorkspaceSmsSenderRegistrationResponses[keyof CreateWorkspaceSmsSenderRegistrationResponses];
 
 export type CreatePhoneNumberLookupData = {
   body: PhoneNumberLookupRequest;
@@ -62381,6 +65427,141 @@ export type ReleaseWorkspaceNumberResponses = {
 export type ReleaseWorkspaceNumberResponse =
   ReleaseWorkspaceNumberResponses[keyof ReleaseWorkspaceNumberResponses];
 
+export type GetBillingResolvedPriceData = {
+  body?: never;
+  headers?: {
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Product ID to price. Provide exactly one of `product_id` or `product_slug`.
+     */
+    product_id?: ProductId;
+    /**
+     * Product slug to price. Provide exactly one of `product_id` or `product_slug`.
+     */
+    product_slug?: string;
+    /**
+     * Published self-serve plan to price under in place of your current plan. Returns `404` if the plan is not an active self-serve plan.
+     */
+    plan_id?: ProductId;
+    /**
+     * Key-value pairs that refine attribute-based pricing, such as destination country or sender type. For example, `dimensions[country_code]=US`.
+     */
+    dimensions?: {
+      [key: string]: string;
+    };
+    /**
+     * Three-letter ISO currency code. Defaults to your organization's billing currency.
+     */
+    currency?: string;
+  };
+  url: "/v1/organization/billing/prices/resolve";
+};
+
+export type GetBillingResolvedPriceErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetBillingResolvedPriceError =
+  GetBillingResolvedPriceErrors[keyof GetBillingResolvedPriceErrors];
+
+export type GetBillingResolvedPriceResponses = {
+  /**
+   * The resolved price.
+   */
+  200: BillingResolvedPrice;
+};
+
+export type GetBillingResolvedPriceResponse =
+  GetBillingResolvedPriceResponses[keyof GetBillingResolvedPriceResponses];
+
+export type ListBillingWalletsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/organization/billing/wallets";
+};
+
+export type ListBillingWalletsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListBillingWalletsError =
+  ListBillingWalletsErrors[keyof ListBillingWalletsErrors];
+
+export type ListBillingWalletsResponses = {
+  /**
+   * The wallets.
+   */
+  200: BillingWalletList;
+};
+
+export type ListBillingWalletsResponse =
+  ListBillingWalletsResponses[keyof ListBillingWalletsResponses];
+
 export type ListVoiceTrunksData = {
   body?: never;
   headers?: {
@@ -66534,6 +69715,10 @@ export type ListEsimsData = {
      * Keep only eSIMs created in this mode. Without it, both live and test eSIMs are returned.
      */
     mode?: EsimMode;
+    /**
+     * Keep only eSIMs whose recurring subscription that has not ended is in this status, or that have none (`none`); repeat the parameter to match any of several.
+     */
+    renewal?: Array<EsimRenewalState>;
     /**
      * Filter by tag. Accepts `name` to match any eSIM carrying that tag name, or `name:value` to match a specific tag pair (e.g. `trip:summer`). A trailing colon (`name:`) matches the name alone, the same as `name`. A term with an empty name is rejected. Repeat the parameter to AND-combine several tag filters.
      *

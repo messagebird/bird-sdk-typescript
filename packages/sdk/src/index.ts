@@ -90,6 +90,28 @@ export type {
   SmsSendBatchResult,
 } from "./resources/sms.js";
 export type { NumbersUpdateParams } from "./resources/numbers.js";
+export type {
+  ComplianceRequirement,
+  ComplianceRequirementsGetQuery,
+} from "./resources/complianceRequirements.gen.js";
+export type {
+  ComplianceSubmission,
+  ComplianceSubmissionsCreateParams,
+  ComplianceSubmissionsResupplyParams,
+} from "./resources/complianceSubmissions.gen.js";
+export type {
+  Attachment,
+  ComplianceAttachment,
+  ComplianceAttachmentsCreateParams,
+  ComplianceAttachmentsListQuery,
+  ComplianceFile,
+} from "./resources/complianceAttachments.js";
+export type {
+  ComplianceIdentity,
+  ComplianceIdentitiesListQuery,
+  ComplianceIdentitiesCreateParams,
+  ComplianceIdentitiesUpdateParams,
+} from "./resources/complianceIdentities.gen.js";
 export type { SmsMessage, SmsListQuery } from "./resources/sms.gen.js";
 export type {
   VoiceCall,
@@ -454,6 +476,14 @@ export {
   AMBFormTextContentType,
   AMBSuppressionOrigin,
   AMBSuppressionReason,
+  ComplianceItemState,
+  ComplianceObligationReason,
+  ComplianceObligationState,
+  ComplianceProgram,
+  SMSSenderProgramEntry,
+  SMSRegistrationStatus,
+  SMSSenderSourceKind,
+  SMSRegistrationProgram,
   DestinationRegion,
   DestinationSuperRegion,
   EmailClientFamily,
@@ -540,6 +570,14 @@ export type {
   AMBFormTextContentTypeValue,
   AMBSuppressionOriginValue,
   AMBSuppressionReasonValue,
+  ComplianceItemStateValue,
+  ComplianceObligationReasonValue,
+  ComplianceObligationStateValue,
+  ComplianceProgramValue,
+  SMSSenderProgramEntryValue,
+  SMSRegistrationStatusValue,
+  SMSSenderSourceKindValue,
+  SMSRegistrationProgramValue,
   DestinationRegionValue,
   DestinationSuperRegionValue,
   EmailClientFamilyValue,
@@ -920,3 +958,12 @@ export type {
 export type { AssetReferenceList } from "./resources/assetsReferences.gen.js";
 
 export type { AssetReference } from "./generated/types.gen.js";
+export type { SmsSendersListQuery, SmsSendersCreateParams, SmsSender } from "./resources/smsSenders.gen.js";
+
+export type { SmsSenderRequirementsListQuery, SmsSenderRequirementList } from "./resources/smsSenderRequirements.gen.js";
+
+export type { SmsSenderRegistrationsCreateParams, SmsCountryRegistration } from "./resources/smsSenderRegistrations.gen.js";
+
+export type { BillingPricesResolveQuery, BillingResolvedPrice } from "./resources/billingPrices.gen.js";
+
+export type { BillingWalletList } from "./resources/billingWallets.gen.js";

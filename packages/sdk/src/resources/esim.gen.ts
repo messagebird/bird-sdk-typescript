@@ -15,7 +15,7 @@ export type EsimCompatibleOffersQuery = NonNullable<ListEsimCompatibleOffersData
 
 export class EsimResourceBase extends Resource {
   /**
-   * List the workspace's eSIMs, newest first, as a cursor page ({data, next_cursor, ...}). Filter by status, iccid, or tag, or search by iccid_prefix, display_name, or phone_number. Each row is a compact summary; fetch a single eSIM for its packages and balances.
+   * List the workspace's eSIMs, newest first, as a cursor page ({data, next_cursor, ...}). Filter by status, renewal, iccid, or tag, or search by iccid_prefix, display_name, or phone_number. Each row is a compact summary carrying its live recurring subscription, if any; fetch a single eSIM for its packages and balances.
    */
   list(query?: EsimListQuery, options?: RequestOptions): PaginatedPromise<EsimSummary> {
     return this.paginated<EsimSummary>("GET", options, ({ signal, headers }, cursor) =>

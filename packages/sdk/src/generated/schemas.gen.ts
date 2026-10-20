@@ -532,6 +532,13 @@ export const RegionSchema = {
   example: "us1",
 } as const;
 
+export const ProductIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^prd_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "prd_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const OrganizationIDSchema = {
   type: "string",
   minLength: 1,
@@ -708,7 +715,8 @@ export const DocsPageSchema = {
       type: "string",
       minLength: 1,
       readOnly: true,
-      description: "The page's full content as Markdown.",
+      description:
+        "The requested page content as Markdown, limited to the selected view for API references.",
     },
   },
 } as const;
@@ -743,6 +751,30 @@ export const DestinationRegionSchema = {
   example: "western_europe",
   description:
     "The commercial region this country belongs to, for grouping a destination list the way it is bought rather than alphabetically. `null` for a country we have not assigned yet. Bird defines these regions independently of ISO and UN M49. A country can move between them, so treat the set as open.\n",
+} as const;
+
+export const SMSRegistrationModeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["none", "optional", "required"],
+  description:
+    "Whether the sender type has a registration path for this destination.\n\n- `none`: no country registration is needed. Where sender IDs are overwritten, registration is unavailable.\n- `optional`: registration is available, but unregistered sending remains possible.\n- `required`: registration must be approved before sending.\n",
+} as const;
+
+export const SMSSenderIDBehaviorSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["unknown", "preserved", "overwritten"],
+  description:
+    "What carriers do with the sender ID for this destination.\n\n- `unknown`: the outcome has not been confirmed.\n- `preserved`: the submitted sender ID reaches the recipient unchanged.\n- `overwritten`: the submitted sender ID is overwritten before delivery.\n",
+} as const;
+
+export const SMSRegistrationProgramSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["10dlc", "tfn", "alpha", "numeric", "short_code"],
+  description:
+    "The registration program a country runs for a sender type.\n\n- `10dlc`: US A2P brand and campaign registration.\n- `tfn`: US toll-free verification.\n- `alpha`: registers an alphanumeric sender.\n- `numeric`: registers a long code.\n- `short_code`: a short-code application, filed and maintained by Bird.\n",
 } as const;
 
 export const CountryCodeSchema = {
@@ -833,6 +865,13 @@ export const WorkspaceSchema = {
       $ref: "#/components/schemas/Timestamps",
     },
   ],
+} as const;
+
+export const ComplianceIdentityIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^cid_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "cid_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const WorkspaceCreateSchema = {
@@ -7844,11 +7883,304 @@ export const SMSKeywordRuleUpdateSchema = {
   },
 } as const;
 
+export const ComplianceDataTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: [
+    "string",
+    "text",
+    "enum",
+    "number",
+    "boolean",
+    "date",
+    "url",
+    "country",
+    "document",
+  ],
+  description:
+    "The kind of value a requirement takes. The `string` value is a single line, while `text` runs to several. The `enum` value accepts only the values listed with the requirement. The `number`, `boolean`, and `date` values take their corresponding data types. The `url` value takes a link. The `country` value takes an uppercase ISO 3166-1 alpha-2 code, such as `NL`. The `document` value means a file you upload first and then reference. All other values are supplied inline.\n",
+} as const;
+
+export const ComplianceRequirementFieldOptionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["value", "label"],
+  properties: {
+    value: {
+      type: "string",
+      minLength: 1,
+      description: "What to send.",
+    },
+    label: {
+      type: "string",
+      minLength: 1,
+      description: "What to show.",
+    },
+  },
+} as const;
+
+export const ComplianceFieldValidationSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Constraints a value must satisfy, where the requirement sets any. Which of these apply follows from its data type: `pattern`, `min_length` and `max_length` constrain `string` and `text` values, `minimum` and `maximum` constrain `number` values, and everything else is `null`. Check these before submitting and you avoid a round trip.\n",
+  properties: {
+    pattern: {
+      type: ["string", "null"],
+      description:
+        "A regular expression the value must match. `null` when the requirement takes neither `string` nor `text`, or sets no pattern.",
+    },
+    min_length: {
+      type: ["integer", "null"],
+      description:
+        "Shortest accepted value. `null` when the requirement takes neither `string` nor `text`, or sets no minimum length.",
+    },
+    max_length: {
+      type: ["integer", "null"],
+      description:
+        "Longest accepted value. `null` when the requirement takes neither `string` nor `text`, or sets no maximum length.",
+    },
+    minimum: {
+      type: ["number", "null"],
+      description:
+        "Smallest accepted number. `null` when the requirement does not take `number`, or sets no minimum.",
+    },
+    maximum: {
+      type: ["number", "null"],
+      description:
+        "Largest accepted number. `null` when the requirement does not take `number`, or sets no maximum.",
+    },
+  },
+} as const;
+
 export const AttachmentIDSchema = {
   type: "string",
   minLength: 1,
   pattern: "^tca_[0-9a-hjkmnp-tv-z]{26}$",
   example: "tca_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const ComplianceItemStateSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "not_supplied",
+    "supplied",
+    "in_review",
+    "approved",
+    "rejected",
+    "not_applicable",
+    "expired",
+  ],
+  description:
+    "Where one requirement stands. The `not_supplied` state means nothing has been\ngiven for it yet. The `supplied` state means we have your answer and review\nhas not started. The `in_review` state means someone is looking at it. The\n`approved` and `rejected` states are decisions. You can replace a rejected\nitem without refiling the rest. The `not_applicable` state means this\nrequirement does not apply to you. The `expired` state means the value was\naccepted but has since gone stale.\n\nAn item only ever reports its state. Treat this as an open set because review\ncan gain stages. A value you do not recognise is a valid state that this\nserver added.\n",
+} as const;
+
+export const ComplianceRequirementFieldSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "key",
+    "label",
+    "help_text",
+    "data_type",
+    "required",
+    "section",
+    "section_label",
+    "options",
+    "validation",
+    "template_url",
+    "max_items",
+    "value",
+    "prefilled",
+    "attachment_id",
+    "values",
+    "attachment_ids",
+    "state",
+    "decided_at",
+    "expires_at",
+    "reason",
+    "editable_for_verifier_repair",
+  ],
+  properties: {
+    parent_key: {
+      type: "string",
+      readOnly: true,
+      description:
+        "Parent field grouping this named document. Absent for an ordinary field.",
+    },
+    document_key: {
+      type: "string",
+      readOnly: true,
+      description:
+        "Stable document key within the parent field. Absent for an ordinary field.",
+    },
+    parent_label: {
+      type: "string",
+      readOnly: true,
+      description:
+        "Display name of the parent field grouping this document. Absent for an ordinary field.",
+    },
+    parent_help_text: {
+      type: "string",
+      readOnly: true,
+      description:
+        "The parent field's own description, shared by every document in the group. Each document's `help_text` describes that document alone. Absent for an ordinary field and when the parent has no description.\n",
+    },
+    key: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Identifies this requirement. Use it as the key when you submit a value.",
+    },
+    label: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "What to call this requirement when you ask someone for it.",
+    },
+    help_text: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "Guidance on what a good answer looks like, including anything the destination country expects. `null` when the label speaks for itself.\n",
+    },
+    data_type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceDataType",
+        },
+      ],
+      readOnly: true,
+    },
+    required: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether an answer is needed before the registration can be approved. Optional requirements are still reviewed when you supply them.\n",
+    },
+    section: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "A stable key grouping related requirements together. Use it to keep your own grouping consistent across requests; use section_label for what to show someone.\n",
+    },
+    section_label: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "What to call this requirement's group when you present it.",
+    },
+    options: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The accepted values, already resolved, when the data type is `enum`. Empty for every other type.\n",
+      items: {
+        $ref: "#/components/schemas/ComplianceRequirementFieldOption",
+      },
+    },
+    validation: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceFieldValidation",
+        },
+      ],
+      readOnly: true,
+    },
+    template_url: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "A blank form to download, complete and upload back, for requirements that need a signed document. `null` when the requirement has no form to download.\n",
+    },
+    max_items: {
+      type: ["integer", "null"],
+      readOnly: true,
+      description:
+        "How many answers this requirement takes, when it takes more than one. `null` for a requirement answered once, which is most of them. Where it is set, answer with `values` or `attachment_ids` and read your answer back from the same pair; `value` and `attachment_id` stay `null`. Order is kept as you send it, and it is part of the answer: a keyword list beginning with `STOP` is not the same declaration as one ending with it.\n",
+    },
+    value: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        'Your answer, for a requirement answered inline. Every answer travels as a string whatever its data type, so a number reads back as `"1500"` and a yes-or-no as `"true"`. Use the data type to parse it. `null` for a requirement that takes a document, and before you have answered.\n',
+    },
+    prefilled: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "`true` when `value` comes from the party this registration is for. Accept it as it stands or replace it; either way it becomes your answer when you submit. Only a requirement that asks about the party is ever prefilled.\n",
+    },
+    attachment_id: {
+      readOnly: true,
+      description:
+        "The document you supplied, for a requirement that takes one. `null` otherwise.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AttachmentID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    values: {
+      type: ["array", "null"],
+      readOnly: true,
+      description:
+        "Your answers, for a requirement that takes several and is answered inline. Set only when `max_items` is, and `null` otherwise, including before you have answered. Each answer travels as a string whatever the data type, the same as `value`.\n",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+    },
+    attachment_ids: {
+      type: ["array", "null"],
+      readOnly: true,
+      description:
+        "The documents you supplied, for a requirement that takes several. Set only when `max_items` is and the requirement takes documents, and `null` otherwise.\n",
+      items: {
+        $ref: "#/components/schemas/AttachmentID",
+      },
+    },
+    state: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceItemState",
+        },
+      ],
+      readOnly: true,
+    },
+    decided_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this was decided. `null` while no decision has been made.",
+    },
+    expires_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this answer goes stale and must be supplied again. `null` when it does not expire.",
+    },
+    editable_for_verifier_repair: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether you may replace this accepted answer to correct the submission after external verification. This permission does not change its `state` or `reason`. Submit only answers whose content or attachment identity you change.\n",
+    },
+    reason: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "Why this requirement was rejected, when it was. `null` otherwise.",
+    },
+  },
 } as const;
 
 export const AttachmentStatusSchema = {
@@ -7861,7 +8193,7 @@ export const AttachmentStatusSchema = {
 
 export const AttachmentSchema = {
   description:
-    "A supporting document uploaded for an SMS registration (10DLC campaign evidence, toll-free verification opt-in screenshots). Reference it from the registration's own attachment-id field to submit it as evidence.",
+    "A supporting document uploaded for compliance answers or SMS registrations, including number ownership evidence, 10DLC campaign evidence and toll-free verification opt-in screenshots. Reference its ID from the relevant answer or registration attachment field to submit it as evidence.",
   unevaluatedProperties: false,
   allOf: [
     {
@@ -7947,6 +8279,218 @@ export const AttachmentSchema = {
       },
     },
   ],
+} as const;
+
+export const SMSSenderIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^snd_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "snd_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const ComplianceIdentitySortFieldSchema = {
+  type: "string",
+  enum: ["created_at", "name"],
+  default: "created_at",
+  description: "Field to sort identities by.",
+} as const;
+
+export const ComplianceIdentityAnswerSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["value", "submitted_at"],
+  description:
+    "One business detail this party last submitted, and when it was filed.",
+  properties: {
+    value: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        'The detail as last submitted. Every value travels as a string whatever the requirement\'s data type, so a number reads back as `"1500"`.',
+    },
+    submitted_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this party last filed the detail. Filing it is what records it here, so it is never a statement that a reviewer agreed with the value. Filing the same value again can carry a previous approval of it forward instead of putting it in front of a reviewer. `null` for a detail recorded before the container began tracking submissions.",
+    },
+    state: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceItemState",
+        },
+      ],
+      description:
+        "Where review has got to on this exact value. Absent when no registration has ruled on it, which covers a detail nobody has reached yet and one filed before the container recorded which submission it came from.\nOne value can be filed on several registrations and decided differently on each, and one verdict is reported for it. A live approval wins, because it is proof the value is acceptable. Failing that a refusal wins over a registration still waiting, since waiting is nobody having looked yet rather than evidence against a refusal. An approval past its validity period is neither: it reads as `expired` and ranks below a refusal, above anything still waiting. `not_applicable` is reported last, because it is a statement about a requirement rather than about the value.",
+    },
+    reason: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What has to change, when `state` is one a reviewer refused. `null` otherwise, and `null` on a refusal recorded without one.",
+    },
+    decided_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the verdict in `state` was reached. `null` while nobody has decided, and on a state no reviewer set.",
+    },
+  },
+} as const;
+
+export const ComplianceIdentitySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A party you register on behalf of: your own business, or one of your clients. Reusing an identity across registrations is what stops you retyping the same business details for every country, and lets a fact reviewed once stand for the registrations that follow.",
+  required: ["id", "name", "answers", "created_at", "updated_at"],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/ComplianceIdentityID",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      description:
+        "What you call this party. Yours to choose; it is never sent to a carrier.",
+      example: "Goldcrest Communications SAS",
+    },
+    answers: {
+      type: "object",
+      readOnly: true,
+      additionalProperties: {
+        $ref: "#/components/schemas/ComplianceIdentityAnswer",
+      },
+      description:
+        "The business details this party has supplied, keyed by requirement. Filled in for you: a single-value detail lands here the moment you file it on one of your registrations, so the next one prefills it rather than asking again. Only requirements a country marks as being about the party appear; anything about a specific sender is asked fresh each time.",
+    },
+    created_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+    },
+    updated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+    },
+  },
+} as const;
+
+export const ComplianceIdentityListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/ComplianceIdentity",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const ComplianceIdentityCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 200,
+      description:
+        "What you call this party. Yours to choose; it is never sent to a carrier.",
+      example: "Goldcrest Communications SAS",
+    },
+  },
+} as const;
+
+export const ValidationErrorSchema = {
+  description:
+    "Field validation error. Uses the standard error envelope with `type` set to `validation_error` and `details` always present.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/Error",
+    },
+  ],
+} as const;
+
+export const ComplianceIdentityUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  description:
+    "Renames the party. Single-value identity answers are filled in when you submit or resupply a registration, regardless of its review outcome. Edit those answers through the registration.",
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 200,
+      description:
+        "What you call this party. Yours to choose; it is never sent to a carrier.",
+      example: "Goldcrest Communications SAS",
+    },
+  },
+} as const;
+
+export const AttachmentSortFieldSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Field to sort registration attachments by.",
+} as const;
+
+export const AttachmentListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/Attachment",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const AttachmentUploadSchema = {
+  description: "The file to upload, sent as a `multipart/form-data` body.",
+  type: "object",
+  additionalProperties: false,
+  required: ["file"],
+  properties: {
+    file: {
+      type: "string",
+      format: "binary",
+      minLength: 1,
+      description:
+        "The file to attach. PNG, JPEG, or PDF, up to 10 MB. The file's contents determine its type; a declared content type is ignored.",
+    },
+    description: {
+      type: "string",
+      maxLength: 255,
+      description: "A short note describing what the file shows.",
+    },
+  },
 } as const;
 
 export const AssetSortFieldSchema = {
@@ -8411,11 +8955,661 @@ export const AssetFolderUpdateSchema = {
   },
 } as const;
 
+export const ComplianceSubjectKindSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["sms_sender", "number", "identity"],
+  description:
+    "What is being registered.\n\n- `sms_sender`: a sender registered to send to one country.\n- `number`: a phone number you hold that needs ownership paperwork before it\n  can carry traffic.\n- `identity`: a business you operate as, registered once and reused by\n  later registrations that name it.\n",
+} as const;
+
+export const ComplianceSubjectIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^(scr|nda|cid)_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "scr_01krdgeqcxet5s7t44vh8rt9mg",
+  description:
+    "What is being registered. For `sms_sender` this is the `scr_` id returned when you register a sender for a country. For `number` it is the `nda_` id of a dedicated number you hold, as returned by `GET /v1/numbers`. A shared short code (`nal_`) is not accepted: it is shared, so its ownership paperwork is not yours to file. For `identity` it is the `cid_` id of the party being registered, picked from the parties your workspace holds, as returned by `GET /v1/compliance/identities`.\n",
+} as const;
+
+export const ComplianceProgramSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "alpha",
+    "numeric",
+    "mobile",
+    "local",
+    "national",
+    "short_code",
+    "short_code_fteu",
+    "toll_free",
+    "business",
+  ],
+  description:
+    "The registration program a country runs. Available programs depend on the registered resource. An SMS sender registers under an authority regime (`alpha` or `numeric`). A phone number proves ownership under its number type (`mobile`, `local`, `national`, `short_code`, `short_code_fteu`, or `toll_free`), matching the values of `NumberType`. An identity registers your business itself under `business`, internationally: its coordinate's country is always `ZZ`. A value is therefore only meaningful alongside the subject it describes. More are added as coverage grows, so treat this as an open set rather than a fixed list.\n",
+} as const;
+
 export const ComplianceSubmissionIDSchema = {
   type: "string",
   minLength: 1,
   pattern: "^csb_[0-9a-hjkmnp-tv-z]{26}$",
   example: "csb_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const ComplianceObligationReasonSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "policy_change",
+    "evidence_expiry",
+    "verdict_withdrawn",
+    "verifier_rejected",
+  ],
+  description:
+    "Why a registration that is already authorised has been asked for something\nmore.\n\n- `policy_change` means the country published a newer version of its form and\n  your answers were given under an older one.\n- `evidence_expiry` means an answer we accepted has gone stale and needs\n  supplying again.\n- `verdict_withdrawn` means this registration was relying on an approval earned\n  on another registration, and that approval has since been taken back, so the\n  answer needs checking again here. Your answer has not changed and has not\n  expired.\n- `verifier_rejected` means an outside party we filed your details with reviewed\n  them and refused them. Your answer has not changed and has not expired, and\n  we did not overrule it.\n\nTreat this as an open set rather than a fixed list. More reasons are added as\nmore of a registration is kept under review, so a value you do not recognise is\none this server added rather than an error.\n",
+} as const;
+
+export const ComplianceObligationStateSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["open", "satisfied", "lapsed", "extended"],
+  description:
+    "Where an obligation stands.\n\n- `open`: the due date has not passed and nothing has been supplied.\n- `satisfied`: you supplied what was asked.\n- `lapsed`: the date passed unmet and the registration is no longer\n  authorised.\n- `extended`: someone here gave you more time, and `due_at` reports the later\n  date.\n",
+} as const;
+
+export const ComplianceObligationSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["reason", "state", "due_at", "target_version"],
+  properties: {
+    reason: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceObligationReason",
+        },
+      ],
+      readOnly: true,
+    },
+    state: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceObligationState",
+        },
+      ],
+      readOnly: true,
+    },
+    due_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The date to supply this by. Where more time has been given, this is the later date rather than the one first asked for.\n",
+    },
+    target_version: {
+      type: "integer",
+      minimum: 1,
+      readOnly: true,
+      description:
+        "The version of the country's form your answers have to reach. For an expiry it is the version you already answered, filled in again.\n",
+    },
+  },
+} as const;
+
+export const ComplianceGeneralReasonsSchema = {
+  type: "array",
+  readOnly: true,
+  description:
+    "Feedback about the submission as a whole from an external verifier. It can remain visible while corrections are under review. Empty when no unresolved verifier feedback applies. On requirements responses, read `needs_input` to determine whether action is needed and `editable_for_verifier_repair` on each field to determine whether an approved or not-applicable answer can be replaced.\n",
+  items: {
+    type: "string",
+  },
+} as const;
+
+export const ComplianceRequirementSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "subject_kind",
+    "subject_id",
+    "program",
+    "country_code",
+    "satisfied",
+    "needs_input",
+    "review_pending",
+    "submission_id",
+    "obligation",
+    "fields",
+    "general_reasons",
+    "reason",
+    "guidance",
+  ],
+  properties: {
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next about this country's requirements, given the state it is in. Each entry names one action and says\nwhy it is worth taking, so you can act on this response without working out the order\nyourself. Present on reads that compute it: an empty list means there is nothing to do,\nand the field is absent entirely on responses that do not report next actions.\n\nWhether anything is asked of you is `needs_input`, and this says what to do about it: send your\nanswers where none have been filed, or replace the ones that were refused. Which items those\nare, and why each was refused, is on the item in `fields`. For feedback about the\nwhole submission, read `reason` and `general_reasons` and update the details that need correction.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+    subject_kind: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceSubjectKind",
+        },
+      ],
+      readOnly: true,
+    },
+    subject_id: {
+      readOnly: true,
+      description:
+        "The registration these requirements are for, the same one you asked about. `null` when you asked without one, which is how a form read on its own says it is answering for nothing yet.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/ComplianceSubjectID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    program: {
+      readOnly: true,
+      description:
+        "The registration program these requirements belong to. `null` when the country runs no registration program at all, in which case nothing is required and the field list is empty.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/ComplianceProgram",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    country_code: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/CountryCode",
+        },
+      ],
+      readOnly: true,
+    },
+    satisfied: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this country's requirements are met. `true` when no requirements apply, or once the submission is approved and every required requirement is approved or marked not applicable. This can remain true when an external verifier requests a correction. Once you submit that correction, it must pass review before this becomes true again, including any optional answers you change.\n",
+    },
+    needs_input: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether anything is waiting on you. True when a required requirement has no answer, its answer was refused or has gone stale, or the registration needs correction as described by `reason`. False does not imply that review is pending: a closed verifier correction can leave the requirements unsatisfied with no editable answers. Read `review_pending` to determine whether an answer is awaiting review. Read this independently of `satisfied`, which reports whether your paperwork is accepted. An unresolved verifier correction also sets it while the matching grant is live and the correction deadline has not passed, until you supply updated details. At the deadline or after grant withdrawal, an unresolved rejection alone does not set it because accepted answers can no longer be replaced. A corrected optional answer that is rejected or expires still needs your input through ordinary resupply, including after that deadline.\n",
+    },
+    review_pending: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether any submitted answer is awaiting or undergoing review. False after all answers have received verdicts. A closed verifier correction can remain unsatisfied with no review pending and no editable answers.\n",
+    },
+    reason: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What to correct about the registration as a whole, or null when no registration-wide correction is requested. Reasons about individual answers are on the entries in fields.\n",
+    },
+    guidance: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "What this country expects of you before and while you fill in the form, written by Bird's compliance team. It may point you to a registration you must complete elsewhere first. `null` when the form needs no introduction, or when no program applies.\n",
+    },
+    submission_id: {
+      readOnly: true,
+      description:
+        "The submission carrying your answers, once you have made one. `null` before that.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/ComplianceSubmissionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    obligation: {
+      readOnly: true,
+      description:
+        "What this registration has to do to keep sending, and by when. Null when nothing is outstanding. An obligation does not stop you sending: the registration stays authorised until the date passes, and supplying what is asked for before then closes it with no interruption.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/ComplianceObligation",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    general_reasons: {
+      $ref: "#/components/schemas/ComplianceGeneralReasons",
+      readOnly: true,
+    },
+    fields: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Every requirement for this country, in the order to present them.",
+      items: {
+        $ref: "#/components/schemas/ComplianceRequirementField",
+      },
+    },
+    closed_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the submission for these requirements was closed. Null while open or not yet submitted.",
+    },
+  },
+} as const;
+
+export const ComplianceTemplateIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^cmt_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "cmt_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const ComplianceSubmissionIdentitySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Registers this on behalf of a party you have not stored yet, creating it as part\nof the submission so you do not need a separate call. Exclusive with\n`identity_id`.\n\nEach time you send this you get a new party. Single-value identity answers filed for one\nare reused by registrations naming the same party. Documents and lists are\nsupplied separately for each registration. Send this once and use the\n`identity_id` from the response for the countries that follow.\n",
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 200,
+      description:
+        "What to call the party. Optional: left out, it takes the legal entity name you supplied. If this country's form does not ask for one, send a name here.",
+      example: "Goldcrest Communications SAS",
+    },
+  },
+} as const;
+
+export const ComplianceAnswerSchema = {
+  type: "object",
+  additionalProperties: false,
+  example: {
+    key: "business_registration_number",
+    value: "90012768",
+  },
+  required: ["key"],
+  description:
+    "One answer. Which field carries it follows from the requirement, as the\nrequirements read reports it:\n\n- answered once, inline: `value`\n- answered once, with a document: `attachment_id`\n- `max_items` set, inline: `values`\n- `max_items` set, with documents: `attachment_ids`\n\nSend exactly one of the four. Order in a list is preserved and is part of the\nanswer.\n",
+  properties: {
+    key: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The requirement this answers, as given by its key in the requirements read.",
+      example: "business_registration_number",
+    },
+    value: {
+      type: "string",
+      minLength: 1,
+      description:
+        'The answer, for a requirement answered inline. Send every answer as a string whatever its data type, so a number goes as `"1500"` and a yes-or-no as `"true"`.\n',
+      example: "90012768",
+    },
+    attachment_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AttachmentID",
+        },
+      ],
+      description:
+        "The uploaded document, for a requirement that takes one. Upload the file as an attachment first, then send the id it returns.\n",
+    },
+    values: {
+      type: "array",
+      minItems: 1,
+      maxItems: 50,
+      description:
+        "The answers, for a requirement whose `max_items` is set and which is answered inline. Send each as a string whatever its data type, and send them in the order you mean them to be read. At most `max_items` of them.\n",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+    },
+    attachment_ids: {
+      type: "array",
+      minItems: 1,
+      maxItems: 50,
+      uniqueItems: true,
+      description:
+        "The uploaded documents, for a requirement whose `max_items` is set and which takes documents. Upload each file first and send the ids it returns, in order. At most `max_items` of them.\n",
+      items: {
+        $ref: "#/components/schemas/AttachmentID",
+      },
+    },
+  },
+  oneOf: [
+    {
+      required: ["value"],
+    },
+    {
+      required: ["attachment_id"],
+    },
+    {
+      required: ["values"],
+    },
+    {
+      required: ["attachment_ids"],
+    },
+  ],
+} as const;
+
+export const ComplianceSubmissionCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "subject_kind",
+    "subject_id",
+    "program",
+    "country_code",
+    "answers",
+  ],
+  properties: {
+    subject_kind: {
+      $ref: "#/components/schemas/ComplianceSubjectKind",
+    },
+    subject_id: {
+      $ref: "#/components/schemas/ComplianceSubjectID",
+    },
+    program: {
+      $ref: "#/components/schemas/ComplianceProgram",
+    },
+    country_code: {
+      $ref: "#/components/schemas/CountryCode",
+    },
+    identity_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceIdentityID",
+        },
+      ],
+      description:
+        "An existing party this registration is for. It fills in the business details you left out from what that party already holds, and each single-value answer you file about the party is written back onto it for next time, whatever the verdict. Documents and multi-value answers are asked fresh each time. Send this or `identity`, never both. An id belonging to another organization is rejected; nothing is created here. When `subject_kind` is `identity`, send neither: `subject_id` already names the party.",
+    },
+    identity: {
+      $ref: "#/components/schemas/ComplianceSubmissionIdentity",
+    },
+    answers: {
+      type: "array",
+      minItems: 1,
+      description:
+        "Every answer at once. Because submissions have no multi-call draft, send a complete set. Anything missing or malformed comes back named. A requirement the named party already answers may be left out; one you send anyway wins over what the party holds.\n",
+      items: {
+        $ref: "#/components/schemas/ComplianceAnswer",
+      },
+    },
+  },
+} as const;
+
+export const ComplianceItemIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^cit_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "cit_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const ComplianceSubmissionItemSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "key",
+    "state",
+    "value",
+    "attachment_id",
+    "values",
+    "attachment_ids",
+    "reason",
+    "decided_at",
+    "expires_at",
+    "inherited",
+  ],
+  properties: {
+    inherited: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "`true` when this answer was accepted without a fresh review, because the same answer to the same requirement had already been approved for this party in this country. It carries the original verdict, including when that verdict expires.\n",
+    },
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceItemID",
+        },
+      ],
+      readOnly: true,
+    },
+    key: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The requirement this answers.",
+    },
+    state: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceItemState",
+        },
+      ],
+      readOnly: true,
+    },
+    value: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        'Your answer, for a requirement answered inline. Every answer travels as a string whatever its data type, so a number reads back as `"1500"` and a yes-or-no as `"true"`. Use the data type to parse it. `null` for a requirement that takes a document.\n',
+    },
+    attachment_id: {
+      readOnly: true,
+      description:
+        "The document you supplied, for a requirement that takes one. `null` otherwise.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AttachmentID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    values: {
+      type: ["array", "null"],
+      readOnly: true,
+      description:
+        "Your answers, for a requirement that takes several and is answered inline. `null` for one answered once. Order is as you sent it.\n",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+    },
+    attachment_ids: {
+      type: ["array", "null"],
+      readOnly: true,
+      description:
+        "The documents you supplied, for a requirement that takes several. `null` otherwise.\n",
+      items: {
+        $ref: "#/components/schemas/AttachmentID",
+      },
+    },
+    reason: {
+      type: ["string", "null"],
+      readOnly: true,
+      description: "Why this was rejected, when it was. `null` otherwise.",
+    },
+    decided_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this was decided. `null` while no decision has been made.",
+    },
+    expires_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this answer goes stale and must be supplied again. `null` when it does not expire.",
+    },
+  },
+} as const;
+
+export const ComplianceSubmissionSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "subject_kind",
+    "subject_id",
+    "program",
+    "country_code",
+    "identity_id",
+    "satisfied",
+    "items",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next about this submission, given the state it is in. Each entry names one action and says\nwhy it is worth taking, so you can act on this response without working out the order\nyourself. Present on reads that compute it: an empty list means there is nothing to do,\nand the field is absent entirely on responses that do not report next actions.\n\nA submission reports the answers you filed; whether the country's requirements are met is\nreported by the requirements read. So this points there rather than repeating a verdict it\ndoes not own.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceSubmissionID",
+        },
+      ],
+      readOnly: true,
+    },
+    subject_kind: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceSubjectKind",
+        },
+      ],
+      readOnly: true,
+    },
+    subject_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceSubjectID",
+        },
+      ],
+      readOnly: true,
+    },
+    program: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceProgram",
+        },
+      ],
+      readOnly: true,
+    },
+    country_code: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/CountryCode",
+        },
+      ],
+      readOnly: true,
+    },
+    identity_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/ComplianceIdentityID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The party this registration was filed for, or `null` if none was named.",
+    },
+    satisfied: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this country's requirements are met. `true` once the submission is approved and every required requirement is approved or marked not applicable. This can remain true when an external verifier requests a correction. Once you submit that correction, it must pass review before this becomes true again, including any optional answers you change.\n",
+    },
+    items: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Every answer and where it stands. Each is decided on its own.",
+      items: {
+        $ref: "#/components/schemas/ComplianceSubmissionItem",
+      },
+    },
+    created_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      readOnly: true,
+      description: "When this was submitted.",
+    },
+    updated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      readOnly: true,
+      description: "When it last changed.",
+    },
+    closed_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this submission was closed. Null while it remains open.",
+    },
+    closure_reason: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "The decline reason for a closed submission, or null while open.",
+    },
+  },
+} as const;
+
+export const ComplianceSubmissionResupplySchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["answers"],
+  description:
+    "Replacement answers for an existing submission. Rejected, expired, or missing answers can\nbe supplied again; accepted answers normally cannot be changed.\n\nWhen the requirements response marks an accepted answer as `editable_for_verifier_repair`,\nyou can replace it during that open correction and before its deadline. Accepted-answer\nrepairs must change content; unchanged accepted entries are ignored. Rejected, expired,\nor missing answers follow the ordinary resupply rules, including same-value retries\nafter a grant is withdrawn. Supplied replacements are reviewed again.\n",
+  properties: {
+    answers: {
+      type: "array",
+      minItems: 1,
+      items: {
+        $ref: "#/components/schemas/ComplianceAnswer",
+      },
+    },
+  },
 } as const;
 
 export const StatsComparePeriodSchema = {
@@ -9815,6 +11009,14 @@ export const DestinationSuperRegionSchema = {
     "The continent-scale group the region rolls up into. Derived from `region`, and `null` whenever that is. Treat the set as open.\n",
 } as const;
 
+export const SMSSenderSourceKindSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["number", "shared_number", "alpha"],
+  description:
+    "What backs an SMS sender: a dedicated number, a shared shortcode, or an alphanumeric sender string.\n",
+} as const;
+
 export const AllocatedNumberIDSchema = {
   type: "string",
   minLength: 1,
@@ -9822,6 +11024,621 @@ export const AllocatedNumberIDSchema = {
   example: "nda_01krdgeqcxet5s7t44vh8rt9mg",
   description:
     "Identifier of a number allocated to your workspace, as returned in the id field of `GET /v1/numbers`.",
+} as const;
+
+export const SMSSenderSortFieldSchema = {
+  type: "string",
+  enum: ["created_at", "sender"],
+} as const;
+
+export const SMSSenderTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["long_code", "short_code", "alphanumeric", "toll_free"],
+  description:
+    "The kind of sender identity a message was sent from: a standard long-code number, a short code, an alphanumeric sender ID, or a toll-free number. Toll-free is its own value rather than a kind of long code, because it carries a separate regulatory regime and both sending policy and pricing key on it directly.\n",
+} as const;
+
+export const SMSSenderStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["active", "pending_number_ownership", "pending_registrations"],
+  description:
+    "Where a sender stands on its own setup: the ownership paperwork its number owes, and the\nregistrations it holds.\n\n- `active`: nothing this sender holds is outstanding.\n- `pending_number_ownership`: the paperwork proving you own this sender's number is not in\n  place, either because it has not been supplied or because the country that issued the\n  number has not accepted it yet. Every send from this sender is refused until it does.\n- `pending_registrations`: the sender holds country registrations and none is approved yet.\n  That covers a registration under review and one that was refused, so read `next` for which.\n\nThis is not whether a message will be accepted. That is decided per destination country, and\n[Get sender requirements](/docs/api/reference/list-workspace-sms-sender-requirements) is the\nonly read that answers it. A sender that has registered nowhere is `active`, even where every\ncountry it can reach wants a registration first. Read `next` for where to go from here.\n",
+} as const;
+
+export const SMSSenderDestinationsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["active", "pending", "needs_attention"],
+  description:
+    "Where this sender stands with the destinations it is set up for, grouped by whose move is\nnext.\n\nThese are not every country the sender could reach. `pending` and `needs_attention` cover\nonly countries you hold a registration for, so a country you could register for but have not,\nor one you have simply not switched on, appears in none of the three: there is nothing\noutstanding there. To see everything reachable and what each country would take, read\n[Get sender requirements](/docs/api/reference/list-workspace-sms-sender-requirements).\n",
+  properties: {
+    active: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Countries you can send to today: switched on in your SMS destination settings, and either asking for no registration or holding an approved one. A country counts here however it became usable, including one enabled for you automatically when your organization set its business address.\n",
+      items: {
+        $ref: "#/components/schemas/CountryCode",
+      },
+    },
+    pending: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Countries whose registration is under way and waiting on us or on a carrier. Nothing is asked of you for these; they move to `active` when the registration is approved.\n",
+      items: {
+        $ref: "#/components/schemas/CountryCode",
+      },
+    },
+    needs_attention: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Countries you have registered for that are not working, and so are waiting on you: the registration was refused or withdrawn, or it is approved but the destination is switched off in your SMS destination settings. While this sender's number is missing the paperwork proving you own it, every country you have registered for is listed here, because none of them can carry a message until that is settled.\n",
+      items: {
+        $ref: "#/components/schemas/CountryCode",
+      },
+    },
+  },
+} as const;
+
+export const SMSSenderSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "sender",
+    "source_kind",
+    "status",
+    "destinations",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/SMSSenderID",
+      description: "Identifier of this sender.",
+    },
+    sender: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The value messages are sent from: a number in E.164 format, a shortcode, or an alphanumeric sender string.\n",
+    },
+    source_kind: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSSenderSourceKind",
+        },
+      ],
+      readOnly: true,
+    },
+    sender_type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSSenderType",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The kind of sender identity this is, which decides what each destination country asks of it. It is finer than source_kind: a short code and an ordinary long code are both numbers but follow different rules.\n",
+    },
+    country_code: {
+      readOnly: true,
+      oneOf: [
+        {
+          $ref: "#/components/schemas/CountryCode",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The country of the number this sender sends from. Null for an alphanumeric sender.",
+    },
+    number_id: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/AllocatedNumberID",
+        },
+      ],
+      description:
+        "The number this sender sends from, as returned in the `id` field of `GET /v1/numbers`. Present only when `source_kind` is `number` or `shared_number`; an alphanumeric sender has no number behind it. Exactly one sender exists per number, so this is also how you go the other way: `GET /v1/sms/senders?number_id={id}` returns this sender.\n",
+    },
+    status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSSenderStatus",
+        },
+      ],
+      readOnly: true,
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next about this sender, given the state it is in. Present on reads that\ncompute it: an empty list means there is nothing to do, and the field is absent entirely\non responses that do not report next actions.\n\nThis routes rather than advises. A sender only knows about itself, so where the work is\nper-country it names the requirements read rather than guessing which country you meant.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+    destinations: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSSenderDestinations",
+        },
+      ],
+      readOnly: true,
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const SMSSenderListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "Your workspace's dedicated numbers and alphanumeric senders, newest first.",
+          items: {
+            $ref: "#/components/schemas/SMSSender",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const SMSSenderCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "sender"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["alpha"],
+      description:
+        "The kind of sender to create. Only `alpha` (an alphanumeric sender string) is customer-creatable. Dedicated numbers become senders when you allocate them from inventory. This endpoint cannot create their senders.\n",
+    },
+    sender: {
+      type: "string",
+      minLength: 3,
+      maxLength: 11,
+      description:
+        'The alphanumeric sender string to create, for example "BIRD". 3–11 letters, digits, spaces, dashes, underscores, or dots, at least one of them a letter, and no separator at either end.\n',
+      example: "BIRD",
+    },
+  },
+} as const;
+
+export const SMSRegistrationStatusSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "pending",
+    "under_review",
+    "bird_approved",
+    "carrier_pending",
+    "approved",
+    "rejected",
+    "suspended",
+    "registration_required",
+    "not_required",
+  ],
+  description:
+    "Country-registration lifecycle state:\n\n- `pending`: Registration work has started.\n- `under_review`: Everything this country requires has been submitted and is being reviewed. Nothing is asked of you while it is.\n- `bird_approved`: Our review passed and carrier approval is still pending.\n- `carrier_pending`: Submitted to the approving carrier or registry.\n- `approved`: Approved for sending.\n- `rejected`: Registration was refused.\n- `suspended`: A previously active registration is suspended.\n- `registration_required`: No required registration has been started.\n- `not_required`: The country does not require registration.\n",
+} as const;
+
+export const SMSCountryRegistrationIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^scr_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "scr_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const SMSSenderProgramEntrySchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "none",
+    "10dlc_brand",
+    "10dlc_campaign",
+    "10dlc_campaign_number_link",
+    "tfn_verification",
+    "compliance_submission",
+  ],
+  description:
+    "The resource this country's walk continues at. `none` means the first one is still to be\ncreated; every other value names what to read next, whose id is `program_entry_ref`.\n\nEvery programme names its entry. US 10DLC enters at a `10dlc_brand` or a `10dlc_campaign` and\ncontinues at the `10dlc_campaign_number_link` a number hangs off. US toll-free both enters and\ncontinues at its `tfn_verification`. A programme answered by filling in a form enters at the\n`compliance_submission` holding your answers, the only entry that names something you filled in\nrather than something a carrier holds. Read the entry whenever you need the detail behind a\ncountry: it carries why a registration was refused, which this row reports only as a status.\n\nThe values are programme-prefixed where a programme owns them, so one vocabulary reads the same\nwherever an entry is reported. Tolerate a value you do not recognize: read `program_entry_ref`\nas the id of a resource to fetch, and read `next` for what to do about the country.\n\nComputed on this read, so it is never stale and never absent. That matters most where a row\ncannot answer for itself: a toll-free verification you have started but not submitted is named\nhere even though no registration exists for it yet, which is what tells you to finish that one\nrather than start a second.\n",
+} as const;
+
+export const SMSSenderRequirementSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "sender_id",
+    "country_code",
+    "registration_mode",
+    "sender_id_behavior",
+    "status",
+    "destination_enabled",
+    "has_compliance_requirements",
+    "program_entry",
+  ],
+  properties: {
+    sender_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSSenderID",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The sender these requirements are for, the same one you asked about. It is repeated on every row so a row is complete on its own: what a country needs is addressed by the sender and the country together, and a step that registers this sender needs both.\n",
+    },
+    country_code: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/CountryCode",
+        },
+      ],
+      readOnly: true,
+    },
+    registration_mode: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSRegistrationMode",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Whether country registration is absent, optional, or required before sending.",
+    },
+    sender_id_behavior: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSSenderIDBehavior",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The effective sender ID behavior for this sender and destination. An approved optional registration changes `overwritten` to `preserved` for its permitted message categories. Required registration does not change the configured sender ID behavior after approval. `unknown` means no behavior is published. This is expected behavior, not confirmation of what a recipient saw. Overwrite details are published in the country messaging context.\n",
+    },
+    program: {
+      readOnly: true,
+      description:
+        "The registration program available for this destination, including optional registration. An existing registration retains its own program.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSRegistrationProgram",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSRegistrationStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Where this sender stands with this country's registration programme. The `approved` and `not_required` statuses satisfy it. Every other status leaves it unsatisfied: the `registration_required` status means the required registration has not started, the `pending` status means something required is still owed by you, and `under_review` means it is all with us. Read `next` for what to do about any of it.\n\nRegistration blocks sending when `registration_mode` is `required`. Optional registration can be pending while sending remains available with `sender_id_behavior` set to `overwritten`. Check `destination_enabled` too, which is independent of registration progress.\n",
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next about this country, given the state it is in. Each entry names one action\nand says why it is worth taking, so you can act on this response without working out the\norder yourself. Present on reads that compute it: an empty list means there is nothing to\ndo, and the field is absent entirely on responses that do not report next actions.\n\nThis routes rather than advises: it names where to go to act on this country, and the\nresource it names carries what to do there. So a country under carrier review names the\nverification to read, rather than restating a verdict that resource owns.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+    destination_enabled: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether your workspace has this destination country turned on. This is a workspace setting rather than anything about this sender, and it is checked before the sender is even considered, so a country can be fully registered and still refuse your messages because it is switched off here. Turn it on with [Update SMS destinations](/docs/api/reference/update-workspace-sms-destinations).\n",
+    },
+    has_compliance_requirements: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether registering this sender for this country continues at compliance requirements you answer with a submission. When true, read them with [Get what a registration needs](/docs/api/reference/get-workspace-compliance-requirements) once the registration exists; the one-off setup fee is charged when you submit, and the monthly charge starts once the registration is approved. False in three cases: the country takes no registration (`registration_mode` is `none`); its programme runs its own flow, such as US 10DLC, toll-free, and short codes, which `next` routes to; or the registration goes to review with nothing to submit, and both charges are made once it is approved.\n",
+    },
+    category: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": [
+        "transactional",
+        "marketing",
+        "authentication",
+        "service",
+      ],
+      description:
+        "Message category the registration covering this country is approved for. Null when the registration admits any category, and null before you register.\n",
+    },
+    registration_id: {
+      readOnly: true,
+      description:
+        "The registration covering this country, once one exists. Null before you register. Where the country's requirements are collected as a form, this is the `subject_id` to pass to `GET /v1/compliance/requirements`.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSCountryRegistrationID",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    program_entry: {
+      $ref: "#/components/schemas/SMSSenderProgramEntry",
+    },
+    program_entry_ref: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The id of the resource `program_entry` names, or null when it names none. Where the workspace holds several to choose from, this is the one to start from: the only brand or campaign if there is one, otherwise the most recently approved, and otherwise the most recent.\n",
+    },
+    rejection_reason: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Why the registration was rejected, when it was. Null otherwise.",
+    },
+    obligation_due_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When this country's registration must be brought up to date by, if it must. Null when nothing is outstanding, which is the ordinary case. The sender keeps sending until the date passes; `GET /v1/compliance/requirements` says what is being asked for.\n",
+    },
+    timeline_min_days: {
+      type: ["integer", "null"],
+      readOnly: true,
+      description:
+        "Shortest time approval usually takes, in business days. Null when the country publishes no estimate.",
+    },
+    timeline_max_days: {
+      type: ["integer", "null"],
+      readOnly: true,
+      description:
+        "Longest time approval usually takes, in business days. Null when the country publishes no estimate.",
+    },
+    registration_types: {
+      type: "array",
+      readOnly: true,
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      description: "Registration categories this country's program accepts.",
+    },
+  },
+} as const;
+
+export const SMSSenderProgramSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["program", "program_ref", "countries", "status"],
+  properties: {
+    program: {
+      readOnly: true,
+      description:
+        "The program this registration runs. Null for the countries that asked for no registration at all, which are grouped together because the only thing they have in common is that you registered nothing for them.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSRegistrationProgram",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    program_ref: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The resource this registration produced, which `program` tells you how to read: a toll-free verification for `tfn`, or a campaign number link for `10dlc`. The link connects this number to its campaign. Get the campaign from `GET /v1/sms/10dlc/campaign-number-links/{link_id}`. Null for a program that issues none, and for one you have not registered yet. Follow it when the status is under_review, because only that resource distinguishes a carrier still reviewing from one waiting on more information from you.\n",
+    },
+    countries: {
+      type: "array",
+      minItems: 1,
+      readOnly: true,
+      description:
+        "Every country this one registration covers. Some programs open several at once, so a single toll-free verification or campaign registration can be what permits four destinations.\n",
+      items: {
+        $ref: "#/components/schemas/CountryCode",
+      },
+    },
+    status: {
+      readOnly: true,
+      description:
+        "Where this registration stands, for all of the countries it covers. `registration_required` means you have not made it yet and every country listed is waiting on it. Null in the one case where the countries have diverged and no single answer is true: read those countries individually.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSRegistrationStatus",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+  },
+} as const;
+
+export const SMSSenderRequirementListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data", "programs"],
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "One entry per destination country this sender can reach, which is the level the decision to carry your message is made at. Ask this list whether you can send somewhere, and what it takes first. A country missing from it is one this sender has no route to at all, so no registration would open it.\n",
+      items: {
+        $ref: "#/components/schemas/SMSSenderRequirement",
+      },
+    },
+    programs: {
+      type: "array",
+      description:
+        "The same countries seen as the registrations they belong to, one entry per registration, with the countries each one covers. Ask this list what to do next: an entry whose status is `registration_required` is a registration you still have to make, and its countries are the ones it would open. Every other entry is a registration you have already made, so this list is the whole picture rather than only the part you have finished.\n",
+      items: {
+        $ref: "#/components/schemas/SMSSenderProgram",
+      },
+    },
+  },
+} as const;
+
+export const SMSCountryRegistrationCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["country_code"],
+  properties: {
+    country_code: {
+      $ref: "#/components/schemas/CountryCode",
+    },
+    category: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSMessageCategory",
+        },
+      ],
+      description:
+        "Message category to register the sender for. Omit to register the sender for all categories.\n",
+    },
+  },
+} as const;
+
+export const SMSCountryRegistrationSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["id", "country_code", "status", "created_at", "updated_at"],
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/SMSCountryRegistrationID",
+      description: "Identifier of this country registration.",
+    },
+    country_code: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/CountryCode",
+        },
+      ],
+      readOnly: true,
+    },
+    registration_mode: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSRegistrationMode",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Current registration policy for this destination and sender type. Omitted if the policy or sender is no longer available.",
+    },
+    sender_id_behavior: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSSenderIDBehavior",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Expected sender ID behavior for this registration's message categories. Optional registration preserves the sender ID once approved. Required registration can still use an overwritten sender ID after approval. Omitted if the policy or sender is no longer available.\n",
+    },
+    program: {
+      readOnly: true,
+      description:
+        'The registration program behind this row. Null for a country that required none, which is the state a row records rather than a program called "none".\n',
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSRegistrationProgram",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    category: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": [
+        "transactional",
+        "marketing",
+        "authentication",
+        "service",
+      ],
+      description:
+        "Message category this registration is approved for. Null means the registration is unrestricted and admits any category.\n",
+    },
+    status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSRegistrationStatus",
+        },
+      ],
+      readOnly: true,
+    },
+    program_ref: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The program artifact that decided this registration, null where none produced it. Which resource it names follows from `program`, and its id prefix tells you too: a toll-free verification for `tfn`, or a campaign number link for `10dlc`. The link connects this number to its campaign. Get the campaign from [Get a 10DLC campaign number link](/docs/api/reference/get-tcr-campaign-number-link). Worth following when the status is `under_review`, because that value covers both the carrier still reviewing and the carrier waiting on more information from you, and only the program's own resource tells those apart.\n",
+    },
+    rejection_reason: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Reason the registration was rejected, shown when the status is `rejected`. Null for registrations that were never rejected.\n",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+    },
+  },
 } as const;
 
 export const LookupPropertySchema = {
@@ -15355,10 +17172,9 @@ export const WhatsAppTemplateLanguageStatusSchema = {
     "archived",
     "deleted",
     "submit_failed",
-    "outcome_unknown",
   ],
   description:
-    "Language review and health status:\n\n- `approved`: Passed review and can be sent.\n- `pending`: Under review.\n- `rejected`: Failed review.\n- `paused` or `disabled`: Sending is suspended.\n- `in_appeal`: A decision is being appealed.\n- `pending_deletion`: Scheduled for deletion by Meta.\n- `limit_exceeded`: Sending is blocked by a limit.\n- `archived`: Reclaimed after 12 months without use; recoverable for 28 days.\n- `deleted`: Permanently deleted.\n- `submit_failed`: A submission or a deletion did not complete and will not be retried. `error.description` says why, and `error.meta_error_code` is set only where WhatsApp itself refused.\n- `outcome_unknown`: A create or an edit reached WhatsApp but no response came back, so the outcome is still being resolved against WhatsApp. An unanswered deletion is retried instead of landing here. `error.description` says so, and `error.meta_error_code` is absent, since nothing was refused.\n\nThis is an open enum. Accept unrecognized values.\n",
+    "Language review and health status:\n\n- `approved`: Passed review and can be sent.\n- `pending`: Under review, or submitted while Bird confirms the result with WhatsApp.\n- `rejected`: Failed review.\n- `paused` or `disabled`: Sending is suspended.\n- `in_appeal`: A decision is being appealed.\n- `pending_deletion`: Scheduled for deletion by Meta.\n- `limit_exceeded`: Sending is blocked by a limit.\n- `archived`: Reclaimed after 12 months without use; recoverable for 28 days.\n- `deleted`: Permanently deleted.\n- `submit_failed`: A submission or a deletion did not complete and will not be retried. `error.description` says why, and `error.meta_error_code` is set only where WhatsApp itself refused.\n\nThis is an open enum. Accept unrecognized values.\n",
 } as const;
 
 export const WhatsAppTemplateRejectionCategorySchema = {
@@ -15475,7 +17291,7 @@ export const WhatsAppTemplateLanguageStateSchema = {
         },
       ],
       description:
-        "Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -15847,7 +17663,7 @@ export const WhatsAppTemplateVersionLanguageSchema = {
         },
       ],
       description:
-        "Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -16103,7 +17919,7 @@ export const WhatsAppTemplateLanguageSchema = {
         },
       ],
       description:
-        "Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
     submitted_at: {
       type: ["string", "null"],
@@ -41669,13 +43485,13 @@ export const EventVerifyAttemptDeliveredDataSchema = {
         carrier: {
           type: ["string", "null"],
           description:
-            "Carrier that delivered the message, when the carrier network reports it. Always null for email, WhatsApp, and Telegram.",
+            "Carrier that delivered the message, when the carrier network reports it. Always null for email, WhatsApp, Telegram, and voice.",
           example: "Verizon",
         },
         mcc_mnc: {
           type: ["string", "null"],
           description:
-            "Mobile country code and mobile network code of the delivering carrier, when reported. Always null for email, WhatsApp, and Telegram.",
+            "Mobile country code and mobile network code of the delivering carrier, when reported. Always null for email, WhatsApp, Telegram, and voice.",
           example: "311480",
         },
         delivered_at: {
@@ -43958,6 +45774,13 @@ export const VoiceLegSchema = {
   },
 } as const;
 
+export const WalletIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^wal_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "wal_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const WalletTransactionIDSchema = {
   type: "string",
   minLength: 1,
@@ -44001,6 +45824,22 @@ export const BillingProductSlugSchema = {
   description:
     "URL-safe identifier for a billing product. Lowercase letters and digits, separated by underscores. Must start with a letter.",
   example: "email_sends",
+} as const;
+
+export const BillingPricingModelSchema = {
+  type: "string",
+  minLength: 1,
+  enum: [
+    "plan",
+    "metered",
+    "rate_card",
+    "unit_subscription",
+    "custom",
+    "counter",
+  ],
+  description:
+    "How this product is priced.\n\n- `plan`: it comes with the organization's subscribed plan, with usage tracked\n  against that plan's included allowance.\n- `metered`: it is billed per unit beyond any included allowance.\n- `rate_card`: the per-unit price varies by attributes of the usage, such as\n  destination, instead of being flat.\n- `unit_subscription`: it is a standalone add-on billed as its own recurring\n  subscription, independent of the plan.\n- `custom`: a pricing arrangement that does not fit the other models.\n- `counter`: usage is recorded without enforcing a spending cap or blocking\n  requests.\n",
+  example: "rate_card",
 } as const;
 
 export const NumberTypeSchema = {
@@ -44574,6 +46413,40 @@ export const NumbersOrderListSchema = {
   ],
 } as const;
 
+export const NumbersOrderComplianceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["answers"],
+  description:
+    "Ownership paperwork for a number being ordered, where its country requires any. Optional always: the order completes and the number is yours either way, and supplying this only decides whether it can carry traffic sooner. Read `GET /v1/compliance/requirements` for the number to learn what is asked for, or file it after the order with `POST /v1/compliance/submissions`. Filing this cannot fail your order: if it is refused, the number is still yours and you can file again. The answers are a legal representation filed under the name of the business they describe. Sending this block uses the order's existing `numbers` scope at write level.\n",
+  properties: {
+    answers: {
+      type: "array",
+      minItems: 1,
+      description:
+        "Every answer at once, in the same shape `POST /v1/compliance/submissions` takes. There is no draft to fill in over several calls, so send a complete set.\n",
+      example: [
+        {
+          key: "business_registration_number",
+          value: "90012768",
+        },
+      ],
+      items: {
+        $ref: "#/components/schemas/ComplianceAnswer",
+      },
+    },
+    identity_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceIdentityID",
+        },
+      ],
+      description:
+        "An existing party this number is held for. It fills in the business details you left out from what that party already holds, and each single-value answer you file about the party is written back onto it for next time, whatever the verdict. Documents and multi-value answers are asked fresh each time. An id belonging to another organization is rejected.",
+    },
+  },
+} as const;
+
 export const NumbersOrderCreateSchema = {
   type: "object",
   additionalProperties: false,
@@ -44593,6 +46466,9 @@ export const NumbersOrderCreateSchema = {
       description:
         "Your own reference to set on the number when this purchase completes. Leading and trailing whitespace is removed. A pending order keeps the reference until the number is allocated.",
       example: "STORE-042",
+    },
+    compliance: {
+      $ref: "#/components/schemas/NumbersOrderCompliance",
     },
   },
 } as const;
@@ -44628,6 +46504,248 @@ export const AutomationPortKeySchema = {
   pattern: "^[a-z][a-z0-9_]{0,63}$",
   description: "Stable named input or output declared by a node-type version.",
   example: "success",
+} as const;
+
+export const BillingResolvedPriceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "unit_price",
+    "tax_rate",
+    "tax_amount",
+    "gross_price",
+    "billing_unit_size",
+    "dimensions",
+    "name",
+    "pricing_model",
+  ],
+  properties: {
+    unit_price: {
+      $ref: "#/components/schemas/Money",
+      description: "The net unit price, before tax.",
+    },
+    tax_rate: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The tax rate applied to this price for your organization, as a decimal (for example `0.21` for 21%). `0` if your organization is tax-exempt or no tax applies.",
+      example: "0.21",
+    },
+    tax_amount: {
+      $ref: "#/components/schemas/Money",
+      description:
+        "The tax charged on one unit, computed from `unit_price` and `tax_rate`.",
+    },
+    gross_price: {
+      $ref: "#/components/schemas/Money",
+      description:
+        "The total your organization is charged per unit, that is, `unit_price` plus `tax_amount`.",
+    },
+    billing_unit_size: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description:
+        "Number of units that form one chargeable block. Overage usage is ceiling-rounded to the nearest multiple of this value before the unit price is applied. A value of 1 charges per individual unit.",
+      example: 1000,
+    },
+    increment: {
+      type: ["string", "null"],
+      description:
+        "The billing rounding window for time-based products, expressed as `{initial_seconds}/{continuation_seconds}`. For example, `60/60` means each unit covers 60 seconds. `null` for per-unit products.",
+      example: "60/60",
+    },
+    dimensions: {
+      type: "object",
+      additionalProperties: {
+        type: "string",
+      },
+      description:
+        "Pricing dimensions that determined this price (for example, `country_code`, `sender_type`).",
+      example: {
+        country_code: "US",
+      },
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      description: "Display name of the product this price was resolved for.",
+      example: "10DLC Brand Registration",
+    },
+    external_description: {
+      readOnly: true,
+      type: ["string", "null"],
+      description:
+        "Customer-facing description of the product this price was resolved for, when set.",
+    },
+    pricing_model: {
+      $ref: "#/components/schemas/BillingPricingModel",
+    },
+    billing_interval: {
+      deprecated: true,
+      $ref: "#/components/schemas/BillingInterval",
+      readOnly: true,
+      description:
+        "Compatibility alias for `pricing_interval.unit`. Only present when `pricing_model` is `unit_subscription`, or `plan` with configured recurring terms. Omitted for other pricing models and plans without configured terms.",
+    },
+    billing_interval_count: {
+      deprecated: true,
+      type: "integer",
+      minimum: 1,
+      readOnly: true,
+      description:
+        "Compatibility alias for `intervals_per_charge`. Only present when `pricing_model` is `unit_subscription`, or `plan` with configured recurring terms. Omitted for other pricing models and plans without configured terms.",
+      example: 1,
+    },
+    pricing_interval: {
+      $ref: "#/components/schemas/BillingPricingInterval",
+      description:
+        "Period covered by the resolved recurring rate. Present for `unit_subscription` products and plans with configured recurring terms. Omitted for other pricing models and plans without configured terms.",
+    },
+    intervals_per_charge: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "Number of complete pricing intervals bought by each recurring charge. Renewal duration is `pricing_interval.count` multiplied by this value. Present alongside `pricing_interval` for `unit_subscription` products and plans with configured recurring terms; omitted otherwise.",
+      example: 1,
+    },
+  },
+} as const;
+
+export const BillingWalletCollectionStatusSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Automatic collection state:\n- `none`: No retained collection run.\n- `in_progress`: Collection is active, though payment may still require customer action.\n- `exhausted`: Automatic retries have stopped and customer action is needed.",
+  enum: ["none", "in_progress", "exhausted"],
+} as const;
+
+export const BillingWalletSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: [
+    "id",
+    "currency_code",
+    "balance",
+    "settled_balance",
+    "renewal_reserved",
+    "renewal_required",
+    "collection_status",
+    "collection_renewal",
+    "collection_required",
+    "collection_usage_buffer",
+    "collection_deficit",
+    "credit_limit",
+    "provisional",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/WalletID",
+    },
+    currency_code: {
+      $ref: "#/components/schemas/CurrencyCode",
+      description: "ISO 4217 currency code.",
+      example: "USD",
+    },
+    balance: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Balance you can spend, in currency units. Usage is charged as it happens, so this drops within seconds of sending and can be lower than the balance the wallet transactions add up to, which only reflects charges that have settled. Funds held for upcoming renewals are also excluded. Credit headroom is reported separately in `credit_limit`, and postpaid accounts can keep spending past a zero balance up to that limit.",
+      example: "118.00",
+    },
+    settled_balance: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Settled wallet balance in currency units, before active reservations are deducted.",
+      example: "150.00",
+    },
+    renewal_reserved: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Amount currently held for prepared subscription renewals and scheduled plan changes, in currency units.",
+      example: "25.00",
+    },
+    renewal_required: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Total amount required for prepared subscription renewals and scheduled plan changes, including tax, in currency units.",
+      example: "30.00",
+    },
+    collection_status: {
+      $ref: "#/components/schemas/BillingWalletCollectionStatus",
+    },
+    collection_renewal: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Part of collection_required needed for unfunded renewal fees, in exact currency units.",
+      example: "30.004",
+    },
+    collection_required: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Total wallet funding still required by the current automatic collection run, in exact currency units.",
+      example: "42.00",
+    },
+    collection_usage_buffer: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Part of collection_required needed for the configured auto-topup amount, in currency units.",
+      example: "10.00",
+    },
+    collection_deficit: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Part of collection_required needed to cover the wallet shortfall after reservations and approved credit, in currency units.",
+      example: "2.00",
+    },
+    credit_limit: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Credit limit in currency units. `0.00` for prepaid wallets.",
+      example: "0.00",
+    },
+    provisional: {
+      type: "boolean",
+      description:
+        "When `true`, the wallet currency has not yet been committed and can be changed once. When `false`, the currency is permanent.",
+    },
+    created_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+    },
+    updated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+    },
+  },
+} as const;
+
+export const BillingWalletListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/BillingWallet",
+      },
+    },
+  },
 } as const;
 
 export const VoiceTrunkSortFieldSchema = {
@@ -49147,6 +51265,30 @@ export const EsimAssignmentCreateSchema = {
   },
 } as const;
 
+export const EsimRenewalStateSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "The status of the eSIM's one recurring subscription that has not ended, or `none` when it has no such subscription. The values are every `EsimRecurringSubscriptionStatus` except `ended`, plus `none`. This is subscription state, not a promise of another renewal: read the subscription's `cancel_at_period_end` for that.\n\n- `pending`: enrollment or the initial purchase is still being processed.\n- `active`: the subscription is in service. One canceled at the end of its paid period stays `active` until that boundary; read the subscription's `cancel_at_period_end` to tell them apart.\n- `needs_attention`: a delivery or a related credit remains unresolved.\n- `none`: the eSIM has no recurring subscription, or only ended ones.\n",
+  enum: ["pending", "active", "needs_attention", "none"],
+} as const;
+
+export const EsimRecurringSubscriptionSummarySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The eSIM's recurring subscription that has not ended. Fetch the subscription by id for its price, cadence, next charge and period history.\n",
+  required: ["subscription_id", "status"],
+  properties: {
+    subscription_id: {
+      $ref: "#/components/schemas/EsimRecurringSubscriptionID",
+    },
+    status: {
+      $ref: "#/components/schemas/EsimRecurringSubscriptionStatus",
+    },
+  },
+} as const;
+
 export const EsimSummarySchema = {
   type: "object",
   additionalProperties: false,
@@ -49160,6 +51302,7 @@ export const EsimSummarySchema = {
     "iccid",
     "phone_number",
     "display_name",
+    "renewal",
     "created_at",
   ],
   properties: {
@@ -49219,6 +51362,19 @@ export const EsimSummarySchema = {
       maxLength: 120,
       readOnly: true,
       description: "Free-text label for your own reference.",
+    },
+    renewal: {
+      readOnly: true,
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EsimRecurringSubscriptionSummary",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The eSIM's recurring subscription that has not ended, or null when it has none. The single-eSIM read does not carry it; list the eSIM's subscriptions with `esim_id` for the full renewal history.",
     },
     created_at: {
       type: "string",
@@ -51393,6 +53549,78 @@ export const SMSKeywordRuleListWritableSchema = {
   },
 } as const;
 
+export const ComplianceRequirementFieldWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
+export const ComplianceIdentityWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A party you register on behalf of: your own business, or one of your clients. Reusing an identity across registrations is what stops you retyping the same business details for every country, and lets a fact reviewed once stand for the registrations that follow.",
+  required: ["id", "name", "created_at", "updated_at"],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/ComplianceIdentityID",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      description:
+        "What you call this party. Yours to choose; it is never sent to a carrier.",
+      example: "Goldcrest Communications SAS",
+    },
+    created_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+    },
+    updated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+    },
+  },
+} as const;
+
+export const ComplianceIdentityListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/ComplianceIdentityWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const AttachmentListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
 export const AssetWritableSchema = {
   description:
     "A file in the workspace's media library, hosted at a permanent public URL. Embed or link `url` anywhere hosted media is needed, including in email that has already been sent: an asset's bytes and URL never change.",
@@ -51513,6 +53741,16 @@ export const AssetFolderListWritableSchema = {
       $ref: "#/components/schemas/_ListEnvelopeWithTotal",
     },
   ],
+} as const;
+
+export const ComplianceRequirementWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
+export const ComplianceSubmissionWritableSchema = {
+  type: "object",
+  additionalProperties: false,
 } as const;
 
 export const SMSLatencyStatsWritableSchema = {
@@ -51676,6 +53914,65 @@ export const SMSInboundStatsByNumberResponseWritableSchema = {
   additionalProperties: false,
   description:
     "Received-message volume broken down by number, ranked by volume.\n",
+} as const;
+
+export const SMSSenderWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
+export const SMSSenderListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description:
+            "Your workspace's dedicated numbers and alphanumeric senders, newest first.",
+          items: {
+            $ref: "#/components/schemas/SMSSenderWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const SMSSenderRequirementWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["program_entry"],
+  properties: {
+    program_entry: {
+      $ref: "#/components/schemas/SMSSenderProgramEntry",
+    },
+  },
+} as const;
+
+export const SMSSenderRequirementListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data", "programs"],
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "One entry per destination country this sender can reach, which is the level the decision to carry your message is made at. Ask this list whether you can send somewhere, and what it takes first. A country missing from it is one this sender has no route to at all, so no registration would open it.\n",
+      items: {
+        $ref: "#/components/schemas/SMSSenderRequirementWritable",
+      },
+    },
+    programs: {
+      type: "array",
+      description:
+        "The same countries seen as the registrations they belong to, one entry per registration, with the countries each one covers. Ask this list what to do next: an entry whose status is `registration_required` is a registration you still have to make, and its countries are the ones it would open. Every other entry is a registration you have already made, so this list is the whole picture rather than only the part you have finished.\n",
+    },
+  },
 } as const;
 
 export const VerificationWritableSchema = {
@@ -52132,7 +54429,7 @@ export const WhatsAppTemplateLanguageStateWritableSchema = {
     },
     error: {
       description:
-        "Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -52282,7 +54579,7 @@ export const WhatsAppTemplateVersionLanguageWritableSchema = {
     },
     error: {
       description:
-        "Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -52424,7 +54721,7 @@ export const WhatsAppTemplateLanguageWritableSchema = {
     },
     error: {
       description:
-        "Why the submission did not complete, present when `status` is `submit_failed` or `outcome_unknown`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -58307,6 +60604,218 @@ export const NumbersOrderListWritableSchema = {
   ],
 } as const;
 
+export const BillingResolvedPriceWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "unit_price",
+    "tax_rate",
+    "tax_amount",
+    "gross_price",
+    "billing_unit_size",
+    "dimensions",
+    "name",
+    "pricing_model",
+  ],
+  properties: {
+    unit_price: {
+      $ref: "#/components/schemas/Money",
+      description: "The net unit price, before tax.",
+    },
+    tax_rate: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The tax rate applied to this price for your organization, as a decimal (for example `0.21` for 21%). `0` if your organization is tax-exempt or no tax applies.",
+      example: "0.21",
+    },
+    tax_amount: {
+      $ref: "#/components/schemas/Money",
+      description:
+        "The tax charged on one unit, computed from `unit_price` and `tax_rate`.",
+    },
+    gross_price: {
+      $ref: "#/components/schemas/Money",
+      description:
+        "The total your organization is charged per unit, that is, `unit_price` plus `tax_amount`.",
+    },
+    billing_unit_size: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description:
+        "Number of units that form one chargeable block. Overage usage is ceiling-rounded to the nearest multiple of this value before the unit price is applied. A value of 1 charges per individual unit.",
+      example: 1000,
+    },
+    increment: {
+      type: ["string", "null"],
+      description:
+        "The billing rounding window for time-based products, expressed as `{initial_seconds}/{continuation_seconds}`. For example, `60/60` means each unit covers 60 seconds. `null` for per-unit products.",
+      example: "60/60",
+    },
+    dimensions: {
+      type: "object",
+      additionalProperties: {
+        type: "string",
+      },
+      description:
+        "Pricing dimensions that determined this price (for example, `country_code`, `sender_type`).",
+      example: {
+        country_code: "US",
+      },
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      description: "Display name of the product this price was resolved for.",
+      example: "10DLC Brand Registration",
+    },
+    pricing_model: {
+      $ref: "#/components/schemas/BillingPricingModel",
+    },
+    pricing_interval: {
+      $ref: "#/components/schemas/BillingPricingInterval",
+      description:
+        "Period covered by the resolved recurring rate. Present for `unit_subscription` products and plans with configured recurring terms. Omitted for other pricing models and plans without configured terms.",
+    },
+    intervals_per_charge: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "Number of complete pricing intervals bought by each recurring charge. Renewal duration is `pricing_interval.count` multiplied by this value. Present alongside `pricing_interval` for `unit_subscription` products and plans with configured recurring terms; omitted otherwise.",
+      example: 1,
+    },
+  },
+} as const;
+
+export const BillingWalletWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: [
+    "id",
+    "currency_code",
+    "balance",
+    "settled_balance",
+    "renewal_reserved",
+    "renewal_required",
+    "collection_status",
+    "collection_renewal",
+    "collection_required",
+    "collection_usage_buffer",
+    "collection_deficit",
+    "credit_limit",
+    "provisional",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/WalletID",
+    },
+    currency_code: {
+      $ref: "#/components/schemas/CurrencyCode",
+      description: "ISO 4217 currency code.",
+      example: "USD",
+    },
+    balance: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Balance you can spend, in currency units. Usage is charged as it happens, so this drops within seconds of sending and can be lower than the balance the wallet transactions add up to, which only reflects charges that have settled. Funds held for upcoming renewals are also excluded. Credit headroom is reported separately in `credit_limit`, and postpaid accounts can keep spending past a zero balance up to that limit.",
+      example: "118.00",
+    },
+    settled_balance: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Settled wallet balance in currency units, before active reservations are deducted.",
+      example: "150.00",
+    },
+    renewal_reserved: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Amount currently held for prepared subscription renewals and scheduled plan changes, in currency units.",
+      example: "25.00",
+    },
+    renewal_required: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Total amount required for prepared subscription renewals and scheduled plan changes, including tax, in currency units.",
+      example: "30.00",
+    },
+    collection_status: {
+      $ref: "#/components/schemas/BillingWalletCollectionStatus",
+    },
+    collection_renewal: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Part of collection_required needed for unfunded renewal fees, in exact currency units.",
+      example: "30.004",
+    },
+    collection_required: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Total wallet funding still required by the current automatic collection run, in exact currency units.",
+      example: "42.00",
+    },
+    collection_usage_buffer: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Part of collection_required needed for the configured auto-topup amount, in currency units.",
+      example: "10.00",
+    },
+    collection_deficit: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Part of collection_required needed to cover the wallet shortfall after reservations and approved credit, in currency units.",
+      example: "2.00",
+    },
+    credit_limit: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Credit limit in currency units. `0.00` for prepaid wallets.",
+      example: "0.00",
+    },
+    provisional: {
+      type: "boolean",
+      description:
+        "When `true`, the wallet currency has not yet been committed and can be changed once. When `false`, the currency is permanent.",
+    },
+    created_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+    },
+    updated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+    },
+  },
+} as const;
+
+export const BillingWalletListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/BillingWalletWritable",
+      },
+    },
+  },
+} as const;
+
 export const VoiceTrunkIPACLWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -58950,6 +61459,13 @@ export const EsimAssignmentWritableSchema = {
   ],
 } as const;
 
+export const EsimSummaryWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Compact eSIM representation used in lists. Fetch the eSIM by id for the full aggregate with packages, balances, and installation state.\n",
+} as const;
+
 export const EsimListWritableSchema = {
   allOf: [
     {
@@ -58958,6 +61474,9 @@ export const EsimListWritableSchema = {
       properties: {
         data: {
           type: "array",
+          items: {
+            $ref: "#/components/schemas/EsimSummaryWritable",
+          },
           description:
             "eSIMs, newest first, in compact form; fetch one by id for the full aggregate.",
         },

@@ -147,6 +147,74 @@ export const AssetReferenceUsage = {
 export type AssetReferenceUsageValue = (typeof AssetReferenceUsage)[keyof typeof AssetReferenceUsage];
 
 /**
+ * Values of ComplianceItemState known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const ComplianceItemState = {
+  Approved: "approved",
+  Expired: "expired",
+  InReview: "in_review",
+  NotApplicable: "not_applicable",
+  NotSupplied: "not_supplied",
+  Rejected: "rejected",
+  Supplied: "supplied",
+} as const;
+
+/** A known ComplianceItemState value. */
+export type ComplianceItemStateValue = (typeof ComplianceItemState)[keyof typeof ComplianceItemState];
+
+/**
+ * Values of ComplianceObligationReason known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const ComplianceObligationReason = {
+  EvidenceExpiry: "evidence_expiry",
+  PolicyChange: "policy_change",
+  VerdictWithdrawn: "verdict_withdrawn",
+  VerifierRejected: "verifier_rejected",
+} as const;
+
+/** A known ComplianceObligationReason value. */
+export type ComplianceObligationReasonValue = (typeof ComplianceObligationReason)[keyof typeof ComplianceObligationReason];
+
+/**
+ * Values of ComplianceObligationState known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const ComplianceObligationState = {
+  Extended: "extended",
+  Lapsed: "lapsed",
+  Open: "open",
+  Satisfied: "satisfied",
+} as const;
+
+/** A known ComplianceObligationState value. */
+export type ComplianceObligationStateValue = (typeof ComplianceObligationState)[keyof typeof ComplianceObligationState];
+
+/**
+ * Values of ComplianceProgram known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const ComplianceProgram = {
+  Alpha: "alpha",
+  Business: "business",
+  Local: "local",
+  Mobile: "mobile",
+  National: "national",
+  Numeric: "numeric",
+  ShortCode: "short_code",
+  ShortCodeFteu: "short_code_fteu",
+  TollFree: "toll_free",
+} as const;
+
+/** A known ComplianceProgram value. */
+export type ComplianceProgramValue = (typeof ComplianceProgram)[keyof typeof ComplianceProgram];
+
+/**
  * Values of DestinationRegion known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -805,6 +873,73 @@ export const SMSKeywordOperation = {
 export type SMSKeywordOperationValue = (typeof SMSKeywordOperation)[keyof typeof SMSKeywordOperation];
 
 /**
+ * Values of SMSRegistrationProgram known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const SMSRegistrationProgram = {
+  Value10dlc: "10dlc",
+  Alpha: "alpha",
+  Numeric: "numeric",
+  ShortCode: "short_code",
+  Tfn: "tfn",
+} as const;
+
+/** A known SMSRegistrationProgram value. */
+export type SMSRegistrationProgramValue = (typeof SMSRegistrationProgram)[keyof typeof SMSRegistrationProgram];
+
+/**
+ * Values of SMSRegistrationStatus known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const SMSRegistrationStatus = {
+  Approved: "approved",
+  BirdApproved: "bird_approved",
+  CarrierPending: "carrier_pending",
+  NotRequired: "not_required",
+  Pending: "pending",
+  RegistrationRequired: "registration_required",
+  Rejected: "rejected",
+  Suspended: "suspended",
+  UnderReview: "under_review",
+} as const;
+
+/** A known SMSRegistrationStatus value. */
+export type SMSRegistrationStatusValue = (typeof SMSRegistrationStatus)[keyof typeof SMSRegistrationStatus];
+
+/**
+ * Values of SMSSenderProgramEntry known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const SMSSenderProgramEntry = {
+  Value10dlcBrand: "10dlc_brand",
+  Value10dlcCampaign: "10dlc_campaign",
+  Value10dlcCampaignNumberLink: "10dlc_campaign_number_link",
+  ComplianceSubmission: "compliance_submission",
+  None: "none",
+  TfnVerification: "tfn_verification",
+} as const;
+
+/** A known SMSSenderProgramEntry value. */
+export type SMSSenderProgramEntryValue = (typeof SMSSenderProgramEntry)[keyof typeof SMSSenderProgramEntry];
+
+/**
+ * Values of SMSSenderSourceKind known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const SMSSenderSourceKind = {
+  Alpha: "alpha",
+  Number: "number",
+  SharedNumber: "shared_number",
+} as const;
+
+/** A known SMSSenderSourceKind value. */
+export type SMSSenderSourceKindValue = (typeof SMSSenderSourceKind)[keyof typeof SMSSenderSourceKind];
+
+/**
  * Values of SMSSuppressionCoverage known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -1338,7 +1473,6 @@ export const WhatsAppTemplateLanguageStatus = {
   Disabled: "disabled",
   InAppeal: "in_appeal",
   LimitExceeded: "limit_exceeded",
-  OutcomeUnknown: "outcome_unknown",
   Paused: "paused",
   Pending: "pending",
   PendingDeletion: "pending_deletion",
