@@ -82,6 +82,7 @@ export type _ContactsPreferences = Pick<BirdClient["contacts"]["preferences"], "
 export type _ContactProperties = Pick<BirdClient["contactProperties"], "list" | "get" | "create" | "update" | "archive" | "unarchive">;
 export type _Audiences = Pick<BirdClient["audiences"], "list" | "get" | "create" | "update" | "delete" | "listContacts" | "addContacts" | "removeContacts" | "removeContact" | "membership" | "membershipHistory">;
 export type _EmailMailboxes = Pick<BirdClient["email"]["mailboxes"], "list" | "create" | "get" | "update" | "delete" | "restore" | "resume" | "stats" | "labels">;
+export type _EmailMailboxesScheduledMessages = Pick<BirdClient["email"]["mailboxes"]["scheduledMessages"], "list" | "get" | "cancel">;
 export type _EmailMailboxesMessages = Pick<BirdClient["email"]["mailboxes"]["messages"], "create">;
 export type _EmailMailboxesReceiveRules = Pick<BirdClient["email"]["mailboxes"]["receiveRules"], "list" | "create" | "delete">;
 export type _EmailThreads = Pick<BirdClient["email"]["threads"], "list" | "get" | "update" | "delete">;

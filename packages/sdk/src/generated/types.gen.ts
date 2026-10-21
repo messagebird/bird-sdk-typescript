@@ -21780,6 +21780,14 @@ export type EmailThread = {
    *
    */
   readonly highlights?: EmailThreadHighlights;
+  /**
+   * Scheduled or dispatching sends targeting this conversation. Returned by conversation get and list, including zero when none remain. Omitted by search.
+   */
+  readonly scheduled_count?: number;
+  /**
+   * Earliest due time among scheduled or dispatching sends. Returned by conversation get and list only when scheduled_count is positive. Omitted by search and when no sends remain.
+   */
+  readonly next_scheduled_at?: string;
 };
 
 export type EmailThreadList = {
@@ -21811,6 +21819,8 @@ export type EmailThreadUpdateRequest = {
    */
   contact_id?: ContactId | null;
 };
+
+export type MailboxScheduledMessageId = string;
 
 /**
  * One recipient's terminal delivery outcome on a sent conversation message, recorded once the outcome becomes known.
@@ -21860,16 +21870,33 @@ export type EmailThreadMessageSource = {
    */
   readonly resource: string;
   /**
-   * When the log entry (and the message's body and raw MIME) expires.
+   * When the log entry (and the message's body and raw MIME) expires. For a scheduled acknowledgement, calculated from the due time and replaced by the actual dispatch-based deadline once dispatched.
    */
   readonly available_until: string;
 };
 
 /**
  * A message in a mailbox conversation, either direction. Message metadata, extracted text, and attachment bytes stay readable for the mailbox's retention tier. The body and raw MIME are available through the body and raw endpoints for 30 days after the message occurred.
+ * A scheduled acknowledgement reserves the message and thread IDs but is not stored in the conversation until dispatch. Use its scheduled_message_id and mailbox_id to inspect or cancel the separate schedule; body and raw reads are unavailable before dispatch.
  *
  */
 export type EmailThreadMessage = {
+  /**
+   * Separate schedule record, always present when status is scheduled.
+   */
+  readonly scheduled_message_id?: MailboxScheduledMessageId;
+  /**
+   * Planned send time on a scheduled acknowledgement.
+   */
+  readonly scheduled_at?: string;
+  /**
+   * Owning mailbox, always present on scheduled acknowledgements.
+   */
+  readonly mailbox_id?: MailboxId;
+  /**
+   * Informational notice when conversation retention expires before dispatch; the reserved thread is recreated without expired messages.
+   */
+  readonly notice?: string;
   /**
    * Message ID. Received messages have a `rem_` ID, sent messages an `em_` ID: the same IDs used by the received-message and sent-message logs.
    *
@@ -21932,6 +21959,7 @@ export type EmailThreadMessage = {
   /**
    * Aggregate delivery status of a sent message:
    *
+   * - `scheduled`: Acknowledgement only; the separate schedule is linked by scheduled_message_id.
    * - `accepted`: Accepted for sending.
    * - `sent`: Handed off to the provider.
    * - `delivered`: All attempted recipients delivered.
@@ -21974,7 +22002,7 @@ export type EmailThreadMessage = {
    */
   readonly dmarc_pass: boolean | null;
   /**
-   * Scheduled permanent-deletion time. This is the end of the mailbox's retention tier, moved to no more than 30 days in the future while the message is in the trash. Restore a trashed message before then with `PATCH {"labels": {"remove": ["trash"]}}`.
+   * Scheduled permanent-deletion time. For a scheduled acknowledgement, this is based on the due time and replaced with actual dispatch-based retention once it sends. This is the end of the mailbox's retention tier, moved to no more than 30 days in the future while the message is in the trash. Restore a trashed message before then with `PATCH {"labels": {"remove": ["trash"]}}`.
    *
    */
   readonly purge_at: string;
@@ -21997,7 +22025,8 @@ export type EmailThreadMessage = {
   contact_id: ContactId | null;
   readonly source: EmailThreadMessageSource;
   /**
-   * When the message was received or accepted for sending.
+   * When the message was received or accepted for sending. For a scheduled acknowledgement, the time it is due to send, replaced by the actual send time once it sends.
+   *
    */
   readonly occurred_at: string;
 };
@@ -22045,6 +22074,10 @@ export type EmailThreadMessageAttachmentList = {
  */
 export type EmailThreadMessageReplyRequest = {
   /**
+   * Send between 30 seconds and 30 days ahead, sharing the scheduled-email allowance. The scheduled send is listed separately and enters the conversation only at dispatch. Sender, mailbox and send-volume eligibility are rechecked then; refusal fails the schedule record without adding a conversation message. Retention starts at dispatch. Attachments are not supported on scheduled messages; send now or schedule without attachments.
+   */
+  scheduled_at?: string;
+  /**
    * HTML body of the reply. At least one of html or text must be provided.
    */
   html?: string;
@@ -22074,13 +22107,87 @@ export type EmailThreadMessageReplyRequest = {
    *
    */
   attachments?: Array<EmailAttachment>;
+  /**
+   * When scheduled_at is set, cancel if an inbound message arrives in the conversation before dispatch is claimed. Defaults to false: the frozen parent, recipients and content are sent unchanged even if new mail arrives.
+   */
+  cancel_on_reply?: boolean;
 };
 
 /**
- * A new message sent from a mailbox, starting a new conversation. Mirrors the plain send request without `from`, because the mailbox is who the message comes from, and without `scheduled_at`, because a mailbox sends immediately. We set the RFC 5322 Message-ID so replies thread back into this conversation. At least one of `html` or `text` must be provided.
+ * - `scheduled`: Waiting for its due time; cancellation is still possible.
+ * - `sending`: Dispatch has been claimed; cancellation is no longer possible.
+ * - `sent`: Handed to the ordinary send pipeline, not necessarily delivered. Follow message_id for delivery status.
+ * - `failed`: Terminal dispatch refusal or failure; see failure_reason. The schedule will not retry.
+ * - `canceled`: Terminal cancellation before dispatch; see cancellation_reason. The message will not send.
+ */
+export type EmailMailboxScheduledMessageStatus =
+  "scheduled" | "sending" | "sent" | "failed" | "canceled";
+
+export type EmailMailboxScheduledMessage = {
+  /**
+   * Scheduled send identifier.
+   */
+  id: MailboxScheduledMessageId;
+  /**
+   * Mailbox that owns the send.
+   */
+  mailbox_id: MailboxId;
+  /**
+   * Reserved conversation identifier. A new compose does not create the conversation until dispatch.
+   */
+  thread_id: ThreadId;
+  /**
+   * Actual message identifier once handed to the send pipeline.
+   */
+  message_id?: EmailId;
+  status: EmailMailboxScheduledMessageStatus;
+  /**
+   * Scheduled at.
+   */
+  scheduled_at: string;
+  /**
+   * Whether an inbound message cancels this send before dispatch is claimed.
+   */
+  cancel_on_reply: boolean;
+  /**
+   * Why dispatch failed.
+   */
+  failure_reason?: string;
+  /**
+   * Why canceled; replied means new inbound mail canceled an opted-in schedule.
+   */
+  cancellation_reason?: string;
+  /**
+   * Frozen subject.
+   */
+  subject: string;
+  /**
+   * Plain-text preview of the frozen message.
+   */
+  snippet: string;
+  /**
+   * Visible recipients (To and Cc). Bcc addresses remain only in the frozen send payload.
+   */
+  recipients: Array<string>;
+  /**
+   * Authenticated caller that scheduled the send.
+   */
+  created_by: Actor;
+} & Timestamps;
+
+export type EmailMailboxScheduledMessageList = {
+  data: Array<EmailMailboxScheduledMessage>;
+} & ListEnvelope;
+
+/**
+ * A new message sent from a mailbox, starting a new conversation. Mirrors the plain send request without `from`, because the mailbox is who the message comes from, and accepts `scheduled_at` to send later. Omit it to send immediately. We set the RFC 5322 Message-ID so replies thread back into this conversation. At least one of `html` or `text` must be provided.
  *
  */
 export type EmailMailboxComposeRequest = {
+  /**
+   * Send between 30 seconds and 30 days ahead, sharing the scheduled-email allowance. The scheduled send is listed separately and enters the conversation only at dispatch. Sender, mailbox and send-volume eligibility are rechecked then; refusal fails the schedule record without adding a conversation message. Retention starts at dispatch. Attachments are not supported on scheduled messages; send now or schedule without attachments.
+   */
+  scheduled_at?: string;
   /**
    * Primary recipients. Each entry is a plain email string, an RFC 5322 mailbox string (`Jane <jane@acme.com>`), or an object with an optional display name.
    */
@@ -22128,6 +22235,10 @@ export type EmailMailboxComposeRequest = {
     [key: string]: unknown;
   };
   category?: EmailMessageCategory;
+  /**
+   * When scheduled_at is set, cancel if an inbound message arrives in the conversation before dispatch is claimed. Defaults to false: the frozen parent, recipients and content are sent unchanged even if new mail arrives.
+   */
+  cancel_on_reply?: boolean;
 };
 
 /**
@@ -32617,6 +32728,7 @@ export type EmailThreadListWritable = {
 
 /**
  * A message in a mailbox conversation, either direction. Message metadata, extracted text, and attachment bytes stay readable for the mailbox's retention tier. The body and raw MIME are available through the body and raw endpoints for 30 days after the message occurred.
+ * A scheduled acknowledgement reserves the message and thread IDs but is not stored in the conversation until dispatch. Use its scheduled_message_id and mailbox_id to inspect or cancel the separate schedule; body and raw reads are unavailable before dispatch.
  *
  */
 export type EmailThreadMessageWritable = {
@@ -32648,6 +32760,65 @@ export type EmailThreadMessageListWritable = {
 export type EmailThreadMessageAttachmentListWritable = {
   data: Array<unknown>;
 };
+
+/**
+ * A mailbox-owned scheduled send, separate from conversation messages. Sent means handed to the ordinary send pipeline, not delivered; follow message_id for delivery status. Frozen recipients and reply headers do not change when new mail arrives. Terminal records remain until the mailbox is permanently erased.
+ */
+export type EmailMailboxScheduledMessageWritable = {
+  /**
+   * Scheduled send identifier.
+   */
+  id: MailboxScheduledMessageId;
+  /**
+   * Mailbox that owns the send.
+   */
+  mailbox_id: MailboxId;
+  /**
+   * Reserved conversation identifier. A new compose does not create the conversation until dispatch.
+   */
+  thread_id: ThreadId;
+  /**
+   * Actual message identifier once handed to the send pipeline.
+   */
+  message_id?: EmailId;
+  status: EmailMailboxScheduledMessageStatus;
+  /**
+   * Scheduled at.
+   */
+  scheduled_at: string;
+  /**
+   * Whether an inbound message cancels this send before dispatch is claimed.
+   */
+  cancel_on_reply: boolean;
+  /**
+   * Why dispatch failed.
+   */
+  failure_reason?: string;
+  /**
+   * Why canceled; replied means new inbound mail canceled an opted-in schedule.
+   */
+  cancellation_reason?: string;
+  /**
+   * Frozen subject.
+   */
+  subject: string;
+  /**
+   * Plain-text preview of the frozen message.
+   */
+  snippet: string;
+  /**
+   * Visible recipients (To and Cc). Bcc addresses remain only in the frozen send payload.
+   */
+  recipients: Array<string>;
+  /**
+   * Authenticated caller that scheduled the send.
+   */
+  created_by: ActorWritable;
+};
+
+export type EmailMailboxScheduledMessageListWritable = {
+  data: Array<EmailMailboxScheduledMessageWritable>;
+} & ListEnvelope;
 
 /**
  * The labels available in a mailbox.
@@ -63360,6 +63531,10 @@ export type DeleteEmailThreadErrors = {
    */
   404: Error;
   /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
    * The resource existed but is no longer available.
    */
   410: Error;
@@ -63993,13 +64168,286 @@ export type ReplyEmailThreadMessageError =
 
 export type ReplyEmailThreadMessageResponses = {
   /**
-   * Reply accepted for asynchronous delivery and recorded in the conversation.
+   * Reply accepted for asynchronous delivery. A scheduled reply is recorded in the conversation only at dispatch.
    */
   202: EmailThreadMessage;
 };
 
 export type ReplyEmailThreadMessageResponse =
   ReplyEmailThreadMessageResponses[keyof ReplyEmailThreadMessageResponses];
+
+export type ListMailboxScheduledMessagesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Mailbox that owns the scheduled send.
+     */
+    mailbox_id: MailboxId;
+  };
+  query?: {
+    /**
+     * Filter by the reserved conversation identifier.
+     */
+    thread_id?: ThreadId;
+    /**
+     * Filter by scheduling state.
+     */
+    status?: EmailMailboxScheduledMessageStatus;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/email/mailboxes/{mailbox_id}/scheduled-messages";
+};
+
+export type ListMailboxScheduledMessagesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ListMailboxScheduledMessagesError =
+  ListMailboxScheduledMessagesErrors[keyof ListMailboxScheduledMessagesErrors];
+
+export type ListMailboxScheduledMessagesResponses = {
+  /**
+   * List scheduled mailbox sends.
+   */
+  200: EmailMailboxScheduledMessageList;
+};
+
+export type ListMailboxScheduledMessagesResponse =
+  ListMailboxScheduledMessagesResponses[keyof ListMailboxScheduledMessagesResponses];
+
+export type GetMailboxScheduledMessageData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Mailbox that owns the scheduled send.
+     */
+    mailbox_id: MailboxId;
+    /**
+     * Scheduled send identifier from scheduled_message_id in the acceptance response.
+     */
+    scheduled_message_id: MailboxScheduledMessageId;
+  };
+  query?: never;
+  url: "/v1/email/mailboxes/{mailbox_id}/scheduled-messages/{scheduled_message_id}";
+};
+
+export type GetMailboxScheduledMessageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetMailboxScheduledMessageError =
+  GetMailboxScheduledMessageErrors[keyof GetMailboxScheduledMessageErrors];
+
+export type GetMailboxScheduledMessageResponses = {
+  /**
+   * Get a scheduled mailbox send.
+   */
+  200: EmailMailboxScheduledMessage;
+};
+
+export type GetMailboxScheduledMessageResponse =
+  GetMailboxScheduledMessageResponses[keyof GetMailboxScheduledMessageResponses];
+
+export type CancelMailboxScheduledMessageData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     * against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Mailbox that owns the scheduled send.
+     */
+    mailbox_id: MailboxId;
+    /**
+     * Scheduled send identifier from scheduled_message_id in the acceptance response.
+     */
+    scheduled_message_id: MailboxScheduledMessageId;
+  };
+  query?: never;
+  url: "/v1/email/mailboxes/{mailbox_id}/scheduled-messages/{scheduled_message_id}/cancel";
+};
+
+export type CancelMailboxScheduledMessageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CancelMailboxScheduledMessageError =
+  CancelMailboxScheduledMessageErrors[keyof CancelMailboxScheduledMessageErrors];
+
+export type CancelMailboxScheduledMessageResponses = {
+  /**
+   * The message is canceled and no longer eligible to send.
+   */
+  204: void;
+};
+
+export type CancelMailboxScheduledMessageResponse =
+  CancelMailboxScheduledMessageResponses[keyof CancelMailboxScheduledMessageResponses];
 
 export type CreateMailboxMessageData = {
   body: EmailMailboxComposeRequest;
@@ -64097,7 +64545,7 @@ export type CreateMailboxMessageError =
 
 export type CreateMailboxMessageResponses = {
   /**
-   * Message accepted for asynchronous delivery and recorded as the first message of a new conversation.
+   * Message accepted for asynchronous delivery. A scheduled send reserves its conversation and message IDs but is recorded only at dispatch.
    */
   202: EmailThreadMessage;
 };

@@ -19,7 +19,12 @@ export type { EmailThreadMessage };
 // mailbox is the sender) and no sending-infrastructure fields — so only these
 // defaults may be merged in. Exported for the type test, which fails if a
 // default a compose accepts is missing here.
-export const COMPOSE_FIELDS = ["reply_to", "category", "tags", "metadata"] as const;
+export const COMPOSE_FIELDS = [
+  "reply_to",
+  "category",
+  "tags",
+  "metadata",
+] as const;
 
 export class EmailMailboxesMessagesResource extends Resource {
   #defaults?: EmailChannelDefaults;
@@ -49,14 +54,17 @@ export class EmailMailboxesMessagesResource extends Resource {
     options?: RequestOptions,
   ): APIPromise<EmailThreadMessage> {
     const body = withDefaults(this.#defaults, params, COMPOSE_FIELDS);
-    return this.call<EmailThreadMessage>("POST", options, ({ signal, headers }) =>
-      createMailboxMessage({
-        client: this.client,
-        path: { mailbox_id: mailboxId },
-        body,
-        headers,
-        signal,
-      }),
+    return this.call<EmailThreadMessage>(
+      "POST",
+      options,
+      ({ signal, headers }) =>
+        createMailboxMessage({
+          client: this.client,
+          path: { mailbox_id: mailboxId },
+          body,
+          headers,
+          signal,
+        }),
     );
   }
 }

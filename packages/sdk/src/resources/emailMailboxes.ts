@@ -7,8 +7,12 @@ import { EmailMailboxesResourceBase } from "./emailMailboxes.gen.js";
 import { EmailMailboxesMessagesResource } from "./emailMailboxesMessages.js";
 import { EmailMailboxesReceiveRulesResource } from "./emailMailboxesReceiveRules.gen.js";
 
+import { EmailMailboxesScheduledMessagesResource } from "./emailMailboxesScheduledMessages.gen.js";
+
 export class EmailMailboxesResource extends EmailMailboxesResourceBase {
   /** Messages sent from the mailbox's own address — `bird.email.mailboxes.messages.create(...)`. */
+  readonly scheduledMessages: EmailMailboxesScheduledMessagesResource;
+
   readonly messages: EmailMailboxesMessagesResource;
 
   /** Per-sender allow/block rules — `bird.email.mailboxes.receiveRules.create(...)`, `.list(...)`, `.delete(...)`. */
@@ -21,6 +25,10 @@ export class EmailMailboxesResource extends EmailMailboxesResourceBase {
   ) {
     super(core, client);
     this.messages = new EmailMailboxesMessagesResource(core, client, defaults);
+    this.scheduledMessages = new EmailMailboxesScheduledMessagesResource(
+      core,
+      client,
+    );
     this.receiveRules = new EmailMailboxesReceiveRulesResource(core, client);
   }
 }

@@ -962,12 +962,35 @@ export type {
 export type { AssetReferenceList } from "./resources/assetsReferences.gen.js";
 
 export type { AssetReference } from "./generated/types.gen.js";
-export type { SmsSendersListQuery, SmsSendersCreateParams, SmsSender } from "./resources/smsSenders.gen.js";
+export type {
+  SmsSendersListQuery,
+  SmsSendersCreateParams,
+  SmsSender,
+} from "./resources/smsSenders.gen.js";
 
-export type { SmsSenderRequirementsListQuery, SmsSenderRequirementList } from "./resources/smsSenderRequirements.gen.js";
+export type {
+  SmsSenderRequirementsListQuery,
+  SmsSenderRequirementList,
+} from "./resources/smsSenderRequirements.gen.js";
 
-export type { SmsSenderRegistrationsCreateParams, SmsCountryRegistration } from "./resources/smsSenderRegistrations.gen.js";
+export type {
+  SmsSenderRegistrationsCreateParams,
+  SmsCountryRegistration,
+} from "./resources/smsSenderRegistrations.gen.js";
 
-export type { BillingPricesResolveQuery, BillingResolvedPrice } from "./resources/billingPrices.gen.js";
+export type {
+  BillingPricesResolveQuery,
+  BillingResolvedPrice,
+} from "./resources/billingPrices.gen.js";
 
 export type { BillingWalletList } from "./resources/billingWallets.gen.js";
+
+export type {
+  EmailMailboxScheduledMessage,
+  EmailMailboxesScheduledMessagesListQuery,
+} from "./resources/emailMailboxesScheduledMessages.gen.js";
+
+export type {
+  Actor,
+  EmailMailboxScheduledMessageStatus,
+} from "./generated/types.gen.js";

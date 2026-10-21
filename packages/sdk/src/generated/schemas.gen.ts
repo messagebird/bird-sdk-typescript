@@ -39313,6 +39313,21 @@ export const EmailThreadSchema = {
       description:
         "Matched search fragments, keyed by the field that matched. Returned only by thread search. Omitted when listing threads.\n",
     },
+    scheduled_count: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Scheduled or dispatching sends targeting this conversation. Returned by conversation get and list, including zero when none remain. Omitted by search.",
+    },
+    next_scheduled_at: {
+      type: "string",
+      format: "date-time",
+      readOnly: true,
+      description:
+        "Earliest due time among scheduled or dispatching sends. Returned by conversation get and list only when scheduled_count is positive. Omitted by search and when no sends remain.",
+    },
   },
 } as const;
 
@@ -39391,6 +39406,13 @@ export const EmailThreadUpdateRequestSchema = {
         "Contact to link this conversation to, or null to unlink the current contact.",
     },
   },
+} as const;
+
+export const MailboxScheduledMessageIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^msm_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "msm_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const EmailThreadMessageRecipientSchema = {
@@ -39474,7 +39496,7 @@ export const EmailThreadMessageSourceSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "When the log entry (and the message's body and raw MIME) expires.",
+        "When the log entry (and the message's body and raw MIME) expires. For a scheduled acknowledgement, calculated from the due time and replaced by the actual dispatch-based deadline once dispatched.",
     },
   },
 } as const;
@@ -39483,7 +39505,7 @@ export const EmailThreadMessageSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A message in a mailbox conversation, either direction. Message metadata, extracted text, and attachment bytes stay readable for the mailbox's retention tier. The body and raw MIME are available through the body and raw endpoints for 30 days after the message occurred.\n",
+    "A message in a mailbox conversation, either direction. Message metadata, extracted text, and attachment bytes stay readable for the mailbox's retention tier. The body and raw MIME are available through the body and raw endpoints for 30 days after the message occurred.\nA scheduled acknowledgement reserves the message and thread IDs but is not stored in the conversation until dispatch. Use its scheduled_message_id and mailbox_id to inspect or cancel the separate schedule; body and raw reads are unavailable before dispatch.\n",
   required: [
     "id",
     "direction",
@@ -39511,6 +39533,30 @@ export const EmailThreadMessageSchema = {
     "occurred_at",
   ],
   properties: {
+    scheduled_message_id: {
+      $ref: "#/components/schemas/MailboxScheduledMessageID",
+      readOnly: true,
+      description:
+        "Separate schedule record, always present when status is scheduled.",
+    },
+    scheduled_at: {
+      type: "string",
+      format: "date-time",
+      readOnly: true,
+      description: "Planned send time on a scheduled acknowledgement.",
+    },
+    mailbox_id: {
+      $ref: "#/components/schemas/MailboxID",
+      readOnly: true,
+      description:
+        "Owning mailbox, always present on scheduled acknowledgements.",
+    },
+    notice: {
+      type: "string",
+      readOnly: true,
+      description:
+        "Informational notice when conversation retention expires before dispatch; the reserved thread is recreated without expired messages.",
+    },
     id: {
       type: "string",
       readOnly: true,
@@ -39606,7 +39652,7 @@ export const EmailThreadMessageSchema = {
       type: ["string", "null"],
       readOnly: true,
       description:
-        "Aggregate delivery status of a sent message:\n\n- `accepted`: Accepted for sending.\n- `sent`: Handed off to the provider.\n- `delivered`: All attempted recipients delivered.\n- `failed`: Terminal failure.\n\nNull for received messages.\n",
+        "Aggregate delivery status of a sent message:\n\n- `scheduled`: Acknowledgement only; the separate schedule is linked by scheduled_message_id.\n- `accepted`: Accepted for sending.\n- `sent`: Handed off to the provider.\n- `delivered`: All attempted recipients delivered.\n- `failed`: Terminal failure.\n\nNull for received messages.\n",
     },
     recipients: {
       type: ["array", "null"],
@@ -39648,7 +39694,7 @@ export const EmailThreadMessageSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        'Scheduled permanent-deletion time. This is the end of the mailbox\'s retention tier, moved to no more than 30 days in the future while the message is in the trash. Restore a trashed message before then with `PATCH {"labels": {"remove": ["trash"]}}`.\n',
+        'Scheduled permanent-deletion time. For a scheduled acknowledgement, this is based on the due time and replaced with actual dispatch-based retention once it sends. This is the end of the mailbox\'s retention tier, moved to no more than 30 days in the future while the message is in the trash. Restore a trashed message before then with `PATCH {"labels": {"remove": ["trash"]}}`.\n',
     },
     attachment_count: {
       type: "integer",
@@ -39695,7 +39741,8 @@ export const EmailThreadMessageSchema = {
       format: "date-time",
       minLength: 1,
       readOnly: true,
-      description: "When the message was received or accepted for sending.",
+      description:
+        "When the message was received or accepted for sending. For a scheduled acknowledgement, the time it is due to send, replaced by the actual send time once it sends.\n",
     },
   },
 } as const;
@@ -39784,7 +39831,22 @@ export const EmailThreadMessageReplyRequestSchema = {
   additionalProperties: false,
   description:
     "A reply to a conversation message. Recipients are derived from the message being replied to: its Reply-To address when present, otherwise its From address. Set `reply_all` to also include the original To and Cc recipients (minus the mailbox's own address). The subject and threading headers are set automatically. At least one of `html` or `text` must be provided.\n",
+  not: {
+    required: ["scheduled_at", "attachments"],
+    properties: {
+      scheduled_at: {},
+      attachments: {
+        minItems: 1,
+      },
+    },
+  },
   properties: {
+    scheduled_at: {
+      type: "string",
+      format: "date-time",
+      description:
+        "Send between 30 seconds and 30 days ahead, sharing the scheduled-email allowance. The scheduled send is listed separately and enters the conversation only at dispatch. Sender, mailbox and send-volume eligibility are rechecked then; refusal fails the schedule record without adding a conversation message. Retention starts at dispatch. Attachments are not supported on scheduled messages; send now or schedule without attachments.",
+    },
     html: {
       type: "string",
       maxLength: 524288,
@@ -39831,19 +39893,179 @@ export const EmailThreadMessageReplyRequestSchema = {
       description:
         "File attachments to include with the reply. The send is rejected when the estimated generated message size exceeds 20 MB (bodies plus all attachments after base64 encoding). Keep total raw attachment content at or below 15 MB for reliable headroom. Attachment metadata stays on the message's `attachment_manifest`, and the bytes are downloadable for the mailbox's retention tier.\n",
     },
+    cancel_on_reply: {
+      type: "boolean",
+      default: false,
+      description:
+        "When scheduled_at is set, cancel if an inbound message arrives in the conversation before dispatch is claimed. Defaults to false: the frozen parent, recipients and content are sent unchanged even if new mail arrives.",
+    },
   },
   example: {
     text: "Thanks, confirming we received your request.",
   },
 } as const;
 
+export const EmailMailboxScheduledMessageStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["scheduled", "sending", "sent", "failed", "canceled"],
+  description:
+    "- `scheduled`: Waiting for its due time; cancellation is still possible.\n- `sending`: Dispatch has been claimed; cancellation is no longer possible.\n- `sent`: Handed to the ordinary send pipeline, not necessarily delivered. Follow message_id for delivery status.\n- `failed`: Terminal dispatch refusal or failure; see failure_reason. The schedule will not retry.\n- `canceled`: Terminal cancellation before dispatch; see cancellation_reason. The message will not send.",
+} as const;
+
+export const EmailMailboxScheduledMessageSchema = {
+  readOnly: true,
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      description:
+        "A mailbox-owned scheduled send, separate from conversation messages. Sent means handed to the ordinary send pipeline, not delivered; follow message_id for delivery status. Frozen recipients and reply headers do not change when new mail arrives. Terminal records remain until the mailbox is permanently erased.",
+      required: [
+        "id",
+        "mailbox_id",
+        "thread_id",
+        "status",
+        "scheduled_at",
+        "cancel_on_reply",
+        "recipients",
+        "subject",
+        "snippet",
+        "created_by",
+      ],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/MailboxScheduledMessageID",
+          description: "Scheduled send identifier.",
+        },
+        mailbox_id: {
+          $ref: "#/components/schemas/MailboxID",
+          description: "Mailbox that owns the send.",
+        },
+        thread_id: {
+          $ref: "#/components/schemas/ThreadID",
+          description:
+            "Reserved conversation identifier. A new compose does not create the conversation until dispatch.",
+        },
+        message_id: {
+          $ref: "#/components/schemas/EmailID",
+          description:
+            "Actual message identifier once handed to the send pipeline.",
+        },
+        status: {
+          $ref: "#/components/schemas/EmailMailboxScheduledMessageStatus",
+        },
+        scheduled_at: {
+          type: "string",
+          minLength: 1,
+          format: "date-time",
+          description: "Scheduled at.",
+        },
+        cancel_on_reply: {
+          type: "boolean",
+          description:
+            "Whether an inbound message cancels this send before dispatch is claimed.",
+        },
+        failure_reason: {
+          type: "string",
+          description: "Why dispatch failed.",
+        },
+        cancellation_reason: {
+          type: "string",
+          description:
+            "Why canceled; replied means new inbound mail canceled an opted-in schedule.",
+        },
+        subject: {
+          type: "string",
+          minLength: 0,
+          description: "Frozen subject.",
+        },
+        snippet: {
+          type: "string",
+          minLength: 0,
+          description: "Plain-text preview of the frozen message.",
+        },
+        recipients: {
+          type: "array",
+          items: {
+            type: "string",
+            format: "email",
+            minLength: 1,
+          },
+          description:
+            "Visible recipients (To and Cc). Bcc addresses remain only in the frozen send payload.",
+        },
+        created_by: {
+          $ref: "#/components/schemas/Actor",
+          description: "Authenticated caller that scheduled the send.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+  example: {
+    id: "msm_01krdgeqcxet5s7t44vh8rt9mg",
+    mailbox_id: "mbx_01krdgeqcxet5s7t44vh8rt9mg",
+    thread_id: "thr_01krdgeqcxet5s7t44vh8rt9mg",
+    status: "scheduled",
+    scheduled_at: "2026-05-20T10:00:00Z",
+    cancel_on_reply: false,
+    recipients: ["customer@example.com"],
+    subject: "Your request",
+    snippet: "Here is the reply.",
+    created_by: {
+      id: "usr_01krdgeqcxet5s7t44vh8rt9mg",
+      type: "user",
+    },
+    created_at: "2026-05-20T09:14:52Z",
+    updated_at: "2026-05-20T09:14:52Z",
+  },
+} as const;
+
+export const EmailMailboxScheduledMessageListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EmailMailboxScheduledMessage",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
 export const EmailMailboxComposeRequestSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A new message sent from a mailbox, starting a new conversation. Mirrors the plain send request without `from`, because the mailbox is who the message comes from, and without `scheduled_at`, because a mailbox sends immediately. We set the RFC 5322 Message-ID so replies thread back into this conversation. At least one of `html` or `text` must be provided.\n",
+    "A new message sent from a mailbox, starting a new conversation. Mirrors the plain send request without `from`, because the mailbox is who the message comes from, and accepts `scheduled_at` to send later. Omit it to send immediately. We set the RFC 5322 Message-ID so replies thread back into this conversation. At least one of `html` or `text` must be provided.\n",
   required: ["to", "subject"],
+  not: {
+    required: ["scheduled_at", "attachments"],
+    properties: {
+      scheduled_at: {},
+      attachments: {
+        minItems: 1,
+      },
+    },
+  },
   properties: {
+    scheduled_at: {
+      type: "string",
+      format: "date-time",
+      description:
+        "Send between 30 seconds and 30 days ahead, sharing the scheduled-email allowance. The scheduled send is listed separately and enters the conversation only at dispatch. Sender, mailbox and send-volume eligibility are rechecked then; refusal fails the schedule record without adding a conversation message. Retention starts at dispatch. Attachments are not supported on scheduled messages; send now or schedule without attachments.",
+    },
     to: {
       type: "array",
       items: {
@@ -39926,6 +40148,12 @@ export const EmailMailboxComposeRequestSchema = {
     category: {
       $ref: "#/components/schemas/EmailMessageCategory",
       default: "transactional",
+    },
+    cancel_on_reply: {
+      type: "boolean",
+      default: false,
+      description:
+        "When scheduled_at is set, cancel if an inbound message arrives in the conversation before dispatch is claimed. Defaults to false: the frozen parent, recipients and content are sent unchanged even if new mail arrives.",
     },
   },
   example: {
@@ -59034,7 +59262,7 @@ export const EmailThreadMessageWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A message in a mailbox conversation, either direction. Message metadata, extracted text, and attachment bytes stay readable for the mailbox's retention tier. The body and raw MIME are available through the body and raw endpoints for 30 days after the message occurred.\n",
+    "A message in a mailbox conversation, either direction. Message metadata, extracted text, and attachment bytes stay readable for the mailbox's retention tier. The body and raw MIME are available through the body and raw endpoints for 30 days after the message occurred.\nA scheduled acknowledgement reserves the message and thread IDs but is not stored in the conversation until dispatch. Use its scheduled_message_id and mailbox_id to inspect or cancel the separate schedule; body and raw reads are unavailable before dispatch.\n",
   required: ["labels", "contact_id"],
   properties: {
     labels: {
@@ -59094,6 +59322,134 @@ export const EmailThreadMessageAttachmentListWritableSchema = {
       type: "array",
     },
   },
+} as const;
+
+export const EmailMailboxScheduledMessageWritableSchema = {
+  readOnly: true,
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      description:
+        "A mailbox-owned scheduled send, separate from conversation messages. Sent means handed to the ordinary send pipeline, not delivered; follow message_id for delivery status. Frozen recipients and reply headers do not change when new mail arrives. Terminal records remain until the mailbox is permanently erased.",
+      required: [
+        "id",
+        "mailbox_id",
+        "thread_id",
+        "status",
+        "scheduled_at",
+        "cancel_on_reply",
+        "recipients",
+        "subject",
+        "snippet",
+        "created_by",
+      ],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/MailboxScheduledMessageID",
+          description: "Scheduled send identifier.",
+        },
+        mailbox_id: {
+          $ref: "#/components/schemas/MailboxID",
+          description: "Mailbox that owns the send.",
+        },
+        thread_id: {
+          $ref: "#/components/schemas/ThreadID",
+          description:
+            "Reserved conversation identifier. A new compose does not create the conversation until dispatch.",
+        },
+        message_id: {
+          $ref: "#/components/schemas/EmailID",
+          description:
+            "Actual message identifier once handed to the send pipeline.",
+        },
+        status: {
+          $ref: "#/components/schemas/EmailMailboxScheduledMessageStatus",
+        },
+        scheduled_at: {
+          type: "string",
+          minLength: 1,
+          format: "date-time",
+          description: "Scheduled at.",
+        },
+        cancel_on_reply: {
+          type: "boolean",
+          description:
+            "Whether an inbound message cancels this send before dispatch is claimed.",
+        },
+        failure_reason: {
+          type: "string",
+          description: "Why dispatch failed.",
+        },
+        cancellation_reason: {
+          type: "string",
+          description:
+            "Why canceled; replied means new inbound mail canceled an opted-in schedule.",
+        },
+        subject: {
+          type: "string",
+          minLength: 0,
+          description: "Frozen subject.",
+        },
+        snippet: {
+          type: "string",
+          minLength: 0,
+          description: "Plain-text preview of the frozen message.",
+        },
+        recipients: {
+          type: "array",
+          items: {
+            type: "string",
+            format: "email",
+            minLength: 1,
+          },
+          description:
+            "Visible recipients (To and Cc). Bcc addresses remain only in the frozen send payload.",
+        },
+        created_by: {
+          $ref: "#/components/schemas/ActorWritable",
+          description: "Authenticated caller that scheduled the send.",
+        },
+      },
+    },
+  ],
+  example: {
+    id: "msm_01krdgeqcxet5s7t44vh8rt9mg",
+    mailbox_id: "mbx_01krdgeqcxet5s7t44vh8rt9mg",
+    thread_id: "thr_01krdgeqcxet5s7t44vh8rt9mg",
+    status: "scheduled",
+    scheduled_at: "2026-05-20T10:00:00Z",
+    cancel_on_reply: false,
+    recipients: ["customer@example.com"],
+    subject: "Your request",
+    snippet: "Here is the reply.",
+    created_by: {
+      id: "usr_01krdgeqcxet5s7t44vh8rt9mg",
+      type: "user",
+    },
+    created_at: "2026-05-20T09:14:52Z",
+    updated_at: "2026-05-20T09:14:52Z",
+  },
+} as const;
+
+export const EmailMailboxScheduledMessageListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/EmailMailboxScheduledMessageWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
 } as const;
 
 export const EmailMailboxLabelListWritableSchema = {

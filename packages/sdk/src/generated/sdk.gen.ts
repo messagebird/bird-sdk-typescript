@@ -31,6 +31,9 @@ import type {
   CancelEsimRecurringSubscriptionData,
   CancelEsimRecurringSubscriptionErrors,
   CancelEsimRecurringSubscriptionResponses,
+  CancelMailboxScheduledMessageData,
+  CancelMailboxScheduledMessageErrors,
+  CancelMailboxScheduledMessageResponses,
   CancelWorkspaceNumberData,
   CancelWorkspaceNumberErrors,
   CancelWorkspaceNumberResponses,
@@ -619,6 +622,9 @@ import type {
   GetMailboxData,
   GetMailboxErrors,
   GetMailboxResponses,
+  GetMailboxScheduledMessageData,
+  GetMailboxScheduledMessageErrors,
+  GetMailboxScheduledMessageResponses,
   GetMailboxStatsData,
   GetMailboxStatsErrors,
   GetMailboxStatsResponses,
@@ -957,6 +963,9 @@ import type {
   ListMailboxReceiveRulesData,
   ListMailboxReceiveRulesErrors,
   ListMailboxReceiveRulesResponses,
+  ListMailboxScheduledMessagesData,
+  ListMailboxScheduledMessagesErrors,
+  ListMailboxScheduledMessagesResponses,
   ListNumbersOrdersData,
   ListNumbersOrdersErrors,
   ListNumbersOrdersResponses,
@@ -12808,7 +12817,7 @@ export const listEmailThreads = <ThrowOnError extends boolean = false>(
 /**
  * Delete a thread
  *
- * Moves the conversation and all of its messages to the trash. Trashed messages are permanently deleted after 30 days, or sooner if the mailbox's retention period ends first. Pass `permanent=true` to permanently delete the conversation and its messages immediately.
+ * Moves the conversation and all of its messages to the trash. Trashed messages are permanently deleted after 30 days, or sooner if the mailbox's retention period ends first. Pass `permanent=true` to permanently delete the conversation and its messages immediately. Pending scheduled sends are canceled in the same transaction as the deletion. If dispatch already claimed a send, deletion returns a conflict and changes nothing.
  *
  */
 export const deleteEmailThread = <ThrowOnError extends boolean = false>(
@@ -13024,7 +13033,7 @@ export const listEmailThreadMessageAttachments = <
 /**
  * Reply to a thread message
  *
- * Sends a reply to a specific message in a conversation, from the mailbox's own address. Recipients are derived from the message being replied to: for a received message, its Reply-To address when present, otherwise its From address; for a message the mailbox sent, its original To recipients. Set `reply_all` to copy the original To and Cc recipients in as `Cc`, leaving out the mailbox's own address. The subject and the threading headers that keep the reply in this conversation are set automatically, and the reply is recorded in the conversation. To reply to a conversation as a whole, target its newest received message.
+ * Sends a reply to a specific message in a conversation, from the mailbox's own address. Recipients are derived from the message being replied to: for a received message, its Reply-To address when present, otherwise its From address; for a message the mailbox sent, its original To recipients. Set `reply_all` to copy the original To and Cc recipients in as `Cc`, leaving out the mailbox's own address. The subject and the threading headers that keep the reply in this conversation are set automatically, and the reply is recorded in the conversation. To reply to a conversation as a whole, target its newest received message. Set `scheduled_at` to send later; the reply joins the conversation only at dispatch.
  *
  */
 export const replyEmailThreadMessage = <ThrowOnError extends boolean = false>(
@@ -13056,9 +13065,102 @@ export const replyEmailThreadMessage = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * List scheduled mailbox sends
+ *
+ * List scheduled sends separately from conversation messages, including completed and canceled records. Filter by conversation or status; use cursors to page.
+ */
+export const listMailboxScheduledMessages = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListMailboxScheduledMessagesData, ThrowOnError>,
+): RequestResult<
+  ListMailboxScheduledMessagesResponses,
+  ListMailboxScheduledMessagesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListMailboxScheduledMessagesResponses,
+    ListMailboxScheduledMessagesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/mailboxes/{mailbox_id}/scheduled-messages",
+    ...options,
+  });
+
+/**
+ * Get a scheduled mailbox send
+ *
+ * Read the scheduled send and its dispatch, failure or cancellation state. The actual message enters the conversation only at dispatch.
+ */
+export const getMailboxScheduledMessage = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetMailboxScheduledMessageData, ThrowOnError>,
+): RequestResult<
+  GetMailboxScheduledMessageResponses,
+  GetMailboxScheduledMessageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetMailboxScheduledMessageResponses,
+    GetMailboxScheduledMessageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/mailboxes/{mailbox_id}/scheduled-messages/{scheduled_message_id}",
+    ...options,
+  });
+
+/**
+ * Cancel a scheduled mailbox send
+ *
+ * Cancels a scheduled send before the scheduler claims dispatch. The record remains visible with status canceled. Cancellation does not refund the scheduled-email allowance. A send already claimed for dispatch or already terminal returns a conflict.
+ */
+export const cancelMailboxScheduledMessage = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CancelMailboxScheduledMessageData, ThrowOnError>,
+): RequestResult<
+  CancelMailboxScheduledMessageResponses,
+  CancelMailboxScheduledMessageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CancelMailboxScheduledMessageResponses,
+    CancelMailboxScheduledMessageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/mailboxes/{mailbox_id}/scheduled-messages/{scheduled_message_id}/cancel",
+    ...options,
+  });
+
+/**
  * Create a message from a mailbox
  *
- * Sends a new message from the mailbox's own address and starts a new conversation with it. The request mirrors the plain send request minus `from`, because the mailbox is who the message comes from. We set the RFC 5322 Message-ID, so later replies from the recipients thread back into the conversation automatically. The send is added to the mailbox's remembered messages and returned as the conversation's first message. A mailbox always sends immediately; scheduled sends are unavailable. A suspended mailbox cannot send and returns `403`.
+ * Sends a new message from the mailbox's own address and starts a new conversation with it. The request mirrors the plain send request minus `from`, because the mailbox is who the message comes from. We set the RFC 5322 Message-ID, so later replies from the recipients thread back into the conversation automatically. For an immediate send, the message is added to the mailbox and returned as the conversation's first message. Set `scheduled_at` to send later: the response reserves the message and conversation IDs with status `scheduled` and links the separate schedule through `scheduled_message_id`. The message joins the conversation only at dispatch. A suspended mailbox cannot send and returns `403`.
  *
  */
 export const createMailboxMessage = <ThrowOnError extends boolean = false>(
