@@ -4447,7 +4447,7 @@ export type SmsSuppressionOrigin =
   "keyword" | "dlr_event" | "api_key" | "user" | (string & {});
 
 /**
- * Message categories blocked for this sender and subscriber. `all` blocks every category, including authentication and transactional messages. `non_transactional` blocks marketing messages only. Responses currently use `all`. Treat unrecognized values as blocking every category.
+ * Message categories blocked for this sender and subscriber. `all` blocks every category, including authentication and transactional messages, except where Bird has agreed a STOP exemption for your workspace's authentication messages. Responses always use `all`; `non_transactional` is not used. Treat unrecognized values as blocking every category.
  *
  */
 export type SmsSuppressionCoverage =
@@ -7541,6 +7541,11 @@ export type WhatsAppMessageTemplateComponentParameter = {
    *
    */
   url?: string;
+  /**
+   * Name the recipient sees on the document, including the extension. Without it, the document arrives untitled. Send it only on a `document` parameter; Bird rejects it on any other kind.
+   *
+   */
+  filename?: string;
   /**
    * The point on the map a location header opens. Send it on a `location` parameter.
    */

@@ -7726,7 +7726,7 @@ export const SMSSuppressionCoverageSchema = {
   minLength: 1,
   "x-extensible-enum": ["all", "non_transactional"],
   description:
-    "Message categories blocked for this sender and subscriber. `all` blocks every category, including authentication and transactional messages. `non_transactional` blocks marketing messages only. Responses currently use `all`. Treat unrecognized values as blocking every category.\n",
+    "Message categories blocked for this sender and subscriber. `all` blocks every category, including authentication and transactional messages, except where Bird has agreed a STOP exemption for your workspace's authentication messages. Responses always use `all`; `non_transactional` is not used. Treat unrecognized values as blocking every category.\n",
 } as const;
 
 export const SMSSuppressionEndReasonSchema = {
@@ -13255,6 +13255,14 @@ export const WhatsAppMessageTemplateComponentParameterSchema = {
       description:
         "Public `https` URL of the file a media header shows, fetched by WhatsApp at send time. Send it on an `image`, `video`, `gif` or `document` parameter.\n",
       example: "https://cdn.example.com/receipts/a1b2c3.png",
+    },
+    filename: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "Name the recipient sees on the document, including the extension. Without it, the document arrives untitled. Send it only on a `document` parameter; Bird rejects it on any other kind.\n",
+      example: "invoice-a1b2c3.pdf",
     },
     location: {
       allOf: [
