@@ -8122,7 +8122,8 @@ export const deleteAmbRoutingRule = <ThrowOnError extends boolean = false>(
 /**
  * Get an Apple Messages for Business routing rule
  *
- * Returns one routing rule by ID.
+ * Returns a single routing rule by ID, including its `business_account_id`, match condition (`match_kind`, `match_intent_id`, `match_group_id`), target `queue`, `precedence`, and `is_default` status. Returns a `404` if the rule does not exist in the workspace.
+ *
  */
 export const getAmbRoutingRule = <ThrowOnError extends boolean = false>(
   options: Options<GetAmbRoutingRuleData, ThrowOnError>,
@@ -8718,6 +8719,7 @@ export const getAmbStatsHourly = <ThrowOnError extends boolean = false>(
  * Get outbound Apple Messages for Business statistics by business
  *
  * Returns outbound counts and latency percentiles grouped by business, for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, omitted when no qualifying message contributes a measurement. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ *
  * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single business, use the summary, daily, or hourly statistics instead.
  *
  */
@@ -8749,6 +8751,7 @@ export const getAmbStatsByBusiness = <ThrowOnError extends boolean = false>(
  * Get outbound Apple Messages for Business statistics by message kind
  *
  * Returns outbound counts and latency percentiles grouped by message content kind, for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, omitted when no qualifying message contributes a measurement. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ *
  * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single content kind, use the summary, daily, or hourly statistics instead.
  *
  */
@@ -8780,6 +8783,7 @@ export const getAmbStatsByMessageKind = <ThrowOnError extends boolean = false>(
  * Get outbound Apple Messages for Business statistics by intent
  *
  * Returns outbound counts and latency percentiles grouped by entry-point intent, for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Intents are workspace-defined strings configured on the business's entry points and have no fixed vocabulary. Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, omitted when no qualifying message contributes a measurement. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ *
  * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single intent, use the summary, daily, or hourly statistics instead.
  *
  */
@@ -8811,6 +8815,7 @@ export const getAmbStatsByIntent = <ThrowOnError extends boolean = false>(
  * Get outbound Apple Messages for Business statistics by group
  *
  * Returns outbound counts and latency percentiles grouped by entry-point group, for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Groups are workspace-defined strings configured on the business's entry points and have no fixed vocabulary. Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, omitted when no qualifying message contributes a measurement. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ *
  * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single group, use the summary, daily, or hourly statistics instead.
  *
  */
@@ -8842,6 +8847,7 @@ export const getAmbStatsByGroup = <ThrowOnError extends boolean = false>(
  * Get outbound Apple Messages for Business statistics by category
  *
  * Returns outbound counts and latency percentiles grouped by message category, for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). A send that names no category is grouped under an empty-string category. Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, omitted when no qualifying message contributes a measurement. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ *
  * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single category, use the summary, daily, or hourly statistics instead.
  *
  */
@@ -8873,6 +8879,7 @@ export const getAmbStatsByCategory = <ThrowOnError extends boolean = false>(
  * Get outbound Apple Messages for Business statistics by tag
  *
  * Returns outbound counts and latency percentiles grouped by tag (`name` or `name:value`), for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Only tagged messages appear, and one carrying several tags counts once under each, so rows do not sum to the period total. Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, omitted when no qualifying message contributes a measurement. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ *
  * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single tag, use the summary, daily, or hourly statistics instead.
  *
  */
@@ -8904,6 +8911,7 @@ export const getAmbStatsByTag = <ThrowOnError extends boolean = false>(
  * Get outbound Apple Messages for Business statistics by error code
  *
  * Returns outbound counts and latency percentiles grouped by failure reason, for the requested period. Rows are ranked by `send_failed + rejected` descending and capped at the requested `limit` (default 50, max 200). Only messages carrying a failure reason appear: a `bird:` code is usually a rejection (never charged, never attempted), an `apple:` code a send failure; use the summary for the period's full accepted total. Rows use accepted-time attribution: a send failure recorded during the period for a message accepted earlier counts against the earlier period. Each row also carries `first_response` latency percentiles, when a failed reply claimed an unanswered inbound message. There is no delivery receipt on this channel, so there is no `delivered` count anywhere in the row.
+ *
  * This is a workspace-scoped, single-dimension breakdown; it does not cross error code with any other dimension such as business. The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter.
  *
  */
@@ -9039,6 +9047,7 @@ export const getAmbInboundStatsHourly = <ThrowOnError extends boolean = false>(
  * Get inbound Apple Messages for Business statistics by business
  *
  * Returns inbound received counts grouped by business, for the requested period. Rows are ranked by received volume descending and capped at the requested `limit` (default 50, max 200). Rows are attributed to when the inbound event occurred, not to any earlier outbound message. This channel has no delivery receipt and no derived rate, so each row carries only the raw `received` count.
+ *
  * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single business, use the inbound summary, daily, or hourly statistics instead.
  *
  */
@@ -9072,6 +9081,7 @@ export const getAmbInboundStatsByBusiness = <
  * Get inbound Apple Messages for Business statistics by intent
  *
  * Returns inbound received counts grouped by entry-point intent, for the requested period. Rows are ranked by received volume descending and capped at the requested `limit` (default 50, max 200). Intents are workspace-defined strings configured on the business's entry points and have no fixed vocabulary. Rows are attributed to when the inbound event occurred, not to any earlier outbound message. This channel has no delivery receipt and no derived rate, so each row carries only the raw `received` count.
+ *
  * The maximum window is 365 days; a longer range returns `422`. Historical dates are supported within the maximum window length; the requested dates are not shifted forward. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single intent, use the inbound summary, daily, or hourly statistics instead.
  *
  */
@@ -12015,6 +12025,7 @@ export const getEmailTemplateParameters = <
  * Get an email template preview
  *
  * Renders a template with the sample values you supply and returns the resulting subject, HTML, and plain-text bodies. Bird does not issue a recipient-specific unsubscribe URL in a preview. If you supply `bird.unsubscribe_url` in `parameters`, the preview renders your value; an empty link is not live. Bird adds unsubscribe content to marketing email at send time; transactional email gets no automatic unsubscribe footer. By default it renders the current draft, so you can check your changes before you submit it. Pass `version` to preview a specific published version instead; built-in `system` templates have no versions, so `version` on a `bird_` template returns a validation error. Pass `contact` to see the email the way one of your contacts would receive it. Works for your workspace templates and built-in `system` templates. Sample `parameters` are capped at 16 KB once serialized, and personalization that is not valid or not supported returns a validation error naming what to fix.
+ *
  * The response also reports what the HTML uses that mail clients remove, ignore, or render inconsistently. Each finding in `compatibility` names the pattern, the line and column it sits on, and what to use instead, and `compatibility_severity` reduces them to one word for the whole body. It is advisory: the preview renders either way.
  *
  */
@@ -13902,7 +13913,7 @@ export const deleteVoiceTrunk = <ThrowOnError extends boolean = false>(
 /**
  * Get a SIP trunk
  *
- * Returns a single SIP trunk, including its Bird-assigned `domain`, its access control lists. Returns a 404 `not_found_error` if the trunk does not exist in the workspace.
+ * Returns a single SIP trunk, including its Bird-assigned `domain`, its IP access control lists, and its allowed API keys. Returns a 404 `not_found_error` if the trunk does not exist in the workspace.
  *
  */
 export const getVoiceTrunk = <ThrowOnError extends boolean = false>(

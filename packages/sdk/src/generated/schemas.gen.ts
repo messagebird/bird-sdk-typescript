@@ -8619,7 +8619,7 @@ export const ComplianceIdentityAnswerSchema = {
         },
       ],
       description:
-        "Where review has got to on this exact value. Absent when no registration has ruled on it, which covers a detail nobody has reached yet and one filed before the container recorded which submission it came from.\nOne value can be filed on several registrations and decided differently on each, and one verdict is reported for it. A live approval wins, because it is proof the value is acceptable. Failing that a refusal wins over a registration still waiting, since waiting is nobody having looked yet rather than evidence against a refusal. An approval past its validity period is neither: it reads as `expired` and ranks below a refusal, above anything still waiting. `not_applicable` is reported last, because it is a statement about a requirement rather than about the value.",
+        "Where review has got to on this exact value. Absent when no registration has ruled on it, which covers a detail nobody has reached yet and one filed before the container recorded which submission it came from.\n\nOne value can be filed on several registrations and decided differently on each, and one verdict is reported for it. A live approval wins, because it is proof the value is acceptable. Failing that a refusal wins over a registration still waiting, since waiting is nobody having looked yet rather than evidence against a refusal. An approval past its validity period is neither: it reads as `expired` and ranks below a refusal, above anything still waiting. `not_applicable` is reported last, because it is a statement about a requirement rather than about the value.\n",
     },
     reason: {
       type: ["string", "null"],
@@ -12966,7 +12966,7 @@ export const VerificationOptionsSchema = {
     language: {
       $ref: "#/components/schemas/LanguageTag",
       description:
-        "Which of the built-in message translations to send. It applies to SMS, email and WhatsApp, and has no effect on a Telegram verification. A tag with no translation of its own falls back to its base language, and then to English. The attempt's `template_language` reports which translation was used. The tag is fixed for the verification, so a resend arrives in the same language as the first message.\n\nOmit it and the language is read from the recipient phone number's country, so a French number gets French without you asking. Set it to override that. A verification with no phone number, and one whose country has no translation here, sends English.\n\nSupported: en, ar, bg, cs, da, de, el, es, fi, fr, he, hi, hr, hu, id, it, ja, ko, lt, lv, mk, mn, ms, nb-NO, nl, no, pl, pt, ro, ru, sk, sl, sr, sv, th, tr, uk, vi, zh, zh-TW. Every one of them is available on SMS and email. Mongolian (mn) is the one WhatsApp cannot carry, so a WhatsApp passcode falls back to English for it.",
+        "Which of the built-in message translations to send. It applies to SMS, email and WhatsApp, and has no effect on a Telegram verification. A tag with no translation of its own falls back to its base language, and then to English. The attempt's `template_language` reports which translation was used. The tag is fixed for the verification, so a resend arrives in the same language as the first message.\n\nOmit it and the language is read from the recipient phone number's country, so a French number gets French without you asking. Set it to override that. A verification with no phone number, and one whose country has no translation here, sends English.\n\nSupported: en, ar, bg, cs, da, de, el, es, fi, fr, he, hi, hr, hu, id, it, ja, ko, lt, lv, mk, mn, ms, nb-NO, nl, no, pl, pt, ro, ru, sk, sl, sr, sv, th, tr, uk, vi, zh, zh-TW. Every one of them is available on SMS and email. Mongolian (mn) is the one WhatsApp cannot carry, so a WhatsApp passcode falls back to English for it.\n",
     },
   },
 } as const;
@@ -13764,7 +13764,7 @@ export const WhatsAppContactCardSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A contact card on this message: one the contact shared, or one this workspace sent.\nNothing here is required. WhatsApp sends the parts the card holds and omits the rest, and a card that arrives with only an `origin` is still meaningful, so an empty card reads back empty rather than being dropped.\n",
+    "A contact card on this message: one the contact shared, or one this workspace sent.\n\nNothing here is required. WhatsApp sends the parts the card holds and omits the rest, and a card that arrives with only an `origin` is still meaningful, so an empty card reads back empty rather than being dropped.\n",
   properties: {
     origin: {
       type: "string",
@@ -15974,7 +15974,7 @@ export const WhatsAppContactCardSendSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A contact card to send. WhatsApp shows the name on the card and the rest in a profile view the recipient opens from it.\nA card carrying a phone number renders buttons that message or save the contact; a card without one can only be added to an address book.\n",
+    "A contact card to send. WhatsApp shows the name on the card and the rest in a profile view the recipient opens from it.\n\nA card carrying a phone number renders buttons that message or save the contact; a card without one can only be added to an address book.\n",
   required: ["name"],
   properties: {
     name: {
@@ -21497,7 +21497,8 @@ export const AMBMessageTypeSchema = {
   type: "string",
   minLength: 1,
   enum: ["text", "rich_link", "interactive"],
-  description: "Apple message family.",
+  description:
+    "Apple Messages for Business message family:\n\n- `text` means a text or attachment message.\n- `rich_link` means a rich URL or video link preview.\n- `interactive` means an interactive payload such as a list picker, time picker, quick reply, form, authentication request, or Apple Pay request.\n",
 } as const;
 
 export const AMBNativeAttachmentSchema = {
@@ -23350,6 +23351,8 @@ export const AMBFormPageTypeSchema = {
   type: "string",
   minLength: 1,
   enum: ["select", "picker", "date_picker", "input"],
+  description:
+    "Type of form page in an Apple Messages for Business interactive form:\n\n- `select` means a single-choice or multiple-choice selection list.\n- `picker` means a wheel picker over a list of items.\n- `date_picker` means a date selector.\n- `input` means a single-line or multi-line text field.\n",
 } as const;
 
 export const AMBInboundFormItemSchema = {
@@ -27537,7 +27540,7 @@ export const WhatsAppKeywordRuleSchema = {
     effective_keywords: {
       type: "array",
       description:
-        "Every keyword that matches this rule: Bird's keywords for the same operation and country, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.\nFor a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.\n",
+        "Every keyword that matches this rule: Bird's keywords for the same operation and country, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.\n\nFor a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.\n",
       items: {
         type: "string",
         minLength: 1,
@@ -45489,7 +45492,7 @@ export const VoicePartySchema = {
         },
       ],
       description:
-        "What kind of participant sat on this side of a leg, and the coordinate that kind carries: a telephone endpoint off the platform, a SIP or WebRTC endpoint, Bird answering, or the platform placing a leg onward. It does not name a person.\n`null` on an observation this API could not read. The entry stays, because the call counted it when it deduplicated, and dropping it here would report fewer participants than were observed.",
+        "What kind of participant sat on this side of a leg, and the coordinate that kind carries: a telephone endpoint off the platform, a SIP or WebRTC endpoint, Bird answering, or the platform placing a leg onward. It does not name a person.\n\n`null` on an observation this API could not read. The entry stays, because the call counted it when it deduplicated, and dropping it here would report fewer participants than were observed.\n",
     },
     address: {
       readOnly: true,
@@ -57024,7 +57027,7 @@ export const WhatsAppKeywordRuleWritableSchema = {
     effective_keywords: {
       type: "array",
       description:
-        "Every keyword that matches this rule: Bird's keywords for the same operation and country, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.\nFor a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.\n",
+        "Every keyword that matches this rule: Bird's keywords for the same operation and country, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.\n\nFor a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.\n",
       items: {
         type: "string",
         minLength: 1,

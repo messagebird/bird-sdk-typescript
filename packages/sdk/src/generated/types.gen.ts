@@ -4965,7 +4965,9 @@ export type ComplianceIdentityAnswer = {
   readonly submitted_at: string | null;
   /**
    * Where review has got to on this exact value. Absent when no registration has ruled on it, which covers a detail nobody has reached yet and one filed before the container recorded which submission it came from.
+   *
    * One value can be filed on several registrations and decided differently on each, and one verdict is reported for it. A live approval wins, because it is proof the value is acceptable. Failing that a refusal wins over a registration still waiting, since waiting is nobody having looked yet rather than evidence against a refusal. An approval past its validity period is neither: it reads as `expired` and ranks below a refusal, above anything still waiting. `not_applicable` is reported last, because it is a statement about a requirement rather than about the value.
+   *
    */
   readonly state?: ComplianceItemState;
   /**
@@ -7377,6 +7379,7 @@ export type VerificationOptions = {
    * Omit it and the language is read from the recipient phone number's country, so a French number gets French without you asking. Set it to override that. A verification with no phone number, and one whose country has no translation here, sends English.
    *
    * Supported: en, ar, bg, cs, da, de, el, es, fi, fr, he, hi, hr, hu, id, it, ja, ko, lt, lv, mk, mn, ms, nb-NO, nl, no, pl, pt, ro, ru, sk, sl, sr, sv, th, tr, uk, vi, zh, zh-TW. Every one of them is available on SMS and email. Mongolian (mn) is the one WhatsApp cannot carry, so a WhatsApp passcode falls back to English for it.
+   *
    */
   language?: LanguageTag;
 };
@@ -7841,6 +7844,7 @@ export type WhatsAppContactAddress = {
 
 /**
  * A contact card on this message: one the contact shared, or one this workspace sent.
+ *
  * Nothing here is required. WhatsApp sends the parts the card holds and omits the rest, and a card that arrives with only an `origin` is still meaningful, so an empty card reads back empty rather than being dropped.
  *
  */
@@ -8959,6 +8963,7 @@ export type WhatsAppContactAddressSend = {
 
 /**
  * A contact card to send. WhatsApp shows the name on the card and the rest in a profile view the recipient opens from it.
+ *
  * A card carrying a phone number renders buttons that message or save the contact; a card without one can only be added to an address book.
  *
  */
@@ -11930,7 +11935,12 @@ export type AmbContentKind =
 export type AmbMessageSource = "operator" | "automation" | "api";
 
 /**
- * Apple message family.
+ * Apple Messages for Business message family:
+ *
+ * - `text` means a text or attachment message.
+ * - `rich_link` means a rich URL or video link preview.
+ * - `interactive` means an interactive payload such as a list picker, time picker, quick reply, form, authentication request, or Apple Pay request.
+ *
  */
 export type AmbMessageType = "text" | "rich_link" | "interactive";
 
@@ -12696,6 +12706,15 @@ export type AmbNativeInboundEvent = {
   title?: string;
 };
 
+/**
+ * Type of form page in an Apple Messages for Business interactive form:
+ *
+ * - `select` means a single-choice or multiple-choice selection list.
+ * - `picker` means a wheel picker over a list of items.
+ * - `date_picker` means a date selector.
+ * - `input` means a single-line or multi-line text field.
+ *
+ */
 export type AmbFormPageType = "select" | "picker" | "date_picker" | "input";
 
 export type AmbInboundFormItem = {
@@ -14833,6 +14852,7 @@ export type WhatsAppKeywordRule = {
   keywords: Array<string>;
   /**
    * Every keyword that matches this rule: Bird's keywords for the same operation and country, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.
+   *
    * For a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.
    *
    */
@@ -25237,7 +25257,9 @@ export type VoicePartyEndpoint = {
 export type VoiceParty = {
   /**
    * What kind of participant sat on this side of a leg, and the coordinate that kind carries: a telephone endpoint off the platform, a SIP or WebRTC endpoint, Bird answering, or the platform placing a leg onward. It does not name a person.
+   *
    * `null` on an observation this API could not read. The entry stays, because the call counted it when it deduplicated, and dropping it here would report fewer participants than were observed.
+   *
    */
   readonly endpoint?: VoicePartyEndpoint | null;
   /**
@@ -31277,6 +31299,7 @@ export type WhatsAppKeywordRuleWritable = {
   keywords: Array<string>;
   /**
    * Every keyword that matches this rule: Bird's keywords for the same operation and country, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.
+   *
    * For a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.
    *
    */
@@ -49945,6 +49968,9 @@ export type RestoreAmbBusinessAccountData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the Apple Messages for Business record to reconnect, as returned by the business list.
+     */
     business_account_id: AmbBusinessId;
   };
   query?: never;
@@ -50018,6 +50044,9 @@ export type ListAmbBusinessAccountEventsData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the Apple Messages for Business record, as returned by the business list.
+     */
     business_account_id: AmbBusinessId;
   };
   query?: {
@@ -50315,6 +50344,9 @@ export type DeleteAmbBusinessAccountData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the Apple Messages for Business record to disconnect, as returned by the business list.
+     */
     business_account_id: AmbBusinessId;
   };
   query?: never;
@@ -50555,6 +50587,9 @@ export type ListAmbBusinessAccountSubmissionsData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the Apple Messages for Business record, as returned by the business list.
+     */
     business_account_id: AmbBusinessId;
   };
   query?: {
@@ -50669,6 +50704,9 @@ export type CreateAmbBusinessAccountSubmissionData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the Apple Messages for Business record, as returned by the business list.
+     */
     business_account_id: AmbBusinessId;
   };
   query?: never;
@@ -51096,6 +51134,9 @@ export type DeleteAmbRoutingRuleData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the routing rule to read, update, or delete.
+     */
     routing_rule_id: AmbRoutingRuleId;
   };
   query?: never;
@@ -51169,6 +51210,9 @@ export type GetAmbRoutingRuleData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the routing rule to read, update, or delete.
+     */
     routing_rule_id: AmbRoutingRuleId;
   };
   query?: never;
@@ -51257,6 +51301,9 @@ export type UpdateAmbRoutingRuleData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the routing rule to read, update, or delete.
+     */
     routing_rule_id: AmbRoutingRuleId;
   };
   query?: never;
@@ -52371,6 +52418,9 @@ export type DeleteAmbSuppressionData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the suppression episode to retrieve or end.
+     */
     suppression_id: AmbSuppressionId;
   };
   query?: never;
@@ -52444,6 +52494,9 @@ export type GetAmbSuppressionData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the suppression episode to retrieve or end.
+     */
     suppression_id: AmbSuppressionId;
   };
   query?: never;
@@ -54953,6 +55006,9 @@ export type DeleteWhatsAppSuppressionData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the WhatsApp suppression record to retrieve or end.
+     */
     suppression_id: WhatsAppSuppressionId;
   };
   query?: never;
@@ -55022,6 +55078,9 @@ export type GetWhatsAppSuppressionData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the WhatsApp suppression record to retrieve or end.
+     */
     suppression_id: WhatsAppSuppressionId;
   };
   query?: never;
@@ -61263,6 +61322,9 @@ export type DeleteEmailTemplateVersionData = {
      *
      */
     template_ref: string;
+    /**
+     * The version to read or reset.
+     */
     version_id: EmailTemplateVersionId;
   };
   query?: never;
@@ -61341,6 +61403,9 @@ export type GetEmailTemplateVersionData = {
      *
      */
     template_ref: string;
+    /**
+     * The version to read or reset.
+     */
     version_id: EmailTemplateVersionId;
   };
   query?: never;
@@ -61410,6 +61475,9 @@ export type ListEmailTemplateVersionLanguagesData = {
      *
      */
     template_ref: string;
+    /**
+     * The version whose languages to list.
+     */
     version_id: EmailTemplateVersionId;
   };
   query?: never;
@@ -61503,7 +61571,13 @@ export type DeleteEmailTemplateLanguageData = {
      *
      */
     template_ref: string;
+    /**
+     * The version that holds the language.
+     */
     version_id: EmailTemplateVersionId;
+    /**
+     * The language as a BCP-47 tag.
+     */
     language: LanguageTag;
   };
   query?: never;
@@ -61582,7 +61656,13 @@ export type GetEmailTemplateLanguageData = {
      *
      */
     template_ref: string;
+    /**
+     * The version that holds the language.
+     */
     version_id: EmailTemplateVersionId;
+    /**
+     * The language as a BCP-47 tag.
+     */
     language: LanguageTag;
   };
   query?: never;
@@ -61676,7 +61756,13 @@ export type UpdateEmailTemplateLanguageData = {
      *
      */
     template_ref: string;
+    /**
+     * The version that holds the language.
+     */
     version_id: EmailTemplateVersionId;
+    /**
+     * The language as a BCP-47 tag.
+     */
     language: LanguageTag;
   };
   query?: never;
@@ -61779,7 +61865,13 @@ export type UpsertEmailTemplateLanguageData = {
      *
      */
     template_ref: string;
+    /**
+     * The version that holds the language.
+     */
     version_id: EmailTemplateVersionId;
+    /**
+     * The language as a BCP-47 tag.
+     */
     language: LanguageTag;
   };
   query?: never;
@@ -61882,6 +61974,9 @@ export type RollbackEmailTemplateData = {
      *
      */
     template_ref: string;
+    /**
+     * The published version to restore.
+     */
     version_id: EmailTemplateVersionId;
   };
   query?: never;
@@ -61984,6 +62079,9 @@ export type SubmitEmailTemplateVersionData = {
      *
      */
     template_ref: string;
+    /**
+     * The draft version to validate or publish.
+     */
     version_id: EmailTemplateVersionId;
   };
   query?: never;
@@ -64088,6 +64186,10 @@ export type ListWebhooksData = {
   };
   path?: never;
   query?: {
+    /**
+     * Field to sort webhook endpoints by: `created_at` (the default; newest first with the default `order`) or the endpoint URL.
+     *
+     */
     sort?: WebhookSortField;
     /**
      * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
@@ -66126,6 +66228,9 @@ export type DeleteVoiceTrunkData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the SIP trunk to retrieve, update, or delete.
+     */
     trunk_id: SipTrunkId;
   };
   query?: never;
@@ -66199,6 +66304,9 @@ export type GetVoiceTrunkData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the SIP trunk to retrieve, update, or delete.
+     */
     trunk_id: SipTrunkId;
   };
   query?: never;
@@ -66286,6 +66394,9 @@ export type UpdateVoiceTrunkData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the SIP trunk to retrieve, update, or delete.
+     */
     trunk_id: SipTrunkId;
   };
   query?: never;
@@ -66435,6 +66546,9 @@ export type ListVoiceTrunkGatewaysData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the SIP trunk whose gateways to list or create.
+     */
     trunk_id: SipTrunkId;
   };
   query?: never;
@@ -66523,6 +66637,9 @@ export type CreateVoiceTrunkGatewayData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the SIP trunk whose gateways to list or create.
+     */
     trunk_id: SipTrunkId;
   };
   query?: never;
@@ -66624,7 +66741,13 @@ export type DeleteVoiceTrunkGatewayData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the SIP trunk that owns the gateway.
+     */
     trunk_id: SipTrunkId;
+    /**
+     * ID of the inbound gateway to retrieve, update, or delete.
+     */
     gateway_id: VoiceTrunkGatewayId;
   };
   query?: never;
@@ -66702,7 +66825,13 @@ export type GetVoiceTrunkGatewayData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the SIP trunk that owns the gateway.
+     */
     trunk_id: SipTrunkId;
+    /**
+     * ID of the inbound gateway to retrieve, update, or delete.
+     */
     gateway_id: VoiceTrunkGatewayId;
   };
   query?: never;
@@ -66791,7 +66920,13 @@ export type UpdateVoiceTrunkGatewayData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the SIP trunk that owns the gateway.
+     */
     trunk_id: SipTrunkId;
+    /**
+     * ID of the inbound gateway to retrieve, update, or delete.
+     */
     gateway_id: VoiceTrunkGatewayId;
   };
   query?: never;
@@ -66974,6 +67109,9 @@ export type GetVoiceNumberData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the voice number to retrieve or update, as returned by the voice number list.
+     */
     number_id: VoiceNumberId;
   };
   query?: never;
@@ -67062,6 +67200,9 @@ export type UpdateVoiceNumberData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the voice number to retrieve or update, as returned by the voice number list.
+     */
     number_id: VoiceNumberId;
   };
   query?: never;
@@ -67508,6 +67649,9 @@ export type DeleteVoiceVerifiedNumberData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the verified number to retrieve, update, or delete.
+     */
     verified_number_id: VoiceVerifiedNumberId;
   };
   query?: never;
@@ -67581,6 +67725,9 @@ export type GetVoiceVerifiedNumberData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the verified number to retrieve, update, or delete.
+     */
     verified_number_id: VoiceVerifiedNumberId;
   };
   query?: never;
@@ -67669,6 +67816,9 @@ export type UpdateVoiceVerifiedNumberData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the verified number to retrieve, update, or delete.
+     */
     verified_number_id: VoiceVerifiedNumberId;
   };
   query?: never;
@@ -67766,6 +67916,9 @@ export type VerifyVoiceVerifiedNumberData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the verified number registration whose ownership challenge to complete.
+     */
     verified_number_id: VoiceVerifiedNumberId;
   };
   query?: never;
@@ -67962,6 +68115,9 @@ export type GetVoiceLegData = {
     "X-Organization-Id"?: string;
   };
   path: {
+    /**
+     * ID of the call leg to retrieve, as returned by the leg list or webhook events.
+     */
     leg_id: VoiceCallId;
   };
   query?: never;
