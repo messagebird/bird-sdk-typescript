@@ -597,7 +597,7 @@ export const _ListEnvelopeWithTotalSchema = {
           format: "int64",
           minimum: 0,
           description:
-            "Total number of items matching the request's filters across all pages. Present only when `include_total=true` was passed; otherwise `null`.",
+            "Total number of items matching the request's filters across all pages. Present only when `include_total=true` was passed, and omitted otherwise.",
         },
       },
     },
@@ -9373,6 +9373,8 @@ export const ComplianceRequirementSchema = {
     "satisfied",
     "needs_input",
     "review_pending",
+    "answers_editable",
+    "resubmission_allowed",
     "submission_id",
     "obligation",
     "fields",
@@ -9442,13 +9444,25 @@ export const ComplianceRequirementSchema = {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether anything is waiting on you. True when a required requirement has no answer, its answer was refused or has gone stale, or the registration needs correction as described by `reason`. False does not imply that review is pending: a closed verifier correction can leave the requirements unsatisfied with no editable answers. Read `review_pending` to determine whether an answer is awaiting review. Read this independently of `satisfied`, which reports whether your paperwork is accepted. An unresolved verifier correction also sets it while the matching grant is live and the correction deadline has not passed, until you supply updated details. At the deadline or after grant withdrawal, an unresolved rejection alone does not set it because accepted answers can no longer be replaced. A corrected optional answer that is rejected or expires still needs your input through ordinary resupply, including after that deadline.\n",
+        "Whether anything is waiting on you. True when a required requirement has no answer, its answer was refused or has gone stale, the registration needs correction as described by `reason`, or a closed submission accepts corrected details (`resubmission_allowed`). False does not imply that review is pending: a closed verifier correction can leave the requirements unsatisfied with no editable answers. Read `review_pending` to determine whether an answer is awaiting review. Read this independently of `satisfied`, which reports whether your paperwork is accepted. An unresolved verifier correction also sets it while the matching grant is live and the correction deadline has not passed, until you supply updated details. At the deadline or after grant withdrawal, an unresolved rejection alone does not set it because accepted answers can no longer be replaced. A corrected optional answer that is rejected or expires still needs your input through ordinary resupply, including after that deadline.\n",
     },
     review_pending: {
       type: "boolean",
       readOnly: true,
       description:
         "Whether any submitted answer is awaiting or undergoing review. False after all answers have received verdicts. A closed verifier correction can remain unsatisfied with no review pending and no editable answers.\n",
+    },
+    answers_editable: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether you may change any answer, not only one that was refused or has gone stale. True for a number, business identity or SMS sender registration whose submission has not been approved yet, including answers awaiting review or already accepted, and for a closed submission when `resubmission_allowed` is true. An SMS sender registration goes to the carrier or registry when it is approved, so it stays editable only until then. A changed answer loses its verdict and is reviewed again. Send only the answers you change. False once the submission is approved: replace only answers in `fields` whose state is `not_supplied`, `rejected` or `expired`, or those marked `editable_for_verifier_repair`.\n",
+    },
+    resubmission_allowed: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether Bird closed the previous submission but accepts corrected details for this registration. When `submission_id` is set, update that submission with your corrected answers and it is reviewed again. When `submission_id` is `null`, the form has changed since: create a new submission. `reason` says why the previous one was closed. False when nothing was closed, and when a closed submission cannot be sent again; contact support then.\n",
     },
     reason: {
       type: ["string", "null"],
@@ -9895,7 +9909,7 @@ export const ComplianceSubmissionResupplySchema = {
   additionalProperties: false,
   required: ["answers"],
   description:
-    "Replacement answers for an existing submission. Rejected, expired, or missing answers can\nbe supplied again; accepted answers normally cannot be changed.\n\nWhen the requirements response marks an accepted answer as `editable_for_verifier_repair`,\nyou can replace it during that open correction and before its deadline. Accepted-answer\nrepairs must change content; unchanged accepted entries are ignored. Rejected, expired,\nor missing answers follow the ordinary resupply rules, including same-value retries\nafter a grant is withdrawn. Supplied replacements are reviewed again.\n",
+    "Replacement answers for an existing submission. Rejected, expired, or missing answers can\nbe supplied again; accepted answers normally cannot be changed. While the requirements\nresponse reports `answers_editable` with a `submission_id`, you can change any answer on that\nsubmission; send only the ones you change. With `submission_id` null, create a new submission instead.\n\nWhen the requirements response marks an accepted answer as `editable_for_verifier_repair`,\nyou can replace it during that open correction and before its deadline. Accepted-answer\nrepairs must change content; unchanged accepted entries are ignored. Rejected, expired,\nor missing answers follow the ordinary resupply rules, including same-value retries\nafter a grant is withdrawn. Supplied replacements are reviewed again.\n",
   properties: {
     answers: {
       type: "array",
@@ -13452,7 +13466,7 @@ export const WhatsAppMediaSchema = {
       type: "string",
       format: "uri",
       description:
-        "Where to fetch the media. On an inbound message, or one from the WhatsApp Business app, this is a Bird URL you fetch with your API key; it is absent when the file could not be retrieved from WhatsApp. It stays populated after the stored bytes expire, and the link returns `410` from then on. On a message sent through Bird it is the URL the sender supplied, whose availability is the sender's to guarantee.\n",
+        "Where to fetch the media. On an inbound message, or one from the WhatsApp Business app, this is a Bird URL you fetch with your API key. The file expires with the message, 30 days after it arrives, and the link returns `404` from then on. If the file is gone while the message is still readable, the link returns `410`. On a message sent through Bird it is the URL the sender supplied, whose availability is the sender's to guarantee.\n",
       example:
         "https://platform.bird.com/v1/whatsapp/messages/wam_01kya19eknftrs2s6p82asmvnh/media/waf_01kyb2m4xq7whs0d8n3prv6tez",
     },
@@ -13685,7 +13699,7 @@ export const WhatsAppContactPhoneSchema = {
       type: "string",
       description:
         "The label attached to this value, for example `CELL`, `Home` or `iPhone`. Free text: WhatsApp defines no vocabulary. A label on a received card is lowercased; one this workspace sent reads back exactly as sent.\n",
-      example: "CELL",
+      example: "cell",
     },
   },
 } as const;
@@ -13843,7 +13857,7 @@ export const WhatsAppContactCardSchema = {
     phone_numbers: [
       {
         phone_number: "+16505551234",
-        type: "CELL",
+        type: "cell",
       },
     ],
   },
@@ -14234,7 +14248,6 @@ export const WhatsAppUnsupportedSchema = {
       "x-extensible-enum": [
         "reaction",
         "interactive",
-        "button",
         "order",
         "system",
         "unsupported",
@@ -15426,7 +15439,7 @@ export const WhatsAppInteractiveCardSendSchema = {
       minItems: 1,
       maxItems: 3,
       description:
-        "The buttons under the card, in the order given. Either one `cta_url` button or up to three `quick_reply` buttons: the two kinds cannot be mixed on one card. Every card in the carousel must carry the same kinds in the same number, and a carousel whose cards disagree returns a `422` `WhatsAppInteractiveCarouselButtonsMismatch`.\n",
+        "The buttons under the card, in the order given. Either one `cta_url` button or up to three `quick_reply` buttons: the two kinds cannot be mixed on one card. Every card in the carousel must carry the same kinds in the same number, and a carousel whose cards disagree returns a `422` `WhatsAppInteractiveCardsButtonsMismatch`.\n",
       items: {
         $ref: "#/components/schemas/WhatsAppInteractiveButtonSend",
       },
@@ -16471,6 +16484,127 @@ export const ConversationInboxStatusSchema = {
     "Whether the conversation needs attention in the workspace inbox. Set it to `resolved` when the work is finished. A new inbound message reopens the same conversation. Changing inbox status preserves message history and does not change the channel's permission to send messages or mark messages read.",
 } as const;
 
+export const WhatsAppConversationControlSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["bird", "meta_business_agent"],
+  description:
+    "Who is in charge of answering the contact's inbound messages. This is a separate question from a message's `origin`, which says where that message came from.\n\n- `meta_business_agent`: the Meta Business Agent on this number answers them.\n- `bird`: your workspace answers them through Bird, and the agent stays silent until you release the conversation.\n\nA message your workspace sends also gives your workspace control.\n",
+  example: "bird",
+} as const;
+
+export const WhatsAppConversationServiceWindowStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["open", "closed"],
+  description:
+    "Whether the customer-service window is open right now.\n\n- `open`: the contact wrote within the last 24 hours, so free-form messages are accepted.\n- `closed`: the window has passed, or the contact has never written, so only a template can be sent.\n",
+  example: "open",
+} as const;
+
+export const WhatsAppConversationIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^wacv_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "wacv_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppConversationRecipientSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "The contact or group on the other side of this conversation. Profile fields are null when unknown and on group conversations.",
+  required: ["bsuid", "phone_number", "display_name", "username"],
+  properties: {
+    bsuid: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Meta's business-scoped user ID for the contact, or null when unknown.",
+      example: "US.13491208655302741918",
+    },
+    phone_number: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Contact phone number in E.164 format, or null when unknown.",
+      example: "+15550001111",
+    },
+    display_name: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Display name from the contact's WhatsApp profile, or null when none has been recorded.",
+    },
+    username: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Contact's WhatsApp username without a leading `@`, or null when none has been recorded. Messages cannot be addressed by username.",
+    },
+    group_id: {
+      $ref: "#/components/schemas/WhatsAppGroupID",
+      description:
+        "Group this conversation belongs to. Omitted for a conversation with one contact.",
+    },
+  },
+  example: {
+    bsuid: "US.13491208655302741918",
+    phone_number: "+15550001111",
+    display_name: "Jamie Rivera",
+    username: "jamierivera",
+  },
+} as const;
+
+export const WhatsAppConversationServiceWindowSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["status", "ends_at"],
+  description:
+    "The 24-hour customer-service window, measured from the most recent message this contact sent. Free-form messages are accepted while it is open; once it closes, only a template can start the conversation again.\n\nThis is what Bird observed, not a promise about what WhatsApp will accept: a message Bird never received leaves the window looking shorter than it is, and WhatsApp decides each send on its own.\n",
+  properties: {
+    status: {
+      $ref: "#/components/schemas/WhatsAppConversationServiceWindowStatus",
+    },
+    ends_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When the window closes, or closed. Null when no inbound message has been recorded, in which case `status` is `closed`.",
+      example: "2026-09-23T10:35:00Z",
+    },
+  },
+} as const;
+
+export const WhatsAppConversationLastMessageSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "A pointer to the most recent message in this conversation, in either direction. It names the message rather than copying it: read the message itself, with its content and delivery status, through the conversation's message list.\n",
+  required: ["id", "direction", "created_at"],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/WhatsAppMessageID",
+      description: "ID of the message.",
+    },
+    direction: {
+      $ref: "#/components/schemas/MessageDirection",
+      description:
+        "`inbound` for a message received from the contact, `outbound` for one your workspace or the agent sent.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description:
+        "The message's `created_at`: when it was accepted (outbound) or received (inbound). The conversation list is ordered by it. It only moves forward: a message that arrives late and belongs earlier in the conversation does not pull it back.\n",
+    },
+  },
+} as const;
+
 export const ConversationLabelsSchema = {
   type: "array",
   items: {
@@ -16483,6 +16617,140 @@ export const ConversationLabelsSchema = {
   description:
     "Workspace labels on this conversation. Labels do not change read state or inbox status.",
   example: ["billing", "vip"],
+} as const;
+
+export const WhatsAppConversationSchema = {
+  description:
+    "One WhatsApp conversation between a number you have connected and a single contact, or a group it belongs to. It holds who answers the conversation right now, its read state and labels, when its service window closes, and the most recent message. Resolving the inbox work preserves the conversation's ID and history. A new inbound message reopens it. Messages are retained for 30 days, and the conversation is deleted when its last message expires.\n",
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: [
+    "id",
+    "business_phone_number",
+    "recipient",
+    "control",
+    "inbox_status",
+    "assigned_to",
+    "last_message",
+    "service_window",
+    "unread_count",
+    "labels",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/WhatsAppConversationID",
+      description: "Conversation ID.",
+    },
+    business_phone_number: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Your WhatsApp business phone number this conversation runs on, in E.164 format. It stays the same when you remove the number and connect it again. Null when Bird holds no phone number for it.\n",
+      example: "+15550001234",
+    },
+    recipient: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppConversationRecipient",
+        },
+      ],
+      description:
+        "The other side of the conversation: the contact, or the group it takes place in. A group conversation carries `group_id` and null contact identity fields.\n",
+    },
+    inbox_status: {
+      $ref: "#/components/schemas/ConversationInboxStatus",
+    },
+    control: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppConversationControl",
+        },
+      ],
+      description:
+        "Who answers this conversation right now. You take and release control in the dashboard inbox.",
+    },
+    assigned_to: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/UserID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The user this conversation is assigned to. Null when unassigned. Assignment is not rechecked against workspace membership on read, so it can still name a user whose access was removed.\n",
+    },
+    service_window: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppConversationServiceWindow",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Customer-service window for a contact. Null for group conversations.",
+    },
+    last_message: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppConversationLastMessage",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "A pointer to the most recent message in this conversation. It names the message; read its content through the conversation's message list. Null when the conversation has no message yet.\n",
+    },
+    unread_count: {
+      type: "integer",
+      minimum: 0,
+      description:
+        "Number of inbound messages the workspace has not acknowledged. Shared across the workspace. Sending a reply does not mark messages read.\n",
+    },
+    labels: {
+      $ref: "#/components/schemas/ConversationLabels",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When Bird opened this conversation.",
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When this conversation last changed.",
+    },
+  },
+} as const;
+
+export const WhatsAppConversationListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "A page of conversations, most recently active first.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppConversation",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
 } as const;
 
 export const _ConversationUpdateSchema = {
@@ -16519,6 +16787,98 @@ export const _ConversationUpdateSchema = {
         "Mark received inbound messages with created_at at or before this timestamp as read in the shared workspace inbox. Messages sharing the timestamp are included together. Later arrivals remain unread until another read update. This does not send a read receipt to the customer or change inbox status. Omit to leave read state unchanged.",
     },
   },
+} as const;
+
+export const WhatsAppConversationUpdateRequestSchema = {
+  description:
+    "Changes to apply to a conversation. Every field is optional; omit one to leave it unchanged. Control moves in the dashboard inbox instead, because WhatsApp has to accept that change and can refuse it.\n",
+  allOf: [
+    {
+      $ref: "#/components/schemas/_ConversationUpdate",
+    },
+  ],
+  unevaluatedProperties: false,
+} as const;
+
+export const WhatsAppConversationEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Type of conversation event. `whatsapp_conversation.control_changed` records the conversation moving between the Meta Business Agent and your application, `whatsapp_conversation.assigned` records it being assigned, reassigned or unassigned, and `whatsapp_conversation.agent_notified` records a notification sent to the agent about this contact. Open enum: new event types may be added over time, so treat any unrecognized value as a future event rather than an error. The values below are the types known at this version.",
+  "x-extensible-enum": [
+    "whatsapp_conversation.control_changed",
+    "whatsapp_conversation.assigned",
+    "whatsapp_conversation.agent_notified",
+  ],
+  example: "whatsapp_conversation.control_changed",
+} as const;
+
+export const WhatsAppConversationEventIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^wace_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "wace_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppConversationEventSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["id", "type", "summary", "metadata", "created_at"],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/WhatsAppConversationEventID",
+      description: "Event ID.",
+    },
+    type: {
+      $ref: "#/components/schemas/WhatsAppConversationEventType",
+    },
+    summary: {
+      type: "string",
+      minLength: 1,
+      description: "Human-readable summary of what happened.",
+      example: "Handed to your application by the agent.",
+    },
+    metadata: {
+      type: "object",
+      description:
+        "Structured details for the event. `from` and `to` carry the values that changed: the holder (`meta_business_agent` or `bird`) for a control change, the assigned user ID for an assignment, null for no assignee. A control change also carries the `initiator` and, when one was left, the `reason`. An assignment carries `assigned_by`, the actor who made it. An agent notification carries the `agent_notification_id` and its `name`.",
+      additionalProperties: true,
+      example: {
+        from: "meta_business_agent",
+        to: "bird",
+        initiator: "meta_business_agent",
+        reason: "Customer asked for a person",
+      },
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When the event happened.",
+    },
+  },
+} as const;
+
+export const WhatsAppConversationEventListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of conversation events, newest first.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppConversationEvent",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
 } as const;
 
 export const WhatsAppGroupSortFieldSchema = {
@@ -17594,7 +17954,7 @@ export const WhatsAppTemplateLanguageStateSchema = {
         },
       ],
       description:
-        "Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -17831,12 +18191,520 @@ export const WhatsAppTemplateListSchema = {
   ],
 } as const;
 
+export const WhatsAppTemplateCategoryWriteSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["authentication", "utility", "marketing"],
+  "x-enum-varnames": [
+    "WhatsAppTemplateCategoryWriteAuthentication",
+    "WhatsAppTemplateCategoryWriteUtility",
+    "WhatsAppTemplateCategoryWriteMarketing",
+  ],
+  description:
+    "Meta's content classification for a template.\n\n- `authentication`: delivers one-time passcodes.\n- `utility`: delivers transaction-triggered updates (receipts, order status).\n- `marketing`: carries promotional content.\n\nThe category determines what a send costs. Any other value is rejected.\n",
+  example: "utility",
+} as const;
+
+export const WhatsAppTemplateComponentTypeWriteSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["header", "body", "footer", "buttons", "carousel"],
+  "x-enum-varnames": [
+    "WhatsAppTemplateComponentTypeWriteHeader",
+    "WhatsAppTemplateComponentTypeWriteBody",
+    "WhatsAppTemplateComponentTypeWriteFooter",
+    "WhatsAppTemplateComponentTypeWriteButtons",
+    "WhatsAppTemplateComponentTypeWriteCarousel",
+  ],
+  description:
+    "A content block's type. A `body` block is required on every language; `header`, `footer`, `buttons` and `carousel` are optional and appear at most once each. A `carousel` holds the cards a marketing template scrolls through, and is the one block type that nests: its cards carry blocks of their own. Any other value is rejected.\n",
+  example: "body",
+} as const;
+
+export const WhatsAppTemplateHeaderFormatWriteSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["text", "image", "video", "gif", "document", "location"],
+  "x-enum-varnames": [
+    "WhatsAppTemplateHeaderFormatWriteText",
+    "WhatsAppTemplateHeaderFormatWriteImage",
+    "WhatsAppTemplateHeaderFormatWriteVideo",
+    "WhatsAppTemplateHeaderFormatWriteGif",
+    "WhatsAppTemplateHeaderFormatWriteDocument",
+    "WhatsAppTemplateHeaderFormatWriteLocation",
+  ],
+  description:
+    "A header's kind. The `text` format carries a line of copy. The `image`, `video`, `gif`, and `document` formats each show a file whose address you give in `url`. A `gif` is an MP4 that plays automatically and works only on a marketing template. The `location` format shows a map the recipient can tap to open. It carries no content here because the coordinates belong to the message rather than the template. Any other value is rejected.\n",
+  example: "text",
+} as const;
+
+export const WhatsAppTemplateParameterTypeWriteSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["text", "image", "video", "gif", "document"],
+  "x-enum-varnames": ["Text", "Image", "Video", "Gif", "Document"],
+  description:
+    "The kind of value a template parameter accepts. `text` is an example filling a `{{n}}` placeholder. The other four are the sample file a media header shows, and each matches its header's `format`. Any other value is rejected.\n",
+  example: "text",
+} as const;
+
+export const WhatsAppTemplateExampleParameterWriteSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  description: "One example value for one variable, as written to a draft.",
+  properties: {
+    type: {
+      $ref: "#/components/schemas/WhatsAppTemplateParameterTypeWrite",
+    },
+    text: {
+      type: "string",
+      description:
+        "The example value. Send it when `type` is `text`. May be empty on a draft; required before submission.\n",
+      example: "123456",
+    },
+    url: {
+      type: "string",
+      maxLength: 2000,
+      description:
+        "The address of the file a media header shows. Send it when `type` is `image`, `video`, `gif` or `document`. We fetch the file when the language is submitted and hand Meta our own copy, so the address only has to be reachable at submission. WhatsApp reviews the template with this file, and the message each recipient receives carries the file named on the send. May be empty on a draft, for a file not yet chosen; a reachable address is required before submission.\n",
+      example: "https://www.example.com/holiday/banner.jpg",
+    },
+    name: {
+      type: "string",
+      description:
+        "The named placeholder this example fills. Send it only for a template written against named parameters rather than positional `{{n}}` ones. May be empty on a draft; required before submission.\n",
+      example: "first_name",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateButtonTypeWriteSchema = {
+  type: "string",
+  minLength: 1,
+  enum: [
+    "url",
+    "quick_reply",
+    "phone_number",
+    "otp",
+    "copy_code",
+    "request_contact_info",
+  ],
+  "x-enum-varnames": [
+    "WhatsAppTemplateButtonTypeWriteUrl",
+    "WhatsAppTemplateButtonTypeWriteQuickReply",
+    "WhatsAppTemplateButtonTypeWritePhoneNumber",
+    "WhatsAppTemplateButtonTypeWriteOtp",
+    "WhatsAppTemplateButtonTypeWriteCopyCode",
+    "WhatsAppTemplateButtonTypeWriteRequestContactInfo",
+  ],
+  description:
+    "A button's behavior.\n\n- `url`: opens a link.\n- `quick_reply`: sends its own label back to you as an inbound message.\n- `phone_number`: dials the number it carries.\n- `otp`: copies a one-time passcode. It belongs only on an authentication\n  template, and that template takes no other button type.\n- `copy_code`: copies a coupon code to the recipient's clipboard. It belongs\n  only on a marketing template, which takes at most one.\n- `request_contact_info`: asks the recipient to share the phone number their\n  WhatsApp account carries. It belongs only on a utility or marketing\n  template, as that template's only button.\n\nAny other value is rejected.\n",
+  example: "url",
+} as const;
+
+export const WhatsAppTemplateButtonOtpTypeWriteSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["copy_code"],
+  description:
+    "How the recipient receives a one-time passcode. `copy_code` puts it on the clipboard.",
+  example: "copy_code",
+} as const;
+
+export const WhatsAppTemplateButtonWriteSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  description: "One button, as written to a draft.",
+  properties: {
+    type: {
+      $ref: "#/components/schemas/WhatsAppTemplateButtonTypeWrite",
+    },
+    otp_type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateButtonOtpTypeWrite",
+        },
+      ],
+      description:
+        "How the recipient receives the passcode. Send it only on an `otp` button.",
+    },
+    text: {
+      type: "string",
+      maxLength: 25,
+      description:
+        "The button's label, which each button type treats differently.\n\n- `url`, `quick_reply`, `phone_number`: your own label. Required.\n- `otp`: omit it. WhatsApp writes this label itself and reveals it only\n  once the language has been submitted.\n- `copy_code`: omit it. WhatsApp fixes this label and does not let you\n  change it.\n- `request_contact_info`: omit it. WhatsApp fixes this label too and\n  writes `Share Contact Info`, which is also what a submitted button\n  reads back as, so a read button can be written back unchanged.\n\nA draft takes any label, so this may be empty on a draft and is required\nonly before submission. A label a fixed-label button may not carry is\nrefused rather than silently replaced: the submit comes back as\n`valid: false` with an `errors` entry naming this field, in every\nlanguage.\n",
+      example: "Track order",
+    },
+    url: {
+      type: "string",
+      maxLength: 2000,
+      description:
+        "The address a `url` button opens. An address with a placeholder is personalized per recipient, and one without is the same for everyone. At most one variable, and it must sit at the end of the address, written as `{{1}}`. A button address is numbered this way even on a template whose text uses named variables. A variable needs its example value in `example_parameters`. May be empty on a draft; required before submission.\n",
+      example: "https://www.example.com/orders/{{1}}",
+    },
+    phone_number: {
+      type: "string",
+      maxLength: 20,
+      description:
+        "The number a `phone_number` button dials, in international format. Some countries publish numbers with a leading zero after the country calling code; WhatsApp strips that zero, so give a number that dials without it. May be empty on a draft; required before submission.\n",
+      example: "+14155550100",
+    },
+    example_parameters: {
+      type: "array",
+      description:
+        "The value that fills the variable in `url`, which WhatsApp reviews in the filled address. Send only the value, so a `{{1}}` standing for an order number takes `A-4192`. Required whenever `url` carries a variable. Also required on a `copy_code` button as one `text` entry. The entry carries a sample coupon code of at most 20 characters for WhatsApp to review. Each recipient copies the code you provide when sending the message.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateExampleParameterWrite",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateCardComponentTypeWriteSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["header", "body", "buttons"],
+  "x-enum-varnames": [
+    "WhatsAppTemplateCardComponentTypeWriteHeader",
+    "WhatsAppTemplateCardComponentTypeWriteBody",
+    "WhatsAppTemplateCardComponentTypeWriteButtons",
+  ],
+  description:
+    "A card block's type. A card carries a `header` showing an image or a video, and optionally a `body` and a `buttons` block. A card has no footer and cannot hold a carousel of its own, which is why a card's blocks are a narrower set than a template's.\n",
+  example: "header",
+} as const;
+
+export const WhatsAppTemplateCardHeaderFormatWriteSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["image", "video"],
+  "x-enum-varnames": [
+    "WhatsAppTemplateCardHeaderFormatWriteImage",
+    "WhatsAppTemplateCardHeaderFormatWriteVideo",
+  ],
+  description:
+    "A card header's kind. A card shows an image or a video only, so a document header works at the top of a template but not on a card.\n",
+  example: "image",
+} as const;
+
+export const WhatsAppTemplateCardComponentWriteSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  description:
+    "One content block inside a carousel card, as written to a draft. A card carries a narrower set of blocks than a template does, so it has its own shape rather than reusing the template's.\n",
+  properties: {
+    type: {
+      $ref: "#/components/schemas/WhatsAppTemplateCardComponentTypeWrite",
+    },
+    format: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateCardHeaderFormatWrite",
+        },
+      ],
+      description:
+        "The card header's kind. Required on a card's `header` block and refused on any other.\n",
+    },
+    text: {
+      type: "string",
+      description:
+        "The card block's text, with each variable written as a placeholder. Send it on a `body` block. If any card carries body text then every card must, so the cards keep an even height. May be empty on a draft; required before submission.\n",
+      example: "Chronograph, brown leather",
+    },
+    example_parameters: {
+      type: "array",
+      description:
+        "An example value per `{{n}}` in `text`, in placeholder order. Meta reviews the filled message rather than the template, so a block with variables and no examples is refused. A card's `header` block carries its file here as a single entry whose `type` matches the header's `format` and whose `url` addresses the file, the same way a template header does.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateExampleParameterWrite",
+      },
+    },
+    buttons: {
+      type: "array",
+      maxItems: 2,
+      description:
+        "The buttons this card carries, at most two. Send it only on a card's `buttons` block. Every card must carry the same buttons in the same order. A card takes a `quick_reply`, `phone_number` or `url` button; a `copy_code` or `request_contact_info` button belongs on the template itself.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateButtonWrite",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateCardWriteSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One card in a carousel, as written to a draft.",
+  properties: {
+    components: {
+      type: "array",
+      maxItems: 3,
+      description:
+        "This card's content blocks, in display order. A card carries a `header` showing an image or a video, and optionally a `body` and a `buttons` block. Every card in the carousel must carry the same blocks, and the same buttons, in the same order, so a card with body text means every card needs body text. May be omitted or empty on a draft; a header block is required before submission.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateCardComponentWrite",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateComponentWriteSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  description: "One content block, as written to a draft.\n",
+  properties: {
+    type: {
+      $ref: "#/components/schemas/WhatsAppTemplateComponentTypeWrite",
+    },
+    format: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateHeaderFormatWrite",
+        },
+      ],
+      description:
+        "The header's kind. Required on a `header` block and refused on any other.\n",
+    },
+    text: {
+      type: "string",
+      description:
+        "The block's text, with each variable written as a placeholder. Send it on a `body`, a `footer`, and a `text` header. Four blocks refuse it. A `buttons` block carries text on the buttons themselves. A media or `location` header shows a file or map and has nowhere to put copy. A `carousel` carries text on its cards. For an authentication template's body and footer, WhatsApp writes the copy from the two settings below. May be empty on a draft; required before submission.\n",
+      example: "Your order {{order_id}} has shipped.",
+    },
+    add_security_recommendation: {
+      type: "boolean",
+      description:
+        "Ends an authentication template's body with WhatsApp's own advice not to share the code. Send it only on an authentication template's body block, whose copy is otherwise WhatsApp's to write.\n",
+    },
+    code_expiration_minutes: {
+      type: "integer",
+      description:
+        "How long the passcode stays valid. Send it on an authentication template's footer block and WhatsApp writes the footer stating it; omit the footer block entirely to leave it off. WhatsApp enforces the range it accepts and refuses the submission otherwise.\n",
+      example: 60,
+    },
+    example_parameters: {
+      type: "array",
+      description:
+        "An example value per `{{n}}` in `text`, in placeholder order. Meta reviews the filled message rather than the template, so a block with variables and no examples is refused. A media header also carries its file here as one entry. Its `type` matches the header's `format`, and its `url` addresses the file. A media header has no placeholder, so this entry is the header's own sample rather than a value that fills one.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateExampleParameterWrite",
+      },
+    },
+    buttons: {
+      type: "array",
+      maxItems: 10,
+      description:
+        "The buttons this block carries. Send it only on a `buttons` block. Ten in total, of which at most two open a link and at most one dials a number. Quick replies must sit together rather than being interleaved with the other types, so `Quick reply, Quick reply, Link` is accepted where `Quick reply, Link, Quick reply` is refused. A template with four or more buttons, or one that mixes a quick reply with another type, cannot be opened on WhatsApp's desktop clients, and the recipient is asked to switch to their phone. May be omitted or empty on a draft; at least one button is required before submission.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateButtonWrite",
+      },
+    },
+    cards: {
+      type: "array",
+      maxItems: 10,
+      description:
+        "The cards a `carousel` block scrolls through. Send it only on a `carousel` block, and only on a marketing template. Every card must carry the same blocks in the same order, and a card's header shows an `image` or a `video`. A `document` header works at the top of a template but not on a card. The number of cards is fixed once the language is approved. A template approved with three cards always sends three. Changing the count requires a new template rather than a new version of this one. May be omitted or hold fewer than two on a draft; at least two are required before submission.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateCardWrite",
+      },
+    },
+  },
+} as const;
+
 export const WhatsAppTemplateRevisionSchema = {
   type: "integer",
   minimum: 1,
   description:
     "A write counter, incremented every time the content it belongs to changes. It sits at 1 on content that has never been written through this API.\n",
   example: 4,
+} as const;
+
+export const WhatsAppTemplateLanguageUpsertSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One language's content, as written to a draft.",
+  properties: {
+    components: {
+      type: "array",
+      maxItems: 10,
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateComponentWrite",
+      },
+      description:
+        "The template's content blocks for this language. Header, footer and buttons are optional. Every variable needs an example value, which is what Meta reviews against. May be omitted or empty on a draft; a body block is required before the language can be submitted.\n",
+    },
+    revision: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateRevision",
+        },
+      ],
+      description:
+        "The revision you last read for this language, making the write a compare-and-set: a mismatch is refused with a conflict, leaving an edit you have not seen in place. Omit it for last-write-wins, which is what a single writer wants. Supplying it for a language that does not exist is also refused with a conflict rather than recreating the language. Inside a template's initial languages seed on create, a value here is refused, since no prior revision exists yet to compare against.\n",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Parameters for creating a WhatsApp template, optionally seeding its first draft.",
+  required: ["waba", "slug", "category", "default_language"],
+  properties: {
+    waba: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The WhatsApp Business Account to author this template on. A template belongs to one account at Meta and is reviewed, approved and sent under it, so every create names the account explicitly. It must be an account connected to this workspace.\n",
+      example: "102290129340398",
+    },
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      description:
+        "The template's workspace-unique handle, and what a send references. Editable only before the first submission. The `bird_` prefix is reserved for our built-in templates and is rejected. Meta's own template name is derived from this handle, so the handle itself is validated against the charset Meta accepts.\n",
+      example: "order_update",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The template's display name, shown wherever the template is listed. Free text, changeable at any time. Defaults to the slug when omitted.\n",
+      example: "Order update",
+    },
+    description: {
+      type: "string",
+      maxLength: 1000,
+      description: "What the template is for. Free text.",
+      example: "Sent when a customer's order ships.",
+    },
+    category: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateCategoryWrite",
+        },
+      ],
+      description:
+        "The category Meta reviews the template under. Required, because Meta demands one on every template it holds and it determines what a send costs. There is no default. Meta can recategorize a template after review; the per-language summary reports what it actually holds.\n",
+    },
+    default_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+      ],
+      description:
+        "The language a send uses when it names none, and the last resort when a requested language is unavailable. When `languages` is supplied it must be one of its keys.\n",
+      example: "en",
+    },
+    on_missing_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateOnMissingLanguage",
+        },
+      ],
+      description:
+        "How a send behaves when it asks for a language this template does not carry. Defaults to `fail`: a WhatsApp send that silently fell back would deliver approved copy the recipient did not expect, at a price the sender did not choose.\n",
+    },
+    language_source_required: {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether a send has to name a language. Set it to have a send that names none rejected, leaving the default language for sends that ask for it.\n",
+    },
+    languages: {
+      type: "object",
+      maxProperties: 25,
+      propertyNames: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      additionalProperties: {
+        $ref: "#/components/schemas/WhatsAppTemplateLanguageUpsert",
+      },
+      description:
+        "Optional seed for the template's first draft, keyed by BCP-47 language\ntag. Supplying it opens the draft and writes every language in one\ntransaction: any invalid entry fails the whole create, leaving no\ntemplate behind. Tags are canonicalised, so `pt-br` lands as `pt-BR`, and\ntwo keys canonicalising to one tag are rejected.\n\nOmit it to create the template with no draft, and add content later\nthrough the version and language paths. Nothing here reaches Meta:\ncontent is submitted, never created.\n",
+      example: {
+        en: {
+          components: [
+            {
+              type: "body",
+              text: "Your order {{order_id}} has shipped.",
+              example_parameters: [
+                {
+                  type: "text",
+                  name: "order_id",
+                  text: "A-4192",
+                },
+              ],
+            },
+          ],
+        },
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Partial update of a template's metadata and language policies. Only the fields you send are changed; the rest are left as they stand. The slug can change only before the first submission.\n",
+  properties: {
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      description:
+        "A new workspace-unique handle. Editable only before the first submission. After a change, the old slug no longer resolves; the template ID stays the same.\n",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The template's display name. Editable at any time; it is not what a send references.",
+      example: "Order update",
+    },
+    description: {
+      type: ["string", "null"],
+      maxLength: 1000,
+      description: "What the template is for. Send `null` to clear it.",
+    },
+    default_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+      ],
+      description:
+        "The language a send falls back to, and the one language the template is required to carry. Repointing it at a language the draft does not hold is refused, the same way removing the current default is: add the language first.\n",
+      example: "en",
+    },
+    on_missing_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateOnMissingLanguage",
+        },
+      ],
+      description:
+        "How a send behaves when it asks for a language this template does not carry. Omitting it leaves the template's current setting alone. The `fail` default belongs to a create, and a partial update never reapplies it.\n",
+    },
+    language_source_required: {
+      type: "boolean",
+      description: "Whether a send has to name a language.",
+    },
+  },
 } as const;
 
 export const WhatsAppTemplateVersionSummarySchema = {
@@ -17966,7 +18834,7 @@ export const WhatsAppTemplateVersionLanguageSchema = {
         },
       ],
       description:
-        "Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -18043,6 +18911,172 @@ export const WhatsAppTemplateVersionSchema = {
   },
   description:
     "One version of a template: the content of every language it holds, frozen when it was submitted, alongside what Meta made of each. A draft is a version too: a mutable one, with no number and no submission date.\n",
+} as const;
+
+export const WhatsAppTemplateDuplicateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The account the copy is created on, plus optional overrides. Everything else is inherited from the source.",
+  required: ["waba"],
+  properties: {
+    waba: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The WhatsApp Business Account the copy is created on. A template belongs to one account at Meta. Meta reviews, approves, and sends it under that account. The copy therefore names its account rather than taking the source's. A built-in template's account is not one you can submit against. It must be an account connected to this workspace.\n",
+      example: "102290129340398",
+    },
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      description:
+        "The copy's handle. The server assigns one when omitted. A `bird_` slug is rejected, and one already in use is a conflict.\n",
+      example: "acme_order_update",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "The copy's display name. Inherited from the source when omitted.",
+    },
+    include_languages: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/LanguageTag",
+      },
+      minItems: 1,
+      maxItems: 100,
+      uniqueItems: true,
+      description:
+        "The languages the copy carries, when it should carry only some of them. Every entry must be a language the source holds. A copy narrows the set it inherits, it never adds to it. Omitted, the copy takes all of the source's languages.\n",
+      example: ["pt-BR", "es-ES"],
+    },
+    default_language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+      ],
+      description:
+        "The copy's default language, which must be one of the languages the copy carries. Omitted, the copy keeps the source's default when `include_languages` still carries it. Otherwise it takes the first of the copy's languages sorted by canonical tag, which is the order the copy stores them in, not the order `include_languages` listed them.\n",
+      example: "pt-BR",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateSubmitSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Options for a submit. Every field is optional, so an empty body submits the draft as it stands.\n",
+  properties: {
+    validate_only: {
+      type: "boolean",
+      default: false,
+      description:
+        "Check the draft without submitting it. Every language is checked and every problem reported, but nothing is frozen and nothing is sent to WhatsApp. A clean result does not guarantee WhatsApp approval: WhatsApp offers no way to ask in advance, so it can still refuse a submission these checks passed. Use a different idempotency key for the validation and the submission. Reusing one key with different request bodies is rejected.\n",
+    },
+  },
+  example: {
+    validate_only: true,
+  },
+} as const;
+
+export const WhatsAppTemplateSubmitProblemSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One problem found while checking a version.",
+  required: ["code", "message"],
+  properties: {
+    language: {
+      readOnly: true,
+      description:
+        "The language the problem belongs to, or null when it concerns the version as a whole.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    field: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Where the problem sits inside the language's content, as a dotted path with indexes, or null when it is not about one field. The path is rooted at the language you wrote, so `components[0].text` is the first block's text.\n",
+      example: "components[2].cards[0].components[1].example_parameters[0].url",
+    },
+    code: {
+      type: "string",
+      minLength: 1,
+      pattern: "^E\\d{5}$",
+      readOnly: true,
+      description:
+        "The error code a real submit fails with. Look it up in the error catalog for what to do about it.\n",
+      example: "E15025",
+    },
+    message: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "What is wrong, in a form you can show the author.",
+      example: "A body block needs text.",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateSubmitResultSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The outcome of a submit. The shape is the same whether the submit was a check or a real one: read `valid` and `version` to see what happened.\n",
+  required: ["valid", "errors"],
+  properties: {
+    valid: {
+      type: "boolean",
+      readOnly: true,
+      description: "Whether the version passed every check.",
+    },
+    errors: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateSubmitProblem",
+      },
+      description:
+        "Every problem found across every language. One round trip identifies all problems. Empty when `valid` is true.\n",
+    },
+    version: {
+      readOnly: true,
+      description:
+        "The version this submit froze, or null when nothing was frozen: a check run, or a submit that found problems.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateVersion",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next with this outcome. Present on reads that compute it: an empty list\nmeans there is nothing to do, and the field is absent entirely on responses that do\nnot report next actions.\n\nA failed check routes back to the languages that need an edit; a clean one routes to\nthe real submit, and then to polling the template for WhatsApp's verdicts.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+  },
 } as const;
 
 export const WhatsAppTemplateLanguageSummarySchema = {
@@ -18149,6 +19183,52 @@ export const WhatsAppTemplateQualitySchema = {
     "Meta's quality rating for one language, with the rating it moved from and when it moved. Present only once Meta has rated the language, and only on the version currently in service. A superseded version's content carries no rating.\n",
 } as const;
 
+export const WhatsAppTemplatePauseReasonSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "first_pause",
+    "second_pause",
+    "rate_limiting_pause",
+    "disabled",
+  ],
+  description:
+    "WhatsApp's label for why it took a language out of service: its `other_info.title`, lowercased. `first_pause` and `second_pause` are the first and second pauses for a low quality rating, which last three and six hours. `rate_limiting_pause` is a pause WhatsApp applied to limit sending. `disabled` means WhatsApp stopped the language from sending after repeated pauses. This is an open enum. Accept unrecognized values.\n",
+  example: "first_pause",
+} as const;
+
+export const WhatsAppTemplatePauseSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["started_at"],
+  properties: {
+    started_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      readOnly: true,
+      description: "When WhatsApp paused or disabled the language.",
+      example: "2026-07-26T16:41:00Z",
+    },
+    reason: {
+      $ref: "#/components/schemas/WhatsAppTemplatePauseReason",
+      readOnly: true,
+      description:
+        "WhatsApp's label for the pause or disablement. Absent when WhatsApp sent none.\n",
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "WhatsApp's explanation of the pause or disablement, passed through unmodified. Absent when WhatsApp sent none.\n",
+      example: "Your WhatsApp message template has been paused.",
+    },
+  },
+  description:
+    "WhatsApp's record of why it paused or disabled one language. Set when WhatsApp pauses or disables the language and removed once the language can send again. Present only on the version currently in service.\n",
+} as const;
+
 export const WhatsAppTemplateLanguageSchema = {
   type: "object",
   additionalProperties: false,
@@ -18206,6 +19286,11 @@ export const WhatsAppTemplateLanguageSchema = {
       description:
         "Meta's quality rating for this language. Present only on the version currently in service, and only once Meta has rated it.\n",
     },
+    pause: {
+      $ref: "#/components/schemas/WhatsAppTemplatePause",
+      description:
+        "Why WhatsApp paused or disabled this language. Present only on the version currently in service, and only until the language can send again.\n",
+    },
     rejection: {
       allOf: [
         {
@@ -18222,7 +19307,7 @@ export const WhatsAppTemplateLanguageSchema = {
         },
       ],
       description:
-        "Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
     submitted_at: {
       type: ["string", "null"],
@@ -18264,6 +19349,72 @@ export const WhatsAppTemplateLanguageSchema = {
   },
   description:
     "One language of one version: its content, what the submission carrying it did with it, and everything Meta holds about it.\n",
+} as const;
+
+export const WhatsAppTemplateLanguageSavedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "What a language write returns, enough to make the next write without re-reading.",
+  required: ["language", "revision", "content_hash", "updated_at"],
+  properties: {
+    language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The canonical form of the tag you addressed. Use it in later calls for this language.",
+      example: "pt-BR",
+    },
+    revision: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateRevision",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The language's new revision, to pass back on your next write.",
+    },
+    content_hash: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateContentHash",
+        },
+      ],
+      readOnly: true,
+      description:
+        "A hash over the content as saved, so you can tell whether your next write would change anything without diffing the document.\n",
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When this language was last written.",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateLanguageDiscardSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Parameters for discarding one language's draft edits. Pass `revision` to guard against overwriting an edit you haven't seen.",
+  properties: {
+    revision: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateRevision",
+        },
+      ],
+      description:
+        "The revision you last read for this language, making the discard a compare-and-set: a mismatch is refused with a conflict, leaving an edit you have not seen in place. Omit it for last-write-wins, which is what a single writer wants. Supplying it for a language the draft no longer holds is also refused with a conflict rather than recreating the language.\n",
+    },
+  },
 } as const;
 
 export const WhatsAppStatsSummaryPeriodSchema = {
@@ -19896,6 +21047,15 @@ export const WhatsAppNumberSchema = {
       description:
         "The number you hold with us that this WhatsApp number was connected from, as its id in GET /v1/numbers. Absent for a number you brought yourself.\n",
     },
+    verified_until: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When we expect WhatsApp to release this pre-verified number if you have not finished signup by then. Present only while the number is `awaiting_signup`. Absent for a number pre-verified before we started recording this moment, and for a number you brought yourself.\n",
+      example: "2026-11-19T10:22:31Z",
+    },
     name: {
       type: "string",
       minLength: 1,
@@ -20055,7 +21215,7 @@ export const WhatsAppNumberListSchema = {
       },
     },
     {
-      $ref: "#/components/schemas/_ListEnvelope",
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
     },
   ],
 } as const;
@@ -20394,7 +21554,7 @@ export const AMBBusinessAccountSchema = {
       minLength: 1,
       readOnly: true,
       description: "When the business record was created.",
-      example: "2026-08-20T09:14:52.000Z",
+      example: "2026-08-20T09:14:52Z",
     },
     updated_at: {
       type: "string",
@@ -20402,7 +21562,7 @@ export const AMBBusinessAccountSchema = {
       minLength: 1,
       readOnly: true,
       description: "When the business record was last changed.",
-      example: "2026-08-25T16:42:01.000Z",
+      example: "2026-08-25T16:42:01Z",
     },
     next: {
       type: "array",
@@ -46413,7 +47573,7 @@ export const NumberOwnershipStatusSchema = {
     "unknown",
   ],
   description:
-    "Current ownership registration approval status. Operational activation is separate:\n`blocked_at` records the ownership block on number use, and `next` describes remaining work.\n\n- `needs_input` means ownership details or a submission correction are needed.\n- `under_review` means your current answers are being reviewed.\n- `approval_pending` means your paperwork is accepted but registration approval is still pending.\n- `approved` means ownership registration is approved. Number activation can still be pending while `blocked_at` is non-null.\n- `not_required` means no active ownership requirement applies, including after a requirement is withdrawn.\n- `rejected` means the submission was closed or the verifier correction deadline passed. Corrections are no longer accepted for this submission.\n- `unknown` means current approval status could not be determined. Read `blocked_at` for any recorded ownership block. Retry the read.\n",
+    "Current ownership registration approval status. Operational activation is separate:\n`blocked_at` records the ownership block on number use, and `next` describes remaining work.\n\n- `needs_input` means ownership details or a submission correction are needed, including when Bird closed a submission but accepts corrected details.\n- `under_review` means your current answers are being reviewed. Until the submission is approved, you can still change any answer; a changed answer is reviewed again.\n- `approval_pending` means your paperwork is accepted but registration approval is still pending.\n- `approved` means ownership registration is approved. Number activation can still be pending while `blocked_at` is non-null.\n- `not_required` means no active ownership requirement applies, including after a requirement is withdrawn.\n- `rejected` means the submission was closed without accepting another one, or the verifier correction deadline passed. Corrections are no longer accepted for this submission. Contact support.\n- `unknown` means current approval status could not be determined. Read `blocked_at` for any recorded ownership block. Retry the read.\n",
 } as const;
 
 export const NumberOwnershipSchema = {
@@ -54774,7 +55934,7 @@ export const WhatsAppMediaWritableSchema = {
       type: "string",
       format: "uri",
       description:
-        "Where to fetch the media. On an inbound message, or one from the WhatsApp Business app, this is a Bird URL you fetch with your API key; it is absent when the file could not be retrieved from WhatsApp. It stays populated after the stored bytes expire, and the link returns `410` from then on. On a message sent through Bird it is the URL the sender supplied, whose availability is the sender's to guarantee.\n",
+        "Where to fetch the media. On an inbound message, or one from the WhatsApp Business app, this is a Bird URL you fetch with your API key. The file expires with the message, 30 days after it arrives, and the link returns `404` from then on. If the file is gone while the message is still readable, the link returns `410`. On a message sent through Bird it is the URL the sender supplied, whose availability is the sender's to guarantee.\n",
       example:
         "https://platform.bird.com/v1/whatsapp/messages/wam_01kya19eknftrs2s6p82asmvnh/media/waf_01kyb2m4xq7whs0d8n3prv6tez",
     },
@@ -55073,6 +56233,297 @@ export const WhatsAppReactionEventListWritableSchema = {
   ],
 } as const;
 
+export const WhatsAppConversationRecipientWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "The contact or group on the other side of this conversation. Profile fields are null when unknown and on group conversations.",
+  required: ["bsuid", "phone_number", "display_name", "username"],
+  properties: {
+    bsuid: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Meta's business-scoped user ID for the contact, or null when unknown.",
+      example: "US.13491208655302741918",
+    },
+    phone_number: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Contact phone number in E.164 format, or null when unknown.",
+      example: "+15550001111",
+    },
+    display_name: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Display name from the contact's WhatsApp profile, or null when none has been recorded.",
+    },
+    username: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Contact's WhatsApp username without a leading `@`, or null when none has been recorded. Messages cannot be addressed by username.",
+    },
+    group_id: {
+      $ref: "#/components/schemas/WhatsAppGroupID",
+      description:
+        "Group this conversation belongs to. Omitted for a conversation with one contact.",
+    },
+  },
+  example: {
+    bsuid: "US.13491208655302741918",
+    phone_number: "+15550001111",
+    display_name: "Jamie Rivera",
+    username: "jamierivera",
+  },
+} as const;
+
+export const WhatsAppConversationServiceWindowWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["status", "ends_at"],
+  description:
+    "The 24-hour customer-service window, measured from the most recent message this contact sent. Free-form messages are accepted while it is open; once it closes, only a template can start the conversation again.\n\nThis is what Bird observed, not a promise about what WhatsApp will accept: a message Bird never received leaves the window looking shorter than it is, and WhatsApp decides each send on its own.\n",
+  properties: {
+    status: {
+      $ref: "#/components/schemas/WhatsAppConversationServiceWindowStatus",
+    },
+    ends_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When the window closes, or closed. Null when no inbound message has been recorded, in which case `status` is `closed`.",
+      example: "2026-09-23T10:35:00Z",
+    },
+  },
+} as const;
+
+export const WhatsAppConversationLastMessageWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "A pointer to the most recent message in this conversation, in either direction. It names the message rather than copying it: read the message itself, with its content and delivery status, through the conversation's message list.\n",
+  required: ["id", "direction", "created_at"],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/WhatsAppMessageID",
+      description: "ID of the message.",
+    },
+    direction: {
+      $ref: "#/components/schemas/MessageDirection",
+      description:
+        "`inbound` for a message received from the contact, `outbound` for one your workspace or the agent sent.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description:
+        "The message's `created_at`: when it was accepted (outbound) or received (inbound). The conversation list is ordered by it. It only moves forward: a message that arrives late and belongs earlier in the conversation does not pull it back.\n",
+    },
+  },
+} as const;
+
+export const WhatsAppConversationWritableSchema = {
+  description:
+    "One WhatsApp conversation between a number you have connected and a single contact, or a group it belongs to. It holds who answers the conversation right now, its read state and labels, when its service window closes, and the most recent message. Resolving the inbox work preserves the conversation's ID and history. A new inbound message reopens it. Messages are retained for 30 days, and the conversation is deleted when its last message expires.\n",
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: [
+    "id",
+    "business_phone_number",
+    "recipient",
+    "control",
+    "inbox_status",
+    "assigned_to",
+    "last_message",
+    "service_window",
+    "unread_count",
+    "labels",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/WhatsAppConversationID",
+      description: "Conversation ID.",
+    },
+    business_phone_number: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Your WhatsApp business phone number this conversation runs on, in E.164 format. It stays the same when you remove the number and connect it again. Null when Bird holds no phone number for it.\n",
+      example: "+15550001234",
+    },
+    recipient: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppConversationRecipientWritable",
+        },
+      ],
+      description:
+        "The other side of the conversation: the contact, or the group it takes place in. A group conversation carries `group_id` and null contact identity fields.\n",
+    },
+    inbox_status: {
+      $ref: "#/components/schemas/ConversationInboxStatus",
+    },
+    control: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppConversationControl",
+        },
+      ],
+      description:
+        "Who answers this conversation right now. You take and release control in the dashboard inbox.",
+    },
+    assigned_to: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/UserID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The user this conversation is assigned to. Null when unassigned. Assignment is not rechecked against workspace membership on read, so it can still name a user whose access was removed.\n",
+    },
+    service_window: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppConversationServiceWindowWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Customer-service window for a contact. Null for group conversations.",
+    },
+    last_message: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppConversationLastMessageWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "A pointer to the most recent message in this conversation. It names the message; read its content through the conversation's message list. Null when the conversation has no message yet.\n",
+    },
+    unread_count: {
+      type: "integer",
+      minimum: 0,
+      description:
+        "Number of inbound messages the workspace has not acknowledged. Shared across the workspace. Sending a reply does not mark messages read.\n",
+    },
+    labels: {
+      $ref: "#/components/schemas/ConversationLabels",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When Bird opened this conversation.",
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When this conversation last changed.",
+    },
+  },
+} as const;
+
+export const WhatsAppConversationListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "A page of conversations, most recently active first.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppConversationWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
+export const WhatsAppConversationEventWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["id", "type", "summary", "metadata", "created_at"],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/WhatsAppConversationEventID",
+      description: "Event ID.",
+    },
+    type: {
+      $ref: "#/components/schemas/WhatsAppConversationEventType",
+    },
+    summary: {
+      type: "string",
+      minLength: 1,
+      description: "Human-readable summary of what happened.",
+      example: "Handed to your application by the agent.",
+    },
+    metadata: {
+      type: "object",
+      description:
+        "Structured details for the event. `from` and `to` carry the values that changed: the holder (`meta_business_agent` or `bird`) for a control change, the assigned user ID for an assignment, null for no assignee. A control change also carries the `initiator` and, when one was left, the `reason`. An assignment carries `assigned_by`, the actor who made it. An agent notification carries the `agent_notification_id` and its `name`.",
+      additionalProperties: true,
+      example: {
+        from: "meta_business_agent",
+        to: "bird",
+        initiator: "meta_business_agent",
+        reason: "Customer asked for a person",
+      },
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When the event happened.",
+    },
+  },
+} as const;
+
+export const WhatsAppConversationEventListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of conversation events, newest first.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppConversationEventWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
 export const WhatsAppGroupWritableSchema = {
   allOf: [
     {
@@ -55180,7 +56631,7 @@ export const WhatsAppTemplateLanguageStateWritableSchema = {
     },
     error: {
       description:
-        "Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -55330,7 +56781,7 @@ export const WhatsAppTemplateVersionLanguageWritableSchema = {
     },
     error: {
       description:
-        "Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -55373,6 +56824,13 @@ export const WhatsAppTemplateVersionWritableSchema = {
   },
   description:
     "One version of a template: the content of every language it holds, frozen when it was submitted, alongside what Meta made of each. A draft is a version too: a mutable one, with no number and no submission date.\n",
+} as const;
+
+export const WhatsAppTemplateSubmitResultWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The outcome of a submit. The shape is the same whether the submit was a check or a real one: read `valid` and `version` to see what happened.\n",
 } as const;
 
 export const WhatsAppTemplateLanguageSummaryWritableSchema = {
@@ -55472,7 +56930,7 @@ export const WhatsAppTemplateLanguageWritableSchema = {
     },
     error: {
       description:
-        "Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -55678,7 +57136,7 @@ export const WhatsAppNumberListWritableSchema = {
       },
     },
     {
-      $ref: "#/components/schemas/_ListEnvelope",
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
     },
   ],
 } as const;

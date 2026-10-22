@@ -92,6 +92,103 @@ export async function whatsappTemplatesVersionsLanguagesGet() {
   for (const component of language.components) console.log(component.type);
 }
 
+export async function whatsappTemplatesCreate() {
+  const template = await bird.whatsapp.templates.create({
+    waba: "102290129340398",
+    slug: "order_update",
+    name: "Order update",
+    category: "utility",
+    default_language: "en",
+    languages: {
+      en: {
+        components: [
+          {
+            type: "body",
+            text: "Your order {{order_id}} has shipped.",
+            example_parameters: [{ type: "text", name: "order_id", text: "A-4192" }],
+          },
+        ],
+      },
+    },
+  });
+  console.log(template.id, template.draft_version_id);
+}
+
+export async function whatsappTemplatesUpdate() {
+  const template = await bird.whatsapp.templates.update("order_update", {
+    name: "Order shipped",
+  });
+  console.log(template.slug, template.name);
+}
+
+export async function whatsappTemplatesDelete() {
+  await bird.whatsapp.templates.delete("order_update");
+}
+
+export async function whatsappTemplatesDuplicate() {
+  const copy = await bird.whatsapp.templates.duplicate("bird_otp", {
+    waba: "102290129340398",
+    slug: "acme_otp",
+  });
+  console.log(copy.slug, copy.draft_version_id);
+}
+
+export async function whatsappTemplatesVersionsCreate() {
+  const draft = await bird.whatsapp.templates.versions.create("order_update");
+  console.log(draft.id);
+}
+
+export async function whatsappTemplatesVersionsDelete() {
+  await bird.whatsapp.templates.versions.delete("order_update", "wav_01krdgeqcxet5s7t44vh8rt9mg");
+}
+
+export async function whatsappTemplatesVersionsSubmit() {
+  const draftId = "wav_01krdgeqcxet5s7t44vh8rt9mg";
+  const check = await bird.whatsapp.templates.versions.submit("order_update", draftId, {
+    validate_only: true,
+  });
+  for (const problem of check.errors) console.log(problem.language, problem.field, problem.message);
+  if (check.valid) {
+    const submitted = await bird.whatsapp.templates.versions.submit("order_update", draftId);
+    console.log(submitted.version?.id);
+  }
+}
+
+export async function whatsappTemplatesVersionsLanguagesSet() {
+  const saved = await bird.whatsapp.templates.versions.languages.set(
+    "order_update",
+    "wav_01krdgeqcxet5s7t44vh8rt9mg",
+    "es",
+    {
+      components: [
+        {
+          type: "body",
+          text: "Tu pedido {{order_id}} ya fue enviado.",
+          example_parameters: [{ type: "text", name: "order_id", text: "A-4192" }],
+        },
+      ],
+    },
+  );
+  console.log(saved.language, saved.revision);
+}
+
+export async function whatsappTemplatesVersionsLanguagesDelete() {
+  await bird.whatsapp.templates.versions.languages.delete(
+    "order_update",
+    "wav_01krdgeqcxet5s7t44vh8rt9mg",
+    "es",
+  );
+}
+
+export async function whatsappTemplatesVersionsLanguagesDiscard() {
+  const restored = await bird.whatsapp.templates.versions.languages.discard(
+    "order_update",
+    "wav_01krdgeqcxet5s7t44vh8rt9mg",
+    "en",
+  );
+  console.log(restored.language, restored.revision);
+}
+
 export async function whatsappNumbersList() {
   for await (const number of bird.whatsapp.numbers.list({ status: ["connected"] })) {
     console.log(number.id, number.phone_number, number.status);
@@ -406,4 +503,54 @@ export async function whatsappAgentsNotificationsGet() {
   // straight after create can throw a not-found error.
   const notification = await bird.whatsapp.agents.notifications.get("waan_01krdgeqcxet5s7t44vh8rt9m7");
   console.log(notification.status, notification.skipped_reason ?? notification.error?.description);
+}
+
+export async function whatsappConversationsList() {
+  const conversations = await bird.whatsapp.conversations.list({
+    inbox_status: "open",
+    control: "bird",
+    assigned_to: "unassigned",
+  });
+  for (const conversation of conversations.data ?? []) {
+    console.log(conversation.id, conversation.unread_count, conversation.service_window?.status);
+  }
+}
+
+export async function whatsappConversationsGet() {
+  const conversation = await bird.whatsapp.conversations.get("wacv_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(conversation.control, conversation.assigned_to, conversation.labels);
+}
+
+export async function whatsappConversationsUpdate() {
+  // labels replaces the whole set, so send every label to keep.
+  const conversation = await bird.whatsapp.conversations.update("wacv_01krdgeqcxet5s7t44vh8rt9mg", {
+    assigned_to: "usr_01krdgeqcxet5s7t44vh8rt9mg",
+    labels: ["billing", "vip"],
+    inbox_status: "resolved",
+  });
+  console.log(conversation.inbox_status);
+}
+
+export async function whatsappConversationsListEvents() {
+  const events = await bird.whatsapp.conversations.listEvents("wacv_01krdgeqcxet5s7t44vh8rt9mg");
+  for (const event of events.data ?? []) {
+    console.log(event.created_at, event.type, event.summary);
+  }
+}
+
+export async function whatsappConversationsListMessages() {
+  const messages = await bird.whatsapp.conversations.listMessages("wacv_01krdgeqcxet5s7t44vh8rt9mg", {
+    direction: "inbound",
+  });
+  for (const message of messages.data ?? []) {
+    console.log(message.id, message.created_at);
+  }
+}
+
+export async function whatsappConversationsGetMessage() {
+  const message = await bird.whatsapp.conversations.getMessage(
+    "wacv_01krdgeqcxet5s7t44vh8rt9mg",
+    "wam_01krdgeqcxet5s7t44vh8rt9mg",
+  );
+  console.log(message.direction, message.status);
 }

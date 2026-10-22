@@ -226,9 +226,9 @@ export type NextAction = {
    * What you do about this step.
    *
    * - `operation`: call the operation named in `operation`, then
-   * read again.
+   *   read again.
    * - `external`: act somewhere this API does not reach, then read
-   * again.
+   *   again.
    * - `wait`: nothing is asked of you, so read again later.
    * - `terminal`: nothing you do resolves this, so stop retrying.
    *
@@ -399,7 +399,7 @@ export type Timezone = string;
 
 export type ListEnvelopeWithTotal = ListEnvelope & {
   /**
-   * Total number of items matching the request's filters across all pages. Present only when `include_total=true` was passed; otherwise `null`.
+   * Total number of items matching the request's filters across all pages. Present only when `include_total=true` was passed, and omitted otherwise.
    */
   total?: number | null;
 };
@@ -1643,15 +1643,15 @@ export type EmailRecipient = {
    * Present on `status: rejected` rows. Specifies why the recipient was rejected:
    *
    * - `recipient_suppressed`: The recipient is on the workspace suppression list, so
-   * delivery was never attempted.
+   *   delivery was never attempted.
    * - `transmission_failed`: The message could not be transmitted for delivery.
    * - `generation_failure`: The message could not be built for delivery (template or
-   * content issue).
+   *   content issue).
    * - `policy_rejection`: The message was refused by sending policy.
    * - `domain_unverified`: The sending domain was not verified.
    * - `quota_exceeded`: The organization's send quota was reached.
    * - `recipient_not_allowed`: A recipient was not permitted for this send (for shared
-   * onboarding-domain sends, recipients must be verified workspace members).
+   *   onboarding-domain sends, recipients must be verified workspace members).
    *
    */
   readonly rejection_reason?:
@@ -2194,14 +2194,14 @@ export type EmailBroadcast = {
    * - `empty_audience`: There was nobody to send to. Either the audience has no members, or every address in it is suppressed.
    * - `audience_unavailable`: The audience no longer exists, so there was nothing to resolve.
    * - `content_invalid`: The broadcast could not be set up to send. `failure_detail` explains what went wrong. It is one of these:
-   * - The broadcast has no template, or the template it uses no longer exists. Choose an existing template and send the broadcast again.
-   * - The template has no published version, or its published version has no subject and no body. Publish the template, or add content and publish it.
-   * - The template uses a loop or reads a value that a broadcast cannot provide. Remove it, or use a contact property instead, then publish the template again.
-   * - The template requires a language, but the broadcast has not selected one. Set `template.language` to one of the template's languages and send the broadcast again.
-   * - The selected language is not available on the published template version. Choose one of that version's languages, or publish a version that includes the selected language.
-   * - The sending domain is no longer verified. Verify the domain again.
-   * - The configured IP pool has no usable IP address.
-   * - We could not hand the prepared message to the delivery system. This is a problem on our side.
+   *   - The broadcast has no template, or the template it uses no longer exists. Choose an existing template and send the broadcast again.
+   *   - The template has no published version, or its published version has no subject and no body. Publish the template, or add content and publish it.
+   *   - The template uses a loop or reads a value that a broadcast cannot provide. Remove it, or use a contact property instead, then publish the template again.
+   *   - The template requires a language, but the broadcast has not selected one. Set `template.language` to one of the template's languages and send the broadcast again.
+   *   - The selected language is not available on the published template version. Choose one of that version's languages, or publish a version that includes the selected language.
+   *   - The sending domain is no longer verified. Verify the domain again.
+   *   - The configured IP pool has no usable IP address.
+   *   - We could not hand the prepared message to the delivery system. This is a problem on our side.
    * - `insufficient_funds`: There was not enough in the workspace balance to pay for the send.
    * - `quota_exceeded`: The send would have gone past your organization's daily or monthly email allowance, whichever runs out first. This can happen when the broadcast is being prepared, or partway through sending if the remaining recipients no longer fit. `failure_detail` gives you the count and the limit.
    * - `internal_error`: Something went wrong on our side. Retry, and open a support ticket if it keeps happening.
@@ -3054,7 +3054,7 @@ export type ContactUpsertResultItem = {
    * - `created`: a new contact was created for the address.
    * - `updated`: an existing contact with the address was updated.
    * - `failed`: the entry was rejected and `error` explains why. A failed entry
-   * does not affect the other entries in the request.
+   *   does not affect the other entries in the request.
    *
    */
   status: "created" | "updated" | "failed";
@@ -4559,11 +4559,11 @@ export type SmsSuppressionCreate = {
  * - `start` resubscribes them.
  * - `help` replies with your support information.
  * - `info` replies with your program information. It behaves exactly as `help` does and is
- * separate so a country whose INFO answer must differ from its HELP answer can carry both.
- * Where Bird ships no `info` rule for a country, INFO is one of that country's `help`
- * keywords and answers with the `help` reply.
+ *   separate so a country whose INFO answer must differ from its HELP answer can carry both.
+ *   Where Bird ships no `info` rule for a country, INFO is one of that country's `help`
+ *   keywords and answers with the `help` reply.
  * - `confirm` marks a double opt-in reply. It sends nothing today, so answer it from your own
- * handler.
+ *   handler.
  * - `custom` replies with the text you configured and has no other effect.
  *
  * Bird's built-in rules fix the operation for `stop`, `start` and `help`; you can change their
@@ -5296,9 +5296,9 @@ export type AssetFolderUpdate = {
  *
  * - `sms_sender`: a sender registered to send to one country.
  * - `number`: a phone number you hold that needs ownership paperwork before it
- * can carry traffic.
+ *   can carry traffic.
  * - `identity`: a business you operate as, registered once and reused by
- * later registrations that name it.
+ *   later registrations that name it.
  *
  */
 export type ComplianceSubjectKind = "sms_sender" | "number" | "identity";
@@ -5332,16 +5332,16 @@ export type ComplianceSubmissionId = string;
  * more.
  *
  * - `policy_change` means the country published a newer version of its form and
- * your answers were given under an older one.
+ *   your answers were given under an older one.
  * - `evidence_expiry` means an answer we accepted has gone stale and needs
- * supplying again.
+ *   supplying again.
  * - `verdict_withdrawn` means this registration was relying on an approval earned
- * on another registration, and that approval has since been taken back, so the
- * answer needs checking again here. Your answer has not changed and has not
- * expired.
+ *   on another registration, and that approval has since been taken back, so the
+ *   answer needs checking again here. Your answer has not changed and has not
+ *   expired.
  * - `verifier_rejected` means an outside party we filed your details with reviewed
- * them and refused them. Your answer has not changed and has not expired, and
- * we did not overrule it.
+ *   them and refused them. Your answer has not changed and has not expired, and
+ *   we did not overrule it.
  *
  * Treat this as an open set rather than a fixed list. More reasons are added as
  * more of a registration is kept under review, so a value you do not recognise is
@@ -5361,9 +5361,9 @@ export type ComplianceObligationReason =
  * - `open`: the due date has not passed and nothing has been supplied.
  * - `satisfied`: you supplied what was asked.
  * - `lapsed`: the date passed unmet and the registration is no longer
- * authorised.
+ *   authorised.
  * - `extended`: someone here gave you more time, and `due_at` reports the later
- * date.
+ *   date.
  *
  */
 export type ComplianceObligationState =
@@ -5422,7 +5422,7 @@ export type ComplianceRequirement = {
    */
   readonly satisfied: boolean;
   /**
-   * Whether anything is waiting on you. True when a required requirement has no answer, its answer was refused or has gone stale, or the registration needs correction as described by `reason`. False does not imply that review is pending: a closed verifier correction can leave the requirements unsatisfied with no editable answers. Read `review_pending` to determine whether an answer is awaiting review. Read this independently of `satisfied`, which reports whether your paperwork is accepted. An unresolved verifier correction also sets it while the matching grant is live and the correction deadline has not passed, until you supply updated details. At the deadline or after grant withdrawal, an unresolved rejection alone does not set it because accepted answers can no longer be replaced. A corrected optional answer that is rejected or expires still needs your input through ordinary resupply, including after that deadline.
+   * Whether anything is waiting on you. True when a required requirement has no answer, its answer was refused or has gone stale, the registration needs correction as described by `reason`, or a closed submission accepts corrected details (`resubmission_allowed`). False does not imply that review is pending: a closed verifier correction can leave the requirements unsatisfied with no editable answers. Read `review_pending` to determine whether an answer is awaiting review. Read this independently of `satisfied`, which reports whether your paperwork is accepted. An unresolved verifier correction also sets it while the matching grant is live and the correction deadline has not passed, until you supply updated details. At the deadline or after grant withdrawal, an unresolved rejection alone does not set it because accepted answers can no longer be replaced. A corrected optional answer that is rejected or expires still needs your input through ordinary resupply, including after that deadline.
    *
    */
   readonly needs_input: boolean;
@@ -5431,6 +5431,16 @@ export type ComplianceRequirement = {
    *
    */
   readonly review_pending: boolean;
+  /**
+   * Whether you may change any answer, not only one that was refused or has gone stale. True for a number, business identity or SMS sender registration whose submission has not been approved yet, including answers awaiting review or already accepted, and for a closed submission when `resubmission_allowed` is true. An SMS sender registration goes to the carrier or registry when it is approved, so it stays editable only until then. A changed answer loses its verdict and is reviewed again. Send only the answers you change. False once the submission is approved: replace only answers in `fields` whose state is `not_supplied`, `rejected` or `expired`, or those marked `editable_for_verifier_repair`.
+   *
+   */
+  readonly answers_editable: boolean;
+  /**
+   * Whether Bird closed the previous submission but accepts corrected details for this registration. When `submission_id` is set, update that submission with your corrected answers and it is reviewed again. When `submission_id` is `null`, the form has changed since: create a new submission. `reason` says why the previous one was closed. False when nothing was closed, and when a closed submission cannot be sent again; contact support then.
+   *
+   */
+  readonly resubmission_allowed: boolean;
   /**
    * What to correct about the registration as a whole, or null when no registration-wide correction is requested. Reasons about individual answers are on the entries in fields.
    *
@@ -5623,7 +5633,9 @@ export type ComplianceSubmission = {
 
 /**
  * Replacement answers for an existing submission. Rejected, expired, or missing answers can
- * be supplied again; accepted answers normally cannot be changed.
+ * be supplied again; accepted answers normally cannot be changed. While the requirements
+ * response reports `answers_editable` with a `submission_id`, you can change any answer on that
+ * submission; send only the ones you change. With `submission_id` null, create a new submission instead.
  *
  * When the requirements response marks an accepted answer as `editable_for_verifier_repair`,
  * you can replace it during that open correction and before its deadline. Accepted-answer
@@ -6382,10 +6394,10 @@ export type SmsSenderType =
  *
  * - `active`: nothing this sender holds is outstanding.
  * - `pending_number_ownership`: the paperwork proving you own this sender's number is not in
- * place, either because it has not been supplied or because the country that issued the
- * number has not accepted it yet. Every send from this sender is refused until it does.
+ *   place, either because it has not been supplied or because the country that issued the
+ *   number has not accepted it yet. Every send from this sender is refused until it does.
  * - `pending_registrations`: the sender holds country registrations and none is approved yet.
- * That covers a registration under review and one that was refused, so read `next` for which.
+ *   That covers a registration under review and one that was refused, so read `next` for which.
  *
  * This is not whether a message will be accepted. That is decided per destination country, and
  * [Get sender requirements](/docs/api/reference/list-workspace-sms-sender-requirements) is the
@@ -6722,14 +6734,14 @@ export type SmsCountryRegistration = {
  * An intelligence property you can add to a base phone number lookup.
  *
  * - `classification`: the property resolves `line_type` to its precise
- * allocated service (premium rate, satellite, machine-to-machine,
- * payphone) where the base lookup only distinguishes broad categories.
+ *   allocated service (premium rate, satellite, machine-to-machine,
+ *   payphone) where the base lookup only distinguishes broad categories.
  * - `porting`: the property returns when the number last moved network and
- * its full porting record.
+ *   its full porting record.
  * - `presence`: the property reports whether the number is currently live
- * on the network.
+ *   on the network.
  * - `roaming`: the property reports whether it is roaming and on which
- * network.
+ *   network.
  * - `sim_swap`: the property returns when its SIM last changed.
  * - `score`: the property returns a credibility score from 0 to 100.
  *
@@ -6793,10 +6805,10 @@ export type LookupFlag = "ported" | (string & {});
  * request.
  *
  * - `unknown`: the carrier platform holds no classification for the
- * range.
+ *   range.
  * - `other`: it holds a classification with no equivalent here.
  * - `m2m`: a range reserved for machine-to-machine traffic, belonging to no
- * individual subscriber.
+ *   individual subscriber.
  *
  * For the allocated service of the range at finer precision, request the
  * `classification` property. That answers from a different source, with its own
@@ -6823,13 +6835,13 @@ export type LookupLineType =
  *
  * - `ok`: the property was answered and its value is in the response.
  * - `unavailable`: no answer arrived, so the property adds nothing: its
- * block is `null`, or for `classification`, `line_type` retains the value
- * from the base lookup. The property is not billed.
+ *   block is `null`, or for `classification`, `line_type` retains the value
+ *   from the base lookup. The property is not billed.
  * - `inconclusive`: an answer arrived but does not resolve the
- * property, either because the number is outside the coverage of the data
- * behind it or because the source returned a value this property does not
- * report. It is a real answer rather than a missing one, and it is not
- * billed either.
+ *   property, either because the number is outside the coverage of the data
+ *   behind it or because the source returned a value this property does not
+ *   report. It is a real answer rather than a missing one, and it is not
+ *   billed either.
  *
  * Open enum: further statuses may be added over time, so treat an unrecognized
  * value as a future one rather than an error. Only `ok` carries a value and only
@@ -6853,11 +6865,11 @@ export type LookupPropertyStatus =
  * Three values in particular have no carrier-side concept at all:
  *
  * - `m2m` is a range reserved for machine-to-machine traffic, belonging to no
- * individual subscriber.
+ *   individual subscriber.
  * - `national_rate` is a non-geographic landline number charged above the
- * local rate.
+ *   local rate.
  * - `fixed_line_or_mobile` is a range a country allocates so a number can port
- * between the two.
+ *   between the two.
  *
  */
 export type LookupClassificationValue =
@@ -7082,13 +7094,13 @@ export type EmailLookupRequest = {
  *
  * - `valid`: the address exists and accepts mail.
  * - `neutral`: it could not be confirmed either way, usually because the
- * receiving domain answers every recipient the same.
+ *   receiving domain answers every recipient the same.
  * - `risky`: it probably accepts mail but is likelier than most to
- * bounce or complain. Examples include role, disposable, and low-reputation
- * addresses.
+ *   bounce or complain. Examples include role, disposable, and low-reputation
+ *   addresses.
  * - `undeliverable`: it does not accept mail, and `reason` says why.
  * - `typo`: the address looks misspelled, and `did_you_mean` contains
- * the correction.
+ *   the correction.
  *
  * Open enum: further verdicts may be added over time, so treat an unrecognized
  * value as a future one rather than an error. Branch on the values you know and
@@ -7103,13 +7115,13 @@ export type EmailLookupResult =
  * A notable characteristic of an email address.
  *
  * - `role`: it addresses a function rather than a person (`support@`,
- * `info@`). Replies and consent are therefore ambiguous, and complaints are
- * more likely.
+ *   `info@`). Replies and consent are therefore ambiguous, and complaints are
+ *   more likely.
  * - `disposable`: it belongs to a throwaway-address provider and
- * typically stops existing.
+ *   typically stops existing.
  * - `free_provider`: it belongs to a consumer mailbox provider such as
- * Gmail or Outlook.com. This is ordinary for consumer mail and a signal when
- * you expected a business address.
+ *   Gmail or Outlook.com. This is ordinary for consumer mail and a signal when
+ *   you expected a business address.
  *
  * Open enum: more flags may be added over time, so treat an unrecognized value
  * as a future flag rather than an error.
@@ -7124,7 +7136,7 @@ export type EmailLookupFlag =
  * - `invalid_syntax`: the address is malformed.
  * - `invalid_domain`: the domain does not accept mail.
  * - `invalid_recipient`: the domain accepts mail but this mailbox does
- * not exist.
+ *   not exist.
  *
  * - `disposable_domain`: the domain belongs to a disposable-address provider.
  *
@@ -7275,17 +7287,17 @@ export type VerificationChannelEntry = {
  * - `soft_bounce`: The email temporarily bounced, such as when a mailbox is full.
  * - `undelivered`: The channel reported a generic delivery failure.
  * - `channel_unavailable`: The channel could not be used, so the verification
- * moved to the next channel.
+ *   moved to the next channel.
  * - `channel_disabled`: Sending on the channel is temporarily disabled, so the
- * verification moved to the next channel.
+ *   verification moved to the next channel.
  * - `channel_restricted`: The channel does not carry passcodes to this
- * destination country. The verification moves to the next channel enabled
- * there, or fails when the country has no other.
+ *   destination country. The verification moves to the next channel enabled
+ *   there, or fails when the country has no other.
  * - `delivery_timeout`: No delivery confirmation arrived before the channel's
- * timeout, so the verification moved to the next channel.
+ *   timeout, so the verification moved to the next channel.
  * - `not_billable`: The send could not be charged, so it was never handed to the
- * channel. Usually the workspace balance is too low to cover it. Topping up
- * the balance is what clears this.
+ *   channel. Usually the workspace balance is too low to cover it. Topping up
+ *   the balance is what clears this.
  *
  * New reasons may be added over time. Treat unrecognized values as reasons added
  * later rather than errors.
@@ -7324,8 +7336,8 @@ export type Verification = {
    * - `pending`: Awaiting a correct passcode.
    * - `verified`: A correct passcode was submitted.
    * - `failed`: The verification cannot be completed. Either too many
-   * incorrect passcodes were submitted, or no planned channel could
-   * deliver one. Read `reason` to tell those apart.
+   *   incorrect passcodes were submitted, or no planned channel could
+   *   deliver one. Read `reason` to tell those apart.
    * - `expired`: The validity window elapsed before a correct passcode.
    * - `canceled`: The verification was canceled before completion.
    * - `blocked`: A fraud or abuse control stopped the verification.
@@ -7657,7 +7669,7 @@ export type WhatsAppMedia = {
    */
   readonly id?: WhatsAppFileId;
   /**
-   * Where to fetch the media. On an inbound message, or one from the WhatsApp Business app, this is a Bird URL you fetch with your API key; it is absent when the file could not be retrieved from WhatsApp. It stays populated after the stored bytes expire, and the link returns `410` from then on. On a message sent through Bird it is the URL the sender supplied, whose availability is the sender's to guarantee.
+   * Where to fetch the media. On an inbound message, or one from the WhatsApp Business app, this is a Bird URL you fetch with your API key. The file expires with the message, 30 days after it arrives, and the link returns `404` from then on. If the file is gone while the message is still readable, the link returns `410`. On a message sent through Bird it is the URL the sender supplied, whose availability is the sender's to guarantee.
    *
    */
   url?: string;
@@ -7891,16 +7903,16 @@ export type WhatsAppContactCard = {
  * Which kind of interactive message this is.
  *
  * - `button`: up to three tappable buttons, each sending its own identifier
- * back as an inbound message. Carried in `buttons`.
+ *   back as an inbound message. Carried in `buttons`.
  * - `list`: a single button that opens a menu of rows to choose one from.
  * - `cta_url`: a single button that opens a link.
  * - `carousel`: 2 to 10 media cards the recipient scrolls through sideways,
- * each with its own buttons. Carried in `cards`.
+ *   each with its own buttons. Carried in `cards`.
  * - `location_request_message`: a single button that asks the recipient to
- * share where they are. A tap arrives as an inbound `location` message.
+ *   share where they are. A tap arrives as an inbound `location` message.
  * - `request_contact_info`: a single button that asks the recipient to share
- * their phone number. A tap arrives as an inbound message carrying the number
- * on `contact_cards`, with `origin` set to `contact_request`.
+ *   their phone number. A tap arrives as an inbound message carrying the number
+ *   on `contact_cards`, with `origin` set to `contact_request`.
  *
  * The last two name no field of their own: the ask is the whole message, and
  * `body_text` is all they carry.
@@ -8118,10 +8130,10 @@ export type WhatsAppInteractive = {
  * Which kind of tap the reply came from.
  *
  * - `button`: a reply button on an interactive message, or a quick-reply
- * button on a template. Both carry an identifier and a label, so they read
- * the same way.
+ *   button on a template. Both carry an identifier and a label, so they read
+ *   the same way.
  * - `list`: a row chosen from a list's menu. Only this kind carries a
- * `description`.
+ *   `description`.
  *
  * Open enum: WhatsApp adds interactive kinds over time, so treat an
  * unrecognized value as a future kind rather than an error.
@@ -8562,17 +8574,17 @@ export type WhatsAppDocumentSend = {
  * Which kind of interactive message to send.
  *
  * - `button`: up to three tappable buttons, each sending its own identifier
- * back as an inbound message. Carried in `buttons`.
+ *   back as an inbound message. Carried in `buttons`.
  * - `list`: a single button that opens a menu of rows to choose one from.
  * - `cta_url`: a single button that opens a link, so the address stays out of
- * the message body.
+ *   the message body.
  * - `carousel`: 2 to 10 media cards the recipient scrolls through sideways,
- * each with its own buttons. Carried in `cards`.
+ *   each with its own buttons. Carried in `cards`.
  * - `location_request_message`: a single button that asks the recipient to
- * share where they are. A tap arrives as an inbound `location` message.
+ *   share where they are. A tap arrives as an inbound `location` message.
  * - `request_contact_info`: a single button that asks the recipient to share
- * their phone number. A tap arrives as an inbound message carrying the number
- * on `contact_cards`, with `origin` set to `contact_request`.
+ *   their phone number. A tap arrives as an inbound message carrying the number
+ *   on `contact_cards`, with `origin` set to `contact_request`.
  *
  */
 export type WhatsAppInteractiveTypeWrite =
@@ -8619,7 +8631,7 @@ export type WhatsAppInteractiveHeaderSend = (
  * Which kind of button this is, and which field carries it.
  *
  * - `quick_reply`: sends its own identifier back as an inbound message. The
- * name `WhatsAppTemplateButtonTypeWrite` already uses for the same control.
+ *   name `WhatsAppTemplateButtonTypeWrite` already uses for the same control.
  * - `cta_url`: opens a link in the recipient's browser.
  *
  * Closed on the write side: a kind Bird cannot send to Meta is rejected rather
@@ -8776,7 +8788,7 @@ export type WhatsAppInteractiveCardSend = (
    */
   body_text?: string;
   /**
-   * The buttons under the card, in the order given. Either one `cta_url` button or up to three `quick_reply` buttons: the two kinds cannot be mixed on one card. Every card in the carousel must carry the same kinds in the same number, and a carousel whose cards disagree returns a `422` `WhatsAppInteractiveCarouselButtonsMismatch`.
+   * The buttons under the card, in the order given. Either one `cta_url` button or up to three `quick_reply` buttons: the two kinds cannot be mixed on one card. Every card in the carousel must carry the same kinds in the same number, and a carousel whose cards disagree returns a `422` `WhatsAppInteractiveCardsButtonsMismatch`.
    *
    */
   buttons: Array<WhatsAppInteractiveButtonSend>;
@@ -9100,8 +9112,8 @@ export type WhatsAppReadReceipt = {
  * - `whatsapp.sent`: The message reached the WhatsApp network.
  * - `whatsapp.delivered`: Delivery to the recipient's device was confirmed.
  * - `whatsapp.read`: The message was read. On an outbound message the recipient
- * opened it; on an inbound one Bird acknowledged it to WhatsApp for the
- * business, which is what a read receipt records.
+ *   opened it; on an inbound one Bird acknowledged it to WhatsApp for the
+ *   business, which is what a read receipt records.
  * - `whatsapp.failed`: Delivery failed permanently.
  * - `whatsapp.rejected`: The message was refused before sending and not charged.
  * - `whatsapp.received`: An inbound message arrived from the contact.
@@ -9179,15 +9191,15 @@ export type WhatsAppReactionAccepted = {
  * What became of one reaction change:
  *
  * - `received` means the contact placed or removed the reaction and WhatsApp
- * told us about it. Every inbound entry carries this.
+ *   told us about it. Every inbound entry carries this.
  * - `sent` means your reaction reached WhatsApp. Reactions have no delivery or
- * read receipt, so this is as far as an outbound entry gets.
+ *   read receipt, so this is as far as an outbound entry gets.
  * - `failed` means WhatsApp refused it. `error` says why, most often because the
- * contact deleted the message. The grounds we can check for ourselves (a
- * message you sent, one that is itself a reaction, one over 30 days old) are
- * refused when you ask, so they do not reach here.
+ *   contact deleted the message. The grounds we can check for ourselves (a
+ *   message you sent, one that is itself a reaction, one over 30 days old) are
+ *   refused when you ask, so they do not reach here.
  * - `rejected` means we refused it before it reached WhatsApp, so nothing was
- * sent. `error` says why.
+ *   sent. `error` says why.
  *
  * Only `received` and `sent` entries change what stands on the message, so those
  * are the ones the message's `reactions` are folded from.
@@ -9240,9 +9252,153 @@ export type WhatsAppReactionEventList = {
 export type ConversationInboxStatus = "open" | "resolved";
 
 /**
+ * Who is in charge of answering the contact's inbound messages. This is a separate question from a message's `origin`, which says where that message came from.
+ *
+ * - `meta_business_agent`: the Meta Business Agent on this number answers them.
+ * - `bird`: your workspace answers them through Bird, and the agent stays silent until you release the conversation.
+ *
+ * A message your workspace sends also gives your workspace control.
+ *
+ */
+export type WhatsAppConversationControl =
+  "bird" | "meta_business_agent" | (string & {});
+
+/**
+ * Whether the customer-service window is open right now.
+ *
+ * - `open`: the contact wrote within the last 24 hours, so free-form messages are accepted.
+ * - `closed`: the window has passed, or the contact has never written, so only a template can be sent.
+ *
+ */
+export type WhatsAppConversationServiceWindowStatus = "open" | "closed";
+
+export type WhatsAppConversationId = string;
+
+/**
+ * The contact or group on the other side of this conversation. Profile fields are null when unknown and on group conversations.
+ */
+export type WhatsAppConversationRecipient = {
+  /**
+   * Meta's business-scoped user ID for the contact, or null when unknown.
+   */
+  bsuid: string | null;
+  /**
+   * Contact phone number in E.164 format, or null when unknown.
+   */
+  phone_number: string | null;
+  /**
+   * Display name from the contact's WhatsApp profile, or null when none has been recorded.
+   */
+  display_name: string | null;
+  /**
+   * Contact's WhatsApp username without a leading `@`, or null when none has been recorded. Messages cannot be addressed by username.
+   */
+  username: string | null;
+  /**
+   * Group this conversation belongs to. Omitted for a conversation with one contact.
+   */
+  group_id?: WhatsAppGroupId;
+};
+
+/**
+ * The 24-hour customer-service window, measured from the most recent message this contact sent. Free-form messages are accepted while it is open; once it closes, only a template can start the conversation again.
+ *
+ * This is what Bird observed, not a promise about what WhatsApp will accept: a message Bird never received leaves the window looking shorter than it is, and WhatsApp decides each send on its own.
+ *
+ */
+export type WhatsAppConversationServiceWindow = {
+  status: WhatsAppConversationServiceWindowStatus;
+  /**
+   * When the window closes, or closed. Null when no inbound message has been recorded, in which case `status` is `closed`.
+   */
+  ends_at: string | null;
+};
+
+/**
+ * A pointer to the most recent message in this conversation, in either direction. It names the message rather than copying it: read the message itself, with its content and delivery status, through the conversation's message list.
+ *
+ */
+export type WhatsAppConversationLastMessage = {
+  /**
+   * ID of the message.
+   */
+  id: WhatsAppMessageId;
+  /**
+   * `inbound` for a message received from the contact, `outbound` for one your workspace or the agent sent.
+   */
+  direction: MessageDirection;
+  /**
+   * The message's `created_at`: when it was accepted (outbound) or received (inbound). The conversation list is ordered by it. It only moves forward: a message that arrives late and belongs earlier in the conversation does not pull it back.
+   *
+   */
+  created_at: string;
+};
+
+/**
  * Workspace labels on this conversation. Labels do not change read state or inbox status.
  */
 export type ConversationLabels = Array<string>;
+
+/**
+ * One WhatsApp conversation between a number you have connected and a single contact, or a group it belongs to. It holds who answers the conversation right now, its read state and labels, when its service window closes, and the most recent message. Resolving the inbox work preserves the conversation's ID and history. A new inbound message reopens it. Messages are retained for 30 days, and the conversation is deleted when its last message expires.
+ *
+ */
+export type WhatsAppConversation = {
+  /**
+   * Conversation ID.
+   */
+  id: WhatsAppConversationId;
+  /**
+   * Your WhatsApp business phone number this conversation runs on, in E.164 format. It stays the same when you remove the number and connect it again. Null when Bird holds no phone number for it.
+   *
+   */
+  business_phone_number: string | null;
+  /**
+   * The other side of the conversation: the contact, or the group it takes place in. A group conversation carries `group_id` and null contact identity fields.
+   *
+   */
+  recipient: WhatsAppConversationRecipient;
+  inbox_status: ConversationInboxStatus;
+  /**
+   * Who answers this conversation right now. You take and release control in the dashboard inbox.
+   */
+  control: WhatsAppConversationControl;
+  /**
+   * The user this conversation is assigned to. Null when unassigned. Assignment is not rechecked against workspace membership on read, so it can still name a user whose access was removed.
+   *
+   */
+  assigned_to: UserId | null;
+  /**
+   * Customer-service window for a contact. Null for group conversations.
+   */
+  service_window: WhatsAppConversationServiceWindow | null;
+  /**
+   * A pointer to the most recent message in this conversation. It names the message; read its content through the conversation's message list. Null when the conversation has no message yet.
+   *
+   */
+  last_message: WhatsAppConversationLastMessage | null;
+  /**
+   * Number of inbound messages the workspace has not acknowledged. Shared across the workspace. Sending a reply does not mark messages read.
+   *
+   */
+  unread_count: number;
+  labels: ConversationLabels;
+  /**
+   * When Bird opened this conversation.
+   */
+  created_at: string;
+  /**
+   * When this conversation last changed.
+   */
+  updated_at: string;
+};
+
+export type WhatsAppConversationList = {
+  /**
+   * A page of conversations, most recently active first.
+   */
+  data: Array<WhatsAppConversation>;
+} & ListEnvelope;
 
 export type ConversationUpdate = {
   /**
@@ -9262,6 +9418,52 @@ export type ConversationUpdate = {
    */
   read?: string;
 };
+
+/**
+ * Changes to apply to a conversation. Every field is optional; omit one to leave it unchanged. Control moves in the dashboard inbox instead, because WhatsApp has to accept that change and can refuse it.
+ *
+ */
+export type WhatsAppConversationUpdateRequest = ConversationUpdate;
+
+/**
+ * Type of conversation event. `whatsapp_conversation.control_changed` records the conversation moving between the Meta Business Agent and your application, `whatsapp_conversation.assigned` records it being assigned, reassigned or unassigned, and `whatsapp_conversation.agent_notified` records a notification sent to the agent about this contact. Open enum: new event types may be added over time, so treat any unrecognized value as a future event rather than an error. The values below are the types known at this version.
+ */
+export type WhatsAppConversationEventType =
+  | "whatsapp_conversation.control_changed"
+  | "whatsapp_conversation.assigned"
+  | "whatsapp_conversation.agent_notified"
+  | (string & {});
+
+export type WhatsAppConversationEventId = string;
+
+export type WhatsAppConversationEvent = {
+  /**
+   * Event ID.
+   */
+  id: WhatsAppConversationEventId;
+  type: WhatsAppConversationEventType;
+  /**
+   * Human-readable summary of what happened.
+   */
+  summary: string;
+  /**
+   * Structured details for the event. `from` and `to` carry the values that changed: the holder (`meta_business_agent` or `bird`) for a control change, the assigned user ID for an assignment, null for no assignee. A control change also carries the `initiator` and, when one was left, the `reason`. An assignment carries `assigned_by`, the actor who made it. An agent notification carries the `agent_notification_id` and its `name`.
+   */
+  metadata: {
+    [key: string]: unknown;
+  };
+  /**
+   * When the event happened.
+   */
+  created_at: string;
+};
+
+export type WhatsAppConversationEventList = {
+  /**
+   * Page of conversation events, newest first.
+   */
+  data: Array<WhatsAppConversationEvent>;
+} & ListEnvelope;
 
 /**
  * Sortable fields for a WhatsApp group list.
@@ -9308,12 +9510,12 @@ export type WhatsAppGroupOperationType =
  * How the operation ended:
  *
  * - `pending` means WhatsApp accepted the request and has not reported back. Another
- * operation on the same thing is refused while this lasts.
+ *   operation on the same thing is refused while this lasts.
  * - `success` means WhatsApp applied everything asked of it. A change whose success
- * removes its own carrier is never seen in this state: a removed participant and an
- * unpinned message leave their lists, and the entry going away is the confirmation.
+ *   removes its own carrier is never seen in this state: a removed participant and an
+ *   unpinned message leave their lists, and the entry going away is the confirmation.
  * - `failed` means WhatsApp applied none of it, or only part: `last_error` says why,
- * and on a `settings_update` the per-field `results` say which fields did apply.
+ *   and on a `settings_update` the per-field `results` say which fields did apply.
  *
  */
 export type WhatsAppGroupOperationStatus = "pending" | "success" | "failed";
@@ -9689,12 +9891,12 @@ export type WhatsAppTemplateButton = {
    * - `quick_reply`: sends its own label back to you as an inbound message.
    * - `phone_number`: dials the number it carries.
    * - `otp`: copies a one-time passcode. It belongs only on an authentication
-   * template, and that template takes no other button type.
+   *   template, and that template takes no other button type.
    * - `copy_code`: copies a coupon code to the recipient's clipboard. It
-   * belongs only on a marketing template, which takes at most one.
+   *   belongs only on a marketing template, which takes at most one.
    * - `request_contact_info`: asks the recipient to share the phone number
-   * their WhatsApp account carries. It belongs only on a utility or
-   * marketing template, as that template's only button.
+   *   their WhatsApp account carries. It belongs only on a utility or
+   *   marketing template, as that template's only button.
    *
    * This is an open enum. Accept unrecognized values.
    *
@@ -9905,7 +10107,7 @@ export type WhatsAppTemplateLanguageState = {
    */
   rejection?: WhatsAppTemplateRejection;
   /**
-   * Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: WhatsAppTemplateSubmissionError;
@@ -10034,10 +10236,347 @@ export type WhatsAppTemplateList = {
 } & ListEnvelope;
 
 /**
+ * Meta's content classification for a template.
+ *
+ * - `authentication`: delivers one-time passcodes.
+ * - `utility`: delivers transaction-triggered updates (receipts, order status).
+ * - `marketing`: carries promotional content.
+ *
+ * The category determines what a send costs. Any other value is rejected.
+ *
+ */
+export type WhatsAppTemplateCategoryWrite =
+  "authentication" | "utility" | "marketing";
+
+/**
+ * A content block's type. A `body` block is required on every language; `header`, `footer`, `buttons` and `carousel` are optional and appear at most once each. A `carousel` holds the cards a marketing template scrolls through, and is the one block type that nests: its cards carry blocks of their own. Any other value is rejected.
+ *
+ */
+export type WhatsAppTemplateComponentTypeWrite =
+  "header" | "body" | "footer" | "buttons" | "carousel";
+
+/**
+ * A header's kind. The `text` format carries a line of copy. The `image`, `video`, `gif`, and `document` formats each show a file whose address you give in `url`. A `gif` is an MP4 that plays automatically and works only on a marketing template. The `location` format shows a map the recipient can tap to open. It carries no content here because the coordinates belong to the message rather than the template. Any other value is rejected.
+ *
+ */
+export type WhatsAppTemplateHeaderFormatWrite =
+  "text" | "image" | "video" | "gif" | "document" | "location";
+
+/**
+ * The kind of value a template parameter accepts. `text` is an example filling a `{{n}}` placeholder. The other four are the sample file a media header shows, and each matches its header's `format`. Any other value is rejected.
+ *
+ */
+export type WhatsAppTemplateParameterTypeWrite =
+  "text" | "image" | "video" | "gif" | "document";
+
+/**
+ * One example value for one variable, as written to a draft.
+ */
+export type WhatsAppTemplateExampleParameterWrite = {
+  type: WhatsAppTemplateParameterTypeWrite;
+  /**
+   * The example value. Send it when `type` is `text`. May be empty on a draft; required before submission.
+   *
+   */
+  text?: string;
+  /**
+   * The address of the file a media header shows. Send it when `type` is `image`, `video`, `gif` or `document`. We fetch the file when the language is submitted and hand Meta our own copy, so the address only has to be reachable at submission. WhatsApp reviews the template with this file, and the message each recipient receives carries the file named on the send. May be empty on a draft, for a file not yet chosen; a reachable address is required before submission.
+   *
+   */
+  url?: string;
+  /**
+   * The named placeholder this example fills. Send it only for a template written against named parameters rather than positional `{{n}}` ones. May be empty on a draft; required before submission.
+   *
+   */
+  name?: string;
+};
+
+/**
+ * A button's behavior.
+ *
+ * - `url`: opens a link.
+ * - `quick_reply`: sends its own label back to you as an inbound message.
+ * - `phone_number`: dials the number it carries.
+ * - `otp`: copies a one-time passcode. It belongs only on an authentication
+ *   template, and that template takes no other button type.
+ * - `copy_code`: copies a coupon code to the recipient's clipboard. It belongs
+ *   only on a marketing template, which takes at most one.
+ * - `request_contact_info`: asks the recipient to share the phone number their
+ *   WhatsApp account carries. It belongs only on a utility or marketing
+ *   template, as that template's only button.
+ *
+ * Any other value is rejected.
+ *
+ */
+export type WhatsAppTemplateButtonTypeWrite =
+  | "url"
+  | "quick_reply"
+  | "phone_number"
+  | "otp"
+  | "copy_code"
+  | "request_contact_info";
+
+/**
+ * How the recipient receives a one-time passcode. `copy_code` puts it on the clipboard.
+ */
+export type WhatsAppTemplateButtonOtpTypeWrite = "copy_code";
+
+/**
+ * One button, as written to a draft.
+ */
+export type WhatsAppTemplateButtonWrite = {
+  type: WhatsAppTemplateButtonTypeWrite;
+  /**
+   * How the recipient receives the passcode. Send it only on an `otp` button.
+   */
+  otp_type?: WhatsAppTemplateButtonOtpTypeWrite;
+  /**
+   * The button's label, which each button type treats differently.
+   *
+   * - `url`, `quick_reply`, `phone_number`: your own label. Required.
+   * - `otp`: omit it. WhatsApp writes this label itself and reveals it only
+   *   once the language has been submitted.
+   * - `copy_code`: omit it. WhatsApp fixes this label and does not let you
+   *   change it.
+   * - `request_contact_info`: omit it. WhatsApp fixes this label too and
+   *   writes `Share Contact Info`, which is also what a submitted button
+   *   reads back as, so a read button can be written back unchanged.
+   *
+   * A draft takes any label, so this may be empty on a draft and is required
+   * only before submission. A label a fixed-label button may not carry is
+   * refused rather than silently replaced: the submit comes back as
+   * `valid: false` with an `errors` entry naming this field, in every
+   * language.
+   *
+   */
+  text?: string;
+  /**
+   * The address a `url` button opens. An address with a placeholder is personalized per recipient, and one without is the same for everyone. At most one variable, and it must sit at the end of the address, written as `{{1}}`. A button address is numbered this way even on a template whose text uses named variables. A variable needs its example value in `example_parameters`. May be empty on a draft; required before submission.
+   *
+   */
+  url?: string;
+  /**
+   * The number a `phone_number` button dials, in international format. Some countries publish numbers with a leading zero after the country calling code; WhatsApp strips that zero, so give a number that dials without it. May be empty on a draft; required before submission.
+   *
+   */
+  phone_number?: string;
+  /**
+   * The value that fills the variable in `url`, which WhatsApp reviews in the filled address. Send only the value, so a `{{1}}` standing for an order number takes `A-4192`. Required whenever `url` carries a variable. Also required on a `copy_code` button as one `text` entry. The entry carries a sample coupon code of at most 20 characters for WhatsApp to review. Each recipient copies the code you provide when sending the message.
+   *
+   */
+  example_parameters?: Array<WhatsAppTemplateExampleParameterWrite>;
+};
+
+/**
+ * A card block's type. A card carries a `header` showing an image or a video, and optionally a `body` and a `buttons` block. A card has no footer and cannot hold a carousel of its own, which is why a card's blocks are a narrower set than a template's.
+ *
+ */
+export type WhatsAppTemplateCardComponentTypeWrite =
+  "header" | "body" | "buttons";
+
+/**
+ * A card header's kind. A card shows an image or a video only, so a document header works at the top of a template but not on a card.
+ *
+ */
+export type WhatsAppTemplateCardHeaderFormatWrite = "image" | "video";
+
+/**
+ * One content block inside a carousel card, as written to a draft. A card carries a narrower set of blocks than a template does, so it has its own shape rather than reusing the template's.
+ *
+ */
+export type WhatsAppTemplateCardComponentWrite = {
+  type: WhatsAppTemplateCardComponentTypeWrite;
+  /**
+   * The card header's kind. Required on a card's `header` block and refused on any other.
+   *
+   */
+  format?: WhatsAppTemplateCardHeaderFormatWrite;
+  /**
+   * The card block's text, with each variable written as a placeholder. Send it on a `body` block. If any card carries body text then every card must, so the cards keep an even height. May be empty on a draft; required before submission.
+   *
+   */
+  text?: string;
+  /**
+   * An example value per `{{n}}` in `text`, in placeholder order. Meta reviews the filled message rather than the template, so a block with variables and no examples is refused. A card's `header` block carries its file here as a single entry whose `type` matches the header's `format` and whose `url` addresses the file, the same way a template header does.
+   *
+   */
+  example_parameters?: Array<WhatsAppTemplateExampleParameterWrite>;
+  /**
+   * The buttons this card carries, at most two. Send it only on a card's `buttons` block. Every card must carry the same buttons in the same order. A card takes a `quick_reply`, `phone_number` or `url` button; a `copy_code` or `request_contact_info` button belongs on the template itself.
+   *
+   */
+  buttons?: Array<WhatsAppTemplateButtonWrite>;
+};
+
+/**
+ * One card in a carousel, as written to a draft.
+ */
+export type WhatsAppTemplateCardWrite = {
+  /**
+   * This card's content blocks, in display order. A card carries a `header` showing an image or a video, and optionally a `body` and a `buttons` block. Every card in the carousel must carry the same blocks, and the same buttons, in the same order, so a card with body text means every card needs body text. May be omitted or empty on a draft; a header block is required before submission.
+   *
+   */
+  components?: Array<WhatsAppTemplateCardComponentWrite>;
+};
+
+/**
+ * One content block, as written to a draft.
+ *
+ */
+export type WhatsAppTemplateComponentWrite = {
+  type: WhatsAppTemplateComponentTypeWrite;
+  /**
+   * The header's kind. Required on a `header` block and refused on any other.
+   *
+   */
+  format?: WhatsAppTemplateHeaderFormatWrite;
+  /**
+   * The block's text, with each variable written as a placeholder. Send it on a `body`, a `footer`, and a `text` header. Four blocks refuse it. A `buttons` block carries text on the buttons themselves. A media or `location` header shows a file or map and has nowhere to put copy. A `carousel` carries text on its cards. For an authentication template's body and footer, WhatsApp writes the copy from the two settings below. May be empty on a draft; required before submission.
+   *
+   */
+  text?: string;
+  /**
+   * Ends an authentication template's body with WhatsApp's own advice not to share the code. Send it only on an authentication template's body block, whose copy is otherwise WhatsApp's to write.
+   *
+   */
+  add_security_recommendation?: boolean;
+  /**
+   * How long the passcode stays valid. Send it on an authentication template's footer block and WhatsApp writes the footer stating it; omit the footer block entirely to leave it off. WhatsApp enforces the range it accepts and refuses the submission otherwise.
+   *
+   */
+  code_expiration_minutes?: number;
+  /**
+   * An example value per `{{n}}` in `text`, in placeholder order. Meta reviews the filled message rather than the template, so a block with variables and no examples is refused. A media header also carries its file here as one entry. Its `type` matches the header's `format`, and its `url` addresses the file. A media header has no placeholder, so this entry is the header's own sample rather than a value that fills one.
+   *
+   */
+  example_parameters?: Array<WhatsAppTemplateExampleParameterWrite>;
+  /**
+   * The buttons this block carries. Send it only on a `buttons` block. Ten in total, of which at most two open a link and at most one dials a number. Quick replies must sit together rather than being interleaved with the other types, so `Quick reply, Quick reply, Link` is accepted where `Quick reply, Link, Quick reply` is refused. A template with four or more buttons, or one that mixes a quick reply with another type, cannot be opened on WhatsApp's desktop clients, and the recipient is asked to switch to their phone. May be omitted or empty on a draft; at least one button is required before submission.
+   *
+   */
+  buttons?: Array<WhatsAppTemplateButtonWrite>;
+  /**
+   * The cards a `carousel` block scrolls through. Send it only on a `carousel` block, and only on a marketing template. Every card must carry the same blocks in the same order, and a card's header shows an `image` or a `video`. A `document` header works at the top of a template but not on a card. The number of cards is fixed once the language is approved. A template approved with three cards always sends three. Changing the count requires a new template rather than a new version of this one. May be omitted or hold fewer than two on a draft; at least two are required before submission.
+   *
+   */
+  cards?: Array<WhatsAppTemplateCardWrite>;
+};
+
+/**
  * A write counter, incremented every time the content it belongs to changes. It sits at 1 on content that has never been written through this API.
  *
  */
 export type WhatsAppTemplateRevision = number;
+
+/**
+ * One language's content, as written to a draft.
+ */
+export type WhatsAppTemplateLanguageUpsert = {
+  /**
+   * The template's content blocks for this language. Header, footer and buttons are optional. Every variable needs an example value, which is what Meta reviews against. May be omitted or empty on a draft; a body block is required before the language can be submitted.
+   *
+   */
+  components?: Array<WhatsAppTemplateComponentWrite>;
+  /**
+   * The revision you last read for this language, making the write a compare-and-set: a mismatch is refused with a conflict, leaving an edit you have not seen in place. Omit it for last-write-wins, which is what a single writer wants. Supplying it for a language that does not exist is also refused with a conflict rather than recreating the language. Inside a template's initial languages seed on create, a value here is refused, since no prior revision exists yet to compare against.
+   *
+   */
+  revision?: WhatsAppTemplateRevision;
+};
+
+/**
+ * Parameters for creating a WhatsApp template, optionally seeding its first draft.
+ */
+export type WhatsAppTemplateCreate = {
+  /**
+   * The WhatsApp Business Account to author this template on. A template belongs to one account at Meta and is reviewed, approved and sent under it, so every create names the account explicitly. It must be an account connected to this workspace.
+   *
+   */
+  waba: string;
+  /**
+   * The template's workspace-unique handle, and what a send references. Editable only before the first submission. The `bird_` prefix is reserved for our built-in templates and is rejected. Meta's own template name is derived from this handle, so the handle itself is validated against the charset Meta accepts.
+   *
+   */
+  slug: TemplateSlug;
+  /**
+   * The template's display name, shown wherever the template is listed. Free text, changeable at any time. Defaults to the slug when omitted.
+   *
+   */
+  name?: string;
+  /**
+   * What the template is for. Free text.
+   */
+  description?: string;
+  /**
+   * The category Meta reviews the template under. Required, because Meta demands one on every template it holds and it determines what a send costs. There is no default. Meta can recategorize a template after review; the per-language summary reports what it actually holds.
+   *
+   */
+  category: WhatsAppTemplateCategoryWrite;
+  /**
+   * The language a send uses when it names none, and the last resort when a requested language is unavailable. When `languages` is supplied it must be one of its keys.
+   *
+   */
+  default_language: LanguageTag;
+  /**
+   * How a send behaves when it asks for a language this template does not carry. Defaults to `fail`: a WhatsApp send that silently fell back would deliver approved copy the recipient did not expect, at a price the sender did not choose.
+   *
+   */
+  on_missing_language?: TemplateOnMissingLanguage;
+  /**
+   * Whether a send has to name a language. Set it to have a send that names none rejected, leaving the default language for sends that ask for it.
+   *
+   */
+  language_source_required?: boolean;
+  /**
+   * Optional seed for the template's first draft, keyed by BCP-47 language
+   * tag. Supplying it opens the draft and writes every language in one
+   * transaction: any invalid entry fails the whole create, leaving no
+   * template behind. Tags are canonicalised, so `pt-br` lands as `pt-BR`, and
+   * two keys canonicalising to one tag are rejected.
+   *
+   * Omit it to create the template with no draft, and add content later
+   * through the version and language paths. Nothing here reaches Meta:
+   * content is submitted, never created.
+   *
+   */
+  languages?: {
+    [key in LanguageTag]?: WhatsAppTemplateLanguageUpsert;
+  };
+};
+
+/**
+ * Partial update of a template's metadata and language policies. Only the fields you send are changed; the rest are left as they stand. The slug can change only before the first submission.
+ *
+ */
+export type WhatsAppTemplateUpdate = {
+  /**
+   * A new workspace-unique handle. Editable only before the first submission. After a change, the old slug no longer resolves; the template ID stays the same.
+   *
+   */
+  slug?: TemplateSlug;
+  /**
+   * The template's display name. Editable at any time; it is not what a send references.
+   */
+  name?: string;
+  /**
+   * What the template is for. Send `null` to clear it.
+   */
+  description?: string | null;
+  /**
+   * The language a send falls back to, and the one language the template is required to carry. Repointing it at a language the draft does not hold is refused, the same way removing the current default is: add the language first.
+   *
+   */
+  default_language?: LanguageTag;
+  /**
+   * How a send behaves when it asks for a language this template does not carry. Omitting it leaves the template's current setting alone. The `fail` default belongs to a create, and a partial update never reapplies it.
+   *
+   */
+  on_missing_language?: TemplateOnMissingLanguage;
+  /**
+   * Whether a send has to name a language.
+   */
+  language_source_required?: boolean;
+};
 
 /**
  * One version of a template, without its content. A version holds a full copy of every language it was submitted with. Listing versions therefore names the languages and what became of each without carrying their content. Read a single version for its content. Read its shallow language collection for content hashes.
@@ -10114,7 +10653,7 @@ export type WhatsAppTemplateVersionLanguage = {
    */
   rejection?: WhatsAppTemplateRejection;
   /**
-   * Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: WhatsAppTemplateSubmissionError;
@@ -10155,6 +10694,104 @@ export type WhatsAppTemplateVersion = {
    *
    */
   readonly created_at: string | null;
+};
+
+/**
+ * The account the copy is created on, plus optional overrides. Everything else is inherited from the source.
+ */
+export type WhatsAppTemplateDuplicate = {
+  /**
+   * The WhatsApp Business Account the copy is created on. A template belongs to one account at Meta. Meta reviews, approves, and sends it under that account. The copy therefore names its account rather than taking the source's. A built-in template's account is not one you can submit against. It must be an account connected to this workspace.
+   *
+   */
+  waba: string;
+  /**
+   * The copy's handle. The server assigns one when omitted. A `bird_` slug is rejected, and one already in use is a conflict.
+   *
+   */
+  slug?: TemplateSlug;
+  /**
+   * The copy's display name. Inherited from the source when omitted.
+   */
+  name?: string;
+  /**
+   * The languages the copy carries, when it should carry only some of them. Every entry must be a language the source holds. A copy narrows the set it inherits, it never adds to it. Omitted, the copy takes all of the source's languages.
+   *
+   */
+  include_languages?: Array<LanguageTag>;
+  /**
+   * The copy's default language, which must be one of the languages the copy carries. Omitted, the copy keeps the source's default when `include_languages` still carries it. Otherwise it takes the first of the copy's languages sorted by canonical tag, which is the order the copy stores them in, not the order `include_languages` listed them.
+   *
+   */
+  default_language?: LanguageTag;
+};
+
+/**
+ * Options for a submit. Every field is optional, so an empty body submits the draft as it stands.
+ *
+ */
+export type WhatsAppTemplateSubmit = {
+  /**
+   * Check the draft without submitting it. Every language is checked and every problem reported, but nothing is frozen and nothing is sent to WhatsApp. A clean result does not guarantee WhatsApp approval: WhatsApp offers no way to ask in advance, so it can still refuse a submission these checks passed. Use a different idempotency key for the validation and the submission. Reusing one key with different request bodies is rejected.
+   *
+   */
+  validate_only?: boolean;
+};
+
+/**
+ * One problem found while checking a version.
+ */
+export type WhatsAppTemplateSubmitProblem = {
+  /**
+   * The language the problem belongs to, or null when it concerns the version as a whole.
+   *
+   */
+  readonly language?: LanguageTag | null;
+  /**
+   * Where the problem sits inside the language's content, as a dotted path with indexes, or null when it is not about one field. The path is rooted at the language you wrote, so `components[0].text` is the first block's text.
+   *
+   */
+  readonly field?: string | null;
+  /**
+   * The error code a real submit fails with. Look it up in the error catalog for what to do about it.
+   *
+   */
+  readonly code: string;
+  /**
+   * What is wrong, in a form you can show the author.
+   */
+  readonly message: string;
+};
+
+/**
+ * The outcome of a submit. The shape is the same whether the submit was a check or a real one: read `valid` and `version` to see what happened.
+ *
+ */
+export type WhatsAppTemplateSubmitResult = {
+  /**
+   * Whether the version passed every check.
+   */
+  readonly valid: boolean;
+  /**
+   * Every problem found across every language. One round trip identifies all problems. Empty when `valid` is true.
+   *
+   */
+  readonly errors: Array<WhatsAppTemplateSubmitProblem>;
+  /**
+   * The version this submit froze, or null when nothing was frozen: a check run, or a submit that found problems.
+   *
+   */
+  readonly version?: WhatsAppTemplateVersion | null;
+  /**
+   * What to do next with this outcome. Present on reads that compute it: an empty list
+   * means there is nothing to do, and the field is absent entirely on responses that do
+   * not report next actions.
+   *
+   * A failed check routes back to the languages that need an edit; a clean one routes to
+   * the real submit, and then to polling the template for WhatsApp's verdicts.
+   *
+   */
+  readonly next?: Array<NextAction>;
 };
 
 /**
@@ -10234,6 +10871,38 @@ export type WhatsAppTemplateQuality = {
 };
 
 /**
+ * WhatsApp's label for why it took a language out of service: its `other_info.title`, lowercased. `first_pause` and `second_pause` are the first and second pauses for a low quality rating, which last three and six hours. `rate_limiting_pause` is a pause WhatsApp applied to limit sending. `disabled` means WhatsApp stopped the language from sending after repeated pauses. This is an open enum. Accept unrecognized values.
+ *
+ */
+export type WhatsAppTemplatePauseReason =
+  | "first_pause"
+  | "second_pause"
+  | "rate_limiting_pause"
+  | "disabled"
+  | (string & {});
+
+/**
+ * WhatsApp's record of why it paused or disabled one language. Set when WhatsApp pauses or disables the language and removed once the language can send again. Present only on the version currently in service.
+ *
+ */
+export type WhatsAppTemplatePause = {
+  /**
+   * When WhatsApp paused or disabled the language.
+   */
+  readonly started_at: string;
+  /**
+   * WhatsApp's label for the pause or disablement. Absent when WhatsApp sent none.
+   *
+   */
+  readonly reason?: WhatsAppTemplatePauseReason;
+  /**
+   * WhatsApp's explanation of the pause or disablement, passed through unmodified. Absent when WhatsApp sent none.
+   *
+   */
+  readonly description?: string;
+};
+
+/**
  * One language of one version: its content, what the submission carrying it did with it, and everything Meta holds about it.
  *
  */
@@ -10271,12 +10940,17 @@ export type WhatsAppTemplateLanguage = {
    */
   quality?: WhatsAppTemplateQuality;
   /**
+   * Why WhatsApp paused or disabled this language. Present only on the version currently in service, and only until the language can send again.
+   *
+   */
+  pause?: WhatsAppTemplatePause;
+  /**
    * Why Meta refused this content, present when `status` is `rejected`. Absent otherwise.
    *
    */
   rejection?: WhatsAppTemplateRejection;
   /**
-   * Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: WhatsAppTemplateSubmissionError;
@@ -10300,6 +10974,40 @@ export type WhatsAppTemplateLanguage = {
    *
    */
   readonly updated_by?: UserId | null;
+};
+
+/**
+ * What a language write returns, enough to make the next write without re-reading.
+ */
+export type WhatsAppTemplateLanguageSaved = {
+  /**
+   * The canonical form of the tag you addressed. Use it in later calls for this language.
+   */
+  readonly language: LanguageTag;
+  /**
+   * The language's new revision, to pass back on your next write.
+   */
+  readonly revision: WhatsAppTemplateRevision;
+  /**
+   * A hash over the content as saved, so you can tell whether your next write would change anything without diffing the document.
+   *
+   */
+  readonly content_hash: WhatsAppTemplateContentHash;
+  /**
+   * When this language was last written.
+   */
+  readonly updated_at: string;
+};
+
+/**
+ * Parameters for discarding one language's draft edits. Pass `revision` to guard against overwriting an edit you haven't seen.
+ */
+export type WhatsAppTemplateLanguageDiscard = {
+  /**
+   * The revision you last read for this language, making the discard a compare-and-set: a mismatch is refused with a conflict, leaving an edit you have not seen in place. Omit it for last-write-wins, which is what a single writer wants. Supplying it for a language the draft no longer holds is also refused with a conflict rather than recreating the language.
+   *
+   */
+  revision?: WhatsAppTemplateRevision;
 };
 
 /**
@@ -11134,6 +11842,11 @@ export type WhatsAppNumber = {
    */
   readonly number_id?: AllocatedNumberId;
   /**
+   * When we expect WhatsApp to release this pre-verified number if you have not finished signup by then. Present only while the number is `awaiting_signup`. Absent for a number pre-verified before we started recording this moment, and for a number you brought yourself.
+   *
+   */
+  readonly verified_until?: string;
+  /**
    * Your workspace's own label for this number, given when it was connected and changeable afterwards. It has no bearing on what WhatsApp displays to people the number messages; `GET /v1/whatsapp/numbers/{number_id}/profile` returns that as `display_name`. For a number we operate on your behalf, this is our own label instead and cannot be changed.
    *
    */
@@ -11216,7 +11929,7 @@ export type WhatsAppNumberList = {
    * The WhatsApp numbers your workspace can send from.
    */
   data: Array<WhatsAppNumber>;
-} & ListEnvelope;
+} & ListEnvelopeWithTotal;
 
 export type NumbersDedicatedAllocationId = string;
 
@@ -11879,15 +12592,15 @@ export type AmbMessageDirection = "outbound" | "inbound";
  *
  * - `accepted`: Accepted and queued for delivery to Apple.
  * - `sent`: Handed to Apple. There is no delivery or read receipt on this
- * channel, so `sent` is the furthest an outbound message's status
- * advances.
+ *   channel, so `sent` is the furthest an outbound message's status
+ *   advances.
  * - `send_failed`: Sending stopped because of a business or conversation
- * restriction, a recipient opt-out, an Apple refusal, or exhausted attempts.
- * An earlier attempt may have reached Apple if its response or the local
- * record of success was lost. See `last_error` for why sending stopped.
+ *   restriction, a recipient opt-out, an Apple refusal, or exhausted attempts.
+ *   An earlier attempt may have reached Apple if its response or the local
+ *   record of success was lost. See `last_error` for why sending stopped.
  * - `rejected`: Refused by Bird before any send attempt and never charged:
- * the destination has no price, the wallet could not fund the send, or the
- * content cannot be sent yet. See `last_error`.
+ *   the destination has no price, the wallet could not fund the send, or the
+ *   content cannot be sent yet. See `last_error`.
  * - `received`: Received as an inbound message.
  *
  */
@@ -11927,7 +12640,7 @@ export type AmbContentKind =
  *
  * - `operator`: A person, through a signed-in dashboard session.
  * - `automation`: A workflow or bot acting on the workspace's behalf,
- * through a signed-in session.
+ *   through a signed-in session.
  * - `api`: A direct API call, authenticated with an API key.
  *
  * A credential can send only the sources it is permitted; naming one
@@ -14559,7 +15272,7 @@ export type WhatsAppBusinessPortfolio = {
  *
  * - `disabled`: WhatsApp has disabled the account, and it cannot send.
  * - `scheduled_for_disable`: WhatsApp has set a date to disable the account, which can
- * still send until then.
+ *   still send until then.
  *
  * An account WhatsApp has reinstated reports no `ban` at all rather than a third value
  * here.
@@ -14589,9 +15302,9 @@ export type WhatsAppBusinessAccountBan = {
  *
  * - `available`: the entity meets every messaging or calling requirement.
  * - `limited`: it can be used, but with a limitation Meta describes in `additional_info`
- * when it gave one.
+ *   when it gave one.
  * - `blocked`: it cannot be used. `errors` says why when Meta named a reason, and each
- * error carries `possible_solution` when Meta suggested one.
+ *   error carries `possible_solution` when Meta suggested one.
  *
  */
 export type WhatsAppMetaHealthVerdict = "available" | "limited" | "blocked";
@@ -14813,9 +15526,9 @@ export type WhatsAppSuppressionCreate = {
  * What Bird does when an inbound message matches the rule.
  *
  * - `opt_out` records that the sender no longer consents to receive any messages from your
- * WhatsApp Business Account, including transactional ones. Typing the word is the person's
- * own statement, so it covers everything, unlike WhatsApp's built-in marketing opt-out
- * control, which stops marketing alone.
+ *   WhatsApp Business Account, including transactional ones. Typing the word is the person's
+ *   own statement, so it covers everything, unlike WhatsApp's built-in marketing opt-out
+ *   control, which stops marketing alone.
  * - `opt_in` records that they consent again.
  *
  * A rule's operation is fixed once created, and a keyword belongs to exactly one operation, so
@@ -14889,9 +15602,9 @@ export type WhatsAppKeywordRuleList = {
  * What Bird does when an inbound message matches the rule.
  *
  * - `opt_out` records that the sender no longer consents to receive any messages from your
- * WhatsApp Business Account, including transactional ones. Typing the word is the person's
- * own statement, so it covers everything, unlike WhatsApp's built-in marketing opt-out
- * control, which stops marketing alone.
+ *   WhatsApp Business Account, including transactional ones. Typing the word is the person's
+ *   own statement, so it covers everything, unlike WhatsApp's built-in marketing opt-out
+ *   control, which stops marketing alone.
  * - `opt_in` records that they consent again.
  *
  * A rule's operation is fixed once created, and a keyword belongs to exactly one operation, so
@@ -16434,10 +17147,10 @@ export type EmailInboxInsightsDomainUpdate = {
  * - `enabled`: Inbox Insights is now switched on for the domain named alongside this.
  * - `already_on`: at least one domain was already switched on, so nothing changed.
  * - `choice_required`: the main sending domain could not be identified, most often
- * because the workspace has several verified domains and no sending to rank them
- * by. Ask the customer to choose.
+ *   because the workspace has several verified domains and no sending to rank them
+ *   by. Ask the customer to choose.
  * - `no_verified_domains`: the workspace has no verified sending domain, so there is
- * nothing to report on until one is verified.
+ *   nothing to report on until one is verified.
  *
  */
 export type EmailInboxInsightsDomainMonitoringOutcome =
@@ -16935,11 +17648,11 @@ export type EmailStatsQueryMetric =
  * - `recipient_domain`, `ip_pool_id`, `broadcast_id`: all metrics except `sends_accepted`.
  * - `mailbox_provider`, `mailbox_provider_region`: all metrics except `sends_accepted`, `accepted`, and `rejected`.
  * - `sending_ip`: `delivered`, `bounced`, `hard_bounced`, `soft_bounced`, `admin_bounced`, `block_bounced`,
- * `undetermined_bounced`, `deferred`, `oob_bounces`, `effective_delivered`, `all_bounces`, `delivery_rate`,
- * `bounce_rate`, `deferral_rate`, `oob_rate`, `total_p50_ms`, `total_p95_ms`, and `total_p99_ms`.
+ *   `undetermined_bounced`, `deferred`, `oob_bounces`, `effective_delivered`, `all_bounces`, `delivery_rate`,
+ *   `bounce_rate`, `deferral_rate`, `oob_rate`, `total_p50_ms`, `total_p95_ms`, and `total_p99_ms`.
  * - `country`, `region`, `city`, `agent_family`, `os_family`, `device_family`: `opens`, `opens_non_prefetched`,
- * `clicks`, `unique_opens`, `unique_opens_non_prefetched`, `unique_clicks`, `confirmed_unique_opens`,
- * and `confirmed_unique_opens_non_prefetched`.
+ *   `clicks`, `unique_opens`, `unique_opens_non_prefetched`, `unique_clicks`, `confirmed_unique_opens`,
+ *   and `confirmed_unique_opens_non_prefetched`.
  * - `smtp_error_code`: `bounced`, `hard_bounced`, `soft_bounced`, `admin_bounced`, `block_bounced`, and `undetermined_bounced`.
  * - `feedback_type`: `complained`.
  *
@@ -18451,9 +19164,9 @@ export type DomainCapabilityPending = {
    *
    * - `pending`: the DNS records have not been detected yet.
    * - `failed`: the records resolved with wrong values; correct them
-   * or submit a different change.
+   *   or submit a different change.
    * - `temporary_failure`: the DNS lookup failed transiently and is
-   * queued for retry.
+   *   queued for retry.
    *
    */
   readonly status: "pending" | "failed" | "temporary_failure";
@@ -18465,16 +19178,16 @@ export type DomainCapability = {
    *
    * - `pending`: verification has not run, or is currently running.
    * - `verified`: all DNS records for this capability resolved with the
-   * expected values.
+   *   expected values.
    * - `warning`: a record for this capability verified before and a recent
-   * check no longer matches, but it is still within the grace period.
-   * Sending is not yet affected; fix it before the grace period ends.
+   *   check no longer matches, but it is still within the grace period.
+   *   Sending is not yet affected; fix it before the grace period ends.
    * - `failed`: DNS records resolved but at least one value is wrong.
-   * Update your DNS to recover.
+   *   Update your DNS to recover.
    * - `temporary_failure`: DNS lookup failed transiently. Verification retries
-   * automatically; do not change DNS records unless they are incorrect.
+   *   automatically; do not change DNS records unless they are incorrect.
    * - `not_configured`: the capability is not set up on this domain
-   * (for example, no tracking domain configured).
+   *   (for example, no tracking domain configured).
    *
    */
   readonly status:
@@ -18496,7 +19209,7 @@ export type DomainCapability = {
    * than a generic failure message.
    *
    * - `tracking_domain_in_use`: the link tracking subdomain is already claimed
-   * by another organization.
+   *   by another organization.
    *
    */
   readonly reason?: string | null;
@@ -18581,12 +19294,12 @@ export type DnsRecord = {
    * - `return_path`: identifies the return-path (bounce) CNAME for sending.
    * - `tracking`: identifies the optional branded open/click tracking CNAME.
    * - `inbound_mx`: identifies the MX record routing mail to us for receiving.
-   * Always present wherever inbound is available, as a regional reference,
-   * regardless of whether receiving is enabled; publishing it does not
-   * enable receiving on its own: see `DomainUpdate.inbound`. It is
-   * `optional` until receiving is enabled, and publishing it before then
-   * is destructive: on a domain at the zone apex it replaces the MX
-   * records that carry the domain's existing mail.
+   *   Always present wherever inbound is available, as a regional reference,
+   *   regardless of whether receiving is enabled; publishing it does not
+   *   enable receiving on its own: see `DomainUpdate.inbound`. It is
+   *   `optional` until receiving is enabled, and publishing it before then
+   *   is destructive: on a domain at the zone apex it replaces the MX
+   *   records that carry the domain's existing mail.
    * - `dmarc`: identifies the DMARC policy record required for sending.
    *
    */
@@ -18596,10 +19309,10 @@ export type DnsRecord = {
    *
    * - `active`: the record backs the domain's current configuration.
    * - `pending`: the record belongs to a staged configuration change;
-   * publish it to complete the change.
+   *   publish it to complete the change.
    * - `deprecated`: the record belonged to a previous configuration.
-   * Keep it in DNS until `safe_to_remove` is `true`; in-flight mail and
-   * previously sent tracked links may still resolve through it.
+   *   Keep it in DNS until `safe_to_remove` is `true`; in-flight mail and
+   *   previously sent tracked links may still resolve through it.
    *
    */
   readonly state: "active" | "pending" | "deprecated";
@@ -18612,15 +19325,15 @@ export type DnsRecord = {
    * Verification status of this record's most recent DNS check.
    *
    * - `pending`: the record has not verified yet; publish it (or correct it)
-   * and it verifies on the next check.
+   *   and it verifies on the next check.
    * - `verified`: the most recent check matched the expected value.
    * - `warning`: the record verified before and a recent check no longer
-   * matched, but it is still within the grace period. Sending is not yet
-   * affected; fix the record before the grace period ends to avoid it
-   * being blocked.
+   *   matched, but it is still within the grace period. Sending is not yet
+   *   affected; fix the record before the grace period ends to avoid it
+   *   being blocked.
    * - `failed`: the record verified before but later checks kept failing
-   * past the grace period; the configuration has regressed and needs
-   * attention.
+   *   past the grace period; the configuration has regressed and needs
+   *   attention.
    *
    */
   readonly status: "pending" | "verified" | "warning" | "failed";
@@ -18665,14 +19378,14 @@ export type Domain = {
    * - `pending`: the DKIM record has not been published yet.
    * - `verified`: the DKIM record is in place; ownership is confirmed.
    * - `failed`: a DKIM record exists but does not match the expected
-   * value (for example a stale record from an earlier setup), or a
-   * previously verified record was removed. Correct the record to
-   * recover.
+   *   value (for example a stale record from an earlier setup), or a
+   *   previously verified record was removed. Correct the record to
+   *   recover.
    * - `temporary_failure`: DNS resolution failed transiently, such as from a
-   * timeout or unreachable nameserver. Verification retries automatically;
-   * do not change the DNS records unless they are incorrect.
+   *   timeout or unreachable nameserver. Verification retries automatically;
+   *   do not change the DNS records unless they are incorrect.
    * - `rejected`: the domain was refused for policy reasons and cannot be
-   * used for sending. Contact support if you believe this is an error.
+   *   used for sending. Contact support if you believe this is an error.
    *
    */
   readonly status:
@@ -18758,10 +19471,10 @@ export type DomainDkimConfig = {
    * How the DKIM public key is published in your DNS.
    *
    * - `txt` (default): you publish the DKIM public key as a TXT record. Key
-   * rotation requires updating the record.
+   *   rotation requires updating the record.
    * - `delegated`: you publish a CNAME that points to a DKIM key we host and
-   * rotate. This mode is unavailable for new configurations; supplying it
-   * returns `422`.
+   *   rotate. This mode is unavailable for new configurations; supplying it
+   *   returns `422`.
    *
    */
   mode?: "txt" | "delegated";
@@ -18922,10 +19635,10 @@ export type Suppression = {
    *
    * - `all`: blocks every message category, including transactional.
    * - `non_transactional`: blocks marketing but allows transactional messages.
-   * A recipient who complained can therefore still receive
-   * mail such as password resets.
+   *   A recipient who complained can therefore still receive
+   *   mail such as password resets.
    * - `category`: scopes the block to a preference category and blocks every
-   * category until one is set.
+   *   category until one is set.
    *
    * This list grows over time, and any value other than `non_transactional`
    * blocks every category, so treat an unknown value as blocking the send.
@@ -21311,10 +22024,10 @@ export type Mailbox = {
    *
    * - `open`: Accepts everything not blocked by a rule.
    * - `replies_only`: Accepts only replies to messages this mailbox has
-   * sent. A reply must match a message the mailbox sent. Landing in an
-   * existing thread by itself does not count.
+   *   sent. A reply must match a message the mailbox sent. Landing in an
+   *   existing thread by itself does not count.
    * - `allowlist`: Accepts only senders matching an allow rule. Replies to
-   * prior outbound mail are always admitted unless blocked.
+   *   prior outbound mail are always admitted unless blocked.
    * - `drop`: Stores nothing.
    *
    */
@@ -21410,8 +22123,8 @@ export type MailboxCreate = {
    *
    * - `open`: Accepts everything not blocked by a rule.
    * - `replies_only`: Accepts only replies to messages this mailbox has
-   * sent. A reply must match a message the mailbox sent. Landing in an
-   * existing thread by itself does not count.
+   *   sent. A reply must match a message the mailbox sent. Landing in an
+   *   existing thread by itself does not count.
    * - `allowlist`: Accepts only senders matching an allow rule.
    * - `drop`: Stores nothing.
    *
@@ -21446,8 +22159,8 @@ export type MailboxUpdate = {
    *
    * - `open`: Accepts everything not blocked by a rule.
    * - `replies_only`: Accepts only replies to messages this mailbox has
-   * sent. A reply must match a message the mailbox sent. Landing in an
-   * existing thread by itself does not count.
+   *   sent. A reply must match a message the mailbox sent. Landing in an
+   *   existing thread by itself does not count.
    * - `allowlist`: Accepts only senders matching an allow rule.
    * - `drop`: Stores nothing.
    *
@@ -22537,15 +23250,15 @@ export type WebhookEndpoint = {
    *
    * - `active`: The initial state; events are being delivered normally.
    * - `degraded`: Recent deliveries are failing. We keep delivering and retrying,
-   * and the endpoint returns to `active` automatically once deliveries succeed
-   * again.
+   *   and the endpoint returns to `active` automatically once deliveries succeed
+   *   again.
    * - `paused`: All delivery is stopped, either because an update set `status` to
-   * `paused` or automatically after sustained delivery failures. A paused endpoint
-   * never resumes on its own: re-enable it with
-   * [Update a webhook endpoint](/docs/api/reference/update-webhook), then
-   * [Replay failed deliveries](/docs/api/reference/create-webhook-replay) to
-   * recover the deliveries that failed before the pause. Events that arrived
-   * while it was paused were never attempted, so a replay does not reach them.
+   *   `paused` or automatically after sustained delivery failures. A paused endpoint
+   *   never resumes on its own: re-enable it with
+   *   [Update a webhook endpoint](/docs/api/reference/update-webhook), then
+   *   [Replay failed deliveries](/docs/api/reference/create-webhook-replay) to
+   *   recover the deliveries that failed before the pause. Events that arrived
+   *   while it was paused were never attempted, so a replay does not reach them.
    *
    */
   readonly status: "active" | "degraded" | "paused";
@@ -22564,20 +23277,20 @@ export type WebhookEndpointList = {
  * platform first:
  *
  * - `claude_managed_agents`: Claude Managed Agents. Send each message you receive to your Claude managed agent.
- * - `agent_id` (`config`, required): Returned when you create the agent. Sessions use its latest version.
- * - `environment_id` (`config`, required): Returned when you create the environment.
- * - `vault_id` (`config`, optional): A credential vault the agent uses, such as the one holding its Bird MCP credential, so it can reply through Bird.
- * - `api_key` (secret, in `credentials`, required): From the Claude workspace your agent runs in.
- * - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.
- * - Setup 1: First, set up your agent in Claude. In the Claude Console, create the agent, its environment and an API key in the same workspace, then come back here with their IDs and the key. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.
- * - Setup 2: Create an API key. In the Claude workspace your agent runs in. See https://platform.claude.com/settings/keys.
- * - Setup 3: Copy the agent and environment IDs. Each create returns its ID. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.
- * - Setup 4: Optionally, add a credential vault. To let the agent reply through Bird, store its Bird MCP credential in a Claude credential vault and give the vault ID here. Each session gets that vault. See https://platform.claude.com/docs/en/managed-agents/vaults.
+ *   - `agent_id` (`config`, required): Returned when you create the agent. Sessions use its latest version.
+ *   - `environment_id` (`config`, required): Returned when you create the environment.
+ *   - `vault_id` (`config`, optional): A credential vault the agent uses, such as the one holding its Bird MCP credential, so it can reply through Bird.
+ *   - `api_key` (secret, in `credentials`, required): From the Claude workspace your agent runs in.
+ *   - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.
+ *   - Setup 1: First, set up your agent in Claude. In the Claude Console, create the agent, its environment and an API key in the same workspace, then come back here with their IDs and the key. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.
+ *   - Setup 2: Create an API key. In the Claude workspace your agent runs in. See https://platform.claude.com/settings/keys.
+ *   - Setup 3: Copy the agent and environment IDs. Each create returns its ID. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.
+ *   - Setup 4: Optionally, add a credential vault. To let the agent reply through Bird, store its Bird MCP credential in a Claude credential vault and give the vault ID here. Each session gets that vault. See https://platform.claude.com/docs/en/managed-agents/vaults.
  * - `grok_bot`: Grok Bot. Send each message you receive to a Grok Bot routine.
- * - `webhook_url` (`config`, required): The routine's webhook URL.
- * - `sender_key` (secret, in `credentials`, required): The routine's sender key. Bird sends it only as the Bearer token.
- * - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.
- * - Setup 1: First, ask Grok Bot to create a routine. Ask Grok Bot to create a routine with a webhook trigger, then paste the webhook URL and sender key it gives you below. See https://cursor.com/docs/cloud-agent/automations#webhook-triggers.
+ *   - `webhook_url` (`config`, required): The routine's webhook URL.
+ *   - `sender_key` (secret, in `credentials`, required): The routine's sender key. Bird sends it only as the Bearer token.
+ *   - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.
+ *   - Setup 1: First, ask Grok Bot to create a routine. Ask Grok Bot to create a routine with a webhook trigger, then paste the webhook URL and sender key it gives you below. See https://cursor.com/docs/cloud-agent/automations#webhook-triggers.
  *
  */
 export type WebhookConnectorId = string;
@@ -23509,15 +24222,15 @@ export type EventEmailReceived = {
  * Why an email was rejected before delivery.
  *
  * - `recipient_suppressed`: The recipient is on the workspace suppression list, so
- * delivery was never attempted.
+ *   delivery was never attempted.
  * - `transmission_failed`: The message could not be transmitted for delivery.
  * - `generation_failure`: The message could not be built for delivery (template or
- * content issue).
+ *   content issue).
  * - `policy_rejection`: The message was refused by sending policy.
  * - `domain_unverified`: The sending domain was not verified.
  * - `quota_exceeded`: The organization's send quota was reached.
  * - `recipient_not_allowed`: A recipient was not permitted for this send (for shared
- * onboarding-domain sends, recipients must be verified workspace members).
+ *   onboarding-domain sends, recipients must be verified workspace members).
  *
  */
 export type EmailRejectionReason =
@@ -24677,12 +25390,12 @@ export type EventVoiceCallAnswered = {
  * - `answered` means it connected and the far end picked up.
  * - `no_answer` means nobody picked up before the call timed out.
  * - `rejected` means it was refused rather than attempted. Either we turned it
- * away before dialing a carrier, in which case `rejection_reason` names the
- * check it failed where there was one, or the far end declined it.
+ *   away before dialing a carrier, in which case `rejection_reason` names the
+ *   check it failed where there was one, or the far end declined it.
  * - `failed` means it was attempted and did not work, and `sip_response_code`
- * is what came back.
+ *   is what came back.
  * - `unknown` means the outcome could not be determined. Contact support with
- * the call `id` if you see one.
+ *   the call `id` if you see one.
  *
  * An active call carries `ringing` before it is picked up and `in_progress`
  * afterward. The call list's `status` filter takes any mix of the two sets.
@@ -25254,9 +25967,9 @@ export type WebhookAttempt = {
    * - `delivered`: your endpoint accepted it with a `2xx` response.
    * - `pending`: the attempt is still in flight.
    * - `failed`: it returned a non-`2xx` response or no response at all. Automatic
-   * retries appear as further attempts with the same `event_id`, so a `failed`
-   * attempt is final for the event only once the retry schedule is spent. A
-   * replayed delivery takes a single attempt and is never retried.
+   *   retries appear as further attempts with the same `event_id`, so a `failed`
+   *   attempt is final for the event only once the retry schedule is spent. A
+   *   replayed delivery takes a single attempt and is never retried.
    *
    */
   status: "delivered" | "pending" | "failed";
@@ -25426,36 +26139,36 @@ export type VoiceSessionCredential = {
  * You can resolve these issues:
  *
  * - `source_not_allowed`: The leg came from an IP address that is not in the
- * trunk's allowed-address list. Add the address your PBX sends from.
+ *   trunk's allowed-address list. Add the address your PBX sends from.
  * - `caller_id_not_verified`: The number in the `From` header is not a verified
- * caller ID for this workspace. Verify it or use a verified caller ID.
+ *   caller ID for this workspace. Verify it or use a verified caller ID.
  * - `number_ownership_not_verified`: The ownership documents for this purchased
- * number have not yet been accepted under its country's requirements. We
- * block outgoing and incoming legs on the number until verification is
- * complete. Blocked incoming legs never reach your PBX, and their route type
- * is `reject` regardless of the number's configuration. Open the number
- * under **Numbers** and complete its ownership requirements, then retry
- * the leg.
+ *   number have not yet been accepted under its country's requirements. We
+ *   block outgoing and incoming legs on the number until verification is
+ *   complete. Blocked incoming legs never reach your PBX, and their route type
+ *   is `reject` regardless of the number's configuration. Open the number
+ *   under **Numbers** and complete its ownership requirements, then retry
+ *   the leg.
  * - `destination_not_enabled`: Calling to this destination country is disabled.
- * Enable it in your voice destination settings.
+ *   Enable it in your voice destination settings.
  * - `insufficient_balance`: Your wallet balance was too low for the leg.
- * Top up or enable automatic top-ups.
+ *   Top up or enable automatic top-ups.
  * - `daily_spend_exceeded`: The leg would exceed your organization's daily
- * voice spend limit. Retry after the limit resets at the start of the next
- * UTC day.
+ *   voice spend limit. Retry after the limit resets at the start of the next
+ *   UTC day.
  * - `concurrent_calls_exceeded`: You already have as many legs in progress as
- * your account allows. Wait for one to end or ask support to raise the limit.
+ *   your account allows. Wait for one to end or ask support to raise the limit.
  * - `calls_per_second_exceeded`: You placed legs faster than your account
- * allows. Reduce your dialing rate and retry.
+ *   allows. Reduce your dialing rate and retry.
  *
  * For all other reasons, contact support and provide the leg `id`:
  *
  * - `routing_not_configured`: This trunk has no dial plan, which can happen on
- * a new trunk.
+ *   a new trunk.
  * - `no_route_found`: A dial plan is attached, but no rule in it covers this
- * destination.
+ *   destination.
  * - `destination_blocked`: The destination is blocked by our routing
- * configuration.
+ *   configuration.
  * - `call_not_permitted`: The leg could not be priced for your account.
  *
  */
@@ -25749,15 +26462,15 @@ export type BillingProductSlug = string;
  * How this product is priced.
  *
  * - `plan`: it comes with the organization's subscribed plan, with usage tracked
- * against that plan's included allowance.
+ *   against that plan's included allowance.
  * - `metered`: it is billed per unit beyond any included allowance.
  * - `rate_card`: the per-unit price varies by attributes of the usage, such as
- * destination, instead of being flat.
+ *   destination, instead of being flat.
  * - `unit_subscription`: it is a standalone add-on billed as its own recurring
- * subscription, independent of the plan.
+ *   subscription, independent of the plan.
  * - `custom`: a pricing arrangement that does not fit the other models.
  * - `counter`: usage is recorded without enforcing a spending cap or blocking
- * requests.
+ *   requests.
  *
  */
 export type BillingPricingModel =
@@ -25784,12 +26497,12 @@ export type NumberCapability = "sms" | "mms" | "voice" | (string & {});
  * Current ownership registration approval status. Operational activation is separate:
  * `blocked_at` records the ownership block on number use, and `next` describes remaining work.
  *
- * - `needs_input` means ownership details or a submission correction are needed.
- * - `under_review` means your current answers are being reviewed.
+ * - `needs_input` means ownership details or a submission correction are needed, including when Bird closed a submission but accepts corrected details.
+ * - `under_review` means your current answers are being reviewed. Until the submission is approved, you can still change any answer; a changed answer is reviewed again.
  * - `approval_pending` means your paperwork is accepted but registration approval is still pending.
  * - `approved` means ownership registration is approved. Number activation can still be pending while `blocked_at` is non-null.
  * - `not_required` means no active ownership requirement applies, including after a requirement is withdrawn.
- * - `rejected` means the submission was closed or the verifier correction deadline passed. Corrections are no longer accepted for this submission.
+ * - `rejected` means the submission was closed without accepting another one, or the verifier correction deadline passed. Corrections are no longer accepted for this submission. Contact support.
  * - `unknown` means current approval status could not be determined. Read `blocked_at` for any recorded ownership block. Retry the read.
  *
  */
@@ -25886,10 +26599,10 @@ export type Number = {
    *
    * - `active` means this number is allocated to your workspace and usable.
    * - `pending_ownership_registration` means this number is allocated to your workspace and billed,
-   * but outbound SMS and both inbound and outbound voice calls are blocked until ownership registration
-   * is approved and activation completes, or the ownership requirement is withdrawn.
-   * This ownership status does not gate inbound SMS or WhatsApp.
-   * Read `ownership.status` and `ownership.next` for the current decision and remaining work.
+   *   but outbound SMS and both inbound and outbound voice calls are blocked until ownership registration
+   *   is approved and activation completes, or the ownership requirement is withdrawn.
+   *   This ownership status does not gate inbound SMS or WhatsApp.
+   *   Read `ownership.status` and `ownership.next` for the current decision and remaining work.
    * - `released` means this number is no longer allocated to your workspace.
    *
    * An allocated number is not always enough to send from it: some destination
@@ -25973,7 +26686,7 @@ export type AvailableNumber = {
    * - `anywhere`: any business address.
    * - `country`: a business address in the number's country.
    * - `number_area`: a business address inside the number's own area code, for example in
-   * Amsterdam for an Amsterdam (020) number.
+   *   Amsterdam for an Amsterdam (020) number.
    *
    */
   ownership_address_scope?: string;
@@ -26596,9 +27309,9 @@ export type VoiceNumberProviderAllocation = {
  *
  * - `pending`: the number is registered but ownership has not yet been proven.
  * - `verified`: the workspace proved ownership of the number. Check the
- * resource's activation or direction fields for outbound availability.
+ *   resource's activation or direction fields for outbound availability.
  * - `failed`: terminal because the verification challenge expired or the attempt limit was exhausted.
- * Delete the verified number and register it again to retry.
+ *   Delete the verified number and register it again to retry.
  *
  * Open enum: additional states may be added over time, so treat an unrecognized
  * value as a future state rather than an error.
@@ -30148,7 +30861,7 @@ export type WhatsAppMessageTemplateWritable = {
  */
 export type WhatsAppMediaWritable = {
   /**
-   * Where to fetch the media. On an inbound message, or one from the WhatsApp Business app, this is a Bird URL you fetch with your API key; it is absent when the file could not be retrieved from WhatsApp. It stays populated after the stored bytes expire, and the link returns `410` from then on. On a message sent through Bird it is the URL the sender supplied, whose availability is the sender's to guarantee.
+   * Where to fetch the media. On an inbound message, or one from the WhatsApp Business app, this is a Bird URL you fetch with your API key. The file expires with the message, 30 days after it arrives, and the link returns `404` from then on. If the file is gone while the message is still readable, the link returns `410`. On a message sent through Bird it is the URL the sender supplied, whose availability is the sender's to guarantee.
    *
    */
   url?: string;
@@ -30323,6 +31036,156 @@ export type WhatsAppReactionEventListWritable = {
 } & ListEnvelope;
 
 /**
+ * The contact or group on the other side of this conversation. Profile fields are null when unknown and on group conversations.
+ */
+export type WhatsAppConversationRecipientWritable = {
+  /**
+   * Meta's business-scoped user ID for the contact, or null when unknown.
+   */
+  bsuid: string | null;
+  /**
+   * Contact phone number in E.164 format, or null when unknown.
+   */
+  phone_number: string | null;
+  /**
+   * Display name from the contact's WhatsApp profile, or null when none has been recorded.
+   */
+  display_name: string | null;
+  /**
+   * Contact's WhatsApp username without a leading `@`, or null when none has been recorded. Messages cannot be addressed by username.
+   */
+  username: string | null;
+  /**
+   * Group this conversation belongs to. Omitted for a conversation with one contact.
+   */
+  group_id?: WhatsAppGroupId;
+};
+
+/**
+ * The 24-hour customer-service window, measured from the most recent message this contact sent. Free-form messages are accepted while it is open; once it closes, only a template can start the conversation again.
+ *
+ * This is what Bird observed, not a promise about what WhatsApp will accept: a message Bird never received leaves the window looking shorter than it is, and WhatsApp decides each send on its own.
+ *
+ */
+export type WhatsAppConversationServiceWindowWritable = {
+  status: WhatsAppConversationServiceWindowStatus;
+  /**
+   * When the window closes, or closed. Null when no inbound message has been recorded, in which case `status` is `closed`.
+   */
+  ends_at: string | null;
+};
+
+/**
+ * A pointer to the most recent message in this conversation, in either direction. It names the message rather than copying it: read the message itself, with its content and delivery status, through the conversation's message list.
+ *
+ */
+export type WhatsAppConversationLastMessageWritable = {
+  /**
+   * ID of the message.
+   */
+  id: WhatsAppMessageId;
+  /**
+   * `inbound` for a message received from the contact, `outbound` for one your workspace or the agent sent.
+   */
+  direction: MessageDirection;
+  /**
+   * The message's `created_at`: when it was accepted (outbound) or received (inbound). The conversation list is ordered by it. It only moves forward: a message that arrives late and belongs earlier in the conversation does not pull it back.
+   *
+   */
+  created_at: string;
+};
+
+/**
+ * One WhatsApp conversation between a number you have connected and a single contact, or a group it belongs to. It holds who answers the conversation right now, its read state and labels, when its service window closes, and the most recent message. Resolving the inbox work preserves the conversation's ID and history. A new inbound message reopens it. Messages are retained for 30 days, and the conversation is deleted when its last message expires.
+ *
+ */
+export type WhatsAppConversationWritable = {
+  /**
+   * Conversation ID.
+   */
+  id: WhatsAppConversationId;
+  /**
+   * Your WhatsApp business phone number this conversation runs on, in E.164 format. It stays the same when you remove the number and connect it again. Null when Bird holds no phone number for it.
+   *
+   */
+  business_phone_number: string | null;
+  /**
+   * The other side of the conversation: the contact, or the group it takes place in. A group conversation carries `group_id` and null contact identity fields.
+   *
+   */
+  recipient: WhatsAppConversationRecipientWritable;
+  inbox_status: ConversationInboxStatus;
+  /**
+   * Who answers this conversation right now. You take and release control in the dashboard inbox.
+   */
+  control: WhatsAppConversationControl;
+  /**
+   * The user this conversation is assigned to. Null when unassigned. Assignment is not rechecked against workspace membership on read, so it can still name a user whose access was removed.
+   *
+   */
+  assigned_to: UserId | null;
+  /**
+   * Customer-service window for a contact. Null for group conversations.
+   */
+  service_window: WhatsAppConversationServiceWindowWritable | null;
+  /**
+   * A pointer to the most recent message in this conversation. It names the message; read its content through the conversation's message list. Null when the conversation has no message yet.
+   *
+   */
+  last_message: WhatsAppConversationLastMessageWritable | null;
+  /**
+   * Number of inbound messages the workspace has not acknowledged. Shared across the workspace. Sending a reply does not mark messages read.
+   *
+   */
+  unread_count: number;
+  labels: ConversationLabels;
+  /**
+   * When Bird opened this conversation.
+   */
+  created_at: string;
+  /**
+   * When this conversation last changed.
+   */
+  updated_at: string;
+};
+
+export type WhatsAppConversationListWritable = {
+  /**
+   * A page of conversations, most recently active first.
+   */
+  data: Array<WhatsAppConversationWritable>;
+} & ListEnvelope;
+
+export type WhatsAppConversationEventWritable = {
+  /**
+   * Event ID.
+   */
+  id: WhatsAppConversationEventId;
+  type: WhatsAppConversationEventType;
+  /**
+   * Human-readable summary of what happened.
+   */
+  summary: string;
+  /**
+   * Structured details for the event. `from` and `to` carry the values that changed: the holder (`meta_business_agent` or `bird`) for a control change, the assigned user ID for an assignment, null for no assignee. A control change also carries the `initiator` and, when one was left, the `reason`. An assignment carries `assigned_by`, the actor who made it. An agent notification carries the `agent_notification_id` and its `name`.
+   */
+  metadata: {
+    [key: string]: unknown;
+  };
+  /**
+   * When the event happened.
+   */
+  created_at: string;
+};
+
+export type WhatsAppConversationEventListWritable = {
+  /**
+   * Page of conversation events, newest first.
+   */
+  data: Array<WhatsAppConversationEventWritable>;
+} & ListEnvelope;
+
+/**
  * A WhatsApp group your business created and administers. People join by opening its invite link, not by being added.
  *
  */
@@ -30378,7 +31241,7 @@ export type WhatsAppTemplateLanguageStateWritable = {
    */
   rejection?: WhatsAppTemplateRejectionWritable;
   /**
-   * Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: unknown;
@@ -30462,7 +31325,7 @@ export type WhatsAppTemplateVersionLanguageWritable = {
    */
   rejection?: WhatsAppTemplateRejectionWritable;
   /**
-   * Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: unknown;
@@ -30480,6 +31343,14 @@ export type WhatsAppTemplateVersionWritable = {
   languages: {
     [key in LanguageTag]?: WhatsAppTemplateVersionLanguageWritable;
   };
+};
+
+/**
+ * The outcome of a submit. The shape is the same whether the submit was a check or a real one: read `valid` and `version` to see what happened.
+ *
+ */
+export type WhatsAppTemplateSubmitResultWritable = {
+  [key: string]: never;
 };
 
 /**
@@ -30557,7 +31428,7 @@ export type WhatsAppTemplateLanguageWritable = {
    */
   rejection?: WhatsAppTemplateRejectionWritable;
   /**
-   * Why the submission did not complete, present when `status` is `submit_failed`. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: unknown;
@@ -30736,7 +31607,7 @@ export type WhatsAppNumberListWritable = {
    * The WhatsApp numbers your workspace can send from.
    */
   data: Array<WhatsAppNumberWritable>;
-} & ListEnvelope;
+} & ListEnvelopeWithTotal;
 
 export type WhatsAppNumberEventWritable = {
   /**
@@ -32144,12 +33015,12 @@ export type DnsRecordWritable = {
    * - `return_path`: identifies the return-path (bounce) CNAME for sending.
    * - `tracking`: identifies the optional branded open/click tracking CNAME.
    * - `inbound_mx`: identifies the MX record routing mail to us for receiving.
-   * Always present wherever inbound is available, as a regional reference,
-   * regardless of whether receiving is enabled; publishing it does not
-   * enable receiving on its own: see `DomainUpdate.inbound`. It is
-   * `optional` until receiving is enabled, and publishing it before then
-   * is destructive: on a domain at the zone apex it replaces the MX
-   * records that carry the domain's existing mail.
+   *   Always present wherever inbound is available, as a regional reference,
+   *   regardless of whether receiving is enabled; publishing it does not
+   *   enable receiving on its own: see `DomainUpdate.inbound`. It is
+   *   `optional` until receiving is enabled, and publishing it before then
+   *   is destructive: on a domain at the zone apex it replaces the MX
+   *   records that carry the domain's existing mail.
    * - `dmarc`: identifies the DMARC policy record required for sending.
    *
    */
@@ -32233,10 +33104,10 @@ export type SuppressionWritable = {
    *
    * - `all`: blocks every message category, including transactional.
    * - `non_transactional`: blocks marketing but allows transactional messages.
-   * A recipient who complained can therefore still receive
-   * mail such as password resets.
+   *   A recipient who complained can therefore still receive
+   *   mail such as password resets.
    * - `category`: scopes the block to a preference category and blocks every
-   * category until one is set.
+   *   category until one is set.
    *
    * This list grows over time, and any value other than `non_transactional`
    * blocks every category, so treat an unknown value as blocking the send.
@@ -32614,10 +33485,10 @@ export type MailboxWritable = {
    *
    * - `open`: Accepts everything not blocked by a rule.
    * - `replies_only`: Accepts only replies to messages this mailbox has
-   * sent. A reply must match a message the mailbox sent. Landing in an
-   * existing thread by itself does not count.
+   *   sent. A reply must match a message the mailbox sent. Landing in an
+   *   existing thread by itself does not count.
    * - `allowlist`: Accepts only senders matching an allow rule. Replies to
-   * prior outbound mail are always admitted unless blocked.
+   *   prior outbound mail are always admitted unless blocked.
    * - `drop`: Stores nothing.
    *
    */
@@ -33523,9 +34394,9 @@ export type WebhookAttemptWritable = {
    * - `delivered`: your endpoint accepted it with a `2xx` response.
    * - `pending`: the attempt is still in flight.
    * - `failed`: it returned a non-`2xx` response or no response at all. Automatic
-   * retries appear as further attempts with the same `event_id`, so a `failed`
-   * attempt is final for the event only once the retry schedule is spent. A
-   * replayed delivery takes a single attempt and is never retried.
+   *   retries appear as further attempts with the same `event_id`, so a `failed`
+   *   attempt is final for the event only once the retry schedule is spent. A
+   *   replayed delivery takes a single attempt and is never retried.
    *
    */
   status: "delivered" | "pending" | "failed";
@@ -33685,10 +34556,10 @@ export type NumberWritable = {
    *
    * - `active` means this number is allocated to your workspace and usable.
    * - `pending_ownership_registration` means this number is allocated to your workspace and billed,
-   * but outbound SMS and both inbound and outbound voice calls are blocked until ownership registration
-   * is approved and activation completes, or the ownership requirement is withdrawn.
-   * This ownership status does not gate inbound SMS or WhatsApp.
-   * Read `ownership.status` and `ownership.next` for the current decision and remaining work.
+   *   but outbound SMS and both inbound and outbound voice calls are blocked until ownership registration
+   *   is approved and activation completes, or the ownership requirement is withdrawn.
+   *   This ownership status does not gate inbound SMS or WhatsApp.
+   *   Read `ownership.status` and `ownership.next` for the current decision and remaining work.
    * - `released` means this number is no longer allocated to your workspace.
    *
    * An allocated number is not always enough to send from it: some destination
@@ -33772,7 +34643,7 @@ export type AvailableNumberWritable = {
    * - `anywhere`: any business address.
    * - `country`: a business address in the number's country.
    * - `number_area`: a business address inside the number's own area code, for example in
-   * Amsterdam for an Amsterdam (020) number.
+   *   Amsterdam for an Amsterdam (020) number.
    *
    */
   ownership_address_scope?: string;
@@ -34314,9 +35185,9 @@ export type EsimCompatibleOfferListWritable = {
  * Two distinct 409 errors signal misuse:
  *
  * - `request_in_progress` (E01004): The same key is currently being
- * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+ *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
  * - `idempotency_key_reuse` (E01005): The same key has already completed
- * against a different request body or method. Generate a new key.
+ *   against a different request body or method. Generate a new key.
  *
  * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
  *
@@ -34408,14 +35279,14 @@ export type EmailBroadcastSearchFilter = string;
  * caller and this operation. Reuse the same key and the exact same request when retrying.
  *
  * - A confirmed `202` response replays unchanged for the same key and request within the
- * configured window, 3 hours by default. Authorization and the destination's member access are
- * checked again on every retry.
+ *   configured window, 3 hours by default. Authorization and the destination's member access are
+ *   checked again on every retry.
  * - `409 request_in_progress` (E01004) or `503 IdempotencyUnavailable` (E01033): retry with
- * backoff using the same key. Switching keys can send another test.
+ *   backoff using the same key. Switching keys can send another test.
  * - `409 idempotency_key_reuse` (E01005): the key was used for a different request or
- * broadcast. Use a new key for a different test send.
+ *   broadcast. Use a new key for a different test send.
  * - After the window, saved results and unresolved requests can be removed. Reusing the key
- * after removal can send another test, even if the earlier response was not confirmed.
+ *   after removal can send another test, even if the earlier response was not confirmed.
  *
  */
 export type BroadcastTestIdempotencyKey = string;
@@ -34446,6 +35317,12 @@ export type ConversationLabelFilter = Array<string>;
  *
  */
 export type WhatsAppStatsTemplateFilter = string;
+
+/**
+ * WhatsApp Business Account ID (`waa_` prefix) or the WhatsApp Business Account ID Meta reports in `waba`. A value that parses as a valid ID resolves by ID; any other value resolves as Meta's ID.
+ *
+ */
+export type WhatsAppBusinessAccountRef = string;
 
 /**
  * Restricts the statistics to a template or a comma-separated union of templates, identified by ID (`emt_…`) or name. This parameter is mutually exclusive with other dimension filters.
@@ -34630,9 +35507,9 @@ export type PublishRealtimeAppEventData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -34726,9 +35603,9 @@ export type PublishRealtimeAppBatchData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -35045,9 +35922,9 @@ export type DisconnectRealtimeAppMemberData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -35145,9 +36022,9 @@ export type SendRealtimeAppMemberEventData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -35355,9 +36232,9 @@ export type CreateEmailMessageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -35454,9 +36331,9 @@ export type CreateEmailMessageBatchData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -35620,9 +36497,9 @@ export type CancelEmailMessageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -35821,9 +36698,9 @@ export type CreateEmailBroadcastData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -35920,9 +36797,9 @@ export type DeleteEmailBroadcastData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -36087,9 +36964,9 @@ export type UpdateEmailBroadcastData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -36568,9 +37445,9 @@ export type ValidateEmailBroadcastData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -36664,9 +37541,9 @@ export type PreviewEmailBroadcastData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -36749,14 +37626,14 @@ export type SendEmailBroadcastTestData = {
      * caller and this operation. Reuse the same key and the exact same request when retrying.
      *
      * - A confirmed `202` response replays unchanged for the same key and request within the
-     * configured window, 3 hours by default. Authorization and the destination's member access are
-     * checked again on every retry.
+     *   configured window, 3 hours by default. Authorization and the destination's member access are
+     *   checked again on every retry.
      * - `409 request_in_progress` (E01004) or `503 IdempotencyUnavailable` (E01033): retry with
-     * backoff using the same key. Switching keys can send another test.
+     *   backoff using the same key. Switching keys can send another test.
      * - `409 idempotency_key_reuse` (E01005): the key was used for a different request or
-     * broadcast. Use a new key for a different test send.
+     *   broadcast. Use a new key for a different test send.
      * - After the window, saved results and unresolved requests can be removed. Reusing the key
-     * after removal can send another test, even if the earlier response was not confirmed.
+     *   after removal can send another test, even if the earlier response was not confirmed.
      *
      */
     "Idempotency-Key": string;
@@ -36856,9 +37733,9 @@ export type SendEmailBroadcastData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -36960,9 +37837,9 @@ export type CancelEmailBroadcastData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -37158,9 +38035,9 @@ export type CreateContactData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -37252,9 +38129,9 @@ export type CreateContactBatchData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -37347,9 +38224,9 @@ export type DeleteContactData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -37511,9 +38388,9 @@ export type UpdateContactData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -37774,9 +38651,9 @@ export type CreatePreferenceData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -37869,9 +38746,9 @@ export type DeletePreferenceData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -38108,9 +38985,9 @@ export type CreateContactPropertyData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -38270,9 +39147,9 @@ export type UpdateContactPropertyData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -38366,9 +39243,9 @@ export type ArchiveContactPropertyData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -38466,9 +39343,9 @@ export type UnarchiveContactPropertyData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -38644,9 +39521,9 @@ export type CreateAudienceData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -38735,9 +39612,9 @@ export type DeleteAudienceData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -38901,9 +39778,9 @@ export type UpdateAudienceData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -39244,9 +40121,9 @@ export type AssignAudienceContactsData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -39340,9 +40217,9 @@ export type UnassignAudienceContactsData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -39436,9 +40313,9 @@ export type UnassignAudienceContactData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -39655,9 +40532,9 @@ export type CreateSmsMessageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -39750,9 +40627,9 @@ export type CreateSmsMessageBatchData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -40564,9 +41441,9 @@ export type CreateSmsSuppressionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -40659,9 +41536,9 @@ export type DeleteSmsSuppressionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -40911,9 +41788,9 @@ export type CreateSmsKeywordRuleData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -41006,9 +41883,9 @@ export type DeleteSmsKeywordRuleData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -41169,9 +42046,9 @@ export type UpdateSmsKeywordRuleData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -41357,9 +42234,9 @@ export type CreateComplianceIdentityData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -41451,9 +42328,9 @@ export type DeleteComplianceIdentityData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -41618,9 +42495,9 @@ export type UpdateComplianceIdentityData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -41805,9 +42682,9 @@ export type CreateComplianceAttachmentData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -41904,9 +42781,9 @@ export type DeleteComplianceAttachmentData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -42186,9 +43063,9 @@ export type DeleteAssetData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -42354,9 +43231,9 @@ export type UpdateAssetData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -42616,9 +43493,9 @@ export type CreateAssetFolderData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -42715,9 +43592,9 @@ export type DeleteAssetFolderData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -42890,9 +43767,9 @@ export type UpdateAssetFolderData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -43153,9 +44030,9 @@ export type CreateWorkspaceComplianceSubmissionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -43319,9 +44196,9 @@ export type UpdateWorkspaceComplianceSubmissionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -45006,9 +45883,9 @@ export type CreateWorkspaceSmsSenderData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -45240,9 +46117,9 @@ export type CreateWorkspaceSmsSenderRegistrationData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -45348,9 +46225,9 @@ export type CreatePhoneNumberLookupData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -45443,9 +46320,9 @@ export type CreateEmailLookupData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -45538,9 +46415,9 @@ export type CreateEmailLookupBatchData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -45641,9 +46518,9 @@ export type CreateVerificationData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -45736,9 +46613,9 @@ export type CreateVerificationCheckData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -45827,9 +46704,9 @@ export type CreateVerificationNextChannelData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -46055,9 +46932,9 @@ export type CreateWhatsAppMessageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -46226,9 +47103,9 @@ export type SendWhatsAppReadReceiptData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -46465,9 +47342,9 @@ export type DeleteWhatsAppMessageReactionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -46564,9 +47441,9 @@ export type UpsertWhatsAppMessageReactionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -46732,6 +47609,527 @@ export type ListWhatsAppMessageReactionEventsResponses = {
 export type ListWhatsAppMessageReactionEventsResponse =
   ListWhatsAppMessageReactionEventsResponses[keyof ListWhatsAppMessageReactionEventsResponses];
 
+export type ListWhatsAppConversationsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Filter by workspace inbox status. Omit to include open and resolved conversations.
+     */
+    inbox_status?: ConversationInboxStatus;
+    /**
+     * Return only conversations on this WhatsApp business phone number, in E.164 format. Omit to cover every number in the workspace.
+     */
+    business_phone_number?: string;
+    /**
+     * Return only conversations the agent holds (`meta_business_agent`) or that your workspace holds (`bird`).
+     */
+    control?: WhatsAppConversationControl;
+    /**
+     * Return conversations assigned to this workspace member. Pass `me` for the signed-in user or `unassigned` for conversations without an assignee. An API key cannot use `me` and receives a `422` response.
+     */
+    assigned_to?: string;
+    /**
+     * Return only conversations whose customer-service window is `open` or `closed`.
+     */
+    service_window_status?: WhatsAppConversationServiceWindowStatus;
+    /**
+     * Return conversations carrying this label. Repeat the parameter to require every supplied label.
+     */
+    label?: Array<string>;
+    /**
+     * Return only conversations whose contact phone number, BSUID, username, display name, group name or one of its labels contains this text, ignoring case. A phone number matches with or without its `+`, spaces, dashes, dots or parentheses. A group matches the name it had when its conversation started, and only for callers with `whatsapp_management` read access. The text cannot contain control characters such as tabs or line breaks.
+     */
+    q?: string;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/conversations";
+};
+
+export type ListWhatsAppConversationsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppConversationsError =
+  ListWhatsAppConversationsErrors[keyof ListWhatsAppConversationsErrors];
+
+export type ListWhatsAppConversationsResponses = {
+  /**
+   * A page of conversations, most recently active first.
+   */
+  200: WhatsAppConversationList;
+};
+
+export type ListWhatsAppConversationsResponse =
+  ListWhatsAppConversationsResponses[keyof ListWhatsAppConversationsResponses];
+
+export type GetWhatsAppConversationData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Conversation identifier. Starts with `wacv_`.
+     */
+    conversation_id: WhatsAppConversationId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/conversations/{conversation_id}";
+};
+
+export type GetWhatsAppConversationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetWhatsAppConversationError =
+  GetWhatsAppConversationErrors[keyof GetWhatsAppConversationErrors];
+
+export type GetWhatsAppConversationResponses = {
+  /**
+   * The conversation.
+   */
+  200: WhatsAppConversation;
+};
+
+export type GetWhatsAppConversationResponse =
+  GetWhatsAppConversationResponses[keyof GetWhatsAppConversationResponses];
+
+export type UpdateWhatsAppConversationData = {
+  body: WhatsAppConversationUpdateRequest;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Conversation identifier. Starts with `wacv_`.
+     */
+    conversation_id: WhatsAppConversationId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/conversations/{conversation_id}";
+};
+
+export type UpdateWhatsAppConversationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateWhatsAppConversationError =
+  UpdateWhatsAppConversationErrors[keyof UpdateWhatsAppConversationErrors];
+
+export type UpdateWhatsAppConversationResponses = {
+  /**
+   * The updated conversation.
+   */
+  200: WhatsAppConversation;
+};
+
+export type UpdateWhatsAppConversationResponse =
+  UpdateWhatsAppConversationResponses[keyof UpdateWhatsAppConversationResponses];
+
+export type ListWhatsAppConversationMessagesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Conversation identifier. Starts with `wacv_`.
+     */
+    conversation_id: WhatsAppConversationId;
+  };
+  query?: {
+    /**
+     * Return only messages the contact sent (`inbound`) or only messages sent to them (`outbound`). Omit for both.
+     *
+     */
+    direction?: MessageDirection;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/conversations/{conversation_id}/messages";
+};
+
+export type ListWhatsAppConversationMessagesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppConversationMessagesError =
+  ListWhatsAppConversationMessagesErrors[keyof ListWhatsAppConversationMessagesErrors];
+
+export type ListWhatsAppConversationMessagesResponses = {
+  /**
+   * A page of messages, newest first.
+   */
+  200: WhatsAppMessageList;
+};
+
+export type ListWhatsAppConversationMessagesResponse =
+  ListWhatsAppConversationMessagesResponses[keyof ListWhatsAppConversationMessagesResponses];
+
+export type GetWhatsAppConversationMessageData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Conversation identifier. Starts with `wacv_`.
+     */
+    conversation_id: WhatsAppConversationId;
+    /**
+     * Message identifier. Starts with `wam_`.
+     */
+    message_id: WhatsAppMessageId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/conversations/{conversation_id}/messages/{message_id}";
+};
+
+export type GetWhatsAppConversationMessageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetWhatsAppConversationMessageError =
+  GetWhatsAppConversationMessageErrors[keyof GetWhatsAppConversationMessageErrors];
+
+export type GetWhatsAppConversationMessageResponses = {
+  /**
+   * The message.
+   */
+  200: WhatsAppMessage;
+};
+
+export type GetWhatsAppConversationMessageResponse =
+  GetWhatsAppConversationMessageResponses[keyof GetWhatsAppConversationMessageResponses];
+
+export type ListWhatsAppConversationEventsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Conversation identifier. Starts with `wacv_`.
+     */
+    conversation_id: WhatsAppConversationId;
+  };
+  query?: {
+    /**
+     * Keep only events of this exact type (for example `whatsapp_conversation.control_changed`). Omit for every type.
+     *
+     */
+    type?: WhatsAppConversationEventType;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/conversations/{conversation_id}/events";
+};
+
+export type ListWhatsAppConversationEventsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ListWhatsAppConversationEventsError =
+  ListWhatsAppConversationEventsErrors[keyof ListWhatsAppConversationEventsErrors];
+
+export type ListWhatsAppConversationEventsResponses = {
+  /**
+   * A page of conversation events.
+   */
+  200: WhatsAppConversationEventList;
+};
+
+export type ListWhatsAppConversationEventsResponse =
+  ListWhatsAppConversationEventsResponses[keyof ListWhatsAppConversationEventsResponses];
+
 export type ListWhatsAppGroupsData = {
   body?: never;
   headers?: {
@@ -46861,9 +48259,9 @@ export type CreateWhatsAppGroupData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -46960,9 +48358,9 @@ export type DeleteWhatsAppGroupData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -47127,9 +48525,9 @@ export type UpdateWhatsAppGroupData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -47227,9 +48625,9 @@ export type RotateWhatsAppGroupInviteLinkData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -47327,9 +48725,9 @@ export type DeleteWhatsAppGroupParticipantData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -47432,9 +48830,9 @@ export type CreateWhatsAppGroupPinnedMessageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -47532,9 +48930,9 @@ export type DeleteWhatsAppGroupPinnedMessageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -47725,9 +49123,9 @@ export type ApproveWhatsAppGroupJoinRequestsData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -47825,9 +49223,9 @@ export type RejectWhatsAppGroupJoinRequestsData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -48001,6 +49399,202 @@ export type ListWhatsAppTemplatesResponses = {
 export type ListWhatsAppTemplatesResponse =
   ListWhatsAppTemplatesResponses[keyof ListWhatsAppTemplatesResponses];
 
+export type CreateWhatsAppTemplateData = {
+  body: WhatsAppTemplateCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/whatsapp/templates";
+};
+
+export type CreateWhatsAppTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateWhatsAppTemplateError =
+  CreateWhatsAppTemplateErrors[keyof CreateWhatsAppTemplateErrors];
+
+export type CreateWhatsAppTemplateResponses = {
+  /**
+   * The created template.
+   */
+  201: WhatsAppTemplate;
+};
+
+export type CreateWhatsAppTemplateResponse =
+  CreateWhatsAppTemplateResponses[keyof CreateWhatsAppTemplateResponses];
+
+export type DeleteWhatsAppTemplateData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+  };
+  query?: never;
+  url: "/v1/whatsapp/templates/{template_ref}";
+};
+
+export type DeleteWhatsAppTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteWhatsAppTemplateError =
+  DeleteWhatsAppTemplateErrors[keyof DeleteWhatsAppTemplateErrors];
+
+export type DeleteWhatsAppTemplateResponses = {
+  /**
+   * The template was deleted.
+   */
+  204: void;
+};
+
+export type DeleteWhatsAppTemplateResponse =
+  DeleteWhatsAppTemplateResponses[keyof DeleteWhatsAppTemplateResponses];
+
 export type GetWhatsAppTemplateData = {
   body?: never;
   headers?: {
@@ -48068,6 +49662,107 @@ export type GetWhatsAppTemplateResponses = {
 
 export type GetWhatsAppTemplateResponse =
   GetWhatsAppTemplateResponses[keyof GetWhatsAppTemplateResponses];
+
+export type UpdateWhatsAppTemplateData = {
+  body: WhatsAppTemplateUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+  };
+  query?: never;
+  url: "/v1/whatsapp/templates/{template_ref}";
+};
+
+export type UpdateWhatsAppTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateWhatsAppTemplateError =
+  UpdateWhatsAppTemplateErrors[keyof UpdateWhatsAppTemplateErrors];
+
+export type UpdateWhatsAppTemplateResponses = {
+  /**
+   * The updated template.
+   */
+  200: WhatsAppTemplate;
+};
+
+export type UpdateWhatsAppTemplateResponse =
+  UpdateWhatsAppTemplateResponses[keyof UpdateWhatsAppTemplateResponses];
 
 export type ListWhatsAppTemplateVersionsData = {
   body?: never;
@@ -48150,6 +49845,313 @@ export type ListWhatsAppTemplateVersionsResponses = {
 export type ListWhatsAppTemplateVersionsResponse =
   ListWhatsAppTemplateVersionsResponses[keyof ListWhatsAppTemplateVersionsResponses];
 
+export type CreateWhatsAppTemplateDraftData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+  };
+  query?: never;
+  url: "/v1/whatsapp/templates/{template_ref}/versions";
+};
+
+export type CreateWhatsAppTemplateDraftErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateWhatsAppTemplateDraftError =
+  CreateWhatsAppTemplateDraftErrors[keyof CreateWhatsAppTemplateDraftErrors];
+
+export type CreateWhatsAppTemplateDraftResponses = {
+  /**
+   * The draft that was already open.
+   */
+  200: WhatsAppTemplateVersion;
+  /**
+   * The draft this call opened.
+   */
+  201: WhatsAppTemplateVersion;
+};
+
+export type CreateWhatsAppTemplateDraftResponse =
+  CreateWhatsAppTemplateDraftResponses[keyof CreateWhatsAppTemplateDraftResponses];
+
+export type DuplicateWhatsAppTemplateData = {
+  body: WhatsAppTemplateDuplicate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+  };
+  query?: never;
+  url: "/v1/whatsapp/templates/{template_ref}/duplicate";
+};
+
+export type DuplicateWhatsAppTemplateErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DuplicateWhatsAppTemplateError =
+  DuplicateWhatsAppTemplateErrors[keyof DuplicateWhatsAppTemplateErrors];
+
+export type DuplicateWhatsAppTemplateResponses = {
+  /**
+   * The copy.
+   */
+  201: WhatsAppTemplate;
+};
+
+export type DuplicateWhatsAppTemplateResponse =
+  DuplicateWhatsAppTemplateResponses[keyof DuplicateWhatsAppTemplateResponses];
+
+export type DeleteWhatsAppTemplateVersionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+    /**
+     * ID of the template version (`wav_` prefix), as returned by the version list.
+     */
+    version_id: WhatsAppTemplateVersionId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}";
+};
+
+export type DeleteWhatsAppTemplateVersionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteWhatsAppTemplateVersionError =
+  DeleteWhatsAppTemplateVersionErrors[keyof DeleteWhatsAppTemplateVersionErrors];
+
+export type DeleteWhatsAppTemplateVersionResponses = {
+  /**
+   * The draft was discarded.
+   */
+  204: void;
+};
+
+export type DeleteWhatsAppTemplateVersionResponse =
+  DeleteWhatsAppTemplateVersionResponses[keyof DeleteWhatsAppTemplateVersionResponses];
+
 export type GetWhatsAppTemplateVersionData = {
   body?: never;
   headers?: {
@@ -48222,6 +50224,112 @@ export type GetWhatsAppTemplateVersionResponses = {
 export type GetWhatsAppTemplateVersionResponse =
   GetWhatsAppTemplateVersionResponses[keyof GetWhatsAppTemplateVersionResponses];
 
+export type SubmitWhatsAppTemplateVersionData = {
+  body?: WhatsAppTemplateSubmit;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+    /**
+     * ID of the template version (`wav_` prefix), as returned by the version list.
+     */
+    version_id: WhatsAppTemplateVersionId;
+  };
+  query?: never;
+  url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/submit";
+};
+
+export type SubmitWhatsAppTemplateVersionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type SubmitWhatsAppTemplateVersionError =
+  SubmitWhatsAppTemplateVersionErrors[keyof SubmitWhatsAppTemplateVersionErrors];
+
+export type SubmitWhatsAppTemplateVersionResponses = {
+  /**
+   * The check's outcome, or a submit that found problems and froze nothing.
+   *
+   */
+  200: WhatsAppTemplateSubmitResult;
+  /**
+   * The frozen version. Languages whose content changed are `pending`; the rest keep their verdict.
+   */
+  202: WhatsAppTemplateSubmitResult;
+};
+
+export type SubmitWhatsAppTemplateVersionResponse =
+  SubmitWhatsAppTemplateVersionResponses[keyof SubmitWhatsAppTemplateVersionResponses];
+
 export type ListWhatsAppTemplateVersionLanguagesData = {
   body?: never;
   headers?: {
@@ -48293,6 +50401,112 @@ export type ListWhatsAppTemplateVersionLanguagesResponses = {
 
 export type ListWhatsAppTemplateVersionLanguagesResponse =
   ListWhatsAppTemplateVersionLanguagesResponses[keyof ListWhatsAppTemplateVersionLanguagesResponses];
+
+export type DeleteWhatsAppTemplateLanguageData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+    /**
+     * ID of the template version (`wav_` prefix), as returned by the version list.
+     */
+    version_id: WhatsAppTemplateVersionId;
+    /**
+     * The language, as a BCP-47 tag. Case and separator variance is accepted and normalised, and the canonical form is returned.
+     *
+     */
+    language: LanguageTag;
+  };
+  query?: never;
+  url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/languages/{language}";
+};
+
+export type DeleteWhatsAppTemplateLanguageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteWhatsAppTemplateLanguageError =
+  DeleteWhatsAppTemplateLanguageErrors[keyof DeleteWhatsAppTemplateLanguageErrors];
+
+export type DeleteWhatsAppTemplateLanguageResponses = {
+  /**
+   * The language was removed from the draft.
+   */
+  204: void;
+};
+
+export type DeleteWhatsAppTemplateLanguageResponse =
+  DeleteWhatsAppTemplateLanguageResponses[keyof DeleteWhatsAppTemplateLanguageResponses];
 
 export type GetWhatsAppTemplateVersionLanguageData = {
   body?: never;
@@ -48370,6 +50584,230 @@ export type GetWhatsAppTemplateVersionLanguageResponses = {
 
 export type GetWhatsAppTemplateVersionLanguageResponse =
   GetWhatsAppTemplateVersionLanguageResponses[keyof GetWhatsAppTemplateVersionLanguageResponses];
+
+export type UpsertWhatsAppTemplateLanguageData = {
+  body: WhatsAppTemplateLanguageUpsert;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+    /**
+     * ID of the template version (`wav_` prefix), as returned by the version list.
+     */
+    version_id: WhatsAppTemplateVersionId;
+    /**
+     * The language, as a BCP-47 tag. Case and separator variance is accepted and normalised, and the canonical form is returned.
+     *
+     */
+    language: LanguageTag;
+  };
+  query?: never;
+  url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/languages/{language}";
+};
+
+export type UpsertWhatsAppTemplateLanguageErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpsertWhatsAppTemplateLanguageError =
+  UpsertWhatsAppTemplateLanguageErrors[keyof UpsertWhatsAppTemplateLanguageErrors];
+
+export type UpsertWhatsAppTemplateLanguageResponses = {
+  /**
+   * The language was replaced.
+   */
+  200: WhatsAppTemplateLanguageSaved;
+  /**
+   * The language was created.
+   */
+  201: WhatsAppTemplateLanguageSaved;
+};
+
+export type UpsertWhatsAppTemplateLanguageResponse =
+  UpsertWhatsAppTemplateLanguageResponses[keyof UpsertWhatsAppTemplateLanguageResponses];
+
+export type DiscardWhatsAppTemplateLanguageEditsData = {
+  body?: WhatsAppTemplateLanguageDiscard;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The template: its id (`wat_…`) or its slug. A value that parses as a `wat_` id is treated as one; anything else is a slug. Slugs on this channel can spell a typed id, so the two are told apart by parsing the value rather than by its character set.
+     *
+     */
+    template_ref: string;
+    /**
+     * Version ID.
+     */
+    version_id: WhatsAppTemplateVersionId;
+    /**
+     * The language, as a BCP-47 tag. Case and separator variance is accepted and normalised, and the canonical form is returned.
+     *
+     */
+    language: LanguageTag;
+  };
+  query?: never;
+  url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/languages/{language}/discard";
+};
+
+export type DiscardWhatsAppTemplateLanguageEditsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DiscardWhatsAppTemplateLanguageEditsError =
+  DiscardWhatsAppTemplateLanguageEditsErrors[keyof DiscardWhatsAppTemplateLanguageEditsErrors];
+
+export type DiscardWhatsAppTemplateLanguageEditsResponses = {
+  /**
+   * The language was restored to the copy the draft was branched from.
+   */
+  200: WhatsAppTemplateLanguageSaved;
+};
+
+export type DiscardWhatsAppTemplateLanguageEditsResponse =
+  DiscardWhatsAppTemplateLanguageEditsResponses[keyof DiscardWhatsAppTemplateLanguageEditsResponses];
 
 export type GetWhatsAppStatsSummaryData = {
   body?: never;
@@ -49632,9 +52070,9 @@ export type CreateWhatsAppAgentNotificationData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -49826,6 +52264,10 @@ export type ListWhatsAppNumbersData = {
      * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
      */
     ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
   };
   url: "/v1/whatsapp/numbers";
 };
@@ -50126,9 +52568,9 @@ export type RestoreAmbBusinessAccountData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -50407,9 +52849,9 @@ export type CreateAmbBusinessAccountData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -50502,9 +52944,9 @@ export type DeleteAmbBusinessAccountData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -50669,9 +53111,9 @@ export type UpdateAmbBusinessAccountData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -50862,9 +53304,9 @@ export type CreateAmbBusinessAccountSubmissionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -51029,9 +53471,9 @@ export type UpdateAmbChannelSettingsData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -51197,9 +53639,9 @@ export type CreateAmbRoutingRuleData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -51292,9 +53734,9 @@ export type DeleteAmbRoutingRuleData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -51459,9 +53901,9 @@ export type UpdateAmbRoutingRuleData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -51680,9 +54122,9 @@ export type CreateAmbMessageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -52095,9 +54537,9 @@ export type UpdateAmbConversationData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -52284,9 +54726,9 @@ export type CreateAmbConversationTypingData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -52477,9 +54919,9 @@ export type CreateAmbSuppressionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -52576,9 +55018,9 @@ export type DeleteAmbSuppressionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -55069,9 +57511,9 @@ export type CreateWhatsAppSuppressionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -55164,9 +57606,9 @@ export type DeleteWhatsAppSuppressionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -55415,9 +57857,9 @@ export type CreateWhatsAppKeywordRuleData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -55510,9 +57952,9 @@ export type DeleteWhatsAppKeywordRuleData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -55678,9 +58120,9 @@ export type UpdateWhatsAppKeywordRuleData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -56437,9 +58879,9 @@ export type CreateEmailInboxInsightsSeedTestData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -56710,9 +59152,9 @@ export type UpdateEmailInboxInsightsDomainData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -56815,9 +59257,9 @@ export type UpsertEmailInboxInsightsDomainMonitoringData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -57250,9 +59692,9 @@ export type GetEmailStatsQueryData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -58945,9 +61387,9 @@ export type CreateDomainData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -59039,9 +61481,9 @@ export type DeleteDomainData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -59203,9 +61645,9 @@ export type UpdateDomainData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -59302,9 +61744,9 @@ export type VerifyDomainData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -59403,9 +61845,9 @@ export type ListSuppressionsData = {
      * - `hard_bounce`: Delivery permanently failed.
      * - `complaint`: The recipient reported a message as spam.
      * - `unsubscribe`: The recipient opted out. Deprecated: unsubscribes are now
-     * recorded as messaging preferences rather than suppressions, so no new
-     * records carry this reason. The filter returns legacy records until they
-     * are moved to messaging preferences.
+     *   recorded as messaging preferences rather than suppressions, so no new
+     *   records carry this reason. The filter returns legacy records until they
+     *   are moved to messaging preferences.
      * - `manual`: Added through the API or dashboard.
      *
      */
@@ -59500,9 +61942,9 @@ export type CreateSuppressionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -59595,9 +62037,9 @@ export type DeleteSuppressionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -59906,9 +62348,9 @@ export type CreateEmailCompetitiveWatchlistBrandData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -60001,9 +62443,9 @@ export type DeleteEmailCompetitiveWatchlistBrandData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -60673,9 +63115,9 @@ export type CreateEmailTemplateData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -60768,9 +63210,9 @@ export type DeleteEmailTemplateData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -60937,9 +63379,9 @@ export type UpdateEmailTemplateData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -61038,9 +63480,9 @@ export type DuplicateEmailTemplateData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -61216,9 +63658,9 @@ export type GetEmailTemplatePreviewData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -61475,9 +63917,9 @@ export type DeleteEmailTemplateVersionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -61724,9 +64166,9 @@ export type DeleteEmailTemplateLanguageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -61909,9 +64351,9 @@ export type UpdateEmailTemplateLanguageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -62018,9 +64460,9 @@ export type UpsertEmailTemplateLanguageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -62127,9 +64569,9 @@ export type RollbackEmailTemplateData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -62232,9 +64674,9 @@ export type SubmitEmailTemplateVersionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -62431,9 +64873,9 @@ export type CreateMailboxData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -62529,9 +64971,9 @@ export type DeleteMailboxData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -62693,9 +65135,9 @@ export type UpdateMailboxData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -62801,9 +65243,9 @@ export type RestoreMailboxData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -62994,9 +65436,9 @@ export type ResumeMailboxData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -63177,9 +65619,9 @@ export type CreateMailboxReceiveRuleData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -63277,9 +65719,9 @@ export type DeleteMailboxReceiveRuleData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -63486,9 +65928,9 @@ export type DeleteEmailThreadData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -63666,9 +66108,9 @@ export type UpdateEmailThreadData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -64088,9 +66530,9 @@ export type ReplyEmailThreadMessageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -64369,9 +66811,9 @@ export type CancelMailboxScheduledMessageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -64473,9 +66915,9 @@ export type CreateMailboxMessageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -64737,9 +67179,9 @@ export type CreateWebhookData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -64827,9 +67269,9 @@ export type DeleteWebhookData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -64987,9 +67429,9 @@ export type UpdateWebhookData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -65082,9 +67524,9 @@ export type RotateWebhookSecretData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -65178,9 +67620,9 @@ export type TestWebhookData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -65277,9 +67719,9 @@ export type CreateWebhookReplayData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -65800,9 +68242,9 @@ export type CreateNumbersOrderData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -65974,9 +68416,9 @@ export type CancelWorkspaceNumberData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -66145,9 +68587,9 @@ export type UpdateWorkspaceNumberData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -66245,9 +68687,9 @@ export type ReleaseWorkspaceNumberData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -66564,9 +69006,9 @@ export type CreateVoiceTrunkData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -66663,9 +69105,9 @@ export type DeleteVoiceTrunkData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -66829,9 +69271,9 @@ export type UpdateVoiceTrunkData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -67072,9 +69514,9 @@ export type CreateVoiceTrunkGatewayData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -67176,9 +69618,9 @@ export type DeleteVoiceTrunkGatewayData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -67355,9 +69797,9 @@ export type UpdateVoiceTrunkGatewayData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -67635,9 +70077,9 @@ export type UpdateVoiceNumberData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -67802,9 +70244,9 @@ export type UpdateVoiceSettingsData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -67985,9 +70427,9 @@ export type CreateVoiceVerifiedNumberData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -68084,9 +70526,9 @@ export type DeleteVoiceVerifiedNumberData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -68251,9 +70693,9 @@ export type UpdateVoiceVerifiedNumberData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -68351,9 +70793,9 @@ export type VerifyVoiceVerifiedNumberData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -68640,9 +71082,9 @@ export type CreateVoiceCallData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -68797,9 +71239,9 @@ export type UpdateVoiceDestinationsData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -69385,9 +71827,9 @@ export type CreateEsimOrderData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -69554,9 +71996,9 @@ export type CancelEsimOrderData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -70121,9 +72563,9 @@ export type CancelEsimRecurringSubscriptionData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -70300,9 +72742,9 @@ export type CreateEsimSubscriberData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -70537,9 +72979,9 @@ export type CreateEsimAssignmentData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -70756,9 +73198,9 @@ export type ReleaseEsimData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -70926,9 +73368,9 @@ export type UpdateEsimData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -71101,9 +73543,9 @@ export type DeliverEsimCredentialsData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -71273,9 +73715,9 @@ export type CreateEsimInstallLinkData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -71377,9 +73819,9 @@ export type DeleteEsimInstallLinkData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -71552,9 +73994,9 @@ export type DeleteEsimPackageData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -71805,9 +74247,9 @@ export type SuspendEsimData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -71904,9 +74346,9 @@ export type ResumeEsimData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *
@@ -72064,9 +74506,9 @@ export type UpdateEsimSettingsData = {
      * Two distinct 409 errors signal misuse:
      *
      * - `request_in_progress` (E01004): The same key is currently being
-     * processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
      * - `idempotency_key_reuse` (E01005): The same key has already completed
-     * against a different request body or method. Generate a new key.
+     *   against a different request body or method. Generate a new key.
      *
      * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
      *

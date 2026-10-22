@@ -1213,6 +1213,33 @@ export const WhatsAppBusinessVertical = {
 export type WhatsAppBusinessVerticalValue = (typeof WhatsAppBusinessVertical)[keyof typeof WhatsAppBusinessVertical];
 
 /**
+ * Values of WhatsAppConversationControl known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppConversationControl = {
+  Bird: "bird",
+  MetaBusinessAgent: "meta_business_agent",
+} as const;
+
+/** A known WhatsAppConversationControl value. */
+export type WhatsAppConversationControlValue = (typeof WhatsAppConversationControl)[keyof typeof WhatsAppConversationControl];
+
+/**
+ * Values of WhatsAppConversationEventType known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppConversationEventType = {
+  WhatsappConversationAgentNotified: "whatsapp_conversation.agent_notified",
+  WhatsappConversationAssigned: "whatsapp_conversation.assigned",
+  WhatsappConversationControlChanged: "whatsapp_conversation.control_changed",
+} as const;
+
+/** A known WhatsAppConversationEventType value. */
+export type WhatsAppConversationEventTypeValue = (typeof WhatsAppConversationEventType)[keyof typeof WhatsAppConversationEventType];
+
+/**
  * Values of WhatsAppDisplayNameStatus known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -1513,6 +1540,21 @@ export const WhatsAppTemplateParameterType = {
 
 /** A known WhatsAppTemplateParameterType value. */
 export type WhatsAppTemplateParameterTypeValue = (typeof WhatsAppTemplateParameterType)[keyof typeof WhatsAppTemplateParameterType];
+
+/**
+ * Values of WhatsAppTemplatePauseReason known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppTemplatePauseReason = {
+  Disabled: "disabled",
+  FirstPause: "first_pause",
+  RateLimitingPause: "rate_limiting_pause",
+  SecondPause: "second_pause",
+} as const;
+
+/** A known WhatsAppTemplatePauseReason value. */
+export type WhatsAppTemplatePauseReasonValue = (typeof WhatsAppTemplatePauseReason)[keyof typeof WhatsAppTemplatePauseReason];
 
 /**
  * Values of WhatsAppTemplateQualityScore known at this SDK version. The wire value is an open

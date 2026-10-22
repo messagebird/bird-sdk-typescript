@@ -24,9 +24,10 @@ export class WhatsappMessagesResource extends Resource {
    * clip, sticker or document. `mediaId` is the `id` on the message's content
    * object, which `bird.whatsapp.get` returns.
    *
-   * Media is kept for 30 days after the message arrives; after that the message
-   * still lists the media's `mime_type` and `caption`, and this throws. Outbound
-   * messages carry no stored media.
+   * Media expires with its message, 30 days after it arrives, and this throws a
+   * 404 from then on. A 410 means only the file expired: the message still lists
+   * the media's `mime_type` and `caption`. Messages sent through Bird carry no
+   * stored media.
    *
    * @example
    * const media = await bird.whatsapp.messages.media(

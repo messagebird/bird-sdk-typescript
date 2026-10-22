@@ -17,6 +17,6 @@
     "check:readme": "cmp -s README.md packages/sdk/README.md || { echo 'root README.md must be byte-identical to packages/sdk/README.md (single-sourced from the SDK)'; exit 1; }"
   },
   "devDependencies": {
-    "publint": "^0.3.13"
+    "publint": "0.3.21"
   }
 }

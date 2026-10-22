@@ -24,6 +24,6 @@
     "koa": "3.2.1",
     "next": "16.4.2",
     "reflect-metadata": "0.2.2",
-    "typescript": "7.0.2"
+    "typescript": "7.1.0-beta"
   }
 }

@@ -298,17 +298,33 @@ export type {
   WhatsappAgentsNotificationsCreateParams,
 } from "./resources/whatsappAgentsNotifications.gen.js";
 export type {
+  WhatsAppConversation,
+  WhatsAppConversationEvent,
+  WhatsappConversationsListQuery,
+  WhatsappConversationsUpdateParams,
+  WhatsappConversationsListEventsQuery,
+  WhatsappConversationsListMessagesQuery,
+} from "./resources/whatsappConversations.gen.js";
+export type {
   WhatsAppTemplate,
+  WhatsappTemplatesCreateParams,
+  WhatsappTemplatesDuplicateParams,
   WhatsappTemplatesListQuery,
+  WhatsappTemplatesUpdateParams,
 } from "./resources/whatsappTemplates.gen.js";
 export type {
+  WhatsAppTemplateSubmitResult,
   WhatsAppTemplateVersion,
   WhatsAppTemplateVersionSummary,
   WhatsappTemplatesVersionsListQuery,
+  WhatsappTemplatesVersionsSubmitParams,
 } from "./resources/whatsappTemplatesVersions.gen.js";
 export type {
   WhatsAppTemplateLanguage,
   WhatsAppTemplateLanguageList,
+  WhatsAppTemplateLanguageSaved,
+  WhatsappTemplatesVersionsLanguagesDiscardParams,
+  WhatsappTemplatesVersionsLanguagesSetParams,
 } from "./resources/whatsappTemplatesVersionsLanguages.gen.js";
 export type {
   WhatsAppStatsSummary,
@@ -540,6 +556,8 @@ export {
   WhatsAppBusinessPortfolioMarketingMessagesStatus,
   WhatsAppBusinessVerificationStatus,
   WhatsAppBusinessVertical,
+  WhatsAppConversationControl,
+  WhatsAppConversationEventType,
   WhatsAppDisplayNameStatus,
   WhatsAppErrorCode,
   WhatsAppEventType,
@@ -558,6 +576,7 @@ export {
   WhatsAppTemplateCategory,
   WhatsAppTemplateLanguageStatus,
   WhatsAppTemplateParameterType,
+  WhatsAppTemplatePauseReason,
   WhatsAppTemplateQualityScore,
   WhatsAppTemplateRejectionCategory,
   WhatsAppUsernameStatus,
@@ -635,6 +654,8 @@ export type {
   WhatsAppBusinessPortfolioMarketingMessagesStatusValue,
   WhatsAppBusinessVerificationStatusValue,
   WhatsAppBusinessVerticalValue,
+  WhatsAppConversationControlValue,
+  WhatsAppConversationEventTypeValue,
   WhatsAppDisplayNameStatusValue,
   WhatsAppErrorCodeValue,
   WhatsAppEventTypeValue,
@@ -653,6 +674,7 @@ export type {
   WhatsAppTemplateCategoryValue,
   WhatsAppTemplateLanguageStatusValue,
   WhatsAppTemplateParameterTypeValue,
+  WhatsAppTemplatePauseReasonValue,
   WhatsAppTemplateQualityScoreValue,
   WhatsAppTemplateRejectionCategoryValue,
   WhatsAppUsernameStatusValue,

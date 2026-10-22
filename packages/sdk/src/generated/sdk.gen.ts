@@ -199,6 +199,12 @@ import type {
   CreateWhatsAppSuppressionData,
   CreateWhatsAppSuppressionErrors,
   CreateWhatsAppSuppressionResponses,
+  CreateWhatsAppTemplateData,
+  CreateWhatsAppTemplateDraftData,
+  CreateWhatsAppTemplateDraftErrors,
+  CreateWhatsAppTemplateDraftResponses,
+  CreateWhatsAppTemplateErrors,
+  CreateWhatsAppTemplateResponses,
   CreateWorkspaceComplianceSubmissionData,
   CreateWorkspaceComplianceSubmissionErrors,
   CreateWorkspaceComplianceSubmissionResponses,
@@ -310,15 +316,30 @@ import type {
   DeleteWhatsAppSuppressionData,
   DeleteWhatsAppSuppressionErrors,
   DeleteWhatsAppSuppressionResponses,
+  DeleteWhatsAppTemplateData,
+  DeleteWhatsAppTemplateErrors,
+  DeleteWhatsAppTemplateLanguageData,
+  DeleteWhatsAppTemplateLanguageErrors,
+  DeleteWhatsAppTemplateLanguageResponses,
+  DeleteWhatsAppTemplateResponses,
+  DeleteWhatsAppTemplateVersionData,
+  DeleteWhatsAppTemplateVersionErrors,
+  DeleteWhatsAppTemplateVersionResponses,
   DeliverEsimCredentialsData,
   DeliverEsimCredentialsErrors,
   DeliverEsimCredentialsResponses,
+  DiscardWhatsAppTemplateLanguageEditsData,
+  DiscardWhatsAppTemplateLanguageEditsErrors,
+  DiscardWhatsAppTemplateLanguageEditsResponses,
   DisconnectRealtimeAppMemberData,
   DisconnectRealtimeAppMemberErrors,
   DisconnectRealtimeAppMemberResponses,
   DuplicateEmailTemplateData,
   DuplicateEmailTemplateErrors,
   DuplicateEmailTemplateResponses,
+  DuplicateWhatsAppTemplateData,
+  DuplicateWhatsAppTemplateErrors,
+  DuplicateWhatsAppTemplateResponses,
   GetAmbBusinessAccountData,
   GetAmbBusinessAccountErrors,
   GetAmbBusinessAccountResponses,
@@ -733,6 +754,12 @@ import type {
   GetWhatsAppBusinessAccountData,
   GetWhatsAppBusinessAccountErrors,
   GetWhatsAppBusinessAccountResponses,
+  GetWhatsAppConversationData,
+  GetWhatsAppConversationErrors,
+  GetWhatsAppConversationMessageData,
+  GetWhatsAppConversationMessageErrors,
+  GetWhatsAppConversationMessageResponses,
+  GetWhatsAppConversationResponses,
   GetWhatsAppGroupData,
   GetWhatsAppGroupErrors,
   GetWhatsAppGroupResponses,
@@ -1032,6 +1059,15 @@ import type {
   ListWhatsAppBusinessAccountsData,
   ListWhatsAppBusinessAccountsErrors,
   ListWhatsAppBusinessAccountsResponses,
+  ListWhatsAppConversationEventsData,
+  ListWhatsAppConversationEventsErrors,
+  ListWhatsAppConversationEventsResponses,
+  ListWhatsAppConversationMessagesData,
+  ListWhatsAppConversationMessagesErrors,
+  ListWhatsAppConversationMessagesResponses,
+  ListWhatsAppConversationsData,
+  ListWhatsAppConversationsErrors,
+  ListWhatsAppConversationsResponses,
   ListWhatsAppGroupJoinRequestsData,
   ListWhatsAppGroupJoinRequestsErrors,
   ListWhatsAppGroupJoinRequestsResponses,
@@ -1140,6 +1176,9 @@ import type {
   SubmitEmailTemplateVersionData,
   SubmitEmailTemplateVersionErrors,
   SubmitEmailTemplateVersionResponses,
+  SubmitWhatsAppTemplateVersionData,
+  SubmitWhatsAppTemplateVersionErrors,
+  SubmitWhatsAppTemplateVersionResponses,
   SuspendEsimData,
   SuspendEsimErrors,
   SuspendEsimResponses,
@@ -1236,12 +1275,18 @@ import type {
   UpdateWebhookData,
   UpdateWebhookErrors,
   UpdateWebhookResponses,
+  UpdateWhatsAppConversationData,
+  UpdateWhatsAppConversationErrors,
+  UpdateWhatsAppConversationResponses,
   UpdateWhatsAppGroupData,
   UpdateWhatsAppGroupErrors,
   UpdateWhatsAppGroupResponses,
   UpdateWhatsAppKeywordRuleData,
   UpdateWhatsAppKeywordRuleErrors,
   UpdateWhatsAppKeywordRuleResponses,
+  UpdateWhatsAppTemplateData,
+  UpdateWhatsAppTemplateErrors,
+  UpdateWhatsAppTemplateResponses,
   UpdateWorkspaceComplianceSubmissionData,
   UpdateWorkspaceComplianceSubmissionErrors,
   UpdateWorkspaceComplianceSubmissionResponses,
@@ -1257,6 +1302,9 @@ import type {
   UpsertWhatsAppMessageReactionData,
   UpsertWhatsAppMessageReactionErrors,
   UpsertWhatsAppMessageReactionResponses,
+  UpsertWhatsAppTemplateLanguageData,
+  UpsertWhatsAppTemplateLanguageErrors,
+  UpsertWhatsAppTemplateLanguageResponses,
   ValidateEmailBroadcastData,
   ValidateEmailBroadcastErrors,
   ValidateEmailBroadcastResponses,
@@ -4693,6 +4741,13 @@ export const getWorkspaceComplianceSubmission = <
  * Replaces rejected, expired, or missing answers on an existing submission. Accepted answers
  * normally cannot be changed and should be omitted.
  *
+ * A number, business identity or SMS sender registration accepts changes to any answer until its submission is approved, including
+ * answers awaiting review or already accepted; read `answers_editable` on the requirements. Each
+ * changed answer loses its verdict and is reviewed again, and unchanged entries are ignored. When
+ * Bird closed this submission and the requirements report `resubmission_allowed` with this
+ * `submission_id`, your changes reopen it for review. When they report `submission_id: null`
+ * instead, the form changed since: create a new submission.
+ *
  * When a verifier requests corrections, you can replace selected accepted answers while that
  * correction remains open and before its deadline. Unchanged entries are ignored, and at least one answer must change.
  * Changed answers are reviewed again; other answers remain unchanged.
@@ -5823,9 +5878,9 @@ export const listWhatsAppMessages = <ThrowOnError extends boolean = false>(
  * - A `from` this workspace cannot send from.
  * - A recipient that is neither a valid phone number nor a business-scoped user ID.
  * - Free-form content sent into a closed customer service window
- * (`WhatsAppServiceWindowClosed`).
+ *   (`WhatsAppServiceWindowClosed`).
  * - Interactive content or an authentication template addressed to a group
- * (`WhatsAppGroupContentNotSupported`).
+ *   (`WhatsAppGroupContentNotSupported`).
  *
  * A group `to` naming no group this workspace holds fails with a `404`
  * `WhatsAppGroupNotFound`, and one whose group is not active with a `409`
@@ -5998,10 +6053,11 @@ export const listWhatsAppMessageEvents = <ThrowOnError extends boolean = false>(
  * redirect, so the storage URL must be fetched with a client that carries
  * none.
  *
- * Media is kept for 30 days after the message is received, and the message
- * itself is kept longer. A message older than that still lists its media's
- * `mime_type` and `caption`, and this operation returns `410` once the bytes
- * have expired. Other outbound messages have no media to serve.
+ * Media is kept for 30 days after the message is received, the same as the
+ * message itself, so once both expire this operation returns `404`. A `410`
+ * means the stored file is gone while the message is still readable: the
+ * message still lists the media's `mime_type` and `caption`, but the bytes
+ * cannot be served. Other outbound messages have no media to serve.
  *
  */
 export const getWhatsAppMessageMedia = <ThrowOnError extends boolean = false>(
@@ -6095,7 +6151,7 @@ export const deleteWhatsAppMessageReaction = <
  * Each of these returns a `422`:
  *
  * - A message this workspace sent. This endpoint places reactions on messages
- * the contact sent; reacting to your own outbound message is not supported.
+ *   the contact sent; reacting to your own outbound message is not supported.
  * - More than one emoji, since WhatsApp takes exactly one.
  *
  * A message Bird can no longer resolve returns a `404` instead. WhatsApp
@@ -6193,6 +6249,232 @@ export const listWhatsAppMessageReactionEvents = <
       },
     ],
     url: "/v1/whatsapp/messages/{message_id}/reaction-events",
+    ...options,
+  });
+
+/**
+ * List WhatsApp conversations
+ *
+ * Returns the workspace's WhatsApp conversations as a cursor-paginated list, most recently active first. A conversation is one thread between a number you have connected and a single contact, or a group that number belongs to. It appears once the number has conversations enabled and a first message has been recorded.
+ *
+ * Each conversation says who answers it right now, when its customer-service window closes, whether anything in it is unread, and what its most recent message was. Read the messages themselves through [the conversation's message list](/docs/api/reference/list-whatsapp-conversation-messages).
+ *
+ * Filter by inbox status, connected number, by who holds the conversation, by who it is assigned to, by whether its service window is open, or by label. Search with `q` to find a contact by any part of their phone number, BSUID, username or display name, or a conversation by part of a label. Callers with `whatsapp_management` read access also find a group by part of its name.
+ *
+ * Resolving a conversation in the inbox preserves its ID and labels. A new inbound message reopens the same conversation. Inbox status is independent of the customer-service window. Messages are retained for **30 days**. When a conversation's last message expires, the conversation is deleted and leaves this list. The contact's next message starts a new conversation with a new ID.
+ *
+ */
+export const listWhatsAppConversations = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWhatsAppConversationsData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppConversationsResponses,
+  ListWhatsAppConversationsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListWhatsAppConversationsResponses,
+    ListWhatsAppConversationsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/conversations",
+    ...options,
+  });
+
+/**
+ * Get a WhatsApp conversation
+ *
+ * Returns one conversation's current state: who answers it right now, when its customer-service window closes, how many messages are unread, its labels, and its most recent message.
+ *
+ * Resolving inbox work preserves the conversation. New inbound messages reopen it with the same ID. Messages are retained for 30 days. When the last one expires, the conversation and its events are deleted, and this returns `404`.
+ *
+ */
+export const getWhatsAppConversation = <ThrowOnError extends boolean = false>(
+  options: Options<GetWhatsAppConversationData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppConversationResponses,
+  GetWhatsAppConversationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWhatsAppConversationResponses,
+    GetWhatsAppConversationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/conversations/{conversation_id}",
+    ...options,
+  });
+
+/**
+ * Update a WhatsApp conversation
+ *
+ * Updates assignment, inbox status, labels, or shared workspace read state. Every field is optional and an omitted one is left unchanged.
+ *
+ * `assigned_to` takes a user ID, `me` for the user making the request, or null to unassign. The user must be a member of this workspace. `me` needs a request made as a user: an API key has no user, so passing `me` with one returns a `422`.
+ *
+ * `labels` replaces the conversation's labels with the set you send, so include every label you want to keep. Pass an empty array to clear them.
+ *
+ * Pass `read` with a date-time cutoff for message `created_at` to acknowledge received inbound messages at or before it in the workspace inbox. Messages sharing the timestamp are included together; later arrivals remain unread. This does not send the customer a WhatsApp read receipt.
+ *
+ * Labels are yours alone: Bird sets none of its own, and changing them does not mark the conversation read or unread.
+ *
+ * Set `inbox_status` to `resolved` to finish the inbox work, or `open` to reopen it. New inbound messages reopen resolved conversations. Inbox status does not change read state or the customer-service window.
+ *
+ * Control is not changed here. Moving a conversation between the agent and your application needs WhatsApp's agreement and can be refused, so you take and release control in the dashboard inbox.
+ *
+ */
+export const updateWhatsAppConversation = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<UpdateWhatsAppConversationData, ThrowOnError>,
+): RequestResult<
+  UpdateWhatsAppConversationResponses,
+  UpdateWhatsAppConversationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateWhatsAppConversationResponses,
+    UpdateWhatsAppConversationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/conversations/{conversation_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List messages in a WhatsApp conversation
+ *
+ * Returns the messages in one conversation, newest first, as a cursor-paginated list. They are the same messages [the WhatsApp message list](/docs/api/reference/list-whatsapp-messages) returns, already narrowed to this conversation's number and contact, so each one carries the content object it was built from and its current delivery status.
+ *
+ * Filter by `direction` to read only what the contact sent or only what was sent to them. Pass the response's `next_cursor` back as `starting_after` for the next page.
+ *
+ * Messages are retained for **30 days**. When a conversation's last message expires, the conversation and its events are deleted too, and the conversation returns `404`. The contact's next message starts a new conversation with a new ID. There is no way to read messages older than the window.
+ *
+ */
+export const listWhatsAppConversationMessages = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListWhatsAppConversationMessagesData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppConversationMessagesResponses,
+  ListWhatsAppConversationMessagesErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListWhatsAppConversationMessagesResponses,
+    ListWhatsAppConversationMessagesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/conversations/{conversation_id}/messages",
+    ...options,
+  });
+
+/**
+ * Get a message in a WhatsApp conversation
+ *
+ * Returns one message in a conversation. It is the same object [get a WhatsApp message](/docs/api/reference/get-whatsapp-message) returns, but read from the conversation's own store, so a message is readable here as soon as the conversation records it.
+ *
+ * Returns `404` when the message does not belong to this conversation, or when it is past the 30-day message retention.
+ *
+ */
+export const getWhatsAppConversationMessage = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<GetWhatsAppConversationMessageData, ThrowOnError>,
+): RequestResult<
+  GetWhatsAppConversationMessageResponses,
+  GetWhatsAppConversationMessageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetWhatsAppConversationMessageResponses,
+    GetWhatsAppConversationMessageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/conversations/{conversation_id}/messages/{message_id}",
+    ...options,
+  });
+
+/**
+ * List WhatsApp conversation events
+ *
+ * Returns the conversation's activity history, newest first:
+ * - A move of control between the Meta Business Agent and your application.
+ * - An assignment, reassignment or unassignment.
+ * - A notification sent to the agent about this contact.
+ *
+ * Messages are listed separately, by [listing the conversation's messages](/docs/api/reference/list-whatsapp-conversation-messages).
+ * Pass `type` to keep only events of one type.
+ *
+ * Events are retained for **30 days** from when they were recorded, so a long-running conversation lists only its recent history. When the conversation's last message passes its own 30-day retention, the conversation is deleted with its remaining events, and this returns `404`.
+ *
+ */
+export const listWhatsAppConversationEvents = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListWhatsAppConversationEventsData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppConversationEventsResponses,
+  ListWhatsAppConversationEventsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListWhatsAppConversationEventsResponses,
+    ListWhatsAppConversationEventsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/conversations/{conversation_id}/events",
     ...options,
   });
 
@@ -6804,6 +7086,70 @@ export const listWhatsAppTemplates = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Create a message template
+ *
+ * Creates a WhatsApp message template. Supply `languages` to seed its first draft in the same call, or omit it to create the template alone and add content through the version and language paths. Nothing here reaches Meta: content is submitted for review as a separate, explicit step, so a template this call returns is `draft` and not yet sendable.
+ *
+ */
+export const createWhatsAppTemplate = <ThrowOnError extends boolean = false>(
+  options: Options<CreateWhatsAppTemplateData, ThrowOnError>,
+): RequestResult<
+  CreateWhatsAppTemplateResponses,
+  CreateWhatsAppTemplateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateWhatsAppTemplateResponses,
+    CreateWhatsAppTemplateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a message template
+ *
+ * Deletes a template and every language it holds. Built-in templates cannot be deleted. A template your workspace authored is removed immediately, and its copy at WhatsApp is removed afterwards. WhatsApp refuses to delete a template while any of its languages is disabled, so the request fails until WhatsApp changes that language's status.
+ *
+ */
+export const deleteWhatsAppTemplate = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteWhatsAppTemplateData, ThrowOnError>,
+): RequestResult<
+  DeleteWhatsAppTemplateResponses,
+  DeleteWhatsAppTemplateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteWhatsAppTemplateResponses,
+    DeleteWhatsAppTemplateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}",
+    ...options,
+  });
+
+/**
  * Get a message template
  *
  * Returns one template by its ID or slug: its lifecycle, the languages a send can currently resolve, a summary of where every language stands at Meta, and a pointer to the version that is live. Content is not here: read [a version](/docs/api/reference/get-whatsapp-template-version) for that.
@@ -6831,6 +7177,40 @@ export const getWhatsAppTemplate = <ThrowOnError extends boolean = false>(
     ],
     url: "/v1/whatsapp/templates/{template_ref}",
     ...options,
+  });
+
+/**
+ * Update a message template
+ *
+ * Updates a template's metadata. The slug can change only before the first submission. Changing it after the first submission returns `409` (`E15070`), even if Meta rejects the template. Display names remain editable. Built-in templates cannot be edited.
+ *
+ */
+export const updateWhatsAppTemplate = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateWhatsAppTemplateData, ThrowOnError>,
+): RequestResult<
+  UpdateWhatsAppTemplateResponses,
+  UpdateWhatsAppTemplateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateWhatsAppTemplateResponses,
+    UpdateWhatsAppTemplateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**
@@ -6862,6 +7242,108 @@ export const listWhatsAppTemplateVersions = <
       },
     ],
     url: "/v1/whatsapp/templates/{template_ref}/versions",
+    ...options,
+  });
+
+/**
+ * Create a template draft
+ *
+ * Opens the template's draft, seeded from the newest submitted version, or an empty draft if the template has none. A template has at most one open draft. The API returns `200` with an existing draft and `201` when this call opens one; both responses use the same body shape. Read the template's `draft_version_id` first if you do not want to open a draft.
+ *
+ * A WhatsApp template has no draft until this call opens one. The email channel has no equivalent operation, because an email template's draft always exists.
+ *
+ */
+export const createWhatsAppTemplateDraft = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateWhatsAppTemplateDraftData, ThrowOnError>,
+): RequestResult<
+  CreateWhatsAppTemplateDraftResponses,
+  CreateWhatsAppTemplateDraftErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateWhatsAppTemplateDraftResponses,
+    CreateWhatsAppTemplateDraftErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}/versions",
+    ...options,
+  });
+
+/**
+ * Duplicate a message template
+ *
+ * Copies a template into a new one holding the source's current content as an open draft. It is how a built-in template is forked into something a workspace can edit, and how an approved template becomes the basis of a variant. The copy calls Meta zero times: it is a draft you submit when ready.
+ *
+ */
+export const duplicateWhatsAppTemplate = <ThrowOnError extends boolean = false>(
+  options: Options<DuplicateWhatsAppTemplateData, ThrowOnError>,
+): RequestResult<
+  DuplicateWhatsAppTemplateResponses,
+  DuplicateWhatsAppTemplateErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    DuplicateWhatsAppTemplateResponses,
+    DuplicateWhatsAppTemplateErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}/duplicate",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a template's open draft
+ *
+ * Deletes the draft and leaves the template without an open draft. Use [Create a template draft](/docs/api/reference/create-whatsapp-template-draft) to create another. Deleting a draft does not change the version used for sends, and submitted versions are immutable.
+ *
+ * The email channel has an operation of the same name and shape that behaves differently: there, the draft's content resets to what is published and the draft itself remains. On WhatsApp the draft is gone until a new one is opened.
+ *
+ */
+export const deleteWhatsAppTemplateVersion = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<DeleteWhatsAppTemplateVersionData, ThrowOnError>,
+): RequestResult<
+  DeleteWhatsAppTemplateVersionResponses,
+  DeleteWhatsAppTemplateVersionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteWhatsAppTemplateVersionResponses,
+    DeleteWhatsAppTemplateVersionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}",
     ...options,
   });
 
@@ -6898,6 +7380,57 @@ export const getWhatsAppTemplateVersion = <
   });
 
 /**
+ * Submit a template version for review
+ *
+ * Validates the template draft before freezing it. If validation fails, the
+ * API returns `200 OK` with every problem across all languages and creates no
+ * version. If validation passes, the API freezes an immutable version and
+ * returns `202 Accepted`. Only the languages whose content differs from their
+ * approved copy are sent to Meta and marked `pending`; the rest carry their
+ * existing verdict forward untouched, so a version whose languages are all
+ * unchanged comes back already settled. A language an earlier version carried
+ * but the draft dropped is deleted at Meta in the background. It is absent
+ * from the new version, so it has no `pending` state. The version becomes live when any
+ * language is approved, and no replacement draft opens automatically.
+ *
+ * Set `validate_only: true` to run the same checks without freezing or
+ * submitting a version. Local validation cannot predict Meta's decision. A
+ * `202 Accepted` response confirms the version was frozen and accepted. Poll the
+ * version or the template's `pending_version_id` for the verdicts on whichever
+ * languages it marked `pending`.
+ *
+ */
+export const submitWhatsAppTemplateVersion = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<SubmitWhatsAppTemplateVersionData, ThrowOnError>,
+): RequestResult<
+  SubmitWhatsAppTemplateVersionResponses,
+  SubmitWhatsAppTemplateVersionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    SubmitWhatsAppTemplateVersionResponses,
+    SubmitWhatsAppTemplateVersionErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/submit",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
  * List a version's languages
  *
  * Returns every language a version holds, without content: each language's tag, what this version's submission did with it, its write counter, and a hash over its content. Compare the hashes to tell which languages actually differ before fetching any content. Fetch [a single language](/docs/api/reference/get-whatsapp-template-version-language) for its content blocks.
@@ -6926,6 +7459,38 @@ export const listWhatsAppTemplateVersionLanguages = <
       },
     ],
     url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/languages",
+    ...options,
+  });
+
+/**
+ * Delete a language from the draft
+ *
+ * Removes one language from the template's draft. The template's default language cannot be removed, and a language under active review at Meta refuses removal until that review finishes. Meta is not told until the draft is submitted, and the version a send resolves is unaffected until then.
+ *
+ */
+export const deleteWhatsAppTemplateLanguage = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<DeleteWhatsAppTemplateLanguageData, ThrowOnError>,
+): RequestResult<
+  DeleteWhatsAppTemplateLanguageResponses,
+  DeleteWhatsAppTemplateLanguageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteWhatsAppTemplateLanguageResponses,
+    DeleteWhatsAppTemplateLanguageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/languages/{language}",
     ...options,
   });
 
@@ -6959,6 +7524,78 @@ export const getWhatsAppTemplateVersionLanguage = <
     ],
     url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/languages/{language}",
     ...options,
+  });
+
+/**
+ * Upsert a language's content
+ *
+ * Writes one language of the template's draft, creating it when absent (`201`) and replacing it when present (`200`). A full replacement, so send the language's complete content every time. Only the draft is writable: submitted versions are immutable, and a language under active review at Meta refuses the write until that review finishes. Pass `revision` to make the write a compare-and-set against the copy you read. Tags are canonicalised, and the response echoes the canonical form: use it in later calls for this language.
+ *
+ */
+export const upsertWhatsAppTemplateLanguage = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<UpsertWhatsAppTemplateLanguageData, ThrowOnError>,
+): RequestResult<
+  UpsertWhatsAppTemplateLanguageResponses,
+  UpsertWhatsAppTemplateLanguageErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).put<
+    UpsertWhatsAppTemplateLanguageResponses,
+    UpsertWhatsAppTemplateLanguageErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/languages/{language}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Discard a language's draft edits back to its submitted copy
+ *
+ * Restores one language of the template's draft to the copy the draft was branched from, discarding the edits made to it since. Only that language moves: every other language in the draft is left alone, which is what discarding the whole draft does not give you. A language the draft added, and a template that has never been submitted, have nothing to restore and are refused. Pass `revision` to make the discard a compare-and-set against the copy you read; omit it and the discard is last-write-wins, the same rule this language's `PUT` follows. Nothing reaches WhatsApp until the draft is submitted.
+ *
+ */
+export const discardWhatsAppTemplateLanguageEdits = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<DiscardWhatsAppTemplateLanguageEditsData, ThrowOnError>,
+): RequestResult<
+  DiscardWhatsAppTemplateLanguageEditsResponses,
+  DiscardWhatsAppTemplateLanguageEditsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    DiscardWhatsAppTemplateLanguageEditsResponses,
+    DiscardWhatsAppTemplateLanguageEditsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}/versions/{version_id}/languages/{language}/discard",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**
@@ -7538,11 +8175,11 @@ export const getWhatsAppAgentNotification = <
  * status, quality rating, business portfolio messaging limit, allowed
  * send rate, and Official Business Account status.
  *
- * Page through the full set with the response cursors. A cursor naming a
- * platform-managed number is rejected once the active filters would exclude
- * it, including a `scope=system` cursor for a number that is not
- * platform-managed. Start again without `starting_after` or `ending_before`
- * whenever you change `phone_number`, `waba`, `status`, or `scope`.
+ * Page through the full set with the response cursors. A cursor marks a
+ * position in the list, not a filter set. Start again without
+ * `starting_after` or `ending_before` whenever you change `phone_number`,
+ * `waba`, `status`, or `scope`, or the new page skips matches before that
+ * position.
  *
  */
 export const listWhatsAppNumbers = <ThrowOnError extends boolean = false>(

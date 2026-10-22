@@ -26,7 +26,7 @@ export class ComplianceSubmissionsResource extends Resource {
   }
 
   /**
-   * Replaces rejected, expired, or missing answers on an existing submission. Read `compliance_requirements.get` for the fields and correction feedback. Accepted answers normally cannot be changed. During an open verifier correction and before its deadline, you can replace selected accepted answers. Unchanged entries are ignored; at least one answer must change. Changed answers are reviewed again. These answers are a legal representation under the business's name.
+   * Replaces rejected, expired, or missing answers on an existing submission. Read `compliance_requirements.get` for the fields and correction feedback. Accepted answers normally cannot be changed, except while `answers_editable` is true on the requirements: then any changed answer is reviewed again, and a closed submission with `resubmission_allowed` reopens. During an open verifier correction and before its deadline, you can replace selected accepted answers. Unchanged entries are ignored; at least one answer must change. Changed answers are reviewed again. These answers are a legal representation under the business's name.
    */
   resupply(submissionId: string, params: ComplianceSubmissionsResupplyParams, options?: RequestOptions): APIPromise<ComplianceSubmission> {
     return this.call<ComplianceSubmission>("POST", options, ({ signal, headers }) =>

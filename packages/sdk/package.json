@@ -1,6 +1,6 @@
 {
   "name": "@messagebird/sdk",
-  "version": "0.104.0",
+  "version": "0.105.0",
   "description": "The official TypeScript SDK for the Bird API: email, SMS, WhatsApp, verification, and Realtime on one typed client.",
   "license": "MIT",
   "author": "Bird",
@@ -58,10 +58,9 @@
   },
   "//unrun": "tsdown's TypeScript-config loader, declared by tsdown as an optional peer. Keep it an explicit devDependency: clean installs omit optional peers, and the mirror build then fails to load tsdown.config.ts. Do not prune.",
   "devDependencies": {
-    "@hey-api/openapi-ts": "0.99.0",
+    "@hey-api/openapi-ts": "0.0.0-next-20260930190945",
     "tsdown": "0.22.14",
-    "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "typescript-7": "npm:typescript@7.0.2",
+    "typescript": "npm:typescript@7.1.0-beta",
     "unrun": "0.3.1",
     "vitest": "5.0.0"
   }
