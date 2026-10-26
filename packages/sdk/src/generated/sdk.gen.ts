@@ -3238,11 +3238,11 @@ export const unassignAudienceContact = <ThrowOnError extends boolean = false>(
  * List SMS messages
  *
  * Returns the workspace's SMS messages as a cursor-paginated list, newest
- * first. Filter by direction, status, category, recipient, sender, failure
- * reason, tag, or creation time; pass the response's `next_cursor` back as
- * `starting_after` to fetch the next page. To follow a single message's
- * delivery, use [Get an SMS message](/docs/api/reference/get-sms-message)
- * instead.
+ * first. Filter by direction, status, category, recipient, sender,
+ * destination country, failure reason, tag, or creation time; pass the
+ * response's `next_cursor` back as `starting_after` to fetch the next page.
+ * To follow a single message's delivery, use
+ * [Get an SMS message](/docs/api/reference/get-sms-message) instead.
  *
  * Messages are retained for **30 days**. A `created_after` earlier than that
  * is accepted and raised to the retention bound rather than rejected, so a
@@ -4264,7 +4264,7 @@ export const listAssets = <ThrowOnError extends boolean = false>(
 /**
  * Remove an asset from the media library
  *
- * Removes an asset from the library. The asset stops appearing in the library and cannot be added to new content, but its URL keeps serving so messages that already reference it continue to render. Deleting is idempotent.
+ * Removes an asset from the library. The asset is excluded from default list results, but remains readable by ID or with the `deleted` list filter unless blocked by staff. Deleting the library entry does not revoke public access: anyone with its URL can continue using it. A separate security or abuse takedown can make the entry and public URL unavailable. Deleting is idempotent.
  *
  */
 export const deleteAsset = <ThrowOnError extends boolean = false>(
@@ -7529,7 +7529,7 @@ export const getWhatsAppTemplateVersionLanguage = <
 /**
  * Upsert a language's content
  *
- * Writes one language of the template's draft, creating it when absent (`201`) and replacing it when present (`200`). A full replacement, so send the language's complete content every time. Only the draft is writable: submitted versions are immutable, and a language under active review at Meta refuses the write until that review finishes. Pass `revision` to make the write a compare-and-set against the copy you read. Tags are canonicalised, and the response echoes the canonical form: use it in later calls for this language.
+ * Writes one language of the template's draft, creating it when absent (`201`) and replacing it when present (`200`). A full replacement, so send the language's complete content every time. `optimization_spec` is the exception: omitting it keeps the current maximum price, and a language created without one uses Meta's standard rate. Only the draft is writable: submitted versions are immutable, and a language under active review at Meta refuses the write until that review finishes. Pass `revision` to make the write a compare-and-set against the copy you read. Tags are canonicalised, and the response echoes the canonical form: use it in later calls for this language.
  *
  */
 export const upsertWhatsAppTemplateLanguage = <
@@ -8871,9 +8871,9 @@ export const listAmbMessages = <ThrowOnError extends boolean = false>(
  *
  * Choose text, rich_link, or interactive content. Interactive content contains a quick reply, list picker, event, form, or custom iMessage app. Native payment and authentication requests are not available through this public operation. Device support varies; an unsupported interaction returns 422.
  *
- * Supply attachment URLs or reusable Apple references. Bird downloads source URLs and uploads the files before sending. Interactive images must be PNG files up to 200 kB each, totaling at most 5 MB. Each attachment must be smaller than 100 MB. A media or provider failure after acceptance changes the message status to send_failed.
+ * Supply attachments by source URL. Bird downloads the files and uploads them to Apple before sending. Interactive images must be PNG files up to 200 kB each, totaling at most 5 MB. Each attachment must be smaller than 100 MB. A media or provider failure after acceptance changes the message status to send_failed.
  *
- * The 202 response confirms acceptance, not delivery. Read the message to obtain its final status and any reusable reference returned by Apple.
+ * The 202 response confirms acceptance, not delivery. Read the message to obtain its final status.
  */
 export const createAmbMessage = <ThrowOnError extends boolean = false>(
   options: Options<CreateAmbMessageData, ThrowOnError>,
@@ -13182,7 +13182,7 @@ export const deleteMailbox = <ThrowOnError extends boolean = false>(
 /**
  * Get a mailbox
  *
- * Returns a single mailbox by ID. A mailbox deleted within its 30-day restore window is still returned, with `deleted_at` set. Once the window closes it is permanently removed and returns `404`.
+ * Returns a single mailbox by ID or email address in this workspace. A mailbox deleted within its 30-day restore window is still returned, with `deleted_at` set. Once the window closes it is permanently removed and returns `404`.
  *
  */
 export const getMailbox = <ThrowOnError extends boolean = false>(
@@ -14500,6 +14500,8 @@ export const releaseWorkspaceNumber = <ThrowOnError extends boolean = false>(
  * Get the effective price for a product
  *
  * Returns the effective unit price, tax, and gross price for a product after organization- and plan-specific pricing. Provide exactly one of `product_id` or `product_slug`. You can also provide pricing dimensions and a currency. Pass `plan_id` to price under a published self-serve plan in place of your current plan; organization-specific rates still take precedence. The currency defaults to the organization's billing currency; if necessary, the price is converted from the product's base currency. Requires a delegated user OAuth token with `org:billing:read`; workspace and organization master API keys are refused with `403`.
+ *
+ * When `is_priced` is `false`, no published price matched. The `unit_price`, `tax_amount`, and `gross_price` amounts are zero placeholders and must not be used as a quote. An explicitly published zero price returns `is_priced: true`.
  */
 export const getBillingResolvedPrice = <ThrowOnError extends boolean = false>(
   options?: Options<GetBillingResolvedPriceData, ThrowOnError>,

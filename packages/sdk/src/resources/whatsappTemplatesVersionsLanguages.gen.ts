@@ -43,7 +43,7 @@ export class WhatsappTemplatesVersionsLanguagesResource extends Resource {
   }
 
   /**
-   * Writes one language of the draft, whole: send the language's complete `components` every time, because this replaces rather than merges. Only the draft is writable. A submitted version is immutable, and a language under review at WhatsApp refuses the write until that review finishes. A body block is required before the language can be submitted, and every variable in a block needs an example value, which is what WhatsApp reviews against. Pass `revision` to make the write a compare-and-set against the copy you read; omit it for last-write-wins, which is what a single writer wants.
+   * Writes one language of the draft, whole: send the language's complete `components` every time, because this replaces rather than merges. `optimization_spec` is the exception: omit it to keep the language's maximum price, or send `null` to return to Meta's standard rate. A new language written without it uses the standard rate. Only the draft is writable. A submitted version is immutable, and a language under review at WhatsApp refuses the write until that review finishes. A body block is required before the language can be submitted, and every variable in a block needs an example value, which is what WhatsApp reviews against. Pass `revision` to make the write a compare-and-set against the copy you read; omit it for last-write-wins, which is what a single writer wants.
    *
    * @example Write one language's content
    * const saved = await bird.whatsapp.templates.versions.languages.set(

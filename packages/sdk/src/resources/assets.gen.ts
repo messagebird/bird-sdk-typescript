@@ -49,7 +49,7 @@ export class AssetsResourceBase extends Resource {
   }
 
   /**
-   * Removes the library entry while its public URL continues serving existing content. Repeating deletion is safe. This operation does not revoke access to the file.
+   * Removes the library entry without revoking public access to the file. A separate staff security or abuse takedown can block the entry and URL. Repeating deletion is safe.
    *
    * @example Remove a library entry
    * await bird.assets.delete("ast_01krdgeqcxet5s7t44vh8rt9mg");

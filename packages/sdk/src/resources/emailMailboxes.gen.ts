@@ -40,7 +40,7 @@ export class EmailMailboxesResourceBase extends Resource {
   }
 
   /**
-   * Read one mailbox by ID. A mailbox deleted within its 30-day restore window is still returned, with `deleted_at` set. Once that window closes it is gone and this returns `404`.
+   * Read one mailbox by ID or email address in this workspace. A mailbox deleted within its 30-day restore window is still returned, with `deleted_at` set. Once that window closes it is gone and this returns `404`.
    *
    * @example Get a mailbox
    * const mailbox = await bird.email.mailboxes.get("mbx_01abc");

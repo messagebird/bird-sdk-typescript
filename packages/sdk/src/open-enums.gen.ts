@@ -1489,6 +1489,18 @@ export const WhatsAppNumberThroughputLevel = {
 export type WhatsAppNumberThroughputLevelValue = (typeof WhatsAppNumberThroughputLevel)[keyof typeof WhatsAppNumberThroughputLevel];
 
 /**
+ * Values of WhatsAppTemplateBidStrategy known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppTemplateBidStrategy = {
+  LowestCostWithBidCap: "lowest_cost_with_bid_cap",
+} as const;
+
+/** A known WhatsAppTemplateBidStrategy value. */
+export type WhatsAppTemplateBidStrategyValue = (typeof WhatsAppTemplateBidStrategy)[keyof typeof WhatsAppTemplateBidStrategy];
+
+/**
  * Values of WhatsAppTemplateCategory known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.

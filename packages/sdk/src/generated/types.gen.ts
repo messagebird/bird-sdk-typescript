@@ -352,9 +352,10 @@ export type Error = {
   error: ErrorBody;
 };
 
-export type ApiKeyId = string;
-
-export type WorkspaceId = string;
+/**
+ * Sort direction, ascending or descending.
+ */
+export type SortOrder = "asc" | "desc";
 
 export type ListEnvelope = {
   /**
@@ -371,10 +372,16 @@ export type ListEnvelope = {
   refresh_cursor: string | null;
 };
 
-/**
- * Sort direction, ascending or descending.
- */
-export type SortOrder = "asc" | "desc";
+export type ListEnvelopeWithTotal = ListEnvelope & {
+  /**
+   * Total number of items matching the request's filters across all pages. Present only when `include_total=true` was passed, and omitted otherwise.
+   */
+  total?: number | null;
+};
+
+export type ApiKeyId = string;
+
+export type WorkspaceId = string;
 
 export type UserId = string;
 
@@ -396,13 +403,6 @@ export type OrganizationId = string;
  * IANA timezone identifier, such as `America/New_York`, `Europe/Amsterdam`, or `UTC`.
  */
 export type Timezone = string;
-
-export type ListEnvelopeWithTotal = ListEnvelope & {
-  /**
-   * Total number of items matching the request's filters across all pages. Present only when `include_total=true` was passed, and omitted otherwise.
-   */
-  total?: number | null;
-};
 
 export type DocsSearchResult = {
   /**
@@ -709,6 +709,2546 @@ export type WorkspaceQuotaList = {
 
 export type ComplianceIdentityId = string;
 
+/**
+ * Set to `previous_period` to also return the same figures for the immediately preceding window of equal length, plus the change between the two, so you can show "+X% vs last period" without a second request.
+ *
+ */
+export type StatsComparePeriod = "previous_period";
+
+/**
+ * The window this response was actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants). The grain of `from` and `to` mirrors the grain of the request's bounds. Days and hour boundaries follow the requested `timezone` (UTC when omitted).
+ *
+ */
+export type EmailStatsSummaryPeriod = {
+  /**
+   * Inclusive start of the window the response covers. A calendar day (YYYY-MM-DD, in the requested `timezone`) for day windows. For hour windows, an RFC 3339 UTC instant marking the start of the first hour, which falls on a local hour boundary when `timezone` is set.
+   */
+  readonly from: string;
+  /**
+   * Inclusive end of the window the response covers. A calendar day (YYYY-MM-DD, in the requested `timezone`) for day windows. For hour windows, an RFC 3339 UTC instant marking the start of the last hour, which falls on a local hour boundary when `timezone` is set.
+   */
+  readonly to: string;
+  /**
+   * The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.
+   *
+   */
+  readonly data_as_of?: string | null;
+};
+
+/**
+ * Breakdown of `bounced` by failure type, with each rate as a fraction of `bounced`. Counts are distinct bounced recipients of that type; the five types approximately partition `bounced`, so the five rates sum to roughly 1.0 when `bounced` is non-zero.
+ *
+ */
+export type EmailBounceStatsWithRates = {
+  /**
+   * Distinct recipients with a permanent delivery failure (invalid address or non-existent domain).
+   */
+  readonly hard: number;
+  /**
+   * Distinct recipients with a transient delivery failure (mailbox full or server temporarily unavailable).
+   */
+  readonly soft: number;
+  /**
+   * Distinct recipients refused by a policy at the receiving end, such as relaying denied or a blocklisted domain.
+   */
+  readonly admin: number;
+  /**
+   * Distinct recipients bounced because the receiving mail server blocked the sending IP for reputation reasons.
+   */
+  readonly block: number;
+  /**
+   * Distinct recipients bounced where the receiving server's response did not allow precise classification.
+   */
+  readonly undetermined: number;
+  /**
+   * Fraction of bounced recipients that hard bounced, computed as `hard / bounced`. Null when `bounced` is zero.
+   *
+   */
+  readonly hard_rate: number | null;
+  /**
+   * Fraction of bounced recipients that soft bounced, computed as `soft / bounced`. Null when `bounced` is zero.
+   *
+   */
+  readonly soft_rate: number | null;
+  /**
+   * Fraction of bounced recipients that admin bounced, computed as `admin / bounced`. Null when `bounced` is zero.
+   *
+   */
+  readonly admin_rate: number | null;
+  /**
+   * Fraction of bounced recipients that block bounced, computed as `block / bounced`. Null when `bounced` is zero.
+   *
+   */
+  readonly block_rate: number | null;
+  /**
+   * Fraction of bounced recipients with undetermined classification, computed as `undetermined / bounced`. Null when `bounced` is zero.
+   *
+   */
+  readonly undetermined_rate: number | null;
+};
+
+/**
+ * Delivery counts and rates for the scope of the containing row (a time bucket, a breakdown dimension, or the whole period). Lifecycle counts identify distinct recipients that reached the named stage in scope; `oob_bounces` counts distinct failure events. Period summaries count each identity once per metric across the whole window, so adding time-bucket distinct counts can overstate the summary. Event time determines attribution; send time does not. A recipient delivered on Monday counts in Monday's row. A recipient who bounced and then succeeded on a retry can appear in both `bounced` and `delivered`. Very large counts are close estimates rather than exact tallies.
+ *
+ * These counts are successive lifecycle stages, so a recipient can appear in more than one:
+ *
+ * - `rejected`: Happens before any send attempt, from suppression, policy, or a generation failure.
+ * - `deferred`: A temporary in-flight delay that is still being retried.
+ * - `bounced`: A delivery failure, with its own hard, soft, admin, block, and undetermined sub-types.
+ * - `complained`: Post-delivery spam feedback.
+ *
+ * Each rate is a fraction in the range 0 to 1 and is null when its denominator is zero. `accepted` is reported only where it can be attributed (time buckets and the period summary). Breakdown rows omit it.
+ *
+ */
+export type EmailDeliveryStats = {
+  /**
+   * Distinct recipients accepted for delivery after suppression filtering. Reported on time buckets and the period summary. Breakdown rows leave it out, because their rollups do not have it.
+   */
+  readonly accepted?: number;
+  /**
+   * Distinct recipients whose message was processed and handed off for delivery.
+   */
+  readonly processed: number;
+  /**
+   * Distinct recipients whose message the receiving mail server accepted.
+   */
+  readonly delivered: number;
+  /**
+   * Distinct recipients whose delivery failed. This is approximately the sum of the five `bounces.*` sub-counts (hard, soft, admin, block, undetermined). The two totals are worked out independently, so they can differ slightly.
+   *
+   */
+  readonly bounced: number;
+  readonly bounces: EmailBounceStatsWithRates;
+  /**
+   * Distinct recipients who reported the message as spam via a feedback loop.
+   */
+  readonly complained: number;
+  /**
+   * Distinct recipients whose delivery the receiving server temporarily delayed and is still being retried.
+   *
+   */
+  readonly deferred: number;
+  /**
+   * Distinct recipients rejected before any delivery attempt. Includes recipients on the workspace suppression list, transmissions that could not be completed, message-generation failures, and recipients refused by sending policy. The per-recipient `rejection_reason` field on `GET /v1/email/messages/{message_id}/recipients` surfaces the specific cause.
+   *
+   */
+  readonly rejected: number;
+  /**
+   * Out-of-band bounce events: distinct failure notifications received after the receiving server had initially confirmed delivery. The count represents deduplicated events rather than unique recipients.
+   *
+   */
+  readonly oob_bounces: number;
+  /**
+   * Recipients who remain delivered after all bounce signals resolve, computed as `delivered - oob_bounces`. Use this as the base for engagement-rate denominators. Clamped to 0 when `oob_bounces` exceeds `delivered`.
+   */
+  readonly effective_delivered: number;
+  /**
+   * Total recipients in this scope who did not receive the message, computed as `bounced + oob_bounces`.
+   */
+  readonly all_bounces: number;
+  /**
+   * Share of this scope's delivery attempts that resulted in an out-of-band bounce, computed as `oob_bounces / (delivered + bounced)`. Null when there were no attempts.
+   */
+  readonly oob_rate: number | null;
+  /**
+   * Share of this scope's delivery attempts that remained delivered after all bounce signals, computed as `effective_delivered / (delivered + bounced)`. Null when there were no attempts.
+   *
+   */
+  readonly delivery_rate: number | null;
+  /**
+   * Share of this scope's delivery attempts that ultimately failed (inband or out-of-band), computed as `all_bounces / (delivered + bounced)`. Because `oob_bounces` counts events rather than recipients, `all_bounces` can exceed the attempt count. The rate is clamped to 1. Null when there were no attempts.
+   *
+   */
+  readonly bounce_rate: number | null;
+  /**
+   * Spam complaints in this scope relative to effectively delivered recipients, computed as `complained / effective_delivered`. Complaints are attributed by event time, so a scope can record more of them than it effectively delivered, pushing the rate above 1. Null when `effective_delivered` is zero.
+   *
+   */
+  readonly complaint_rate: number | null;
+};
+
+/**
+ * Engagement counts and rates for the scope of the containing row (a time bucket, a breakdown dimension, or the whole period). `opens`, `opens_non_prefetched` and `clicks` count distinct engagement events (deduplicated occurrences). The `unique_*` fields count distinct recipients. `unsubscribes` counts distinct unsubscribe events. An event counts in the time bucket when it occurs, even if the message was sent in an earlier bucket. Counts are deduplicated with a scalable approximate counting method, so very large counts are close estimates rather than exact tallies. Each rate divides the counts in this scope and is null when its denominator is zero.
+ *
+ */
+export type EmailEngagementStats = {
+  /**
+   * Distinct open events, counting repeat opens from the same recipient and opens auto-fetched by inbox privacy features (such as Apple Mail Privacy Protection and the Gmail image proxy).
+   *
+   */
+  readonly opens: number;
+  /**
+   * Distinct open events excluding those auto-fetched by inbox privacy features. Same event-counting semantics as `opens` (repeat opens from the same recipient count separately), with prefetched opens removed.
+   *
+   */
+  readonly opens_non_prefetched: number;
+  /**
+   * Distinct recipients who opened at least once, including opens auto-fetched by inbox privacy features.
+   */
+  readonly unique_opens: number;
+  /**
+   * Distinct recipients who opened at least once, excluding opens auto-fetched by inbox privacy features. This is the numerator used for open rate, so iOS-heavy audiences (Apple Mail Privacy Protection and similar) do not inflate it.
+   *
+   */
+  readonly unique_opens_non_prefetched: number;
+  /**
+   * Distinct click events, counting repeat clicks from the same recipient.
+   */
+  readonly clicks: number;
+  /**
+   * Distinct recipients who clicked at least once.
+   */
+  readonly unique_clicks: number;
+  /**
+   * Distinct unsubscribe events, recorded via the list-unsubscribe header or the footer link.
+   */
+  readonly unsubscribes: number;
+  /**
+   * Distinct non-prefetched openers relative to effectively delivered recipients in the same scope, computed as `unique_opens_non_prefetched / delivery.effective_delivered`; on rows without an `effective_delivered` field (the mailbox-provider breakdowns) the denominator equals `delivery.delivered`. The numerator excludes opens auto-fetched by inbox privacy features. Opens are attributed by event time, so engagement earned by earlier deliveries can push the rate above 1. Null when the denominator is zero.
+   *
+   */
+  readonly open_rate: number | null;
+  /**
+   * Distinct clickers relative to effectively delivered recipients in the same scope, computed as `unique_clicks / delivery.effective_delivered` (`delivery.delivered` on rows without an `effective_delivered` field). Clicks are attributed by event time, so engagement earned by earlier deliveries can push the rate above 1. Null when the denominator is zero.
+   *
+   */
+  readonly click_rate: number | null;
+  /**
+   * Unsubscribe events relative to effectively delivered recipients in the same scope, computed as `unsubscribes / delivery.effective_delivered` (`delivery.delivered` on rows without an `effective_delivered` field). Unsubscribes are attributed by event time, so the rate can exceed 1. Null when the denominator is zero.
+   *
+   */
+  readonly unsubscribe_rate: number | null;
+};
+
+/**
+ * Approximate p50, p95, and p99 latency percentiles in milliseconds for one latency family over the bucket. All three are null when no qualifying event contributed a measurement.
+ *
+ */
+export type EmailLatencyQuantiles = {
+  /**
+   * Median (50th percentile) latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p50_ms: number | null;
+  /**
+   * 95th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p95_ms: number | null;
+  /**
+   * 99th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p99_ms: number | null;
+};
+
+/**
+ * Latency percentiles (p50, p95, p99) in milliseconds for the bucket. On the summary endpoint these are computed across the whole period rather than per bucket. Three families are reported:
+ *
+ * - `processing`: Time from accepting the send to handing the message off for delivery. Measured per processed recipient; null when no recipient in the bucket has reached the processed stage.
+ * - `delivery`: Time from handoff to the receiving mail server accepting the message, dominated by recipient-side delivery behavior. Measured per delivered recipient; null when no deliveries occurred in the bucket.
+ * - `total`: End-to-end time from accepting the send to delivery, and the number most worth watching against your own delivery targets. Measured per delivered recipient; null when no deliveries occurred in the bucket.
+ *
+ * Each family is reported independently. A family is omitted when no qualifying
+ * event contributed a latency measurement in the bucket. This also applies when
+ * the workspace has not recorded latency for that stage yet. The `processing`
+ * family can therefore be present while `delivery` and `total` are absent. A
+ * client must handle a missing family, and a null p50/p95/p99 within a present
+ * family, by rendering a placeholder rather than assuming a number.
+ *
+ */
+export type EmailLatencyStats = {
+  processing?: EmailLatencyQuantiles;
+  delivery?: EmailLatencyQuantiles;
+  total?: EmailLatencyQuantiles;
+};
+
+/**
+ * The change in each headline metric from the preceding period to the requested one. A `*_pct_change` field is a signed relative change in a count, computed as `(current - previous) / previous`, so `0.5` means 50% higher and `-0.2` means 20% lower. It is null when the previous period's count was zero because a relative change cannot be computed. A `*_rate_pp` field is the signed difference between the two periods' rate values. Each value is expressed as a fraction. A value of `0.012` means the rate rose by 1.2 percentage points. A value of `-0.003` means it fell by 0.3 points. The field is null when either period's rate is undefined, because its denominator was zero. `delivery_rate_pp` and `bounce_rate_pp` range from `-1` to `1`, because the rates behind them cannot exceed 1. The engagement deltas have no fixed bound, because events are counted when they arrive rather than when the message was sent, which can push their rate above 1.
+ *
+ */
+export type EmailStatsComparisonDelta = {
+  /**
+   * Relative change in accepted messages (the `sends_accepted` count) versus the previous period, as a signed fraction. Null when the previous period accepted none.
+   */
+  readonly sends_accepted_pct_change: number | null;
+  /**
+   * Relative change in effectively delivered recipients (`delivery.effective_delivered`, the delivery-rate numerator) versus the previous period, as a signed fraction. Null when the previous period effectively delivered none.
+   */
+  readonly delivered_pct_change: number | null;
+  /**
+   * Relative change in total bounces including out-of-band (`delivery.all_bounces`, the bounce-rate numerator) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly bounced_pct_change: number | null;
+  /**
+   * Relative change in spam complaints (`delivery.complained`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly complained_pct_change: number | null;
+  /**
+   * Relative change in unique non-prefetched opens (`engagement.unique_opens_non_prefetched`, the same count the open rate uses) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly opened_pct_change: number | null;
+  /**
+   * Signed difference between this period's and the previous period's delivery rate, both fractions in [0,1] (multiply by 100 for percentage points). Null when either period's delivery rate is undefined.
+   */
+  readonly delivery_rate_pp: number | null;
+  /**
+   * Signed difference between this period's and the previous period's open rate, both fractions (multiply by 100 for percentage points). Null when either period's open rate is undefined.
+   */
+  readonly open_rate_pp: number | null;
+  /**
+   * Signed difference between this period's and the previous period's click rate, both fractions (multiply by 100 for percentage points). Null when either period's click rate is undefined.
+   */
+  readonly click_rate_pp: number | null;
+  /**
+   * Signed difference between this period's and the previous period's bounce rate, both fractions in [0,1] (multiply by 100 for percentage points). Null when either period's bounce rate is undefined.
+   */
+  readonly bounce_rate_pp: number | null;
+  /**
+   * Signed difference between this period's and the previous period's complaint rate, both fractions (multiply by 100 for percentage points). Null when either period's complaint rate is undefined.
+   */
+  readonly complaint_rate_pp: number | null;
+  /**
+   * Signed difference between this period's and the previous period's unsubscribe rate, both fractions (multiply by 100 for percentage points). Null when either period's unsubscribe rate is undefined.
+   */
+  readonly unsubscribe_rate_pp: number | null;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending the day immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type EmailStatsComparison = {
+  /**
+   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows). For a request covering 2026-05-01 to 2026-05-31, this is 2026-03-31 to 2026-04-30, both inclusive.
+   */
+  period: EmailStatsSummaryPeriod;
+  /**
+   * Distinct email messages accepted in the preceding period, counted at the message level.
+   */
+  readonly sends_accepted: number;
+  readonly delivery: EmailDeliveryStats;
+  readonly engagement: EmailEngagementStats;
+  readonly latency: EmailLatencyStats;
+  readonly delta: EmailStatsComparisonDelta;
+};
+
+/**
+ * A single row that aggregates delivery and engagement counts, plus derived
+ * rates, across the whole requested period. Use this endpoint for KPI
+ * tiles, campaign reporting, and anywhere you need a rate with a meaningful
+ * denominator. The daily and hourly endpoints report the same rates, but
+ * per bucket, each one dividing that bucket's own counts.
+ *
+ * Distinct message, recipient, and event counts are computed across the whole
+ * requested period. An identity present in more than one time bucket counts
+ * once for that metric in the period summary, so adding daily or hourly
+ * distinct counts can overstate the summary. Very large counts are close
+ * estimates rather than exact tallies. Latency percentiles are also computed
+ * across the whole period. A rate is null when its denominator is zero.
+ *
+ */
+export type EmailStatsSummary = {
+  /**
+   * The window the response covers (echoed back from the request, day or hour grain), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: EmailStatsSummaryPeriod;
+  /**
+   * Distinct email messages accepted, counted at the message level (one per accepted send regardless of recipient count) across the whole requested period. This field counts messages. `delivery.accepted` counts recipients, so the two values are not comparable (a single message to 500 recipients is 1 here and up to 500 there).
+   */
+  readonly sends_accepted: number;
+  readonly delivery: EmailDeliveryStats;
+  readonly engagement: EmailEngagementStats;
+  readonly latency: EmailLatencyStats;
+  readonly comparison?: EmailStatsComparison;
+};
+
+/**
+ * Aggregate stats for one time bucket (a calendar day or hour, per the requested grain, in the requested `timezone` or UTC by default), bucketed by event time. Buckets with no activity are included with zero counts and null latency percentiles, so the series charts continuously without client-side gap handling.
+ *
+ */
+export type EmailStatsPoint = {
+  /**
+   * The day (YYYY-MM-DD, in the requested `timezone`) or hour this point covers, matching the period's grain. An hour bucket is an RFC 3339 UTC instant marking the start of the hour. It falls on a local hour boundary when `timezone` is set, which is on the UTC hour only for whole-hour offsets.
+   */
+  readonly bucket: string;
+  /**
+   * Distinct email messages accepted in this bucket, counted at the message level (one per accepted send regardless of how many recipients it addresses). Every other metric in `delivery` and `engagement` is recipient-level or event-level.
+   *
+   */
+  readonly sends_accepted: number;
+  readonly delivery: EmailDeliveryStats;
+  readonly engagement: EmailEngagementStats;
+  readonly latency: EmailLatencyStats;
+};
+
+/**
+ * Metric to rank breakdown rows by, applied descending. Shared by the breakdowns whose rows have the full delivery, engagement, and latency block: tags, sending domains, categories, recipient domains, templates, and broadcasts. Any count or rate can be used. A row whose rate is undefined, because its denominator was zero, sorts last. A bounce sub-type is nested under `bounces` in each row, so its sort name reflects that, for example `bounces.hard` and `bounces.hard_rate`. `oob_bounces` is distinct from `bounced`: it counts out-of-band bounces, failure notifications that arrive after delivery was already confirmed.
+ *
+ */
+export type EmailStatsSortMetric =
+  | "processed"
+  | "delivered"
+  | "bounced"
+  | "complained"
+  | "deferred"
+  | "rejected"
+  | "oob_bounces"
+  | "bounces.hard"
+  | "bounces.soft"
+  | "bounces.admin"
+  | "bounces.block"
+  | "bounces.undetermined"
+  | "opens"
+  | "opens_non_prefetched"
+  | "unique_opens"
+  | "unique_opens_non_prefetched"
+  | "clicks"
+  | "unique_clicks"
+  | "unsubscribes"
+  | "delivery_rate"
+  | "bounce_rate"
+  | "complaint_rate"
+  | "open_rate"
+  | "click_rate"
+  | "unsubscribe_rate"
+  | "bounces.hard_rate"
+  | "bounces.soft_rate"
+  | "bounces.admin_rate"
+  | "bounces.block_rate"
+  | "bounces.undetermined_rate";
+
+/**
+ * The date range this response was actually computed against. Echoed back so clients can render the period without tracking it themselves and so cached responses can be keyed by what was queried.
+ *
+ */
+export type EmailStatsPeriod = {
+  /**
+   * Inclusive start date the response covers (YYYY-MM-DD).
+   */
+  readonly from: string;
+  /**
+   * Inclusive end date the response covers (YYYY-MM-DD).
+   */
+  readonly to: string;
+  /**
+   * The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.
+   *
+   */
+  readonly data_as_of?: string | null;
+};
+
+export type IpPoolId = string;
+
+/**
+ * Delivery counts and rates for messages attributed to a single sending IP. Per-IP results omit `accepted` and `processed` counts. The sending IP becomes known only after a message is delivered, bounced, deferred, or bounced late. Those earlier lifecycle states cannot be attributed to a specific IP. Spam complaints and out-of-band bounce notifications also lack per-IP attribution on this breakdown. The `complained` and `oob_bounces` fields therefore read 0. Their rates read 0 when the denominator is non-zero and null when it is zero. The `effective_delivered` field equals `delivered`, and `all_bounces` equals `bounced`.
+ *
+ */
+export type EmailSendingIpDeliveryStats = {
+  /**
+   * Distinct recipients whose message the receiving mail server accepted.
+   */
+  readonly delivered: number;
+  /**
+   * Distinct recipients whose delivery failed. This is approximately the sum of the five `bounces.*` sub-counts (hard, soft, admin, block, undetermined). The two are computed independently, so they can differ slightly.
+   */
+  readonly bounced: number;
+  /**
+   * Distinct recipients who reported the message as spam. Complaints are not attributed to a sending IP, so this reads 0 on this breakdown. Read complaint counts from the summary or time-series statistics instead.
+   */
+  readonly complained: number;
+  /**
+   * Distinct recipients in transient delivery deferral that is still being retried.
+   */
+  readonly deferred: number;
+  /**
+   * Out-of-band bounce events: failure notifications received after the receiving server had initially confirmed delivery. Not attributed to a sending IP on this breakdown, so this reads 0. Workspace-wide out-of-band counts are on the summary and time-series statistics.
+   *
+   */
+  readonly oob_bounces: number;
+  /**
+   * Recipients on this IP who remain delivered after all bounce signals resolve, computed as `delivered - oob_bounces`. Clamped to 0 when `oob_bounces` exceeds `delivered`.
+   */
+  readonly effective_delivered: number;
+  /**
+   * Total recipients on this IP who did not receive the message, computed as `bounced + oob_bounces`.
+   */
+  readonly all_bounces: number;
+  /**
+   * Share of this IP's delivery attempts that resulted in an out-of-band bounce, computed as `oob_bounces / (delivered + bounced)`. Null when `delivered + bounced` is zero (no attempts).
+   */
+  readonly oob_rate: number | null;
+  readonly bounces: EmailBounceStatsWithRates;
+  /**
+   * Share of this IP's delivery attempts that remained delivered after all bounce signals, computed as `effective_delivered / (delivered + bounced)`. Null when `delivered + bounced` is zero.
+   *
+   */
+  readonly delivery_rate: number | null;
+  /**
+   * Share of this IP's delivery attempts that ultimately failed (inband or out-of-band), computed as `all_bounces / (delivered + bounced)`. Null when `delivered + bounced` is zero (no attempts).
+   *
+   */
+  readonly bounce_rate: number | null;
+  /**
+   * Share of effectively delivered recipients on this IP who reported the message as spam, computed as `complained / effective_delivered`. Null when `effective_delivered` is zero.
+   *
+   */
+  readonly complaint_rate: number | null;
+};
+
+/**
+ * Latency percentiles (p50, p95, p99) in milliseconds for the messages in this breakdown row, for breakdowns whose dimension is known only from delivery onward (sending IP, mailbox provider).
+ *
+ * - `delivery`: Time from handing the message off to the receiving mail server accepting it. Null when no deliveries occurred for this row in the period.
+ * - `total`: End-to-end time from accepting the send to delivery. Null when no deliveries occurred for this row in the period.
+ *
+ * These breakdowns have no `processing` latency family. A message's row identifies which sending IP carried it or which mailbox provider received it. This becomes known only after the receiving mail server reports a delivery, bounce, deferral, or late bounce. The accept-to-processed phase ends before that attribution is known, preventing row-level processing latency. Use `GET /v1/email/stats/daily` for processing-latency percentiles across the whole workspace.
+ *
+ */
+export type EmailDeliveryLatencyStats = {
+  delivery: EmailLatencyQuantiles;
+  total: EmailLatencyQuantiles;
+};
+
+/**
+ * One point in a breakdown row's trend series: the headline delivery and engagement rates for that row's dimension value over a single day or hour. Returned only when `include_trend=true`. The bucket grain (day or hour) follows the `trend_grain` parameter. Counts and rates are approximate at scale.
+ *
+ */
+export type EmailStatsSeriesPoint = {
+  /**
+   * The day (YYYY-MM-DD) or hour (ISO 8601, on the hour) this point covers, matching the requested `trend_grain`.
+   */
+  readonly bucket: string;
+  /**
+   * Delivered recipients in this bucket.
+   */
+  readonly delivered: number;
+  /**
+   * Bounced recipients in this bucket.
+   */
+  readonly bounced: number;
+  /**
+   * Delivery rate for this bucket, as a fraction. Null when nothing was delivered or bounced.
+   */
+  readonly delivery_rate: number | null;
+  /**
+   * Bounce rate for this bucket, as a fraction. Null when nothing was delivered or bounced.
+   */
+  readonly bounce_rate: number | null;
+  /**
+   * Complaint rate for this bucket, as a fraction. Event-time attribution can push it above 1 when complaints outrun the bucket's deliveries. Null when nothing was delivered in the bucket. On a sending-IP row complaints are not attributed to the IP, so this reads 0 in buckets that had deliveries and null in buckets that had none.
+   */
+  readonly complaint_rate: number | null;
+  /**
+   * Open rate for this bucket, as a fraction. Event-time attribution can push it above 1 when opens outrun the bucket's deliveries. Null when nothing was delivered in the bucket. On a sending-IP row engagement is not attributed to the IP, so this reads 0 in buckets that had deliveries and null in buckets that had none.
+   */
+  readonly open_rate: number | null;
+  /**
+   * Click rate for this bucket, as a fraction. Event-time attribution can push it above 1 when clicks outrun the bucket's deliveries. Null when nothing was delivered in the bucket. On a sending-IP row engagement is not attributed to the IP, so this reads 0 in buckets that had deliveries and null in buckets that had none.
+   */
+  readonly click_rate: number | null;
+};
+
+/**
+ * Aggregate delivery and engagement stats for a single tag name-and-value pair over the requested period.
+ */
+export type EmailTagStatsPoint = {
+  /**
+   * The tag this row aggregates, formatted as `name:value` from the tag set at send time (for example `campaign:welcome-series`). Each distinct name-and-value pair is its own row.
+   *
+   */
+  readonly tag: string;
+  readonly delivery: EmailDeliveryStats;
+  readonly engagement: EmailEngagementStats;
+  readonly latency: EmailLatencyStats;
+  /**
+   * Per-bucket rate series for this tag over the window. Present only when `include_trend=true`.
+   */
+  readonly trend?: Array<EmailStatsSeriesPoint>;
+};
+
+/**
+ * Per-tag breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
+ */
+export type EmailStatsTagsResponse = {
+  /**
+   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: EmailStatsPeriod;
+  /**
+   * Tag breakdown rows, ranked by the `sort` metric (default `processed`) descending. Empty when no tagged sends occurred in the period.
+   */
+  readonly data: Array<EmailTagStatsPoint>;
+  /**
+   * Total number of distinct tags (name and value pairs) with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
+   *
+   */
+  readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
+export type EmailBroadcastId = string;
+
+export type EmailTemplateId = string;
+
+/**
+ * Metric to rank rows by, applied descending. Shared by every breakdown whose attribution begins at delivery, so `processed`, `rejected`, and `oob_bounces` are not part of those rows and are not sortable. Any count or rate on the row can be used; rows whose rate is undefined (zero denominator) sort last. Bounce sub-types use their nested location in each row, for example `bounces.hard` and `bounces.hard_rate`.
+ *
+ */
+export type EmailMailboxProviderSortMetric =
+  | "delivered"
+  | "bounced"
+  | "complained"
+  | "deferred"
+  | "bounces.hard"
+  | "bounces.soft"
+  | "bounces.admin"
+  | "bounces.block"
+  | "bounces.undetermined"
+  | "opens"
+  | "opens_non_prefetched"
+  | "unique_opens"
+  | "unique_opens_non_prefetched"
+  | "clicks"
+  | "unique_clicks"
+  | "unsubscribes"
+  | "delivery_rate"
+  | "bounce_rate"
+  | "complaint_rate"
+  | "open_rate"
+  | "click_rate"
+  | "unsubscribe_rate"
+  | "bounces.hard_rate"
+  | "bounces.soft_rate"
+  | "bounces.admin_rate"
+  | "bounces.block_rate"
+  | "bounces.undetermined_rate";
+
+/**
+ * Delivery counts and rates for messages attributed to a single recipient mailbox provider. Per-provider results do not include `accepted` or `processed` counts, because we only learn the recipient's mailbox provider once the receiving mail server reports delivery, a bounce, a deferral, or a late bounce. Earlier lifecycle states (accepted, processed) cannot be attributed to a specific provider.
+ *
+ */
+export type EmailMailboxProviderDeliveryStats = {
+  /**
+   * Distinct recipients whose message the receiving mail server accepted.
+   */
+  readonly delivered: number;
+  /**
+   * Distinct recipients whose delivery failed. Approximately the sum of the five `bounces.*` sub-counts (hard, soft, admin, block, undetermined); the totals are computed independently so they may differ slightly at the approximation error.
+   */
+  readonly bounced: number;
+  /**
+   * Distinct recipients who reported the message as spam.
+   */
+  readonly complained: number;
+  /**
+   * Distinct recipients in transient delivery deferral that is still being retried.
+   */
+  readonly deferred: number;
+  readonly bounces: EmailBounceStatsWithRates;
+  /**
+   * Share of attempted recipients on this mailbox provider that were delivered, computed as `delivered / (delivered + bounced)`. Null when `delivered + bounced` is zero (no attempts).
+   *
+   */
+  readonly delivery_rate: number | null;
+  /**
+   * Share of attempted recipients on this mailbox provider that bounced, computed as `bounced / (delivered + bounced)`. Null when `delivered + bounced` is zero (no attempts).
+   *
+   */
+  readonly bounce_rate: number | null;
+  /**
+   * Share of delivered recipients on this mailbox provider who reported the message as spam, computed as `complained / delivered`. Null when `delivered` is zero.
+   *
+   */
+  readonly complaint_rate: number | null;
+};
+
+/**
+ * Delivery, engagement, and deliverability stats for messages grouped by a single recipient mailbox provider (`gmail`, `microsoft`, `yahoo`, `apple`, ...) over the requested period. We learn a recipient's mailbox provider from the receiving mail server. Per-provider rows therefore cover the delivery stage onward. They omit the `accepted` and `processed` counts and the `processing` latency family. These fields are absent rather than null. Engagement (opens and clicks, and their rates) is included because those events happen after delivery, once the mailbox provider is already known.
+ *
+ */
+export type EmailMailboxProviderStatsPoint = {
+  /**
+   * The recipient mailbox provider this row aggregates, as a lowercase classifier such as `gmail`, `yahoo`, `microsoft`, or `apple`. New classifiers may be added over time.
+   */
+  readonly mailbox_provider: string;
+  readonly delivery: EmailMailboxProviderDeliveryStats;
+  readonly engagement: EmailEngagementStats;
+  readonly latency: EmailDeliveryLatencyStats;
+  /**
+   * Per-bucket rate series for this mailbox provider over the window. Present only when `include_trend=true`.
+   */
+  readonly trend?: Array<EmailStatsSeriesPoint>;
+};
+
+/**
+ * Per-mailbox-provider breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).
+ */
+export type EmailStatsByMailboxProviderResponse = {
+  /**
+   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: EmailStatsPeriod;
+  /**
+   * Mailbox-provider breakdown rows, ranked by the `sort` metric (default `delivered`) descending. Empty when no eligible activity occurred in the period.
+   */
+  readonly data: Array<EmailMailboxProviderStatsPoint>;
+  /**
+   * Total number of distinct mailbox providers with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
+   *
+   */
+  readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
+/**
+ * Aggregate delivery, engagement, and latency stats for messages sent to a single recipient mailbox domain over the requested period.
+ */
+export type EmailRecipientDomainStatsPoint = {
+  /**
+   * The recipient mailbox domain this row aggregates (the part of the recipient address after the `@`), normalized to lowercase.
+   */
+  readonly recipient_domain: string;
+  readonly delivery: EmailDeliveryStats;
+  readonly engagement: EmailEngagementStats;
+  readonly latency: EmailLatencyStats;
+  /**
+   * Per-bucket rate series for this recipient domain over the window. Present only when `include_trend=true`.
+   */
+  readonly trend?: Array<EmailStatsSeriesPoint>;
+};
+
+/**
+ * Per-recipient-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
+ */
+export type EmailStatsByRecipientDomainResponse = {
+  /**
+   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: EmailStatsPeriod;
+  /**
+   * Recipient-domain breakdown rows, ranked by the `sort` metric (default `processed`) descending. Empty when no eligible activity occurred in the period.
+   */
+  readonly data: Array<EmailRecipientDomainStatsPoint>;
+  /**
+   * Total number of distinct recipient domains with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
+   *
+   */
+  readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
+/**
+ * Breakdown of `bounced` by failure type. Each field counts distinct bounced recipients of that type in this row's scope; the five types approximately partition `bounced`.
+ *
+ */
+export type EmailBounceStats = {
+  /**
+   * Distinct recipients with a permanent delivery failure (invalid address or non-existent domain). The address is automatically added to the suppression list.
+   *
+   */
+  readonly hard: number;
+  /**
+   * Distinct recipients with a transient delivery failure (mailbox full or server temporarily unavailable). Delivery was retried.
+   *
+   */
+  readonly soft: number;
+  /**
+   * Distinct recipients refused by a policy at the receiving end, such as relaying denied or a blocklisted domain. Fix these by changing your content or sender configuration. Cleaning the recipient list does not usually help.
+   *
+   */
+  readonly admin: number;
+  /**
+   * Distinct recipients bounced because the receiving mail server blocked the sending IP for reputation reasons (mail block, spam block, spam content). Triage usually focuses on IP reputation and sending volume.
+   *
+   */
+  readonly block: number;
+  /**
+   * Distinct recipients bounced where the receiving server's response did not allow precise classification.
+   *
+   */
+  readonly undetermined: number;
+};
+
+/**
+ * Bounce counts for a single SMTP status code over the requested period, with the per-type breakdown. This is a deliverability-debugging view keyed on what the receiving mail server returned, so it only reports the failure side: bounced recipients, and their `hard`, `soft`, `admin`, `block`, and `undetermined` split. It has no delivered, open, or rate fields.
+ *
+ */
+export type EmailBounceCodeStatsPoint = {
+  /**
+   * The SMTP error code the receiving mail server returned for these bounces, as reported by that server (for example `5.1.1` for an unknown recipient, `4.2.2` for a full mailbox). The form varies by server, and the set of codes is open.
+   */
+  readonly smtp_error_code: string;
+  /**
+   * Distinct recipients whose delivery failed with this SMTP status code, approximately equal to the sum of the five `bounces.*` sub-counts. The two are computed independently, so they can differ slightly because of approximation.
+   */
+  readonly bounced: number;
+  readonly bounces: EmailBounceStats;
+};
+
+/**
+ * Per-SMTP-code bounce breakdown for the requested period, ranked by the `sort` metric (default `bounced`) descending and paginated with the requested `limit` (default 50, max 200).
+ */
+export type EmailStatsByBounceCodeResponse = {
+  /**
+   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: EmailStatsPeriod;
+  /**
+   * Bounce-code breakdown rows, ranked by the `sort` metric (default `bounced`) descending. Empty when no bounces occurred in the period.
+   */
+  readonly data: Array<EmailBounceCodeStatsPoint>;
+  /**
+   * Total number of distinct SMTP error codes with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
+   *
+   */
+  readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
+/**
+ * Complaint counts for a single feedback-loop complaint type over the requested period. A complaint type is recorded only on spam-complaint events, so this breakdown reports the complained count for each type and nothing else. A complaint event has no delivery or engagement information attached to it, so no other count applies.
+ *
+ */
+export type EmailComplaintTypeStatsPoint = {
+  /**
+   * The complaint classification reported by the mailbox provider's feedback loop, in the abuse-reporting-format vocabulary (for example `abuse`, `fraud`, `virus`, `other`). The set is open.
+   */
+  readonly feedback_type: string;
+  /**
+   * Distinct recipients who reported a message as spam with this complaint type at any point in the period.
+   */
+  readonly complained: number;
+};
+
+/**
+ * Per-complaint-type breakdown for the requested period, ranked by `complained` descending and paginated with the requested `limit` (default 50, max 200).
+ */
+export type EmailStatsByComplaintTypeResponse = {
+  /**
+   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: EmailStatsPeriod;
+  /**
+   * Complaint-type breakdown rows, ranked by `complained` descending. Empty when no complaints occurred in the period.
+   */
+  readonly data: Array<EmailComplaintTypeStatsPoint>;
+  /**
+   * Total number of distinct feedback types with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
+   *
+   */
+  readonly total: number;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
+/**
+ * The window the server actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants on the hour). The grain of `from` and `to` mirrors the grain of the request's bounds.
+ *
+ */
+export type SmsStatsSummaryPeriod = {
+  /**
+   * Inclusive start of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.
+   */
+  readonly from: string;
+  /**
+   * Inclusive end of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.
+   */
+  readonly to: string;
+  /**
+   * Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.
+   *
+   */
+  readonly data_as_of?: string | null;
+};
+
+/**
+ * SMS lifecycle counts and rates for a whole period or breakdown. Counts use the message send time, so a later delivery stays attributed to the bucket in which the message was sent. Rates are null when their denominator is zero.
+ *
+ */
+export type SmsDeliveryStats = {
+  /**
+   * Distinct messages accepted for sending after admission checks. This is the denominator for `delivery_rate` and `failure_rate`.
+   */
+  readonly accepted: number;
+  /**
+   * Distinct messages handed off to the carrier for delivery.
+   */
+  readonly sent: number;
+  /**
+   * Distinct messages the carrier confirmed as delivered to the handset.
+   */
+  readonly delivered: number;
+  /**
+   * Distinct messages the carrier reported as not delivered.
+   */
+  readonly undelivered: number;
+  /**
+   * Distinct messages that failed during sending.
+   */
+  readonly failed: number;
+  /**
+   * Distinct messages rejected before any send attempt, for example by sending policy or a message-generation failure.
+   */
+  readonly rejected: number;
+  /**
+   * Distinct messages that could not be delivered within their validity window and expired.
+   */
+  readonly expired: number;
+  /**
+   * Share of accepted messages that were delivered, computed as `delivered / accepted`. Null when no messages were accepted in scope.
+   *
+   */
+  readonly delivery_rate: number | null;
+  /**
+   * Share of accepted messages that ultimately failed, computed as `(undelivered + failed + expired) / accepted`. Null when no messages were accepted in scope.
+   *
+   */
+  readonly failure_rate: number | null;
+};
+
+/**
+ * Approximate p50, p95, and p99 latency percentiles in milliseconds for one latency family. All three are null when no qualifying event contributed a measurement.
+ *
+ */
+export type SmsLatencyQuantiles = {
+  /**
+   * Median (50th percentile) latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p50_ms: number | null;
+  /**
+   * 95th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p95_ms: number | null;
+  /**
+   * 99th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p99_ms: number | null;
+};
+
+/**
+ * Latency percentiles in milliseconds for the requested scope:
+ *
+ * - `processing`: From acceptance to carrier handoff.
+ * - `delivery`: From carrier handoff to delivery confirmation.
+ * - `total`: From acceptance to delivery confirmation.
+ *
+ * Each family is omitted when no qualifying event contributes a measurement.
+ * Individual percentiles can also be null.
+ *
+ */
+export type SmsLatencyStats = {
+  processing?: SmsLatencyQuantiles;
+  delivery?: SmsLatencyQuantiles;
+  total?: SmsLatencyQuantiles;
+};
+
+/**
+ * Changes from the previous period. A `*_pct_change` value is the signed relative change `(current - previous) / previous` and is null when the previous count is zero. A `*_rate_pp` value is the signed difference between rate fractions and is null when either rate is undefined.
+ *
+ */
+export type SmsStatsComparisonDelta = {
+  /**
+   * Relative change in accepted messages (`delivery.accepted`) versus the previous period, as a signed fraction. Null when the previous period accepted none.
+   */
+  readonly accepted_pct_change: number | null;
+  /**
+   * Relative change in sent messages (`delivery.sent`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly sent_pct_change: number | null;
+  /**
+   * Relative change in delivered messages (`delivery.delivered`) versus the previous period, as a signed fraction. Null when the previous period delivered none.
+   */
+  readonly delivered_pct_change: number | null;
+  /**
+   * Relative change in undelivered messages (`delivery.undelivered`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly undelivered_pct_change: number | null;
+  /**
+   * Relative change in failed messages (`delivery.failed`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly failed_pct_change: number | null;
+  /**
+   * Relative change in rejected messages (`delivery.rejected`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly rejected_pct_change: number | null;
+  /**
+   * Relative change in expired messages (`delivery.expired`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly expired_pct_change: number | null;
+  /**
+   * Signed difference between this period's and the previous period's delivery rate, both fractions in [0,1] (multiply by 100 for percentage points). Null when either period's delivery rate is undefined.
+   */
+  readonly delivery_rate_pp: number | null;
+  /**
+   * Signed difference between the current and previous failure-rate fractions. Multiply by 100 for percentage points. The value can fall outside `[-1, 1]` because a message can contribute to more than one failure outcome and high-volume counts are approximate. Null when either rate is undefined.
+   *
+   */
+  readonly failure_rate_pp: number | null;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type SmsStatsComparison = {
+  /**
+   * Equal-length window ending immediately before the requested start.
+   */
+  period: SmsStatsSummaryPeriod;
+  readonly delivery: SmsDeliveryStats;
+  readonly latency: SmsLatencyStats;
+  readonly delta: SmsStatsComparisonDelta;
+};
+
+/**
+ * Single-row aggregate across the full requested period, covering SMS lifecycle counts plus the derived delivery and failure rates, and latency percentiles. Use this endpoint for KPI tiles and reporting; the daily and hourly endpoints carry the same counts per bucket.
+ *
+ * Every count is a sum of per-bucket counts across the window. Latency percentiles are computed across the whole period rather than summed per bucket. Rates are null when their denominator is zero.
+ *
+ */
+export type SmsStatsSummary = {
+  /**
+   * The window the response covers (echoed back from the request, day or hour grain), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: SmsStatsSummaryPeriod;
+  readonly delivery: SmsDeliveryStats;
+  readonly latency: SmsLatencyStats;
+  readonly comparison?: SmsStatsComparison;
+};
+
+/**
+ * SMS lifecycle counts for a time bucket. Counts use the message send time, so a message accepted on Monday and delivered on Tuesday counts in Monday's bucket. Rates are available only for whole periods and breakdowns.
+ *
+ */
+export type SmsDeliveryCounts = {
+  /**
+   * Distinct messages accepted for sending after admission checks.
+   */
+  readonly accepted: number;
+  /**
+   * Distinct messages handed off to the carrier for delivery.
+   */
+  readonly sent: number;
+  /**
+   * Distinct messages the carrier confirmed as delivered to the handset.
+   */
+  readonly delivered: number;
+  /**
+   * Distinct messages the carrier reported as not delivered.
+   */
+  readonly undelivered: number;
+  /**
+   * Distinct messages that failed during sending.
+   */
+  readonly failed: number;
+  /**
+   * Distinct messages rejected before any send attempt, for example by sending policy or a message-generation failure.
+   */
+  readonly rejected: number;
+  /**
+   * Distinct messages that could not be delivered within their validity window and expired.
+   */
+  readonly expired: number;
+};
+
+/**
+ * SMS lifecycle counts for one time bucket (a calendar day or hour), bucketed by send time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. Per-bucket values include counts only. The summary and breakdown endpoints report rates and latency as whole-window aggregates.
+ *
+ */
+export type SmsStatsPoint = {
+  /**
+   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.
+   */
+  readonly bucket: string;
+  readonly delivery: SmsDeliveryCounts;
+};
+
+/**
+ * Metric to rank breakdown rows by, applied descending. Shared by the volume breakdowns whose rows carry the full delivery and latency block (originators, countries, categories, carriers). Any lifecycle count or derived rate may be used; rows whose rate is undefined (zero denominator) sort last.
+ *
+ */
+export type SmsStatsSortMetric =
+  | "accepted"
+  | "sent"
+  | "delivered"
+  | "undelivered"
+  | "failed"
+  | "rejected"
+  | "expired"
+  | "delivery_rate"
+  | "failure_rate";
+
+/**
+ * Aggregate delivery and latency stats for a single destination country over the requested period.
+ */
+export type SmsCountryStatsPoint = {
+  /**
+   * The destination country this row aggregates, as an ISO 3166-1 alpha-2 code.
+   */
+  readonly country: string;
+  readonly delivery: SmsDeliveryStats;
+  readonly latency: SmsLatencyStats;
+  /**
+   * Per-bucket lifecycle counts for this country, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.
+   */
+  readonly trend?: Array<SmsStatsPoint>;
+};
+
+/**
+ * Per-country breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByCountryResponse = {
+  /**
+   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: SmsStatsSummaryPeriod;
+  /**
+   * Country breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no messages were sent in the period.
+   */
+  readonly data: Array<SmsCountryStatsPoint>;
+  /**
+   * Total number of distinct destination countries with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   *
+   */
+  readonly total: number;
+};
+
+/**
+ * Aggregate delivery and latency stats for a single delivery carrier over the requested period.
+ */
+export type SmsCarrierStatsPoint = {
+  /**
+   * The delivery carrier this row aggregates, as resolved for the destination handset.
+   */
+  readonly carrier: string;
+  readonly delivery: SmsDeliveryStats;
+  readonly latency: SmsLatencyStats;
+  /**
+   * Per-bucket lifecycle counts for this carrier, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.
+   */
+  readonly trend?: Array<SmsStatsPoint>;
+};
+
+/**
+ * Per-carrier breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByCarrierResponse = {
+  /**
+   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: SmsStatsSummaryPeriod;
+  /**
+   * Carrier breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no messages were sent in the period.
+   */
+  readonly data: Array<SmsCarrierStatsPoint>;
+  /**
+   * Total number of distinct carriers with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   *
+   */
+  readonly total: number;
+};
+
+/**
+ * Aggregate delivery and latency stats for a single message category over the requested period.
+ */
+export type SmsCategoryStatsPoint = {
+  /**
+   * The category this row aggregates, as set at send time. `transactional` is one-to-one messaging triggered by a user action; `marketing` is bulk sending. New categories may be added over time.
+   */
+  readonly category: string;
+  readonly delivery: SmsDeliveryStats;
+  readonly latency: SmsLatencyStats;
+  /**
+   * Per-bucket lifecycle counts for this category, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.
+   */
+  readonly trend?: Array<SmsStatsPoint>;
+};
+
+/**
+ * Per-category breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByCategoryResponse = {
+  /**
+   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: SmsStatsSummaryPeriod;
+  /**
+   * Category breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no messages were sent in the period.
+   */
+  readonly data: Array<SmsCategoryStatsPoint>;
+  /**
+   * Total number of distinct categories with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   *
+   */
+  readonly total: number;
+};
+
+/**
+ * Aggregate delivery and latency stats for a single tag (`name:value`) over the requested period.
+ */
+export type SmsTagStatsPoint = {
+  /**
+   * The tag this row aggregates, in `name:value` form. Each distinct name-and-value pair is its own row, and a message carrying several tags is counted once under each of them, so rows do not sum to the period total.
+   *
+   */
+  readonly tag: string;
+  readonly delivery: SmsDeliveryStats;
+  readonly latency: SmsLatencyStats;
+  /**
+   * Per-bucket lifecycle-count series for this tag over the window, bucketed by `trend_grain`. Sparse, so only buckets with activity are present rather than zero-filled, unlike the daily and hourly series. Present only when `include_trend=true`.
+   *
+   */
+  readonly trend?: Array<SmsStatsPoint>;
+};
+
+/**
+ * Per-tag breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByTagResponse = {
+  /**
+   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: SmsStatsSummaryPeriod;
+  /**
+   * Tag breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no tagged messages were sent in the period.
+   */
+  readonly data: Array<SmsTagStatsPoint>;
+  /**
+   * Total number of distinct tags with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   *
+   */
+  readonly total: number;
+};
+
+/**
+ * Metric to rank breakdown rows by, applied descending. Shared by the breakdowns whose rows carry lifecycle counts only, with no derived rates to sort on.
+ *
+ */
+export type SmsStatsLifecycleSortMetric =
+  | "accepted"
+  | "sent"
+  | "delivered"
+  | "undelivered"
+  | "failed"
+  | "rejected"
+  | "expired";
+
+/**
+ * Standardized failure reason:
+ *
+ * - `invalid_destination`: The number is unassigned, ported out, or malformed.
+ * - `unreachable`: The handset is off or outside coverage.
+ * - `blocked_by_carrier`: The carrier filtered the message.
+ * - `blocked_by_fraud_protection`: Bird fraud protection blocked suspected SMS pumping.
+ * - `blocked_by_recipient`: The recipient device blocked the sender.
+ * - `landline_unreachable`: The destination is a landline that does not accept SMS.
+ * - `content_rejected`: The carrier rejected the content.
+ * - `sender_unregistered`: The sender is not registered for the destination.
+ * - `recipient_opted_out`: The recipient is on a suppression list.
+ * - `provider_unavailable`: The provider remained unavailable after retries.
+ * - `insufficient_balance`: The workspace wallet could not fund the send.
+ * - `unknown`: The failure could not be classified.
+ *
+ * This is an open enum. Accept unrecognized values.
+ *
+ */
+export type SmsErrorCode =
+  | "invalid_destination"
+  | "unreachable"
+  | "blocked_by_carrier"
+  | "blocked_by_fraud_protection"
+  | "blocked_by_recipient"
+  | "landline_unreachable"
+  | "content_rejected"
+  | "sender_unregistered"
+  | "recipient_opted_out"
+  | "provider_unavailable"
+  | "insufficient_balance"
+  | "unknown"
+  | (string & {});
+
+/**
+ * Delivery and latency statistics for one standardized failure reason over the requested period.
+ */
+export type SmsErrorCodeStatsPoint = {
+  /**
+   * Standardized failure reason this row aggregates. Matches the `error_code` message-list filter.
+   */
+  readonly error_code: SmsErrorCode;
+  readonly delivery: SmsDeliveryStats;
+  readonly latency: SmsLatencyStats;
+  /**
+   * Per-bucket lifecycle counts for this error code, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.
+   */
+  readonly trend?: Array<SmsStatsPoint>;
+};
+
+/**
+ * Per-error-code breakdown for the requested period, ranked by the `sort` metric (default `failed`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByErrorCodeResponse = {
+  /**
+   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: SmsStatsSummaryPeriod;
+  /**
+   * Error-code breakdown rows, ranked by the `sort` metric (default `failed`) descending. Empty when no delivery failures occurred in the period.
+   */
+  readonly data: Array<SmsErrorCodeStatsPoint>;
+  /**
+   * Total number of distinct error codes with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   *
+   */
+  readonly total: number;
+};
+
+/**
+ * The change from the preceding period to the requested one. The `received_pct_change` field is a signed relative change, computed as `(current - previous) / previous`. A value of `0.5` means 50% higher, and `-0.2` means 20% lower. The field is null when the previous period received none.
+ *
+ */
+export type SmsInboundStatsComparisonDelta = {
+  /**
+   * Relative change in received messages versus the previous period, as a signed fraction. Null when the previous period received none.
+   */
+  readonly received_pct_change: number | null;
+};
+
+/**
+ * The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type SmsInboundStatsComparison = {
+  /**
+   * Equal-length window ending immediately before the requested start.
+   */
+  period: SmsStatsSummaryPeriod;
+  /**
+   * Distinct messages received in the preceding period.
+   */
+  readonly received: number;
+  readonly delta: SmsInboundStatsComparisonDelta;
+};
+
+/**
+ * Total received messages over the requested period.
+ *
+ */
+export type SmsInboundStatsSummaryResponse = {
+  period: SmsStatsSummaryPeriod;
+  /**
+   * Distinct messages received in the period, counted by the time the carrier received them.
+   */
+  readonly received: number;
+  readonly comparison?: SmsInboundStatsComparison;
+};
+
+/**
+ * One time bucket of received-message counts, attributed by arrival time.
+ */
+export type SmsInboundStatsPoint = {
+  /**
+   * Start of the bucket this row covers, as a calendar day (YYYY-MM-DD) for the daily series or an hour boundary (RFC 3339) for the hourly one.
+   */
+  readonly bucket: string;
+  /**
+   * Distinct messages received in this bucket, counted by the time the carrier received them.
+   */
+  readonly received: number;
+};
+
+/**
+ * Received-message volume for one country.
+ *
+ */
+export type SmsInboundCountryStatsPoint = {
+  /**
+   * The country of the Bird number the messages arrived on, as an ISO 3166-1 alpha-2 code. This identifies where the message was received. It does not identify the sender's country.
+   */
+  readonly country: string;
+  /**
+   * Distinct messages received on numbers in this country during the period.
+   */
+  readonly received: number;
+};
+
+/**
+ * Received-message volume broken down by country, ranked by volume.
+ *
+ */
+export type SmsInboundStatsByCountryResponse = {
+  period: SmsStatsSummaryPeriod;
+  /**
+   * One row per country with activity in the period, most messages first, capped at the requested `limit`. A country with no messages in the period is absent rather than zero-filled, because unlike a time bucket it is not part of a continuous axis.
+   *
+   */
+  readonly data: Array<SmsInboundCountryStatsPoint>;
+  /**
+   * Total number of distinct countries the messages arrived in with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   */
+  readonly total: number;
+};
+
+/**
+ * Received-message volume for one mobile operator.
+ *
+ */
+export type SmsInboundOperatorStatsPoint = {
+  /**
+   * Mobile country code and mobile network code of the network the sending subscriber is on. The breakdown keys on this rather than on an operator name because the carrier reports a name only where a surcharge applies, which would leave most of the world in one unnamed bucket.
+   */
+  readonly mcc_mnc: string;
+  /**
+   * Distinct messages received from senders on this operator during the period.
+   */
+  readonly received: number;
+};
+
+/**
+ * Received-message volume broken down by operator, ranked by volume.
+ *
+ */
+export type SmsInboundStatsByOperatorResponse = {
+  period: SmsStatsSummaryPeriod;
+  /**
+   * One row per operator with activity in the period, most messages first, capped at the requested `limit`. An operator with no messages in the period is absent rather than zero-filled, because unlike a time bucket it is not part of a continuous axis.
+   *
+   */
+  readonly data: Array<SmsInboundOperatorStatsPoint>;
+  /**
+   * Total number of distinct sending operators with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   */
+  readonly total: number;
+};
+
+/**
+ * Meta's content classification for a template.
+ *
+ * - `authentication`: delivers one-time passcodes.
+ * - `utility`: delivers transaction-triggered updates (receipts, order status).
+ * - `marketing`: carries promotional content.
+ *
+ * The category determines the sender number and price. This is an open enum.
+ * Accept unrecognized values.
+ *
+ */
+export type WhatsAppTemplateCategory =
+  "authentication" | "utility" | "marketing" | (string & {});
+
+/**
+ * The window the server actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants on the hour). The grain of `from` and `to` mirrors the grain of the request's bounds.
+ *
+ */
+export type WhatsAppStatsSummaryPeriod = {
+  /**
+   * Inclusive start of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.
+   */
+  readonly from: string;
+  /**
+   * Inclusive end of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.
+   */
+  readonly to: string;
+  /**
+   * Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.
+   *
+   */
+  readonly data_as_of?: string | null;
+};
+
+/**
+ * WhatsApp lifecycle counts and rates for the requested period, attributed by send time, so a later delivery stays attributed to the period in which its message was accepted, and a recent period under-reports `delivered` while delivery reports are still arriving. The sibling `engagement` block reports read counts and rates. Rates are null when their denominator is zero. Very large counts are close estimates rather than exact tallies.
+ *
+ */
+export type WhatsAppDeliveryStats = {
+  /**
+   * Distinct messages accepted for sending after admission checks. This is the denominator for `delivery_rate` and `failure_rate`.
+   */
+  readonly accepted: number;
+  /**
+   * Distinct messages handed off for delivery.
+   */
+  readonly sent: number;
+  /**
+   * Distinct messages confirmed delivered to the recipient's device.
+   */
+  readonly delivered: number;
+  /**
+   * Distinct messages that failed during sending or delivery.
+   */
+  readonly failed: number;
+  /**
+   * Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, or the wallet could not fund the send. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.
+   */
+  readonly rejected: number;
+  /**
+   * Share of accepted messages that were delivered, computed as `delivered / accepted`. Null when no messages were accepted in scope.
+   *
+   */
+  readonly delivery_rate: number | null;
+  /**
+   * Share of accepted messages that ultimately failed, computed as `failed / accepted`. Null when no messages were accepted in scope.
+   *
+   */
+  readonly failure_rate: number | null;
+};
+
+/**
+ * WhatsApp engagement counts and the derived read rate for the scope of the containing row (the whole requested period or a breakdown dimension). The `read` field is the number of distinct messages confirmed read by the recipient. Send time determines attribution; the instant the read receipt arrived does not. A read is counted in the period its message was accepted in, alongside that message's own delivery when one arrived. The read rate divides reads by messages delivered in the same scope and is null when its denominator is zero. Very large counts are close estimates rather than exact tallies.
+ *
+ */
+export type WhatsAppEngagementStats = {
+  /**
+   * Distinct messages confirmed read by the recipient.
+   */
+  readonly read: number;
+  /**
+   * Distinct messages read relative to messages delivered in the same scope, computed as `read / delivery.delivered`. Both counts are attributed by send time, so a read is counted alongside its own message's delivery. The rate can exceed 1 where a read receipt arrived for a message whose delivery receipt did not, or, at high volume, because the counts are close estimates. Null when `delivery.delivered` is zero.
+   *
+   */
+  readonly read_rate: number | null;
+};
+
+/**
+ * Approximate p50, p95, and p99 latency percentiles in milliseconds for one latency family. All three are null when no qualifying event contributed a measurement.
+ *
+ */
+export type WhatsAppLatencyQuantiles = {
+  /**
+   * Median (50th percentile) latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p50_ms: number | null;
+  /**
+   * 95th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p95_ms: number | null;
+  /**
+   * 99th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p99_ms: number | null;
+};
+
+/**
+ * Latency percentiles in milliseconds for the requested scope:
+ *
+ * - `processing`: From acceptance to WhatsApp handoff.
+ * - `delivery`: From WhatsApp handoff to delivery confirmation.
+ * - `total`: From acceptance to delivery confirmation.
+ *
+ * Each family is omitted when no qualifying message contributes a measurement.
+ * Individual percentiles can also be null. `delivery` is measured on a best-effort basis, so
+ * it can be absent for a scope whose `processing` and `total` are present.
+ *
+ */
+export type WhatsAppLatencyStats = {
+  processing?: WhatsAppLatencyQuantiles;
+  delivery?: WhatsAppLatencyQuantiles;
+  total?: WhatsAppLatencyQuantiles;
+};
+
+/**
+ * Changes from the previous period. A `*_pct_change` value is the signed relative change `(current - previous) / previous` and is null when the previous count is zero. A `*_rate_pp` value is the signed difference between rate fractions and is null when either rate is undefined.
+ *
+ */
+export type WhatsAppStatsComparisonDelta = {
+  /**
+   * Relative change in accepted messages (`delivery.accepted`) versus the previous period, as a signed fraction. Null when the previous period accepted none.
+   */
+  readonly accepted_pct_change: number | null;
+  /**
+   * Relative change in sent messages (`delivery.sent`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly sent_pct_change: number | null;
+  /**
+   * Relative change in delivered messages (`delivery.delivered`) versus the previous period, as a signed fraction. Null when the previous period delivered none.
+   */
+  readonly delivered_pct_change: number | null;
+  /**
+   * Relative change in failed messages (`delivery.failed`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly failed_pct_change: number | null;
+  /**
+   * Relative change in rejected messages (`delivery.rejected`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly rejected_pct_change: number | null;
+  /**
+   * Relative change in messages read (`engagement.read`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly read_pct_change: number | null;
+  /**
+   * Signed difference between this period's and the previous period's delivery rate, both fractions in [0,1] (multiply by 100 for percentage points). Null when either period's delivery rate is undefined.
+   */
+  readonly delivery_rate_pp: number | null;
+  /**
+   * Signed difference between this period's and the previous period's failure rate, both fractions in [0,1] (multiply by 100 for percentage points). Null when either period's failure rate is undefined.
+   */
+  readonly failure_rate_pp: number | null;
+  /**
+   * Signed difference between the current and previous read-rate fractions. Multiply by 100 for percentage points. The value can fall outside `[-1, 1]` because a read receipt can arrive for a message whose delivery receipt did not, and high-volume counts are approximate. Null when either rate is undefined.
+   *
+   */
+  readonly read_rate_pp: number | null;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type WhatsAppStatsComparison = {
+  /**
+   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows). For a request covering 2026-05-01 to 2026-05-25, this is 2026-04-06 to 2026-04-30, both inclusive.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  readonly delivery: WhatsAppDeliveryStats;
+  readonly engagement: WhatsAppEngagementStats;
+  readonly latency: WhatsAppLatencyStats;
+  readonly delta: WhatsAppStatsComparisonDelta;
+};
+
+/**
+ * WhatsApp lifecycle counts, rates, engagement, and latency percentiles for the full requested period. Counts aggregate the time buckets. Latency percentiles cover the whole period. Rates are null when their denominator is zero.
+ *
+ */
+export type WhatsAppStatsSummary = {
+  /**
+   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  readonly delivery: WhatsAppDeliveryStats;
+  readonly engagement: WhatsAppEngagementStats;
+  readonly latency: WhatsAppLatencyStats;
+  readonly comparison?: WhatsAppStatsComparison;
+};
+
+/**
+ * WhatsApp lifecycle counts for a time bucket, attributed by send time. A message accepted on Monday and delivered on Tuesday counts in Monday's bucket. The sibling `engagement` block reports read counts. Rates are available only for the whole period. Very large counts are close estimates rather than exact tallies.
+ *
+ */
+export type WhatsAppDeliveryCounts = {
+  /**
+   * Distinct messages accepted for sending after admission checks.
+   */
+  readonly accepted: number;
+  /**
+   * Distinct messages handed off for delivery.
+   */
+  readonly sent: number;
+  /**
+   * Distinct messages confirmed delivered to the recipient's device.
+   */
+  readonly delivered: number;
+  /**
+   * Distinct messages that failed during sending or delivery.
+   */
+  readonly failed: number;
+  /**
+   * Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, or the wallet could not fund the send. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.
+   */
+  readonly rejected: number;
+};
+
+/**
+ * WhatsApp engagement counts for a time bucket, attributed by send time. A message accepted on Monday and read on Tuesday counts in Monday's bucket. Read rates are available only for the whole period. Very large counts are close estimates rather than exact tallies.
+ *
+ */
+export type WhatsAppEngagementCounts = {
+  /**
+   * Distinct messages confirmed read by the recipient.
+   */
+  readonly read: number;
+};
+
+/**
+ * WhatsApp lifecycle counts, engagement, and latency percentiles for one time bucket (a calendar day or hour), bucketed by send time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. Rates apply to the whole window rather than individual buckets.
+ *
+ */
+export type WhatsAppStatsPoint = {
+  /**
+   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.
+   */
+  readonly bucket: string;
+  readonly delivery: WhatsAppDeliveryCounts;
+  readonly engagement: WhatsAppEngagementCounts;
+  readonly latency: WhatsAppLatencyStats;
+};
+
+export type WhatsAppTemplateId = string;
+
+/**
+ * Lifecycle counts, derived rates, and engagement for a single WhatsApp template category over the requested period.
+ */
+export type WhatsAppTemplateCategoryStatsPoint = {
+  /**
+   * The template category this row aggregates.
+   */
+  readonly category: WhatsAppTemplateCategory;
+  readonly delivery: WhatsAppDeliveryStats;
+  readonly engagement: WhatsAppEngagementStats;
+  readonly latency: WhatsAppLatencyStats;
+};
+
+/**
+ * Per-template-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByTemplateCategoryResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Category rows ranked by accepted volume descending.
+   */
+  readonly data: Array<WhatsAppTemplateCategoryStatsPoint>;
+  /**
+   * Total distinct categories with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Lifecycle counts, derived rates, and engagement for a single tag (name:value) over the requested period.
+ */
+export type WhatsAppTagStatsPoint = {
+  /**
+   * The tag this row aggregates, in `name:value` form.
+   */
+  readonly tag: string;
+  readonly delivery: WhatsAppDeliveryStats;
+  readonly engagement: WhatsAppEngagementStats;
+  readonly latency: WhatsAppLatencyStats;
+};
+
+/**
+ * Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByTagResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Tag rows ranked by accepted volume descending.
+   */
+  readonly data: Array<WhatsAppTagStatsPoint>;
+  /**
+   * Total distinct tags with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Lifecycle counts, derived rates, engagement and latency for a single destination country over the requested period.
+ */
+export type WhatsAppCountryStatsPoint = {
+  /**
+   * The destination country this row aggregates, as an ISO 3166-1 alpha-2 code. `ZZ` collects recipients whose country could not be resolved.
+   */
+  readonly country: CountryCode;
+  readonly delivery: WhatsAppDeliveryStats;
+  readonly engagement: WhatsAppEngagementStats;
+  readonly latency: WhatsAppLatencyStats;
+};
+
+/**
+ * Per-country breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ *
+ */
+export type WhatsAppStatsByCountryResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Country rows ranked by accepted volume descending. Empty when no eligible activity occurred in the period; rows sum to the summary less group-send volume, and less any pre-cutover phone-addressed sends still inside the window.
+   *
+   */
+  readonly data: Array<WhatsAppCountryStatsPoint>;
+  /**
+   * Total distinct countries with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Standardized failure reason:
+ *
+ * - `insufficient_balance`: The workspace wallet could not fund the send.
+ * - `price_not_found`: No price was configured for the destination and template.
+ * - `internal_error`: An unexpected service failure occurred.
+ * - `undeliverable`: The recipient could not be reached.
+ * - `service_window_expired`: The 24-hour service window closed; send a template.
+ * - `rate_limited`: The send was throttled.
+ * - `recipient_suppressed`: The recipient is on the workspace suppression list.
+ * - `media_rejected`: WhatsApp could not fetch the media URL, or refused the file it found there; `description` carries its reason.
+ *
+ * This is an open enum. Accept unrecognized values.
+ *
+ */
+export type WhatsAppErrorCode =
+  | "insufficient_balance"
+  | "price_not_found"
+  | "internal_error"
+  | "undeliverable"
+  | "service_window_expired"
+  | "rate_limited"
+  | "recipient_suppressed"
+  | "media_rejected"
+  | (string & {});
+
+/**
+ * Number of failed messages for a single normalized failure reason over the requested period.
+ */
+export type WhatsAppErrorCodeStatsPoint = {
+  /**
+   * The normalized failure reason this row aggregates, matching the `last_error.code` reported on an individual failed message.
+   */
+  readonly error_code: WhatsAppErrorCode;
+  /**
+   * Distinct messages that failed with this reason in scope.
+   */
+  readonly count: number;
+};
+
+/**
+ * Per-error-code failure breakdown for the requested period, ranked by failure count descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByErrorCodeResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Error-code rows ranked by failure count descending. Empty when no failures occurred in the period.
+   */
+  readonly data: Array<WhatsAppErrorCodeStatsPoint>;
+  /**
+   * Total distinct error codes with failures in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * The change from the preceding period to the requested one. The `received_pct_change` field is a signed relative change, computed as `(current - previous) / previous`. A value of `0.5` means 50% higher, and `-0.2` means 20% lower. The field is null when the previous period received none.
+ *
+ */
+export type WhatsAppInboundStatsComparisonDelta = {
+  /**
+   * Relative change in received messages versus the previous period, as a signed fraction. Null when the previous period received none.
+   */
+  readonly received_pct_change: number | null;
+};
+
+/**
+ * The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type WhatsAppInboundStatsComparison = {
+  /**
+   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows). For a request covering 2026-05-01 to 2026-05-25, this is 2026-04-06 to 2026-04-30, both inclusive.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Distinct messages received in the preceding period.
+   */
+  readonly received: number;
+  readonly delta: WhatsAppInboundStatsComparisonDelta;
+};
+
+/**
+ * Total received messages for the requested period.
+ *
+ */
+export type WhatsAppInboundStatsSummaryResponse = {
+  /**
+   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: WhatsAppStatsSummaryPeriod;
+  /**
+   * Distinct messages received in the period, counted by the time each message reached your number. Computed across the whole window rather than summed from the daily or hourly series, so it can sit slightly below the sum of those rows.
+   */
+  readonly received: number;
+  readonly comparison?: WhatsAppInboundStatsComparison;
+};
+
+/**
+ * Received-message count for one time bucket (a calendar day or hour), bucketed by the time each message reached your number.
+ *
+ */
+export type WhatsAppInboundStatsPoint = {
+  /**
+   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the request's grain.
+   */
+  readonly bucket: string;
+  /**
+   * Distinct messages received in this bucket.
+   */
+  readonly received: number;
+};
+
+export type AmbBusinessId = string;
+
+/**
+ * Derived message classification for filtering and statistics. Send requests use the native content.type families. Create Apple Pay and authentication requests through the conversation payment and authentication operations.
+ *
+ * - text: Text, optionally with a subject.
+ * - attachment: One or more files, images, audio clips, or videos.
+ * - rich_link: A link with a preview card.
+ * - quick_reply: Two to five reply choices.
+ * - list_picker: A grouped menu of choices.
+ * - time_picker: Appointment time slots; a reply may contain only a selected label.
+ * - form: A multi-page form.
+ * - imessage_app: A custom iMessage app interaction on a compatible device.
+ * - interactive: An opaque interactive reference whose subtype is unknown.
+ * - apple_pay: An Apple Pay request created through the conversation payment operations.
+ * - authenticate: An identity verification request created through the conversation authentication operations.
+ */
+export type AmbContentKind =
+  | "text"
+  | "attachment"
+  | "rich_link"
+  | "quick_reply"
+  | "list_picker"
+  | "time_picker"
+  | "form"
+  | "apple_pay"
+  | "authenticate"
+  | "imessage_app"
+  | "interactive";
+
+/**
+ * The window the server actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants on the hour). The grain of `from` and `to` mirrors the grain of the request's bounds.
+ *
+ */
+export type AmbStatsSummaryPeriod = {
+  /**
+   * Inclusive start of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary. Historical starts are preserved; the maximum request length does not impose a historical cutoff.
+   */
+  readonly from: string;
+  /**
+   * Inclusive end of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.
+   */
+  readonly to: string;
+  /**
+   * Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.
+   *
+   */
+  readonly data_as_of?: string | null;
+};
+
+/**
+ * Which timestamp a statistics response buckets its rows and totals by:
+ *
+ * - `accepted_time`: attributed to when Bird accepted the outbound message for sending. The outbound send statistics use this, so a later event for the same message, such as a send failure, still counts against the day or hour its message was accepted.
+ * - `event_time`: attributed to when the event itself occurred. Inbound message statistics, conversation statistics and the staff per-business failure counts use this, since there is no earlier outbound event to anchor them to.
+ *
+ * A response never mixes the two axes: every row and total in one payload shares the same attribution.
+ *
+ */
+export type AmbStatsAttribution = "accepted_time" | "event_time";
+
+/**
+ * Outbound Apple Messages for Business counts for the requested scope, attributed to when each message was accepted. Apple Messages for Business has no delivery receipt, so there is no `delivered` count anywhere in this API: `sent` is the last outbound state Bird observes for a message. Very large counts are close estimates rather than exact tallies. Rates are computed once here, clamped to 1, and null when nothing was accepted.
+ *
+ */
+export type AmbOutboundStatsCounts = {
+  /**
+   * Distinct messages accepted for sending after admission checks. This is the denominator for `sent_rate` and `send_failure_rate`.
+   */
+  readonly accepted: number;
+  /**
+   * Distinct messages handed off to Apple.
+   */
+  readonly sent: number;
+  /**
+   * Distinct accepted messages that Apple refused or that exhausted their send attempts. See `last_error.code` on the message for the reason; a refused charge is not a send failure, it is `rejected`.
+   */
+  readonly send_failed: number;
+  /**
+   * Distinct messages refused before any send attempt, because the destination has no price, the wallet could not fund the send, or the content cannot be sent yet. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `send_failure_rate`, which covers send failures only.
+   */
+  readonly rejected: number;
+  /**
+   * Share of accepted messages Apple acknowledged, computed as `sent / accepted`. Null when no messages were accepted in scope. This stands where other channels report a delivery rate.
+   */
+  readonly sent_rate: number | null;
+  /**
+   * Share of accepted messages that failed to send, computed as `send_failed / accepted`. Null when no messages were accepted in scope.
+   */
+  readonly send_failure_rate: number | null;
+};
+
+/**
+ * Approximate p50, p95, and p99 latency percentiles in milliseconds for one latency family. All three are null when no qualifying event contributed a measurement.
+ *
+ */
+export type AmbStatsQuantiles = {
+  /**
+   * Median (50th percentile) latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p50_ms: number | null;
+  /**
+   * 95th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p95_ms: number | null;
+  /**
+   * 99th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
+   */
+  readonly p99_ms: number | null;
+};
+
+/**
+ * Processing-latency percentiles in milliseconds for the requested scope, from acceptance to Apple handoff. Apple Messages for Business has no delivery receipt, so there is no `delivery` or `total` member beside `processing`. Conversation response timing is reported separately in `first_response`. Always present; every percentile is null when no qualifying message in scope has a measurement.
+ *
+ */
+export type AmbStatsLatency = {
+  processing: AmbStatsQuantiles;
+};
+
+/**
+ * Changes from the previous period. Each value is the signed relative change `(current - previous) / previous` and is null when the previous count is zero.
+ *
+ */
+export type AmbStatsComparisonDelta = {
+  /**
+   * Relative change in accepted messages (`counts.accepted`) versus the previous period, as a signed fraction. Null when the previous period accepted none.
+   */
+  readonly accepted_pct_change: number | null;
+  /**
+   * Relative change in sent messages (`counts.sent`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly sent_pct_change: number | null;
+  /**
+   * Relative change in send failures (`counts.send_failed`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly send_failed_pct_change: number | null;
+  /**
+   * Relative change in rejected messages (`counts.rejected`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly rejected_pct_change: number | null;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with computed changes for the message counts and rates listed in `delta`. Present only when `compare=previous_period` is requested. Monthly active contacts and latency values are returned for both periods without a computed change.
+ *
+ */
+export type AmbStatsComparison = {
+  /**
+   * New monthly active contact charges activated by replies submitted in this window. Each business-scoped contact counts once per UTC calendar month. Omitted for message-kind, intent, group, category or tag filters. Read from retained activation records independently of the message rollup data_as_of boundary; tenant purges remove these records.
+   */
+  readonly monthly_active_contacts?: number;
+  /**
+   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows).
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * First-response latency percentiles for the preceding period. Omitted when no qualifying message in that period has a measurement.
+   */
+  readonly first_response?: AmbStatsQuantiles;
+  readonly delta: AmbStatsComparisonDelta;
+};
+
+/**
+ * Outbound Apple Messages for Business counts and latency percentiles for the full requested period. Counts and percentiles are computed over the whole period rather than combined from the returned time-series values.
+ *
+ */
+export type AmbStatsSummary = {
+  /**
+   * New monthly active contact charges activated by replies submitted in this window. Each business-scoped contact counts once per UTC calendar month. Omitted for message-kind, intent, group, category or tag filters. Read from retained activation records independently of the message rollup data_as_of boundary; tenant purges remove these records.
+   */
+  readonly monthly_active_contacts?: number;
+  /**
+   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * Time from the oldest unanswered inbound message to acceptance of the first outbound reply that claims it. Reported on summaries and breakdowns. Omitted when no qualifying reply contributes a measurement.
+   */
+  readonly first_response?: AmbStatsQuantiles;
+  readonly comparison?: AmbStatsComparison;
+};
+
+/**
+ * Outbound Apple Messages for Business counts and processing-latency percentiles for one time bucket (a calendar day or hour), bucketed by acceptance time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. There is no `first_response` here. Read first-response latency from the summary or a breakdown endpoint.
+ *
+ */
+export type AmbStatsPoint = {
+  /**
+   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.
+   */
+  readonly bucket: string;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single message content kind over the requested period.
+ */
+export type AmbMessageKindStatsPoint = {
+  /**
+   * The content kind these messages were sent as, the same value the message read returns as its content kind discriminator.
+   */
+  readonly message_kind: AmbContentKind;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * First-response latency percentiles for this content kind. Omitted when no qualifying message contributes a measurement.
+   */
+  readonly first_response?: AmbStatsQuantiles;
+};
+
+/**
+ * Per-content-kind breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByMessageKindResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Content-kind rows ranked by accepted volume descending.
+   */
+  readonly data: Array<AmbMessageKindStatsPoint>;
+  /**
+   * Total distinct content kinds with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single message category over the requested period.
+ */
+export type AmbCategoryStatsPoint = {
+  /**
+   * The category these messages were sent with. Defaults to an empty string when a send names no category.
+   */
+  readonly category: string;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * First-response latency percentiles for this category. Omitted when no qualifying message contributes a measurement.
+   */
+  readonly first_response?: AmbStatsQuantiles;
+};
+
+/**
+ * Per-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByCategoryResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Category rows ranked by accepted volume descending.
+   */
+  readonly data: Array<AmbCategoryStatsPoint>;
+  /**
+   * Total distinct categories with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single tag over the requested period.
+ */
+export type AmbTagStatsPoint = {
+  /**
+   * The tag these messages carry, as a bare name or a `name:value` pair. A message with several tags is counted once under each, so rows do not sum to the period total.
+   */
+  readonly tag: string;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * First-response latency percentiles for this tag. Omitted when no qualifying message contributes a measurement.
+   */
+  readonly first_response?: AmbStatsQuantiles;
+};
+
+/**
+ * Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Only tagged messages appear.
+ */
+export type AmbStatsByTagResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Tag rows ranked by accepted volume descending.
+   */
+  readonly data: Array<AmbTagStatsPoint>;
+  /**
+   * Total distinct tags with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * Machine-readable reason a send failed, in one of two namespaces: `bird:` for a reason Bird's own pipeline assigned (for example `bird:business_not_registered`), or `apple:` followed by the HTTP status Apple's API returned for the send attempt (for example `apple:404`). This is an open, growing set in both namespaces; accept unrecognized values.
+ *
+ */
+export type AmbStatsErrorCode = string;
+
+/**
+ * Outbound counts and latency percentiles for a single failure reason over the requested period.
+ */
+export type AmbErrorCodeStatsPoint = {
+  /**
+   * The failure reason these messages share.
+   */
+  readonly error_code: AmbStatsErrorCode;
+  readonly counts: AmbOutboundStatsCounts;
+  readonly latency: AmbStatsLatency;
+  /**
+   * First-response latency for failed replies that claimed an unanswered inbound message. Omitted when no qualifying reply contributes a measurement.
+   *
+   */
+  readonly first_response?: AmbStatsQuantiles;
+};
+
+/**
+ * Per-failure-reason breakdown for the requested period, ranked by `send_failed + rejected` descending and capped at the requested `limit` (default 50, max 200). Only messages carrying an error code appear: a `bird:` code is usually a rejection, an `apple:` code a send failure.
+ */
+export type AmbStatsByErrorCodeResponse = {
+  /**
+   * The window the response covers (echoed back), plus `data_as_of`.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `accepted_time` for outbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Error-code rows ranked by `send_failed + rejected` descending.
+   */
+  readonly data: Array<AmbErrorCodeStatsPoint>;
+  /**
+   * Total distinct error codes with activity in the period, regardless of `limit`.
+   */
+  readonly total: number;
+};
+
+/**
+ * The change from the preceding period to the requested one. The `received_pct_change` field is a signed relative change, computed as `(current - previous) / previous`. A value of `0.5` means 50% higher, and `-0.2` means 20% lower. The field is null when the previous period received none.
+ *
+ */
+export type AmbInboundStatsComparisonDelta = {
+  /**
+   * Relative change in received messages versus the previous period, as a signed fraction. Null when the previous period received none.
+   */
+  readonly received_pct_change: number | null;
+};
+
+/**
+ * The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type AmbInboundStatsComparison = {
+  /**
+   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows).
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Distinct messages received in the preceding period.
+   */
+  readonly received: number;
+  readonly delta: AmbInboundStatsComparisonDelta;
+};
+
+/**
+ * Total inbound Apple Messages for Business messages for the requested period.
+ *
+ */
+export type AmbInboundStatsSummary = {
+  /**
+   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `event_time` for inbound statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  /**
+   * Distinct messages received in the period, counted by the time each message occurred. Computed across the whole window rather than summed from the daily or hourly series, so it can sit slightly below the sum of those rows.
+   */
+  readonly received: number;
+  readonly comparison?: AmbInboundStatsComparison;
+};
+
+/**
+ * Received-message count for one time bucket (a calendar day or hour), bucketed by the time each message occurred.
+ *
+ */
+export type AmbInboundStatsPoint = {
+  /**
+   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the request's grain.
+   */
+  readonly bucket: string;
+  /**
+   * Distinct messages received in this bucket.
+   */
+  readonly received: number;
+};
+
+/**
+ * Conversation lifecycle counts for the requested scope, attributed to when each event occurred. A conversation can start, reopen, and close more than once over its life, so `started`, `reopened`, and `closed` can each exceed `conversations`, the number of distinct conversations touched in scope. Very large counts are close estimates rather than exact tallies.
+ *
+ */
+export type AmbConversationStatsCounts = {
+  /**
+   * Count of conversation-started events in scope.
+   */
+  readonly started: number;
+  /**
+   * Count of conversation-reopened events in scope.
+   */
+  readonly reopened: number;
+  /**
+   * Count of conversation-closed events in scope.
+   */
+  readonly closed: number;
+  /**
+   * Distinct conversations with at least one lifecycle event in scope.
+   */
+  readonly conversations: number;
+};
+
+/**
+ * Changes from the previous period. Each value is the signed relative change `(current - previous) / previous` and is null when the previous count is zero.
+ *
+ */
+export type AmbConversationStatsComparisonDelta = {
+  /**
+   * Relative change in conversation starts (`counts.started`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly started_pct_change: number | null;
+  /**
+   * Relative change in conversation reopens (`counts.reopened`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly reopened_pct_change: number | null;
+  /**
+   * Relative change in conversation closes (`counts.closed`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly closed_pct_change: number | null;
+  /**
+   * Relative change in distinct conversations touched (`counts.conversations`) versus the previous period, as a signed fraction. Null when the previous period had none.
+   */
+  readonly conversations_pct_change: number | null;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type AmbConversationStatsComparison = {
+  /**
+   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows).
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  readonly counts: AmbConversationStatsCounts;
+  readonly delta: AmbConversationStatsComparisonDelta;
+};
+
+/**
+ * Conversation lifecycle counts for the full requested period. Counts aggregate the time buckets.
+ *
+ */
+export type AmbConversationStatsSummary = {
+  /**
+   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  readonly period: AmbStatsSummaryPeriod;
+  /**
+   * Always `event_time` for conversation statistics.
+   */
+  readonly attribution: AmbStatsAttribution;
+  readonly counts: AmbConversationStatsCounts;
+  readonly comparison?: AmbConversationStatsComparison;
+};
+
+/**
+ * Conversation lifecycle counts for one time bucket (a calendar day or hour), bucketed by when each event occurred.
+ *
+ */
+export type AmbConversationStatsPoint = {
+  /**
+   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.
+   */
+  readonly bucket: string;
+  readonly counts: AmbConversationStatsCounts;
+};
+
+export type SipTrunkId = string;
+
+/**
+ * Call status.
+ *
+ * A call that has ended carries one of:
+ *
+ * - `answered` means it connected and the far end picked up.
+ * - `no_answer` means nobody picked up before the call timed out.
+ * - `rejected` means it was refused rather than attempted. Either we turned it
+ *   away before dialing a carrier, in which case `rejection_reason` names the
+ *   check it failed where there was one, or the far end declined it.
+ * - `failed` means it was attempted and did not work, and `sip_response_code`
+ *   is what came back.
+ * - `unknown` means the outcome could not be determined. Contact support with
+ *   the call `id` if you see one.
+ *
+ * An active call carries `ringing` before it is picked up and `in_progress`
+ * afterward. The call list's `status` filter takes any mix of the two sets.
+ *
+ * `busy` and `canceled` are reserved for incoming calls delivered to your own
+ * numbers: `busy` for a called party that rejected the call as busy, `canceled`
+ * for a caller who hung up before it was picked up. Neither is emitted yet and
+ * both outcomes are reported as `failed` today.
+ *
+ */
+export type VoiceCallStatus =
+  | "answered"
+  | "no_answer"
+  | "busy"
+  | "canceled"
+  | "failed"
+  | "rejected"
+  | "unknown"
+  | "ringing"
+  | "in_progress";
+
+/**
+ * Whether the call was placed from your side, by your PBX, the API, the browser or Bird dialing onward for you (outbound), or arrived from a remote party (inbound).
+ */
+export type VoiceCallDirection = "inbound" | "outbound";
+
+export type Money = {
+  /**
+   * Decimal amount as a string, in major currency units.
+   */
+  amount: string;
+  /**
+   * ISO 4217 currency code.
+   */
+  currency_code: CurrencyCode;
+};
+
+/**
+ * The channel a passcode is delivered over. Open enum: new channels may be added over time, so treat any unrecognized value as a future channel rather than an error.
+ */
+export type VerificationChannel =
+  "email" | "sms" | "whatsapp" | "telegram" | "voice" | (string & {});
+
+/**
+ * Why a verification session reached its final state without succeeding: `attempts_exhausted` (too many incorrect passcodes), `ttl_elapsed` (the time window elapsed before a correct passcode), or `undeliverable` (no planned channel could deliver a passcode, so the recipient never had one to submit). Open enum: new reasons may be added over time, so treat any unrecognized value as a future reason rather than an error.
+ */
+export type VerificationTerminalReason =
+  "attempts_exhausted" | "ttl_elapsed" | "undeliverable" | (string & {});
+
+/**
+ * Why a passcode send did not deliver:
+ *
+ * - `carrier_rejected`: The SMS carrier rejected the send.
+ * - `hard_bounce`: The email permanently bounced.
+ * - `soft_bounce`: The email temporarily bounced, such as when a mailbox is full.
+ * - `undelivered`: The channel reported a generic delivery failure.
+ * - `channel_unavailable`: The channel could not be used, so the verification
+ *   moved to the next channel.
+ * - `channel_disabled`: Sending on the channel is temporarily disabled, so the
+ *   verification moved to the next channel.
+ * - `channel_restricted`: The channel does not carry passcodes to this
+ *   destination country. The verification moves to the next channel enabled
+ *   there, or fails when the country has no other.
+ * - `delivery_timeout`: No delivery confirmation arrived before the channel's
+ *   timeout, so the verification moved to the next channel.
+ * - `not_billable`: The send could not be charged, so it was never handed to the
+ *   channel. Usually the workspace balance is too low to cover it. Topping up
+ *   the balance is what clears this.
+ *
+ * New reasons may be added over time. Treat unrecognized values as reasons added
+ * later rather than errors.
+ */
+export type VerificationAttemptFailureReason =
+  | "carrier_rejected"
+  | "hard_bounce"
+  | "soft_bounce"
+  | "undelivered"
+  | "channel_unavailable"
+  | "channel_disabled"
+  | "channel_restricted"
+  | "delivery_timeout"
+  | "not_billable"
+  | (string & {});
+
+export type RealtimeAppId = string;
+
 export type WorkspaceCreate = {
   name: TenantName;
 };
@@ -732,8 +3272,6 @@ export type RealtimeRegionList = {
  *
  */
 export type RealtimeAppSortField = "created_at" | "name";
-
-export type RealtimeAppId = string;
 
 export type RealtimeApp = Timestamps & {
   /**
@@ -1055,8 +3593,6 @@ export type RealtimeAppKeyList = {
   data: Array<RealtimeAppKey>;
 };
 
-export type EmailBroadcastId = string;
-
 /**
  * Aggregate delivery status of an email, derived from its recipients' states.
  *
@@ -1120,8 +3656,6 @@ export type EmailAddress = {
  * A language tag in BCP-47 form, for example `en` or `pt-BR`.
  */
 export type LanguageTag = string;
-
-export type EmailTemplateId = string;
 
 export type EmailTemplateVersionId = string;
 
@@ -1507,7 +4041,7 @@ export type EmailMessageSendRequest = {
    */
   track_clicks?: boolean;
   /**
-   * ID of the IP pool to send from (`ipp_` prefix), or `ipp_shared` to route through the shared pool explicitly. Omit to use your organization's default pool. An unknown pool, or a pool with no dedicated IPs available to send from, is rejected with a `422`.
+   * ID of the IP pool to send from (`ipp_` prefix), or `ipp_shared` to route through the shared pool explicitly. Omit to use the sending domain's default pool in this workspace, or the organization's default when the domain has none. An unknown pool, or a pool with no dedicated IPs available to send from, is rejected with a `422`.
    *
    */
   ip_pool_id?: string;
@@ -1900,17 +4434,6 @@ export type EmailMessageContent = {
    * The plain-text body of the message as delivered, if it was stored.
    */
   text?: string;
-};
-
-export type Money = {
-  /**
-   * Decimal amount as a string, in major currency units.
-   */
-  amount: string;
-  /**
-   * ISO 4217 currency code.
-   */
-  currency_code: CurrencyCode;
 };
 
 /**
@@ -3489,6 +6012,22 @@ export type SmsMessageStatus =
   | "expired"
   | "received";
 
+/**
+ * An 8-bit binary SMS payload, sent as one segment. `udh` plus `data` must fit 140 octets.
+ *
+ */
+export type SmsBinary = {
+  /**
+   * User data header as hexadecimal, 1-16 octets. Required on a send: a binary send without it returns `422`. Its first octet must count the octets after it, every information element must fit inside it, and concatenation elements (`00`, `08`) are refused because the message is one segment.
+   *
+   */
+  udh?: string;
+  /**
+   * The payload after the header, as hexadecimal.
+   */
+  data: string;
+};
+
 export type SmsTemplateId = string;
 
 export type SmsTemplateVersionId = string;
@@ -3498,6 +6037,8 @@ export type SmsTemplateVersionId = string;
  *
  */
 export type SmsTemplateContentHash = string;
+
+export type SmsMessagingProfileId = string;
 
 /**
  * Segment breakdown for the message body. Segment count drives billing.
@@ -3521,10 +6062,12 @@ export type SmsSegments = {
    * outside the Basic Multilingual Plane is a surrogate pair costing two code
    * units, so 35 of those fill a single segment.
    *
+   * `BINARY` marks an 8-bit binary payload, sent as one segment, where `characters` counts its octets. Only the preview binary send produces it; it is declared ahead of general availability so clients see the value before any message carries it outside the preview.
+   *
    */
-  readonly encoding: "GSM_7BIT" | "UCS2";
+  readonly encoding: "GSM_7BIT" | "UCS2" | "BINARY";
   /**
-   * Character count of the body, counted in Unicode code points under either encoding. This is not the segment measure: a `GSM_7BIT` extended-table character counts once here but costs two septets, and a `UCS2` emoji outside the Basic Multilingual Plane counts once here but costs two of the segment's 70 code units.
+   * Character count of the body, counted in Unicode code points under `GSM_7BIT` and `UCS2`; under `BINARY` it is the payload's octets, header included. This is not the segment measure: a `GSM_7BIT` extended-table character counts once here but costs two septets, and a `UCS2` emoji outside the Basic Multilingual Plane counts once here but costs two of the segment's 70 code units.
    *
    */
   readonly characters: number;
@@ -3566,41 +6109,20 @@ export type SmsMessageEffectiveOptions = {
    *
    */
   smart_encoding: boolean;
+  /**
+   * Preview feature: `true` when this message is excluded from any future quiet-hours delivery window. Absent otherwise.
+   */
+  ignore_delivery_window?: boolean;
+  /**
+   * Preview feature: `true` when the send asked to skip opt-outs. Recorded only: every opt-out still applied. Absent otherwise.
+   */
+  ignore_suppression?: boolean;
+  /**
+   * Preview feature: the callback URL the send recorded. Absent when it recorded none. Recorded only: status events go to your webhook subscriptions either way.
+   *
+   */
+  callback_url?: string;
 };
-
-/**
- * Standardized failure reason:
- *
- * - `invalid_destination`: The number is unassigned, ported out, or malformed.
- * - `unreachable`: The handset is off or outside coverage.
- * - `blocked_by_carrier`: The carrier filtered the message.
- * - `blocked_by_fraud_protection`: Bird fraud protection blocked suspected SMS pumping.
- * - `blocked_by_recipient`: The recipient device blocked the sender.
- * - `landline_unreachable`: The destination is a landline that does not accept SMS.
- * - `content_rejected`: The carrier rejected the content.
- * - `sender_unregistered`: The sender is not registered for the destination.
- * - `recipient_opted_out`: The recipient is on a suppression list.
- * - `provider_unavailable`: The provider remained unavailable after retries.
- * - `insufficient_balance`: The workspace wallet could not fund the send.
- * - `unknown`: The failure could not be classified.
- *
- * This is an open enum. Accept unrecognized values.
- *
- */
-export type SmsErrorCode =
-  | "invalid_destination"
-  | "unreachable"
-  | "blocked_by_carrier"
-  | "blocked_by_fraud_protection"
-  | "blocked_by_recipient"
-  | "landline_unreachable"
-  | "content_rejected"
-  | "sender_unregistered"
-  | "recipient_opted_out"
-  | "provider_unavailable"
-  | "insufficient_balance"
-  | "unknown"
-  | (string & {});
 
 /**
  * Failure detail for a message that could not be delivered or was rejected.
@@ -3619,7 +6141,33 @@ export type SmsError = {
    * When the failure occurred.
    */
   occurred_at: string;
+  /**
+   * Whether the cause is permanent, so sending the same message again would fail the same way. Describes the cause, not whether Bird retries. Null when Bird cannot tell, which is currently always.
+   *
+   */
+  permanent?: boolean | null;
 } | null;
+
+/**
+ * Preview feature: the outbound message a received message was paired with. Bird pairs a reply with the last message the messaging profile sent this subscriber from the receiving number, within the profile's outbound-matching window. The pairing is inferred from timing; the subscriber does not report which message they answered.
+ *
+ */
+export type SmsInReplyToMessage = {
+  /**
+   * ID of the outbound message.
+   */
+  id: SmsMessageId;
+  /**
+   * Text of the outbound message as Bird stored it. Authentication messages read `**REDACTED**`. Absent once that message is past the read window.
+   *
+   */
+  text?: string;
+  /**
+   * Time Bird handed the outbound message to the carrier; the matching window counts from here. Absent once that message is past the read window.
+   *
+   */
+  sent_at?: string;
+};
 
 export type SmsMessage = {
   /**
@@ -3643,10 +6191,14 @@ export type SmsMessage = {
    */
   from: string;
   /**
-   * The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text. For a template send, this is the rendered text after parameter substitution. When `category` is `authentication` (a message carrying a one-time code), this is `**REDACTED**`: the code still reaches the recipient, but the API does not retain it for later reads.
+   * The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text, and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. When `category` is `authentication` (a message carrying a one-time code), this is `**REDACTED**`: the code still reaches the recipient, but the API does not retain it for later reads.
    *
    */
   text?: string;
+  /**
+   * Preview feature: the payload of a binary send, in place of `text`. Absent on every other message.
+   */
+  readonly binary?: SmsBinary;
   /**
    * Content classification supplied for free text or derived from the template. Null for inbound messages.
    */
@@ -3675,6 +6227,10 @@ export type SmsMessage = {
    */
   readonly template_content_hash: SmsTemplateContentHash | null;
   /**
+   * The messaging profile this message was sent or received under. Absent when no messaging profile applied.
+   */
+  readonly messaging_profile_id?: SmsMessagingProfileId;
+  /**
    * Segment breakdown for the body.
    */
   segments: SmsSegments;
@@ -3698,9 +6254,13 @@ export type SmsMessage = {
    */
   readonly options?: SmsMessageEffectiveOptions;
   /**
-   * Preview feature: how long, in seconds, the carrier may keep attempting delivery before the message is marked `expired`. Not returned yet.
+   * Preview feature: the `validity_period` applied to the message, in seconds: the send's own, or else its messaging profile's. Absent when neither set one.
    */
   readonly validity_period?: number;
+  /**
+   * Preview feature: the `cost_center` applied to the message: the send's own, or else its messaging profile's. Absent when neither set one, and on inbound messages.
+   */
+  readonly cost_center?: string;
   /**
    * Carrier that handled the message. Absent until a delivery receipt identifies it, and on a received message the carrier reports it only where a carrier fee applies.
    */
@@ -3713,6 +6273,16 @@ export type SmsMessage = {
    * Failure detail on a message that failed, was rejected, was not delivered, or expired. Absent otherwise.
    */
   last_error?: SmsError;
+  /**
+   * On an outbound message, the country of the recipient's number. On a received message, the country of the sender's number, or of your number that received it when the sender is not a phone number, such as a short code or an alphanumeric sender. The same value as the message's `sms.*` events' `country_code`. Absent when not known.
+   *
+   */
+  readonly country_code?: CountryCode;
+  /**
+   * Preview feature: on a received message, the outbound message it was paired with through its messaging profile's outbound matching. Absent on outbound messages and on received messages that were not paired.
+   *
+   */
+  readonly in_reply_to_message?: SmsInReplyToMessage;
   /**
    * When the message was accepted (outbound) or received (inbound).
    */
@@ -3735,7 +6305,7 @@ export type SmsMessageList = {
 } & ListEnvelope;
 
 /**
- * Settings that change how Bird processes this message. Each option applies to this send only; omit one to use its default.
+ * Settings that change how Bird processes this message. Each option applies to this send only; omit one to use the value of the messaging profile in `messaging_profile_id`, or its default when the profile sets none.
  *
  */
 export type SmsSendOptions = {
@@ -3791,12 +6361,12 @@ export type SmsTemplateSend = unknown & {
 
 export type SmsMessageSendRequest = unknown & {
   /**
-   * Recipient phone number in E.164 format (for example `+14155550100`). One recipient per message. The number is stored and returned in canonical E.164; a recipient that cannot be routed returns a `422` `SMSInvalidRecipient`.
+   * Recipient phone number in E.164 format (for example `+14155550100`), or in national format when you also pass `to_country_code`. One recipient per message. The number is stored and returned in canonical E.164; a recipient that cannot be routed returns a `422` `SMSInvalidRecipient`.
    *
    */
   to: string;
   /**
-   * Sender to send from. It must be a sender the workspace holds: a number it owns in E.164, such as `+15557654321`, a short code it holds, such as `24680`, or an alphanumeric sender ID it has claimed, such as `MyBrand`. A sender the workspace does not hold returns a `422` `SMSSenderNotConfigured`, and an alphanumeric sender must also be permitted, and where required registered, for the destination country. Required on a free-text send and when sending a workspace template. Omitting it in either case returns `422`. A built-in template selects its sender automatically and rejects `from`.
+   * Sender to send from. It must be a sender the workspace holds: a number it owns in E.164, such as `+15557654321`, a short code it holds, such as `24680`, or an alphanumeric sender ID it has claimed, such as `MyBrand`. A sender the workspace does not hold returns a `422` `SMSSenderNotConfigured`, and an alphanumeric sender must also be permitted, and where required registered, for the destination country. Required on a free-text send and when sending a workspace template, unless `messaging_profile_id` is set and the profile selects a sender for the destination country or has a default sender. Omitting it otherwise returns `422`. A built-in template selects its sender automatically and rejects `from`.
    *
    */
   from?: string;
@@ -3806,12 +6376,12 @@ export type SmsMessageSendRequest = unknown & {
    */
   text?: string;
   /**
-   * Content classification: why you are sending. Required on a free-text send; omit it on a template send, where the category is derived from the template. Where the destination country requires the sender to be registered, a category outside what that registration covers returns a `422` `SenderCategoryNotPermitted`.
+   * Content classification: why you are sending. Required on a free-text send unless the messaging profile in `messaging_profile_id` sets a default category; omit it on a template send, where the category is derived from the template. Where the destination country requires the sender to be registered, a category outside what that registration covers returns a `422` `SenderCategoryNotPermitted`.
    *
    */
   category?: SmsMessageCategory;
   /**
-   * Preview feature: how long, in seconds (60-172800), the carrier may keep attempting delivery before the message is marked `expired`. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.
+   * Preview feature: how long, in seconds (60-172800), the message may wait for delivery, counted from acceptance. Bird does not submit the message to the carrier after this deadline and passes the remaining time to the carrier where the route supports it. A message that misses the deadline before reaching the carrier ends `rejected` or `failed`, not `expired`; `expired` comes only from a carrier report. Omit it to use the validity period of the messaging profile in `messaging_profile_id`, or the carrier's own validity rules when the profile sets none. Organizations outside the preview receive `422 SMSUnsupportedFeature`.
    *
    */
   validity_period?: number;
@@ -3837,7 +6407,8 @@ export type SmsMessageSendRequest = unknown & {
    */
   media_urls?: Array<string>;
   /**
-   * Preview feature: sender selection from a messaging profile pool. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.
+   * Preview feature: the messaging profile that supplies this message's sender and defaults. When `from` is omitted, Bird sends from the profile's sender for the destination country, or its default sender. An omitted `category` on a free-text send takes the profile's default category, and `smart_encoding`, `cost_center` and `validity_period` take the profile's settings. So do `options.callback_url`, `options.ignore_delivery_window` and `options.ignore_suppression`, which Bird records on the message; the profile's `options.validation.network` is not inherited. Values you set on the message take precedence. A built-in template sends from Bird's system sender and ignores the profile's senders. A profile that does not exist in this workspace returns `422` `SMSMessagingProfileNotFound`; a `from` bound to a different profile returns `422` `SMSMessagingProfileSenderBound`. Organizations outside the preview get `422` `SMSUnsupportedFeature`.
+   *
    */
   messaging_profile_id?: string;
   /**
@@ -3876,6 +6447,13 @@ export type SmsMessageSendRequest = unknown & {
     [key: string]: unknown;
   };
 };
+
+/**
+ * The kind of sender identity a message was sent from: a standard long-code number, a short code, an alphanumeric sender ID, or a toll-free number. Toll-free is its own value rather than a kind of long code, because it carries a separate regulatory regime and both sending policy and pricing key on it directly.
+ *
+ */
+export type SmsSenderType =
+  "long_code" | "short_code" | "alphanumeric" | "toll_free";
 
 /**
  * Batch of SMS message send requests.
@@ -4213,7 +6791,7 @@ export type TemplateVariable = {
    */
   readonly key: string;
   /**
-   * The value type this slot accepts. Built-in SMS templates use typed slots (`code`, `amount` and the rest), each of which rejects a value that does not match its `constraint`. Email, WhatsApp and workspace SMS templates use `text`. Workspace SMS parameters must be scalar values. Open enum: treat an unrecognized value as a future type rather than an error.
+   * The value type this slot accepts. Each typed slot rejects a value that does not match its `constraint`. Built-in SMS templates use typed slots (`code`, `amount` and the rest). Apple Messages templates type a variable from its content: the field it fills (`url`, `image`, `timestamp`) or the formatting filter applied to it (`date`, `date_time`, `amount`, `currency`). Email, WhatsApp and workspace SMS templates use `text`. Workspace SMS parameters must be scalar values. Open enum: treat an unrecognized value as a future type rather than an error.
    *
    */
   readonly type: string;
@@ -4709,6 +7287,8 @@ export type SmsKeywordRuleUpdate = {
   confirmed_self_managed?: boolean;
 };
 
+export type SmsSenderId = string;
+
 /**
  * The kind of value a requirement takes. The `string` value is a single line, while `text` runs to several. The `enum` value accepts only the values listed with the requirement. The `number`, `boolean`, and `date` values take their corresponding data types. The `url` value takes a link. The `country` value takes an uppercase ISO 3166-1 alpha-2 code, such as `NL`. The `document` value means a file you upload first and then reference. All other values are supplied inline.
  *
@@ -4944,8 +7524,6 @@ export type Attachment = Timestamps & {
   readonly expires_at: string | null;
 };
 
-export type SmsSenderId = string;
-
 /**
  * Field to sort identities by.
  */
@@ -5103,7 +7681,7 @@ export type AssetKind =
   "image" | "video" | "audio" | "document" | (string & {});
 
 /**
- * A file in the workspace's media library, hosted at a permanent public URL. Embed or link `url` anywhere hosted media is needed, including in email that has already been sent: an asset's bytes and URL never change.
+ * A file in the workspace's media library, hosted at a permanent public URL. Embed or link `url` in your content. Metadata changes and removing a library entry preserve the URL and bytes; an abuse or security takedown can make the file unavailable.
  */
 export type Asset = Timestamps & {
   readonly id: AssetId;
@@ -5137,7 +7715,7 @@ export type Asset = Timestamps & {
    */
   readonly height: number | null;
   /**
-   * Default alternative text describing the asset, carried along whenever it is placed. Most mail clients block images by default, so for an image this is often the only thing a recipient reads.
+   * Default alternative text for the asset. Use it as the starting point for an image description when inserting the asset into content. Updating this field does not update descriptions already copied into saved content.
    */
   alt_text: string | null;
   /**
@@ -5155,18 +7733,19 @@ export type AssetList = {
 } & ListEnvelopeWithTotal;
 
 /**
- * The file to upload, sent as a `multipart/form-data` body. Include each field at most once. Each text field is limited to 8 KiB before surrounding whitespace is trimmed; its character limit also applies.
+ * The file to upload, sent as a `multipart/form-data` body. Include each field at most once. Each text field is limited to 8 KiB before surrounding whitespace is trimmed; its character limit also applies. When provided, `folder_id` must identify an existing folder even when the upload matches an active asset in this workspace. A duplicate keeps its existing folder.
  */
 export type AssetUpload = {
   /**
    * The file to upload. The file's contents determine its type; a declared content
    * type is ignored.
    *
-   * Images: PNG, JPEG, GIF, or WebP, up to 5 MB. WebP is converted on upload, and
-   * every image is re-encoded.
+   * Images: PNG, JPEG, GIF, or static WebP, up to 5 MiB (5,242,880 bytes). Every image
+   * is re-encoded. Static WebP becomes JPEG or PNG; animated GIF keeps its animation.
+   * Animated WebP is not supported.
    *
    * Video (MP4, WebM, QuickTime), audio (MP3, M4A, Ogg, WAV), and PDF: up to 25 MB,
-   * stored byte-for-byte.
+   * validated for container structure and stored byte-for-byte. Validation does not scan for malware.
    *
    */
   file: Blob | File;
@@ -5175,11 +7754,11 @@ export type AssetUpload = {
    */
   name?: string;
   /**
-   * Default alternative text describing the asset, carried along whenever it is placed.
+   * Default alternative text to use when inserting the asset into content.
    */
   alt_text?: string;
   /**
-   * The folder to file the asset in. Omit it to place the asset at the top level of the library. Ignored when the upload matches an existing asset, which is returned where it already sits.
+   * The folder to file the asset in. Omit it to place the asset at the top level of the library. Must name an existing folder even when the upload matches an active asset in this workspace. A duplicate keeps its existing folder.
    */
   folder_id?: AssetFolderId;
 };
@@ -5649,187 +8228,6 @@ export type ComplianceSubmissionResupply = {
 };
 
 /**
- * Set to `previous_period` to also return the same figures for the immediately preceding window of equal length, plus the change between the two, so you can show "+X% vs last period" without a second request.
- *
- */
-export type StatsComparePeriod = "previous_period";
-
-/**
- * The window the server actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants on the hour). The grain of `from` and `to` mirrors the grain of the request's bounds.
- *
- */
-export type SmsStatsSummaryPeriod = {
-  /**
-   * Inclusive start of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.
-   */
-  readonly from: string;
-  /**
-   * Inclusive end of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.
-   */
-  readonly to: string;
-  /**
-   * Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.
-   *
-   */
-  readonly data_as_of?: string | null;
-};
-
-/**
- * SMS lifecycle counts and rates for a whole period or breakdown. Counts use the message send time, so a later delivery stays attributed to the bucket in which the message was sent. Rates are null when their denominator is zero.
- *
- */
-export type SmsDeliveryStats = {
-  /**
-   * Distinct messages accepted for sending after admission checks. This is the denominator for `delivery_rate` and `failure_rate`.
-   */
-  readonly accepted: number;
-  /**
-   * Distinct messages handed off to the carrier for delivery.
-   */
-  readonly sent: number;
-  /**
-   * Distinct messages the carrier confirmed as delivered to the handset.
-   */
-  readonly delivered: number;
-  /**
-   * Distinct messages the carrier reported as not delivered.
-   */
-  readonly undelivered: number;
-  /**
-   * Distinct messages that failed during sending.
-   */
-  readonly failed: number;
-  /**
-   * Distinct messages rejected before any send attempt, for example by sending policy or a message-generation failure.
-   */
-  readonly rejected: number;
-  /**
-   * Distinct messages that could not be delivered within their validity window and expired.
-   */
-  readonly expired: number;
-  /**
-   * Share of accepted messages that were delivered, computed as `delivered / accepted`. Null when no messages were accepted in scope.
-   *
-   */
-  readonly delivery_rate: number | null;
-  /**
-   * Share of accepted messages that ultimately failed, computed as `(undelivered + failed + expired) / accepted`. Null when no messages were accepted in scope.
-   *
-   */
-  readonly failure_rate: number | null;
-};
-
-/**
- * Approximate p50, p95, and p99 latency percentiles in milliseconds for one latency family. All three are null when no qualifying event contributed a measurement.
- *
- */
-export type SmsLatencyQuantiles = {
-  /**
-   * Median (50th percentile) latency in milliseconds. Null when no qualifying event contributed a measurement.
-   */
-  readonly p50_ms: number | null;
-  /**
-   * 95th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
-   */
-  readonly p95_ms: number | null;
-  /**
-   * 99th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
-   */
-  readonly p99_ms: number | null;
-};
-
-/**
- * Latency percentiles in milliseconds for the requested scope:
- *
- * - `processing`: From acceptance to carrier handoff.
- * - `delivery`: From carrier handoff to delivery confirmation.
- * - `total`: From acceptance to delivery confirmation.
- *
- * Each family is omitted when no qualifying event contributes a measurement.
- * Individual percentiles can also be null.
- *
- */
-export type SmsLatencyStats = {
-  processing?: SmsLatencyQuantiles;
-  delivery?: SmsLatencyQuantiles;
-  total?: SmsLatencyQuantiles;
-};
-
-/**
- * Changes from the previous period. A `*_pct_change` value is the signed relative change `(current - previous) / previous` and is null when the previous count is zero. A `*_rate_pp` value is the signed difference between rate fractions and is null when either rate is undefined.
- *
- */
-export type SmsStatsComparisonDelta = {
-  /**
-   * Relative change in accepted messages (`delivery.accepted`) versus the previous period, as a signed fraction. Null when the previous period accepted none.
-   */
-  readonly accepted_pct_change: number | null;
-  /**
-   * Relative change in sent messages (`delivery.sent`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly sent_pct_change: number | null;
-  /**
-   * Relative change in delivered messages (`delivery.delivered`) versus the previous period, as a signed fraction. Null when the previous period delivered none.
-   */
-  readonly delivered_pct_change: number | null;
-  /**
-   * Relative change in undelivered messages (`delivery.undelivered`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly undelivered_pct_change: number | null;
-  /**
-   * Relative change in failed messages (`delivery.failed`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly failed_pct_change: number | null;
-  /**
-   * Relative change in rejected messages (`delivery.rejected`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly rejected_pct_change: number | null;
-  /**
-   * Relative change in expired messages (`delivery.expired`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly expired_pct_change: number | null;
-  /**
-   * Signed difference between this period's and the previous period's delivery rate, both fractions in [0,1] (multiply by 100 for percentage points). Null when either period's delivery rate is undefined.
-   */
-  readonly delivery_rate_pp: number | null;
-  /**
-   * Signed difference between the current and previous failure-rate fractions. Multiply by 100 for percentage points. The value can fall outside `[-1, 1]` because a message can contribute to more than one failure outcome and high-volume counts are approximate. Null when either rate is undefined.
-   *
-   */
-  readonly failure_rate_pp: number | null;
-};
-
-/**
- * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
- *
- */
-export type SmsStatsComparison = {
-  /**
-   * Equal-length window ending immediately before the requested start.
-   */
-  period: SmsStatsSummaryPeriod;
-  readonly delivery: SmsDeliveryStats;
-  readonly latency: SmsLatencyStats;
-  readonly delta: SmsStatsComparisonDelta;
-};
-
-/**
- * Single-row aggregate across the full requested period, covering SMS lifecycle counts plus the derived delivery and failure rates, and latency percentiles. Use this endpoint for KPI tiles and reporting; the daily and hourly endpoints carry the same counts per bucket.
- *
- * Every count is a sum of per-bucket counts across the window. Latency percentiles are computed across the whole period rather than summed per bucket. Rates are null when their denominator is zero.
- *
- */
-export type SmsStatsSummary = {
-  /**
-   * The window the response covers (echoed back from the request, day or hour grain), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: SmsStatsSummaryPeriod;
-  readonly delivery: SmsDeliveryStats;
-  readonly latency: SmsLatencyStats;
-  readonly comparison?: SmsStatsComparison;
-};
-
-/**
  * The bucket grain of the series, either `day` or `hour`.
  */
 export type StatsGrain = "day" | "hour";
@@ -5856,53 +8254,6 @@ export type SmsStatsSeriesPeriod = {
 };
 
 /**
- * SMS lifecycle counts for a time bucket. Counts use the message send time, so a message accepted on Monday and delivered on Tuesday counts in Monday's bucket. Rates are available only for whole periods and breakdowns.
- *
- */
-export type SmsDeliveryCounts = {
-  /**
-   * Distinct messages accepted for sending after admission checks.
-   */
-  readonly accepted: number;
-  /**
-   * Distinct messages handed off to the carrier for delivery.
-   */
-  readonly sent: number;
-  /**
-   * Distinct messages the carrier confirmed as delivered to the handset.
-   */
-  readonly delivered: number;
-  /**
-   * Distinct messages the carrier reported as not delivered.
-   */
-  readonly undelivered: number;
-  /**
-   * Distinct messages that failed during sending.
-   */
-  readonly failed: number;
-  /**
-   * Distinct messages rejected before any send attempt, for example by sending policy or a message-generation failure.
-   */
-  readonly rejected: number;
-  /**
-   * Distinct messages that could not be delivered within their validity window and expired.
-   */
-  readonly expired: number;
-};
-
-/**
- * SMS lifecycle counts for one time bucket (a calendar day or hour), bucketed by send time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. Per-bucket values include counts only. The summary and breakdown endpoints report rates and latency as whole-window aggregates.
- *
- */
-export type SmsStatsPoint = {
-  /**
-   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.
-   */
-  readonly bucket: string;
-  readonly delivery: SmsDeliveryCounts;
-};
-
-/**
  * Time-series stats payload. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
  *
  */
@@ -5913,21 +8264,6 @@ export type SmsStatsResponse = {
    */
   readonly data: Array<SmsStatsPoint>;
 };
-
-/**
- * Metric to rank breakdown rows by, applied descending. Shared by the volume breakdowns whose rows carry the full delivery and latency block (originators, countries, categories, carriers). Any lifecycle count or derived rate may be used; rows whose rate is undefined (zero denominator) sort last.
- *
- */
-export type SmsStatsSortMetric =
-  | "accepted"
-  | "sent"
-  | "delivered"
-  | "undelivered"
-  | "failed"
-  | "rejected"
-  | "expired"
-  | "delivery_rate"
-  | "failure_rate";
 
 /**
  * Bucket grain for a stats trend series.
@@ -5964,196 +8300,6 @@ export type SmsStatsByOriginatorResponse = {
   readonly data: Array<SmsOriginatorStatsPoint>;
   /**
    * Total number of distinct originators with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
-   *
-   */
-  readonly total: number;
-};
-
-/**
- * Aggregate delivery and latency stats for a single destination country over the requested period.
- */
-export type SmsCountryStatsPoint = {
-  /**
-   * The destination country this row aggregates, as an ISO 3166-1 alpha-2 code.
-   */
-  readonly country: string;
-  readonly delivery: SmsDeliveryStats;
-  readonly latency: SmsLatencyStats;
-  /**
-   * Per-bucket lifecycle counts for this country, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.
-   */
-  readonly trend?: Array<SmsStatsPoint>;
-};
-
-/**
- * Per-country breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
- */
-export type SmsStatsByCountryResponse = {
-  /**
-   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: SmsStatsSummaryPeriod;
-  /**
-   * Country breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no messages were sent in the period.
-   */
-  readonly data: Array<SmsCountryStatsPoint>;
-  /**
-   * Total number of distinct destination countries with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
-   *
-   */
-  readonly total: number;
-};
-
-/**
- * Aggregate delivery and latency stats for a single message category over the requested period.
- */
-export type SmsCategoryStatsPoint = {
-  /**
-   * The category this row aggregates, as set at send time. `transactional` is one-to-one messaging triggered by a user action; `marketing` is bulk sending. New categories may be added over time.
-   */
-  readonly category: string;
-  readonly delivery: SmsDeliveryStats;
-  readonly latency: SmsLatencyStats;
-  /**
-   * Per-bucket lifecycle counts for this category, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.
-   */
-  readonly trend?: Array<SmsStatsPoint>;
-};
-
-/**
- * Per-category breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
- */
-export type SmsStatsByCategoryResponse = {
-  /**
-   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: SmsStatsSummaryPeriod;
-  /**
-   * Category breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no messages were sent in the period.
-   */
-  readonly data: Array<SmsCategoryStatsPoint>;
-  /**
-   * Total number of distinct categories with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
-   *
-   */
-  readonly total: number;
-};
-
-/**
- * Metric to rank breakdown rows by, applied descending. Shared by the breakdowns whose rows carry lifecycle counts only, with no derived rates to sort on.
- *
- */
-export type SmsStatsLifecycleSortMetric =
-  | "accepted"
-  | "sent"
-  | "delivered"
-  | "undelivered"
-  | "failed"
-  | "rejected"
-  | "expired";
-
-/**
- * Delivery and latency statistics for one standardized failure reason over the requested period.
- */
-export type SmsErrorCodeStatsPoint = {
-  /**
-   * Standardized failure reason this row aggregates. Matches the `error_code` message-list filter.
-   */
-  readonly error_code: SmsErrorCode;
-  readonly delivery: SmsDeliveryStats;
-  readonly latency: SmsLatencyStats;
-  /**
-   * Per-bucket lifecycle counts for this error code, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.
-   */
-  readonly trend?: Array<SmsStatsPoint>;
-};
-
-/**
- * Per-error-code breakdown for the requested period, ranked by the `sort` metric (default `failed`) descending and capped at the requested `limit` (default 50, max 200).
- */
-export type SmsStatsByErrorCodeResponse = {
-  /**
-   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: SmsStatsSummaryPeriod;
-  /**
-   * Error-code breakdown rows, ranked by the `sort` metric (default `failed`) descending. Empty when no delivery failures occurred in the period.
-   */
-  readonly data: Array<SmsErrorCodeStatsPoint>;
-  /**
-   * Total number of distinct error codes with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
-   *
-   */
-  readonly total: number;
-};
-
-/**
- * Aggregate delivery and latency stats for a single delivery carrier over the requested period.
- */
-export type SmsCarrierStatsPoint = {
-  /**
-   * The delivery carrier this row aggregates, as resolved for the destination handset.
-   */
-  readonly carrier: string;
-  readonly delivery: SmsDeliveryStats;
-  readonly latency: SmsLatencyStats;
-  /**
-   * Per-bucket lifecycle counts for this carrier, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.
-   */
-  readonly trend?: Array<SmsStatsPoint>;
-};
-
-/**
- * Per-carrier breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
- */
-export type SmsStatsByCarrierResponse = {
-  /**
-   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: SmsStatsSummaryPeriod;
-  /**
-   * Carrier breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no messages were sent in the period.
-   */
-  readonly data: Array<SmsCarrierStatsPoint>;
-  /**
-   * Total number of distinct carriers with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
-   *
-   */
-  readonly total: number;
-};
-
-/**
- * Aggregate delivery and latency stats for a single tag (`name:value`) over the requested period.
- */
-export type SmsTagStatsPoint = {
-  /**
-   * The tag this row aggregates, in `name:value` form. Each distinct name-and-value pair is its own row, and a message carrying several tags is counted once under each of them, so rows do not sum to the period total.
-   *
-   */
-  readonly tag: string;
-  readonly delivery: SmsDeliveryStats;
-  readonly latency: SmsLatencyStats;
-  /**
-   * Per-bucket lifecycle-count series for this tag over the window, bucketed by `trend_grain`. Sparse, so only buckets with activity are present rather than zero-filled, unlike the daily and hourly series. Present only when `include_trend=true`.
-   *
-   */
-  readonly trend?: Array<SmsStatsPoint>;
-};
-
-/**
- * Per-tag breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
- */
-export type SmsStatsByTagResponse = {
-  /**
-   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: SmsStatsSummaryPeriod;
-  /**
-   * Tag breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no tagged messages were sent in the period.
-   */
-  readonly data: Array<SmsTagStatsPoint>;
-  /**
-   * Total number of distinct tags with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
    *
    */
   readonly total: number;
@@ -6200,60 +8346,6 @@ export type SmsStatsByStatusResponse = {
 };
 
 /**
- * The change from the preceding period to the requested one. The `received_pct_change` field is a signed relative change, computed as `(current - previous) / previous`. A value of `0.5` means 50% higher, and `-0.2` means 20% lower. The field is null when the previous period received none.
- *
- */
-export type SmsInboundStatsComparisonDelta = {
-  /**
-   * Relative change in received messages versus the previous period, as a signed fraction. Null when the previous period received none.
-   */
-  readonly received_pct_change: number | null;
-};
-
-/**
- * The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
- *
- */
-export type SmsInboundStatsComparison = {
-  /**
-   * Equal-length window ending immediately before the requested start.
-   */
-  period: SmsStatsSummaryPeriod;
-  /**
-   * Distinct messages received in the preceding period.
-   */
-  readonly received: number;
-  readonly delta: SmsInboundStatsComparisonDelta;
-};
-
-/**
- * Total received messages over the requested period.
- *
- */
-export type SmsInboundStatsSummaryResponse = {
-  period: SmsStatsSummaryPeriod;
-  /**
-   * Distinct messages received in the period, counted by the time the carrier received them.
-   */
-  readonly received: number;
-  readonly comparison?: SmsInboundStatsComparison;
-};
-
-/**
- * One time bucket of received-message counts, attributed by arrival time.
- */
-export type SmsInboundStatsPoint = {
-  /**
-   * Start of the bucket this row covers, as a calendar day (YYYY-MM-DD) for the daily series or an hour boundary (RFC 3339) for the hourly one.
-   */
-  readonly bucket: string;
-  /**
-   * Distinct messages received in this bucket, counted by the time the carrier received them.
-   */
-  readonly received: number;
-};
-
-/**
  * Received-message time series. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
  *
  */
@@ -6263,70 +8355,6 @@ export type SmsInboundStatsResponse = {
    * One row per bucket (day or hour, per the grain) in the period, in chronological order. Buckets with no activity are included with a count of zero, so the series charts continuously without client-side gap handling.
    */
   readonly data: Array<SmsInboundStatsPoint>;
-};
-
-/**
- * Received-message volume for one country.
- *
- */
-export type SmsInboundCountryStatsPoint = {
-  /**
-   * The country of the Bird number the messages arrived on, as an ISO 3166-1 alpha-2 code. This identifies where the message was received. It does not identify the sender's country.
-   */
-  readonly country: string;
-  /**
-   * Distinct messages received on numbers in this country during the period.
-   */
-  readonly received: number;
-};
-
-/**
- * Received-message volume broken down by country, ranked by volume.
- *
- */
-export type SmsInboundStatsByCountryResponse = {
-  period: SmsStatsSummaryPeriod;
-  /**
-   * One row per country with activity in the period, most messages first, capped at the requested `limit`. A country with no messages in the period is absent rather than zero-filled, because unlike a time bucket it is not part of a continuous axis.
-   *
-   */
-  readonly data: Array<SmsInboundCountryStatsPoint>;
-  /**
-   * Total number of distinct countries the messages arrived in with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
-   */
-  readonly total: number;
-};
-
-/**
- * Received-message volume for one mobile operator.
- *
- */
-export type SmsInboundOperatorStatsPoint = {
-  /**
-   * Mobile country code and mobile network code of the network the sending subscriber is on. The breakdown keys on this rather than on an operator name because the carrier reports a name only where a surcharge applies, which would leave most of the world in one unnamed bucket.
-   */
-  readonly mcc_mnc: string;
-  /**
-   * Distinct messages received from senders on this operator during the period.
-   */
-  readonly received: number;
-};
-
-/**
- * Received-message volume broken down by operator, ranked by volume.
- *
- */
-export type SmsInboundStatsByOperatorResponse = {
-  period: SmsStatsSummaryPeriod;
-  /**
-   * One row per operator with activity in the period, most messages first, capped at the requested `limit`. An operator with no messages in the period is absent rather than zero-filled, because unlike a time bucket it is not part of a continuous axis.
-   *
-   */
-  readonly data: Array<SmsInboundOperatorStatsPoint>;
-  /**
-   * Total number of distinct sending operators with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
-   */
-  readonly total: number;
 };
 
 /**
@@ -6380,13 +8408,6 @@ export type SmsSenderSourceKind =
 export type AllocatedNumberId = string;
 
 export type SmsSenderSortField = "created_at" | "sender";
-
-/**
- * The kind of sender identity a message was sent from: a standard long-code number, a short code, an alphanumeric sender ID, or a toll-free number. Toll-free is its own value rather than a kind of long code, because it carries a separate regulatory regime and both sending policy and pricing key on it directly.
- *
- */
-export type SmsSenderType =
-  "long_code" | "short_code" | "alphanumeric" | "toll_free";
 
 /**
  * Where a sender stands on its own setup: the ownership paperwork its number owes, and the
@@ -7246,19 +9267,7 @@ export type EmailLookupBatchResponse = {
   readonly data: Array<EmailLookupBatchItem>;
 };
 
-/**
- * The channel a passcode is delivered over. Open enum: new channels may be added over time, so treat any unrecognized value as a future channel rather than an error.
- */
-export type VerificationChannel =
-  "email" | "sms" | "whatsapp" | "telegram" | "voice" | (string & {});
-
 export type VerificationId = string;
-
-/**
- * Why a verification session reached its final state without succeeding: `attempts_exhausted` (too many incorrect passcodes), `ttl_elapsed` (the time window elapsed before a correct passcode), or `undeliverable` (no planned channel could deliver a passcode, so the recipient never had one to submit). Open enum: new reasons may be added over time, so treat any unrecognized value as a future reason rather than an error.
- */
-export type VerificationTerminalReason =
-  "attempts_exhausted" | "ttl_elapsed" | "undeliverable" | (string & {});
 
 /**
  * The recipient to verify. Provide an `email`, a `phone_number`, or both; at least one is required. The addresses also identify the verification: a check must supply exactly the set used on the create call, so a verification created with both addresses is not found by either one alone.
@@ -7278,55 +9287,6 @@ export type VerificationTo = {
 export type VerificationChannelEntry = {
   channel: VerificationChannel;
 };
-
-/**
- * Why a passcode send did not deliver:
- *
- * - `carrier_rejected`: The SMS carrier rejected the send.
- * - `hard_bounce`: The email permanently bounced.
- * - `soft_bounce`: The email temporarily bounced, such as when a mailbox is full.
- * - `undelivered`: The channel reported a generic delivery failure.
- * - `channel_unavailable`: The channel could not be used, so the verification
- *   moved to the next channel.
- * - `channel_disabled`: Sending on the channel is temporarily disabled, so the
- *   verification moved to the next channel.
- * - `channel_restricted`: The channel does not carry passcodes to this
- *   destination country. The verification moves to the next channel enabled
- *   there, or fails when the country has no other.
- * - `delivery_timeout`: No delivery confirmation arrived before the channel's
- *   timeout, so the verification moved to the next channel.
- * - `not_billable`: The send could not be charged, so it was never handed to the
- *   channel. Usually the workspace balance is too low to cover it. Topping up
- *   the balance is what clears this.
- *
- * New reasons may be added over time. Treat unrecognized values as reasons added
- * later rather than errors.
- */
-export type VerificationAttemptFailureReason =
-  | "carrier_rejected"
-  | "hard_bounce"
-  | "soft_bounce"
-  | "undelivered"
-  | "channel_unavailable"
-  | "channel_disabled"
-  | "channel_restricted"
-  | "delivery_timeout"
-  | "not_billable"
-  | (string & {});
-
-/**
- * Meta's content classification for a template.
- *
- * - `authentication`: delivers one-time passcodes.
- * - `utility`: delivers transaction-triggered updates (receipts, order status).
- * - `marketing`: carries promotional content.
- *
- * The category determines the sender number and price. This is an open enum.
- * Accept unrecognized values.
- *
- */
-export type WhatsAppTemplateCategory =
-  "authentication" | "utility" | "marketing" | (string & {});
 
 export type Verification = {
   readonly id: VerificationId;
@@ -7445,8 +9405,6 @@ export type VerificationNextChannelRequest = {
 export type DomainId = string;
 
 export type WhatsAppNumberId = string;
-
-export type WhatsAppTemplateId = string;
 
 /**
  * Delivery status:
@@ -7640,6 +9598,11 @@ export type WhatsAppMessageTemplate = {
    * The canonical BCP-47 tag of the template variant that was sent.
    */
   readonly language: LanguageTag;
+  /**
+   * The `bid_multiplier` the message was sent with. Absent when the send named none, which bids at 1. Also absent on messages sent before Bird stored it.
+   *
+   */
+  readonly bid_multiplier?: number;
   /**
    * The values that filled the template's placeholders. Empty for an authentication template, whose content is never returned.
    *
@@ -8226,32 +10189,6 @@ export type WhatsAppMessageOrigin =
   "business_agent_echo" | "business_app_echo" | "history_sync" | (string & {});
 
 /**
- * Standardized failure reason:
- *
- * - `insufficient_balance`: The workspace wallet could not fund the send.
- * - `price_not_found`: No price was configured for the destination and template.
- * - `internal_error`: An unexpected service failure occurred.
- * - `undeliverable`: The recipient could not be reached.
- * - `service_window_expired`: The 24-hour service window closed; send a template.
- * - `rate_limited`: The send was throttled.
- * - `recipient_suppressed`: The recipient is on the workspace suppression list.
- * - `media_rejected`: WhatsApp could not fetch the media URL, or refused the file it found there; `description` carries its reason.
- *
- * This is an open enum. Accept unrecognized values.
- *
- */
-export type WhatsAppErrorCode =
-  | "insufficient_balance"
-  | "price_not_found"
-  | "internal_error"
-  | "undeliverable"
-  | "service_window_expired"
-  | "rate_limited"
-  | "recipient_suppressed"
-  | "media_rejected"
-  | (string & {});
-
-/**
  * Failure detail for a message that could not be delivered or was rejected.
  */
 export type WhatsAppError = {
@@ -8464,6 +10401,11 @@ export type WhatsAppTemplateSend = unknown & {
    *
    */
   language?: LanguageTag;
+  /**
+   * Scales the language's maximum price for this message only. The effective bid is the language's `optimization_spec.bid_amount`, times its country multiplier, times this value. At least 0.01 and at most 100; 1 when omitted. Only a language with an `optimization_spec`, on a template still in the `marketing` category, accepts it.
+   *
+   */
+  bid_multiplier?: number;
   /**
    * Values for the template's placeholders. Build it from the template language's `components`: each block's `example_parameters`, with real values, becomes that part's `parameters`. A template's `buttons` block becomes one `button` part per button that has `example_parameters`, in order; a `carousel` becomes one `cards` entry per card, built the same way. A `location` header always needs a part with a `location` parameter. Leave out other blocks without any.
    *
@@ -10249,6 +12191,34 @@ export type WhatsAppTemplateCategoryWrite =
   "authentication" | "utility" | "marketing";
 
 /**
+ * How Meta bids for each delivery.
+ *
+ * - `lowest_cost_with_bid_cap`: Meta delivers at the lowest cost it can find, never above the bid.
+ *
+ */
+export type WhatsAppTemplateBidStrategyWrite = "lowest_cost_with_bid_cap";
+
+/**
+ * A maximum price for this language's marketing deliveries. Meta charges each delivery a variable amount up to the bid. Only marketing templates accept it.
+ *
+ */
+export type WhatsAppTemplateOptimizationSpecWrite = {
+  /**
+   * The maximum price per 1,000 deliveries, in the smallest unit of the account's currency. The reach estimate returns that currency as `currency_code`. 5000 is USD 0.05 per delivery.
+   *
+   */
+  bid_amount: number;
+  bid_strategy: WhatsAppTemplateBidStrategyWrite;
+  /**
+   * Scales the bid for recipients in a country, keyed by ISO 3166-1 alpha-2 code. A country you leave out uses 1. Each write replaces the whole map.
+   *
+   */
+  bid_country_multiplier_overrides?: {
+    [key: string]: number;
+  };
+};
+
+/**
  * A content block's type. A `body` block is required on every language; `header`, `footer`, `buttons` and `carousel` are optional and appear at most once each. A `carousel` holds the cards a marketing template scrolls through, and is the one block type that nests: its cards carry blocks of their own. Any other value is rejected.
  *
  */
@@ -10472,6 +12442,11 @@ export type WhatsAppTemplateRevision = number;
  * One language's content, as written to a draft.
  */
 export type WhatsAppTemplateLanguageUpsert = {
+  /**
+   * This language's maximum price. Omit it to keep the current one. A new language written without it uses Meta's standard rate. Send `null` to return to the standard rate. Changing only the price updates Meta without a new review. A send at a maximum price needs the business account's `marketing_messages_onboarding_status` to be `onboarded`. Otherwise it fails with WhatsApp error 131061.
+   *
+   */
+  optimization_spec?: WhatsAppTemplateOptimizationSpecWrite | null;
   /**
    * The template's content blocks for this language. Header, footer and buttons are optional. Every variable needs an example value, which is what Meta reviews against. May be omitted or empty on a draft; a body block is required before the language can be submitted.
    *
@@ -10837,6 +12812,35 @@ export type WhatsAppTemplateLanguageList = {
 };
 
 /**
+ * How Meta bids for each delivery.
+ *
+ * - `lowest_cost_with_bid_cap`: Meta delivers at the lowest cost it can find, never above the bid.
+ *
+ */
+export type WhatsAppTemplateBidStrategy =
+  "lowest_cost_with_bid_cap" | (string & {});
+
+/**
+ * The maximum price for this language's marketing deliveries. Meta charges each delivery a variable amount up to the bid.
+ *
+ */
+export type WhatsAppTemplateOptimizationSpec = {
+  /**
+   * The maximum price per 1,000 deliveries, in the smallest unit of the account's currency. The reach estimate returns that currency as `currency_code`. 5000 is USD 0.05 per delivery.
+   *
+   */
+  bid_amount: number;
+  bid_strategy: WhatsAppTemplateBidStrategy;
+  /**
+   * Scales the bid for recipients in a country, keyed by ISO 3166-1 alpha-2 code. A country not listed uses 1. Empty when no country is scaled.
+   *
+   */
+  bid_country_multiplier_overrides: {
+    [key: string]: number;
+  };
+};
+
+/**
  * A hash over the serialized `components` this API surfaces, prefixed with the algorithm that produced it (`sha256:`) so the algorithm can change without the field becoming ambiguous. It tells you whether a language differs without transferring its content. Compare hashes only within one version of this API. Adding a field to the component shape changes every hash even when the underlying content is unchanged. Email's field of the same name carries bare hex and predates this form.
  *
  */
@@ -10907,6 +12911,10 @@ export type WhatsAppTemplatePause = {
  *
  */
 export type WhatsAppTemplateLanguage = {
+  /**
+   * This language's maximum price, or `null` when Meta's standard rate applies.
+   */
+  optimization_spec?: WhatsAppTemplateOptimizationSpec | null;
   /**
    * The canonical tag this language is addressed by.
    */
@@ -11011,190 +13019,6 @@ export type WhatsAppTemplateLanguageDiscard = {
 };
 
 /**
- * The window the server actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants on the hour). The grain of `from` and `to` mirrors the grain of the request's bounds.
- *
- */
-export type WhatsAppStatsSummaryPeriod = {
-  /**
-   * Inclusive start of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.
-   */
-  readonly from: string;
-  /**
-   * Inclusive end of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.
-   */
-  readonly to: string;
-  /**
-   * Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.
-   *
-   */
-  readonly data_as_of?: string | null;
-};
-
-/**
- * WhatsApp lifecycle counts and rates for the requested period, attributed by send time, so a later delivery stays attributed to the period in which its message was accepted, and a recent period under-reports `delivered` while delivery reports are still arriving. The sibling `engagement` block reports read counts and rates. Rates are null when their denominator is zero. Very large counts are close estimates rather than exact tallies.
- *
- */
-export type WhatsAppDeliveryStats = {
-  /**
-   * Distinct messages accepted for sending after admission checks. This is the denominator for `delivery_rate` and `failure_rate`.
-   */
-  readonly accepted: number;
-  /**
-   * Distinct messages handed off for delivery.
-   */
-  readonly sent: number;
-  /**
-   * Distinct messages confirmed delivered to the recipient's device.
-   */
-  readonly delivered: number;
-  /**
-   * Distinct messages that failed during sending or delivery.
-   */
-  readonly failed: number;
-  /**
-   * Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, or the wallet could not fund the send. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.
-   */
-  readonly rejected: number;
-  /**
-   * Share of accepted messages that were delivered, computed as `delivered / accepted`. Null when no messages were accepted in scope.
-   *
-   */
-  readonly delivery_rate: number | null;
-  /**
-   * Share of accepted messages that ultimately failed, computed as `failed / accepted`. Null when no messages were accepted in scope.
-   *
-   */
-  readonly failure_rate: number | null;
-};
-
-/**
- * WhatsApp engagement counts and the derived read rate for the scope of the containing row (the whole requested period or a breakdown dimension). The `read` field is the number of distinct messages confirmed read by the recipient. Send time determines attribution; the instant the read receipt arrived does not. A read is counted in the period its message was accepted in, alongside that message's own delivery when one arrived. The read rate divides reads by messages delivered in the same scope and is null when its denominator is zero. Very large counts are close estimates rather than exact tallies.
- *
- */
-export type WhatsAppEngagementStats = {
-  /**
-   * Distinct messages confirmed read by the recipient.
-   */
-  readonly read: number;
-  /**
-   * Distinct messages read relative to messages delivered in the same scope, computed as `read / delivery.delivered`. Both counts are attributed by send time, so a read is counted alongside its own message's delivery. The rate can exceed 1 where a read receipt arrived for a message whose delivery receipt did not, or, at high volume, because the counts are close estimates. Null when `delivery.delivered` is zero.
-   *
-   */
-  readonly read_rate: number | null;
-};
-
-/**
- * Approximate p50, p95, and p99 latency percentiles in milliseconds for one latency family. All three are null when no qualifying event contributed a measurement.
- *
- */
-export type WhatsAppLatencyQuantiles = {
-  /**
-   * Median (50th percentile) latency in milliseconds. Null when no qualifying event contributed a measurement.
-   */
-  readonly p50_ms: number | null;
-  /**
-   * 95th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
-   */
-  readonly p95_ms: number | null;
-  /**
-   * 99th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
-   */
-  readonly p99_ms: number | null;
-};
-
-/**
- * Latency percentiles in milliseconds for the requested scope:
- *
- * - `processing`: From acceptance to WhatsApp handoff.
- * - `delivery`: From WhatsApp handoff to delivery confirmation.
- * - `total`: From acceptance to delivery confirmation.
- *
- * Each family is omitted when no qualifying message contributes a measurement.
- * Individual percentiles can also be null. `delivery` is measured on a best-effort basis, so
- * it can be absent for a scope whose `processing` and `total` are present.
- *
- */
-export type WhatsAppLatencyStats = {
-  processing?: WhatsAppLatencyQuantiles;
-  delivery?: WhatsAppLatencyQuantiles;
-  total?: WhatsAppLatencyQuantiles;
-};
-
-/**
- * Changes from the previous period. A `*_pct_change` value is the signed relative change `(current - previous) / previous` and is null when the previous count is zero. A `*_rate_pp` value is the signed difference between rate fractions and is null when either rate is undefined.
- *
- */
-export type WhatsAppStatsComparisonDelta = {
-  /**
-   * Relative change in accepted messages (`delivery.accepted`) versus the previous period, as a signed fraction. Null when the previous period accepted none.
-   */
-  readonly accepted_pct_change: number | null;
-  /**
-   * Relative change in sent messages (`delivery.sent`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly sent_pct_change: number | null;
-  /**
-   * Relative change in delivered messages (`delivery.delivered`) versus the previous period, as a signed fraction. Null when the previous period delivered none.
-   */
-  readonly delivered_pct_change: number | null;
-  /**
-   * Relative change in failed messages (`delivery.failed`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly failed_pct_change: number | null;
-  /**
-   * Relative change in rejected messages (`delivery.rejected`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly rejected_pct_change: number | null;
-  /**
-   * Relative change in messages read (`engagement.read`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly read_pct_change: number | null;
-  /**
-   * Signed difference between this period's and the previous period's delivery rate, both fractions in [0,1] (multiply by 100 for percentage points). Null when either period's delivery rate is undefined.
-   */
-  readonly delivery_rate_pp: number | null;
-  /**
-   * Signed difference between this period's and the previous period's failure rate, both fractions in [0,1] (multiply by 100 for percentage points). Null when either period's failure rate is undefined.
-   */
-  readonly failure_rate_pp: number | null;
-  /**
-   * Signed difference between the current and previous read-rate fractions. Multiply by 100 for percentage points. The value can fall outside `[-1, 1]` because a read receipt can arrive for a message whose delivery receipt did not, and high-volume counts are approximate. Null when either rate is undefined.
-   *
-   */
-  readonly read_rate_pp: number | null;
-};
-
-/**
- * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
- *
- */
-export type WhatsAppStatsComparison = {
-  /**
-   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows). For a request covering 2026-05-01 to 2026-05-25, this is 2026-04-06 to 2026-04-30, both inclusive.
-   */
-  period: WhatsAppStatsSummaryPeriod;
-  readonly delivery: WhatsAppDeliveryStats;
-  readonly engagement: WhatsAppEngagementStats;
-  readonly latency: WhatsAppLatencyStats;
-  readonly delta: WhatsAppStatsComparisonDelta;
-};
-
-/**
- * WhatsApp lifecycle counts, rates, engagement, and latency percentiles for the full requested period. Counts aggregate the time buckets. Latency percentiles cover the whole period. Rates are null when their denominator is zero.
- *
- */
-export type WhatsAppStatsSummary = {
-  /**
-   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: WhatsAppStatsSummaryPeriod;
-  readonly delivery: WhatsAppDeliveryStats;
-  readonly engagement: WhatsAppEngagementStats;
-  readonly latency: WhatsAppLatencyStats;
-  readonly comparison?: WhatsAppStatsComparison;
-};
-
-/**
  * The window and bucket grain the response covers, echoed from the request, plus the freshness boundary the data is current to.
  *
  */
@@ -11216,58 +13040,6 @@ export type WhatsAppStatsSeriesPeriod = {
 };
 
 /**
- * WhatsApp lifecycle counts for a time bucket, attributed by send time. A message accepted on Monday and delivered on Tuesday counts in Monday's bucket. The sibling `engagement` block reports read counts. Rates are available only for the whole period. Very large counts are close estimates rather than exact tallies.
- *
- */
-export type WhatsAppDeliveryCounts = {
-  /**
-   * Distinct messages accepted for sending after admission checks.
-   */
-  readonly accepted: number;
-  /**
-   * Distinct messages handed off for delivery.
-   */
-  readonly sent: number;
-  /**
-   * Distinct messages confirmed delivered to the recipient's device.
-   */
-  readonly delivered: number;
-  /**
-   * Distinct messages that failed during sending or delivery.
-   */
-  readonly failed: number;
-  /**
-   * Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, or the wallet could not fund the send. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.
-   */
-  readonly rejected: number;
-};
-
-/**
- * WhatsApp engagement counts for a time bucket, attributed by send time. A message accepted on Monday and read on Tuesday counts in Monday's bucket. Read rates are available only for the whole period. Very large counts are close estimates rather than exact tallies.
- *
- */
-export type WhatsAppEngagementCounts = {
-  /**
-   * Distinct messages confirmed read by the recipient.
-   */
-  readonly read: number;
-};
-
-/**
- * WhatsApp lifecycle counts, engagement, and latency percentiles for one time bucket (a calendar day or hour), bucketed by send time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. Rates apply to the whole window rather than individual buckets.
- *
- */
-export type WhatsAppStatsPoint = {
-  /**
-   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.
-   */
-  readonly bucket: string;
-  readonly delivery: WhatsAppDeliveryCounts;
-  readonly engagement: WhatsAppEngagementCounts;
-  readonly latency: WhatsAppLatencyStats;
-};
-
-/**
  * Time-series stats payload. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
  *
  */
@@ -11277,38 +13049,6 @@ export type WhatsAppStatsResponse = {
    * One row per day or hour in chronological order. Buckets with no activity contain zero counts.
    */
   readonly data: Array<WhatsAppStatsPoint>;
-};
-
-/**
- * Number of failed messages for a single normalized failure reason over the requested period.
- */
-export type WhatsAppErrorCodeStatsPoint = {
-  /**
-   * The normalized failure reason this row aggregates, matching the `last_error.code` reported on an individual failed message.
-   */
-  readonly error_code: WhatsAppErrorCode;
-  /**
-   * Distinct messages that failed with this reason in scope.
-   */
-  readonly count: number;
-};
-
-/**
- * Per-error-code failure breakdown for the requested period, ranked by failure count descending and capped at the requested `limit` (default 50, max 200).
- */
-export type WhatsAppStatsByErrorCodeResponse = {
-  /**
-   * The window the response covers (echoed back), plus `data_as_of`.
-   */
-  period: WhatsAppStatsSummaryPeriod;
-  /**
-   * Error-code rows ranked by failure count descending. Empty when no failures occurred in the period.
-   */
-  readonly data: Array<WhatsAppErrorCodeStatsPoint>;
-  /**
-   * Total distinct error codes with failures in the period, regardless of `limit`.
-   */
-  readonly total: number;
 };
 
 /**
@@ -11339,68 +13079,6 @@ export type WhatsAppStatsByTemplateResponse = {
   readonly data: Array<WhatsAppTemplateStatsPoint>;
   /**
    * Total distinct templates with activity in the period, regardless of `limit`.
-   */
-  readonly total: number;
-};
-
-/**
- * Lifecycle counts, derived rates, and engagement for a single WhatsApp template category over the requested period.
- */
-export type WhatsAppTemplateCategoryStatsPoint = {
-  /**
-   * The template category this row aggregates.
-   */
-  readonly category: WhatsAppTemplateCategory;
-  readonly delivery: WhatsAppDeliveryStats;
-  readonly engagement: WhatsAppEngagementStats;
-  readonly latency: WhatsAppLatencyStats;
-};
-
-/**
- * Per-template-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
- */
-export type WhatsAppStatsByTemplateCategoryResponse = {
-  /**
-   * The window the response covers (echoed back), plus `data_as_of`.
-   */
-  period: WhatsAppStatsSummaryPeriod;
-  /**
-   * Category rows ranked by accepted volume descending.
-   */
-  readonly data: Array<WhatsAppTemplateCategoryStatsPoint>;
-  /**
-   * Total distinct categories with activity in the period, regardless of `limit`.
-   */
-  readonly total: number;
-};
-
-/**
- * Lifecycle counts, derived rates, and engagement for a single tag (name:value) over the requested period.
- */
-export type WhatsAppTagStatsPoint = {
-  /**
-   * The tag this row aggregates, in `name:value` form.
-   */
-  readonly tag: string;
-  readonly delivery: WhatsAppDeliveryStats;
-  readonly engagement: WhatsAppEngagementStats;
-  readonly latency: WhatsAppLatencyStats;
-};
-
-/**
- * Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
- */
-export type WhatsAppStatsByTagResponse = {
-  /**
-   * The window the response covers (echoed back), plus `data_as_of`.
-   */
-  period: WhatsAppStatsSummaryPeriod;
-  /**
-   * Tag rows ranked by accepted volume descending.
-   */
-  readonly data: Array<WhatsAppTagStatsPoint>;
-  /**
-   * Total distinct tags with activity in the period, regardless of `limit`.
    */
   readonly total: number;
 };
@@ -11439,97 +13117,6 @@ export type WhatsAppStatsByPhoneNumberResponse = {
    * Total distinct phone numbers with activity in the period, regardless of `limit`.
    */
   readonly total: number;
-};
-
-/**
- * Lifecycle counts, derived rates, engagement and latency for a single destination country over the requested period.
- */
-export type WhatsAppCountryStatsPoint = {
-  /**
-   * The destination country this row aggregates, as an ISO 3166-1 alpha-2 code. `ZZ` collects recipients whose country could not be resolved.
-   */
-  readonly country: CountryCode;
-  readonly delivery: WhatsAppDeliveryStats;
-  readonly engagement: WhatsAppEngagementStats;
-  readonly latency: WhatsAppLatencyStats;
-};
-
-/**
- * Per-country breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
- *
- */
-export type WhatsAppStatsByCountryResponse = {
-  /**
-   * The window the response covers (echoed back), plus `data_as_of`.
-   */
-  readonly period: WhatsAppStatsSummaryPeriod;
-  /**
-   * Country rows ranked by accepted volume descending. Empty when no eligible activity occurred in the period; rows sum to the summary less group-send volume, and less any pre-cutover phone-addressed sends still inside the window.
-   *
-   */
-  readonly data: Array<WhatsAppCountryStatsPoint>;
-  /**
-   * Total distinct countries with activity in the period, regardless of `limit`.
-   */
-  readonly total: number;
-};
-
-/**
- * The change from the preceding period to the requested one. The `received_pct_change` field is a signed relative change, computed as `(current - previous) / previous`. A value of `0.5` means 50% higher, and `-0.2` means 20% lower. The field is null when the previous period received none.
- *
- */
-export type WhatsAppInboundStatsComparisonDelta = {
-  /**
-   * Relative change in received messages versus the previous period, as a signed fraction. Null when the previous period received none.
-   */
-  readonly received_pct_change: number | null;
-};
-
-/**
- * The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
- *
- */
-export type WhatsAppInboundStatsComparison = {
-  /**
-   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows). For a request covering 2026-05-01 to 2026-05-25, this is 2026-04-06 to 2026-04-30, both inclusive.
-   */
-  period: WhatsAppStatsSummaryPeriod;
-  /**
-   * Distinct messages received in the preceding period.
-   */
-  readonly received: number;
-  readonly delta: WhatsAppInboundStatsComparisonDelta;
-};
-
-/**
- * Total received messages for the requested period.
- *
- */
-export type WhatsAppInboundStatsSummaryResponse = {
-  /**
-   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: WhatsAppStatsSummaryPeriod;
-  /**
-   * Distinct messages received in the period, counted by the time each message reached your number. Computed across the whole window rather than summed from the daily or hourly series, so it can sit slightly below the sum of those rows.
-   */
-  readonly received: number;
-  readonly comparison?: WhatsAppInboundStatsComparison;
-};
-
-/**
- * Received-message count for one time bucket (a calendar day or hour), bucketed by the time each message reached your number.
- *
- */
-export type WhatsAppInboundStatsPoint = {
-  /**
-   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the request's grain.
-   */
-  readonly bucket: string;
-  /**
-   * Distinct messages received in this bucket.
-   */
-  readonly received: number;
 };
 
 /**
@@ -12082,8 +13669,6 @@ export type WhatsAppNumberProfile = {
   readonly profile_picture_url?: string;
 };
 
-export type AmbBusinessId = string;
-
 /**
  * Pending accounts need setup or review. Active accounts have recorded approval. Suspended accounts retain their recorded suspension. Configured, connected accounts can exchange messages regardless of review status; Apple decides whether to accept outgoing requests. Disconnected accounts retain their identity and history but cannot exchange new messages until reconnected.
  */
@@ -12576,6 +14161,106 @@ export type AmbRoutingRuleUpdate = (
   is_default?: boolean;
 };
 
+export type AmbAttachmentUploadFromUrl = {
+  /**
+   * Apple business identifier of the business account that sends the attachment. Read it from the business account's apple_business_id. Only this business account can send the attachment.
+   */
+  from: string;
+  /**
+   * HTTPS URL of the file, at most 99,999,999 bytes. Bird downloads it and uploads it to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`.
+   */
+  source_url: string;
+  /**
+   * Display filename. Defaults to the last segment of the source_url path.
+   */
+  name?: string;
+  /**
+   * Media type of the file. Defaults to the type Bird detects from the contents.
+   */
+  mime_type?: string;
+};
+
+export type AmbAttachmentUpload = (
+  | {
+      file: unknown;
+    }
+  | {
+      source_url: unknown;
+    }
+) & {
+  /**
+   * Apple business identifier of the business account that sends the attachment. Read it from the business account's apple_business_id. Only this business account can send the attachment.
+   */
+  from: string;
+  /**
+   * The file, at most 25,000,000 bytes. Its filename becomes the attachment's name unless `name` is given. Supply this or source_url.
+   */
+  file?: Blob | File;
+  /**
+   * HTTPS URL of a file of at most 99,999,999 bytes, which Bird downloads instead of an uploaded file. Supply this or file. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`.
+   */
+  source_url?: string;
+  /**
+   * Display filename. Defaults to the uploaded filename, else the last segment of the source_url path.
+   */
+  name?: string;
+  /**
+   * Media type of the file. Defaults to the uploaded part's declared type, else the type Bird detects from the contents.
+   */
+  mime_type?: string;
+};
+
+export type AmbAttachmentId = string;
+
+/**
+ * How Bird obtained an attachment:
+ *
+ * - `received`: A customer sent it in a message.
+ * - `sent`: You sent it in a message by `source_url`.
+ * - `uploaded`: You uploaded it with createAMBAttachment.
+ *
+ */
+export type AmbAttachmentOrigin = "received" | "sent" | "uploaded";
+
+/**
+ * A file Apple holds for one business account. Send it again by passing `id` as `attachment_id` in `content.attachments`. Only the business account in `business_account_id` can send it; a send from another business account is refused with a `422` `AMBAttachmentBusinessMismatch`. `message_id` is absent for an uploaded attachment.
+ */
+export type AmbAttachment = {
+  /**
+   * Send it as `attachment_id`.
+   */
+  id: AmbAttachmentId;
+  /**
+   * The business account Apple holds the attachment for.
+   */
+  business_account_id: AmbBusinessId;
+  origin: AmbAttachmentOrigin;
+  /**
+   * The message the attachment belongs to.
+   */
+  message_id?: AmbMessageId;
+  /**
+   * Display filename. May be empty for an attachment stored before this release.
+   */
+  name: string;
+  /**
+   * Media type of the attachment. May be empty for an attachment stored before this release.
+   */
+  mime_type: string;
+  /**
+   * Attachment size in bytes. May be 0 for an attachment stored before this release.
+   */
+  size: number;
+  /**
+   * Bird's estimate of when Apple stops holding the attachment, 30 days after it was received, uploaded or last sent. A send within 24 hours of this time is refused.
+   */
+  expires_at: string;
+  /**
+   * When Bird stored the attachment.
+   */
+  created_at: string;
+};
+
 export type AmbConversationId = string;
 
 /**
@@ -12608,34 +14293,6 @@ export type AmbMessageStatus =
   "accepted" | "sent" | "send_failed" | "rejected" | "received";
 
 /**
- * Derived message classification for filtering and statistics. Send requests use the native content.type families. Create Apple Pay and authentication requests through the conversation payment and authentication operations.
- *
- * - text: Text, optionally with a subject.
- * - attachment: One or more files, images, audio clips, or videos.
- * - rich_link: A link with a preview card.
- * - quick_reply: Two to five reply choices.
- * - list_picker: A grouped menu of choices.
- * - time_picker: Appointment time slots; a reply may contain only a selected label.
- * - form: A multi-page form.
- * - imessage_app: A custom iMessage app interaction on a compatible device.
- * - interactive: An opaque interactive reference whose subtype is unknown.
- * - apple_pay: An Apple Pay request created through the conversation payment operations.
- * - authenticate: An identity verification request created through the conversation authentication operations.
- */
-export type AmbContentKind =
-  | "text"
-  | "attachment"
-  | "rich_link"
-  | "quick_reply"
-  | "list_picker"
-  | "time_picker"
-  | "form"
-  | "apple_pay"
-  | "authenticate"
-  | "imessage_app"
-  | "interactive";
-
-/**
  * Who sent an outbound message:
  *
  * - `operator`: A person, through a signed-in dashboard session.
@@ -12662,9 +14319,20 @@ export type AmbMessageSource = "operator" | "automation" | "api";
  */
 export type AmbMessageType = "text" | "rich_link" | "interactive";
 
-export type AmbNativeAttachment = unknown & {
+export type AmbNativeAttachment = (
+  | {
+      source_url: unknown;
+    }
+  | {
+      attachment_id: unknown;
+    }
+) & {
   /**
-   * HTTPS URL Bird downloads and uploads to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.
+   * The attachment to send, or this attachment's ID on a read.
+   */
+  attachment_id?: AmbAttachmentId;
+  /**
+   * HTTPS URL Bird downloads and uploads to Apple. Required on a send unless attachment_id is given. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS. Returned on reads of attachments you sent this way.
    */
   source_url?: string;
   /**
@@ -12676,25 +14344,9 @@ export type AmbNativeAttachment = unknown & {
    */
   mime_type?: string;
   /**
-   * Encrypted attachment URL returned by Apple.
+   * Attachment size in bytes. Absent until Apple holds the attachment.
    */
-  url?: string;
-  /**
-   * Opaque owner value returned by Apple.
-   */
-  owner?: string;
-  /**
-   * Attachment authorization signature returned by Apple.
-   */
-  signature_base64?: string;
-  /**
-   * Attachment decryption key returned by Apple.
-   */
-  key?: string;
-  /**
-   * Attachment size in bytes.
-   */
-  size?: number;
+  readonly size?: number;
 };
 
 export type AmbNativeTextContent = (
@@ -12716,7 +14368,7 @@ export type AmbNativeTextContent = (
    */
   subject?: string;
   /**
-   * Ordered attachments. Each object supplies a source URL or an encrypted Apple reference.
+   * Ordered attachments. A send supplies each one by source_url or attachment_id.
    */
   attachments?: Array<AmbNativeAttachment>;
 };
@@ -12760,43 +14412,8 @@ export type AmbNativeRichLinkData = {
   assets: AmbNativeRichLinkAssets;
 };
 
-export type AmbRichLinkReference = unknown & {
-  /**
-   * Title supplied by Apple for the preview.
-   */
-  title?: string;
-  /**
-   * Messages extension identifier supplied by Apple, when present.
-   */
-  bid?: string;
-  /**
-   * Signature binding the reference to the business, when supplied by Apple.
-   */
-  data_ref_sig?: string;
-  /**
-   * Location of the encrypted preview.
-   */
-  url: string;
-  /**
-   * Owner identifier supplied by Apple.
-   */
-  owner: string;
-  /**
-   * Signature supplied by Apple.
-   */
-  signature_base64: string;
-  /**
-   * Decryption key supplied by Apple.
-   */
-  key?: string;
-  /**
-   * Size of the encrypted preview in bytes.
-   */
-  size: number;
-};
-
 /**
- * Asks Apple to build the rich link preview when the message is sent, rather than through a prior `POST /v1/amb/messages/construct-payload` call. No caller holds a signed reference until the send itself resolves one.
+ * Asks Apple to build the rich link preview when the message is sent. Use `POST /v1/amb/messages/construct-payload` beforehand only to check the URL and see the preview's title.
  */
 export type AmbRichLinkConstruct = {
   /**
@@ -12823,11 +14440,10 @@ export type AmbNativeRichLinkContent = unknown & {
    */
   subject?: string;
   /**
-   * Ordered attachments. Each object supplies a source URL or an encrypted Apple reference.
+   * Ordered attachments. A send supplies each one by source_url or attachment_id.
    */
   attachments?: Array<AmbNativeAttachment>;
   rich_link_data?: AmbNativeRichLinkData;
-  rich_link_data_ref?: AmbRichLinkReference;
   rich_link_construct?: AmbRichLinkConstruct;
 };
 
@@ -12982,7 +14598,7 @@ export type AmbTimeSlot = {
    */
   identifier: string;
   /**
-   * When this slot begins. Seconds and fractional seconds must be zero, for example `2026-09-02T14:30:00Z`; otherwise sending returns `422` with error code `E01001`. The timestamp is converted to UTC for Apple while preserving the instant.
+   * When this slot begins, as an ISO 8601 date-time with a UTC offset. Seconds and fractional seconds must be zero, for example `2026-09-02T14:30:00Z`; any other value returns `422` with error code `E01001`. The timestamp is converted to UTC for Apple while preserving the instant. In Apple Messages template content it may instead be exactly one placeholder, such as `{{ slot_1 }}`, filled with a `timestamp` variable when the template is sent.
    */
   start_at: string;
   /**
@@ -13321,13 +14937,13 @@ export type AmbNativeInteractiveData = unknown & {
   data?: AmbNativeInteractivePayload;
 };
 
-export type AmbNativeInteractiveContent = unknown & {
+export type AmbNativeInteractiveContent = {
   /**
    * Always interactive.
    */
   type: AmbMessageType;
   /**
-   * Automatic introductions for inline quick replies are enabled regionally in stages. When enabled for a new send containing `interactive_data.data.quick_reply`, a nonblank body is sent as separate text before the choices. Messages using `interactive_data_ref` do not receive this automatic introduction, even after activation. All parts belong to one message, which becomes sent after Apple accepts all parts. For referenced interactions, before activation, and for retries retaining legacy behavior, body is included in the interactive request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the quick reply. Omit body to send choices only. For list pickers, time pickers and forms, use interactive_data.received_message for the visible introduction. Use one U+FFFC object replacement character per attachment to control placement.
+   * Automatic introductions for inline quick replies are enabled regionally in stages. When enabled for a new send containing `interactive_data.data.quick_reply`, a nonblank body is sent as separate text before the choices. All parts belong to one message, which becomes sent after Apple accepts all parts. Before activation, and for retries retaining legacy behavior, body is included in the interactive request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the quick reply. Omit body to send choices only. For list pickers, time pickers and forms, use interactive_data.received_message for the visible introduction. Use one U+FFFC object replacement character per attachment to control placement.
    */
   body?: string;
   /**
@@ -13335,11 +14951,10 @@ export type AmbNativeInteractiveContent = unknown & {
    */
   subject?: string;
   /**
-   * Ordered attachments. Each object supplies a source URL or an encrypted Apple reference.
+   * Ordered attachments. A send supplies each one by source_url or attachment_id.
    */
   attachments?: Array<AmbNativeAttachment>;
-  interactive_data?: AmbNativeInteractiveData;
-  interactive_data_ref?: AmbRichLinkReference;
+  interactive_data: AmbNativeInteractiveData;
 };
 
 /**
@@ -13582,12 +15197,6 @@ export type AmbInboundContent =
     } & AmbNativeInboundInteractiveContent);
 
 /**
- * Machine-readable reason a send failed, in one of two namespaces: `bird:` for a reason Bird's own pipeline assigned (for example `bird:business_not_registered`), or `apple:` followed by the HTTP status Apple's API returned for the send attempt (for example `apple:404`). This is an open, growing set in both namespaces; accept unrecognized values.
- *
- */
-export type AmbStatsErrorCode = string;
-
-/**
  * Failure detail for a message or invitation that could not be sent or was rejected.
  */
 export type AmbError = {
@@ -13693,10 +15302,6 @@ export type AmbMessage = {
    * When the selected sending outcome occurred. Null unless the current status is `sent` and the message is outbound. For older messages without a retained sending event, the stored record time is used.
    */
   readonly sent_at?: string | null;
-  /**
-   * Reusable encrypted content reference returned by Apple after a successful send. Absent until Apple returns one.
-   */
-  readonly data_ref?: AmbRichLinkReference;
   /**
    * Apple department identifier carried by this message. Omitted when absent from the message or unavailable on a historical record.
    */
@@ -14092,166 +15697,6 @@ export type AmbSuppressionCreate = {
 };
 
 /**
- * The window the server actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants on the hour). The grain of `from` and `to` mirrors the grain of the request's bounds.
- *
- */
-export type AmbStatsSummaryPeriod = {
-  /**
-   * Inclusive start of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary. Historical starts are preserved; the maximum request length does not impose a historical cutoff.
-   */
-  readonly from: string;
-  /**
-   * Inclusive end of the window, as a calendar day (`YYYY-MM-DD`) or an RFC 3339 hour boundary.
-   */
-  readonly to: string;
-  /**
-   * Latest time reflected in the statistics. More recent events might not be included yet. Null when the freshness boundary is unavailable.
-   *
-   */
-  readonly data_as_of?: string | null;
-};
-
-/**
- * Which timestamp a statistics response buckets its rows and totals by:
- *
- * - `accepted_time`: attributed to when Bird accepted the outbound message for sending. The outbound send statistics use this, so a later event for the same message, such as a send failure, still counts against the day or hour its message was accepted.
- * - `event_time`: attributed to when the event itself occurred. Inbound message statistics, conversation statistics and the staff per-business failure counts use this, since there is no earlier outbound event to anchor them to.
- *
- * A response never mixes the two axes: every row and total in one payload shares the same attribution.
- *
- */
-export type AmbStatsAttribution = "accepted_time" | "event_time";
-
-/**
- * Outbound Apple Messages for Business counts for the requested scope, attributed to when each message was accepted. Apple Messages for Business has no delivery receipt, so there is no `delivered` count anywhere in this API: `sent` is the last outbound state Bird observes for a message. Very large counts are close estimates rather than exact tallies. Rates are computed once here, clamped to 1, and null when nothing was accepted.
- *
- */
-export type AmbOutboundStatsCounts = {
-  /**
-   * Distinct messages accepted for sending after admission checks. This is the denominator for `sent_rate` and `send_failure_rate`.
-   */
-  readonly accepted: number;
-  /**
-   * Distinct messages handed off to Apple.
-   */
-  readonly sent: number;
-  /**
-   * Distinct accepted messages that Apple refused or that exhausted their send attempts. See `last_error.code` on the message for the reason; a refused charge is not a send failure, it is `rejected`.
-   */
-  readonly send_failed: number;
-  /**
-   * Distinct messages refused before any send attempt, because the destination has no price, the wallet could not fund the send, or the content cannot be sent yet. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `send_failure_rate`, which covers send failures only.
-   */
-  readonly rejected: number;
-  /**
-   * Share of accepted messages Apple acknowledged, computed as `sent / accepted`. Null when no messages were accepted in scope. This stands where other channels report a delivery rate.
-   */
-  readonly sent_rate: number | null;
-  /**
-   * Share of accepted messages that failed to send, computed as `send_failed / accepted`. Null when no messages were accepted in scope.
-   */
-  readonly send_failure_rate: number | null;
-};
-
-/**
- * Approximate p50, p95, and p99 latency percentiles in milliseconds for one latency family. All three are null when no qualifying event contributed a measurement.
- *
- */
-export type AmbStatsQuantiles = {
-  /**
-   * Median (50th percentile) latency in milliseconds. Null when no qualifying event contributed a measurement.
-   */
-  readonly p50_ms: number | null;
-  /**
-   * 95th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
-   */
-  readonly p95_ms: number | null;
-  /**
-   * 99th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
-   */
-  readonly p99_ms: number | null;
-};
-
-/**
- * Processing-latency percentiles in milliseconds for the requested scope, from acceptance to Apple handoff. Apple Messages for Business has no delivery receipt, so there is no `delivery` or `total` member beside `processing`. Conversation response timing is reported separately in `first_response`. Always present; every percentile is null when no qualifying message in scope has a measurement.
- *
- */
-export type AmbStatsLatency = {
-  processing: AmbStatsQuantiles;
-};
-
-/**
- * Changes from the previous period. Each value is the signed relative change `(current - previous) / previous` and is null when the previous count is zero.
- *
- */
-export type AmbStatsComparisonDelta = {
-  /**
-   * Relative change in accepted messages (`counts.accepted`) versus the previous period, as a signed fraction. Null when the previous period accepted none.
-   */
-  readonly accepted_pct_change: number | null;
-  /**
-   * Relative change in sent messages (`counts.sent`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly sent_pct_change: number | null;
-  /**
-   * Relative change in send failures (`counts.send_failed`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly send_failed_pct_change: number | null;
-  /**
-   * Relative change in rejected messages (`counts.rejected`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly rejected_pct_change: number | null;
-};
-
-/**
- * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with computed changes for the message counts and rates listed in `delta`. Present only when `compare=previous_period` is requested. Monthly active contacts and latency values are returned for both periods without a computed change.
- *
- */
-export type AmbStatsComparison = {
-  /**
-   * New monthly active contact charges activated by replies submitted in this window. Each business-scoped contact counts once per UTC calendar month. Omitted for message-kind, intent, group, category or tag filters. Read from retained activation records independently of the message rollup data_as_of boundary; tenant purges remove these records.
-   */
-  readonly monthly_active_contacts?: number;
-  /**
-   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows).
-   */
-  readonly period: AmbStatsSummaryPeriod;
-  readonly counts: AmbOutboundStatsCounts;
-  readonly latency: AmbStatsLatency;
-  /**
-   * First-response latency percentiles for the preceding period. Omitted when no qualifying message in that period has a measurement.
-   */
-  readonly first_response?: AmbStatsQuantiles;
-  readonly delta: AmbStatsComparisonDelta;
-};
-
-/**
- * Outbound Apple Messages for Business counts and latency percentiles for the full requested period. Counts and percentiles are computed over the whole period rather than combined from the returned time-series values.
- *
- */
-export type AmbStatsSummary = {
-  /**
-   * New monthly active contact charges activated by replies submitted in this window. Each business-scoped contact counts once per UTC calendar month. Omitted for message-kind, intent, group, category or tag filters. Read from retained activation records independently of the message rollup data_as_of boundary; tenant purges remove these records.
-   */
-  readonly monthly_active_contacts?: number;
-  /**
-   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  readonly period: AmbStatsSummaryPeriod;
-  /**
-   * Always `accepted_time` for outbound statistics.
-   */
-  readonly attribution: AmbStatsAttribution;
-  readonly counts: AmbOutboundStatsCounts;
-  readonly latency: AmbStatsLatency;
-  /**
-   * Time from the oldest unanswered inbound message to acceptance of the first outbound reply that claims it. Reported on summaries and breakdowns. Omitted when no qualifying reply contributes a measurement.
-   */
-  readonly first_response?: AmbStatsQuantiles;
-  readonly comparison?: AmbStatsComparison;
-};
-
-/**
  * The window and bucket grain the response covers, echoed from the request, plus the freshness boundary the data is current to.
  *
  */
@@ -14270,19 +15715,6 @@ export type AmbStatsSeriesPeriod = {
    *
    */
   readonly data_as_of?: string | null;
-};
-
-/**
- * Outbound Apple Messages for Business counts and processing-latency percentiles for one time bucket (a calendar day or hour), bucketed by acceptance time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. There is no `first_response` here. Read first-response latency from the summary or a breakdown endpoint.
- *
- */
-export type AmbStatsPoint = {
-  /**
-   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.
-   */
-  readonly bucket: string;
-  readonly counts: AmbOutboundStatsCounts;
-  readonly latency: AmbStatsLatency;
 };
 
 /**
@@ -14335,44 +15767,6 @@ export type AmbStatsByBusinessResponse = {
   readonly data: Array<AmbBusinessAccountStatsPoint>;
   /**
    * Total distinct businesses with activity in the period, regardless of `limit`.
-   */
-  readonly total: number;
-};
-
-/**
- * Outbound counts and latency percentiles for a single message content kind over the requested period.
- */
-export type AmbMessageKindStatsPoint = {
-  /**
-   * The content kind these messages were sent as, the same value the message read returns as its content kind discriminator.
-   */
-  readonly message_kind: AmbContentKind;
-  readonly counts: AmbOutboundStatsCounts;
-  readonly latency: AmbStatsLatency;
-  /**
-   * First-response latency percentiles for this content kind. Omitted when no qualifying message contributes a measurement.
-   */
-  readonly first_response?: AmbStatsQuantiles;
-};
-
-/**
- * Per-content-kind breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
- */
-export type AmbStatsByMessageKindResponse = {
-  /**
-   * The window the response covers (echoed back), plus `data_as_of`.
-   */
-  readonly period: AmbStatsSummaryPeriod;
-  /**
-   * Always `accepted_time` for outbound statistics.
-   */
-  readonly attribution: AmbStatsAttribution;
-  /**
-   * Content-kind rows ranked by accepted volume descending.
-   */
-  readonly data: Array<AmbMessageKindStatsPoint>;
-  /**
-   * Total distinct content kinds with activity in the period, regardless of `limit`.
    */
   readonly total: number;
 };
@@ -14451,183 +15845,6 @@ export type AmbStatsByGroupResponse = {
    * Total distinct groups with activity in the period, regardless of `limit`.
    */
   readonly total: number;
-};
-
-/**
- * Outbound counts and latency percentiles for a single message category over the requested period.
- */
-export type AmbCategoryStatsPoint = {
-  /**
-   * The category these messages were sent with. Defaults to an empty string when a send names no category.
-   */
-  readonly category: string;
-  readonly counts: AmbOutboundStatsCounts;
-  readonly latency: AmbStatsLatency;
-  /**
-   * First-response latency percentiles for this category. Omitted when no qualifying message contributes a measurement.
-   */
-  readonly first_response?: AmbStatsQuantiles;
-};
-
-/**
- * Per-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
- */
-export type AmbStatsByCategoryResponse = {
-  /**
-   * The window the response covers (echoed back), plus `data_as_of`.
-   */
-  readonly period: AmbStatsSummaryPeriod;
-  /**
-   * Always `accepted_time` for outbound statistics.
-   */
-  readonly attribution: AmbStatsAttribution;
-  /**
-   * Category rows ranked by accepted volume descending.
-   */
-  readonly data: Array<AmbCategoryStatsPoint>;
-  /**
-   * Total distinct categories with activity in the period, regardless of `limit`.
-   */
-  readonly total: number;
-};
-
-/**
- * Outbound counts and latency percentiles for a single tag over the requested period.
- */
-export type AmbTagStatsPoint = {
-  /**
-   * The tag these messages carry, as a bare name or a `name:value` pair. A message with several tags is counted once under each, so rows do not sum to the period total.
-   */
-  readonly tag: string;
-  readonly counts: AmbOutboundStatsCounts;
-  readonly latency: AmbStatsLatency;
-  /**
-   * First-response latency percentiles for this tag. Omitted when no qualifying message contributes a measurement.
-   */
-  readonly first_response?: AmbStatsQuantiles;
-};
-
-/**
- * Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Only tagged messages appear.
- */
-export type AmbStatsByTagResponse = {
-  /**
-   * The window the response covers (echoed back), plus `data_as_of`.
-   */
-  readonly period: AmbStatsSummaryPeriod;
-  /**
-   * Always `accepted_time` for outbound statistics.
-   */
-  readonly attribution: AmbStatsAttribution;
-  /**
-   * Tag rows ranked by accepted volume descending.
-   */
-  readonly data: Array<AmbTagStatsPoint>;
-  /**
-   * Total distinct tags with activity in the period, regardless of `limit`.
-   */
-  readonly total: number;
-};
-
-/**
- * Outbound counts and latency percentiles for a single failure reason over the requested period.
- */
-export type AmbErrorCodeStatsPoint = {
-  /**
-   * The failure reason these messages share.
-   */
-  readonly error_code: AmbStatsErrorCode;
-  readonly counts: AmbOutboundStatsCounts;
-  readonly latency: AmbStatsLatency;
-  /**
-   * First-response latency for failed replies that claimed an unanswered inbound message. Omitted when no qualifying reply contributes a measurement.
-   *
-   */
-  readonly first_response?: AmbStatsQuantiles;
-};
-
-/**
- * Per-failure-reason breakdown for the requested period, ranked by `send_failed + rejected` descending and capped at the requested `limit` (default 50, max 200). Only messages carrying an error code appear: a `bird:` code is usually a rejection, an `apple:` code a send failure.
- */
-export type AmbStatsByErrorCodeResponse = {
-  /**
-   * The window the response covers (echoed back), plus `data_as_of`.
-   */
-  readonly period: AmbStatsSummaryPeriod;
-  /**
-   * Always `accepted_time` for outbound statistics.
-   */
-  readonly attribution: AmbStatsAttribution;
-  /**
-   * Error-code rows ranked by `send_failed + rejected` descending.
-   */
-  readonly data: Array<AmbErrorCodeStatsPoint>;
-  /**
-   * Total distinct error codes with activity in the period, regardless of `limit`.
-   */
-  readonly total: number;
-};
-
-/**
- * The change from the preceding period to the requested one. The `received_pct_change` field is a signed relative change, computed as `(current - previous) / previous`. A value of `0.5` means 50% higher, and `-0.2` means 20% lower. The field is null when the previous period received none.
- *
- */
-export type AmbInboundStatsComparisonDelta = {
-  /**
-   * Relative change in received messages versus the previous period, as a signed fraction. Null when the previous period received none.
-   */
-  readonly received_pct_change: number | null;
-};
-
-/**
- * The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
- *
- */
-export type AmbInboundStatsComparison = {
-  /**
-   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows).
-   */
-  readonly period: AmbStatsSummaryPeriod;
-  /**
-   * Distinct messages received in the preceding period.
-   */
-  readonly received: number;
-  readonly delta: AmbInboundStatsComparisonDelta;
-};
-
-/**
- * Total inbound Apple Messages for Business messages for the requested period.
- *
- */
-export type AmbInboundStatsSummary = {
-  /**
-   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  readonly period: AmbStatsSummaryPeriod;
-  /**
-   * Always `event_time` for inbound statistics.
-   */
-  readonly attribution: AmbStatsAttribution;
-  /**
-   * Distinct messages received in the period, counted by the time each message occurred. Computed across the whole window rather than summed from the daily or hourly series, so it can sit slightly below the sum of those rows.
-   */
-  readonly received: number;
-  readonly comparison?: AmbInboundStatsComparison;
-};
-
-/**
- * Received-message count for one time bucket (a calendar day or hour), bucketed by the time each message occurred.
- *
- */
-export type AmbInboundStatsPoint = {
-  /**
-   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the request's grain.
-   */
-  readonly bucket: string;
-  /**
-   * Distinct messages received in this bucket.
-   */
-  readonly received: number;
 };
 
 /**
@@ -14719,94 +15936,6 @@ export type AmbInboundStatsByIntentResponse = {
 };
 
 /**
- * Conversation lifecycle counts for the requested scope, attributed to when each event occurred. A conversation can start, reopen, and close more than once over its life, so `started`, `reopened`, and `closed` can each exceed `conversations`, the number of distinct conversations touched in scope. Very large counts are close estimates rather than exact tallies.
- *
- */
-export type AmbConversationStatsCounts = {
-  /**
-   * Count of conversation-started events in scope.
-   */
-  readonly started: number;
-  /**
-   * Count of conversation-reopened events in scope.
-   */
-  readonly reopened: number;
-  /**
-   * Count of conversation-closed events in scope.
-   */
-  readonly closed: number;
-  /**
-   * Distinct conversations with at least one lifecycle event in scope.
-   */
-  readonly conversations: number;
-};
-
-/**
- * Changes from the previous period. Each value is the signed relative change `(current - previous) / previous` and is null when the previous count is zero.
- *
- */
-export type AmbConversationStatsComparisonDelta = {
-  /**
-   * Relative change in conversation starts (`counts.started`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly started_pct_change: number | null;
-  /**
-   * Relative change in conversation reopens (`counts.reopened`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly reopened_pct_change: number | null;
-  /**
-   * Relative change in conversation closes (`counts.closed`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly closed_pct_change: number | null;
-  /**
-   * Relative change in distinct conversations touched (`counts.conversations`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly conversations_pct_change: number | null;
-};
-
-/**
- * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
- *
- */
-export type AmbConversationStatsComparison = {
-  /**
-   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows).
-   */
-  readonly period: AmbStatsSummaryPeriod;
-  readonly counts: AmbConversationStatsCounts;
-  readonly delta: AmbConversationStatsComparisonDelta;
-};
-
-/**
- * Conversation lifecycle counts for the full requested period. Counts aggregate the time buckets.
- *
- */
-export type AmbConversationStatsSummary = {
-  /**
-   * The window the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  readonly period: AmbStatsSummaryPeriod;
-  /**
-   * Always `event_time` for conversation statistics.
-   */
-  readonly attribution: AmbStatsAttribution;
-  readonly counts: AmbConversationStatsCounts;
-  readonly comparison?: AmbConversationStatsComparison;
-};
-
-/**
- * Conversation lifecycle counts for one time bucket (a calendar day or hour), bucketed by when each event occurred.
- *
- */
-export type AmbConversationStatsPoint = {
-  /**
-   * The day (YYYY-MM-DD) or hour (RFC 3339, on the hour) this point covers, matching the period's grain.
-   */
-  readonly bucket: string;
-  readonly counts: AmbConversationStatsCounts;
-};
-
-/**
  * Conversation lifecycle time series. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
  *
  */
@@ -14877,6 +16006,11 @@ export type AmbTemplateSummary = {
    *
    */
   readonly content_kind: AmbContentKind;
+  /**
+   * Whether this built-in template holds sample business details, such as a store location or product images, that must be replaced before it can be sent. Sending it returns `422`; duplicate it into your workspace and customize the copy. Always false on workspace templates.
+   *
+   */
+  readonly customize_before_use: boolean;
   /**
    * The permanent editable draft version. Null for a built-in template.
    */
@@ -14960,6 +16094,11 @@ export type AmbTemplate = {
    *
    */
   readonly content_kind: AmbContentKind;
+  /**
+   * Whether this built-in template holds sample business details, such as a store location or product images, that must be replaced before it can be sent. Sending it returns `422`; duplicate it into your workspace and customize the copy. Always false on workspace templates.
+   *
+   */
+  readonly customize_before_use: boolean;
   /**
    * The permanent editable draft version. Null for a built-in template.
    */
@@ -15446,6 +16585,43 @@ export type WhatsAppBusinessAccountList = {
    */
   data: Array<WhatsAppBusinessAccount>;
 } & ListEnvelope;
+
+/**
+ * How many days of recent auctions a reach estimate is based on, ending now.
+ */
+export type WhatsAppReachEstimateWindow = "1d" | "7d" | "14d" | "28d";
+
+export type WhatsAppReachEstimateRow = {
+  /**
+   * The candidate bid, per 1,000 deliveries in the smallest currency unit. It is the unit `optimization_spec.bid_amount` takes.
+   */
+  bid_amount: number;
+  /**
+   * The audience size the estimate is for.
+   */
+  users: number;
+  deliveries_lower_bound: number;
+  deliveries_upper_bound: number;
+  /**
+   * The lower cost estimate, per 1,000 deliveries in the smallest currency unit.
+   */
+  cost_lower_bound: number;
+  /**
+   * The upper cost estimate, per 1,000 deliveries in the smallest currency unit.
+   */
+  cost_upper_bound: number;
+};
+
+export type WhatsAppReachEstimate = {
+  /**
+   * The currency of every amount in `estimates`.
+   */
+  currency_code: CurrencyCode;
+  /**
+   * One estimate per candidate bid, in ascending bid order.
+   */
+  estimates: Array<WhatsAppReachEstimateRow>;
+};
 
 export type WhatsAppSuppressionReasonFilter = "manual";
 
@@ -17191,250 +18367,6 @@ export type EmailStatsSeriesPeriod = {
 };
 
 /**
- * Breakdown of `bounced` by failure type, with each rate as a fraction of `bounced`. Counts are distinct bounced recipients of that type; the five types approximately partition `bounced`, so the five rates sum to roughly 1.0 when `bounced` is non-zero.
- *
- */
-export type EmailBounceStatsWithRates = {
-  /**
-   * Distinct recipients with a permanent delivery failure (invalid address or non-existent domain).
-   */
-  readonly hard: number;
-  /**
-   * Distinct recipients with a transient delivery failure (mailbox full or server temporarily unavailable).
-   */
-  readonly soft: number;
-  /**
-   * Distinct recipients refused by a policy at the receiving end, such as relaying denied or a blocklisted domain.
-   */
-  readonly admin: number;
-  /**
-   * Distinct recipients bounced because the receiving mail server blocked the sending IP for reputation reasons.
-   */
-  readonly block: number;
-  /**
-   * Distinct recipients bounced where the receiving server's response did not allow precise classification.
-   */
-  readonly undetermined: number;
-  /**
-   * Fraction of bounced recipients that hard bounced, computed as `hard / bounced`. Null when `bounced` is zero.
-   *
-   */
-  readonly hard_rate: number | null;
-  /**
-   * Fraction of bounced recipients that soft bounced, computed as `soft / bounced`. Null when `bounced` is zero.
-   *
-   */
-  readonly soft_rate: number | null;
-  /**
-   * Fraction of bounced recipients that admin bounced, computed as `admin / bounced`. Null when `bounced` is zero.
-   *
-   */
-  readonly admin_rate: number | null;
-  /**
-   * Fraction of bounced recipients that block bounced, computed as `block / bounced`. Null when `bounced` is zero.
-   *
-   */
-  readonly block_rate: number | null;
-  /**
-   * Fraction of bounced recipients with undetermined classification, computed as `undetermined / bounced`. Null when `bounced` is zero.
-   *
-   */
-  readonly undetermined_rate: number | null;
-};
-
-/**
- * Delivery counts and rates for the scope of the containing row (a time bucket, a breakdown dimension, or the whole period). Lifecycle counts identify distinct recipients that reached the named stage in scope; `oob_bounces` counts distinct failure events. Period summaries count each identity once per metric across the whole window, so adding time-bucket distinct counts can overstate the summary. Event time determines attribution; send time does not. A recipient delivered on Monday counts in Monday's row. A recipient who bounced and then succeeded on a retry can appear in both `bounced` and `delivered`. Very large counts are close estimates rather than exact tallies.
- *
- * These counts are successive lifecycle stages, so a recipient can appear in more than one:
- *
- * - `rejected`: Happens before any send attempt, from suppression, policy, or a generation failure.
- * - `deferred`: A temporary in-flight delay that is still being retried.
- * - `bounced`: A delivery failure, with its own hard, soft, admin, block, and undetermined sub-types.
- * - `complained`: Post-delivery spam feedback.
- *
- * Each rate is a fraction in the range 0 to 1 and is null when its denominator is zero. `accepted` is reported only where it can be attributed (time buckets and the period summary). Breakdown rows omit it.
- *
- */
-export type EmailDeliveryStats = {
-  /**
-   * Distinct recipients accepted for delivery after suppression filtering. Reported on time buckets and the period summary. Breakdown rows leave it out, because their rollups do not have it.
-   */
-  readonly accepted?: number;
-  /**
-   * Distinct recipients whose message was processed and handed off for delivery.
-   */
-  readonly processed: number;
-  /**
-   * Distinct recipients whose message the receiving mail server accepted.
-   */
-  readonly delivered: number;
-  /**
-   * Distinct recipients whose delivery failed. This is approximately the sum of the five `bounces.*` sub-counts (hard, soft, admin, block, undetermined). The two totals are worked out independently, so they can differ slightly.
-   *
-   */
-  readonly bounced: number;
-  readonly bounces: EmailBounceStatsWithRates;
-  /**
-   * Distinct recipients who reported the message as spam via a feedback loop.
-   */
-  readonly complained: number;
-  /**
-   * Distinct recipients whose delivery the receiving server temporarily delayed and is still being retried.
-   *
-   */
-  readonly deferred: number;
-  /**
-   * Distinct recipients rejected before any delivery attempt. Includes recipients on the workspace suppression list, transmissions that could not be completed, message-generation failures, and recipients refused by sending policy. The per-recipient `rejection_reason` field on `GET /v1/email/messages/{message_id}/recipients` surfaces the specific cause.
-   *
-   */
-  readonly rejected: number;
-  /**
-   * Out-of-band bounce events: distinct failure notifications received after the receiving server had initially confirmed delivery. The count represents deduplicated events rather than unique recipients.
-   *
-   */
-  readonly oob_bounces: number;
-  /**
-   * Recipients who remain delivered after all bounce signals resolve, computed as `delivered - oob_bounces`. Use this as the base for engagement-rate denominators. Clamped to 0 when `oob_bounces` exceeds `delivered`.
-   */
-  readonly effective_delivered: number;
-  /**
-   * Total recipients in this scope who did not receive the message, computed as `bounced + oob_bounces`.
-   */
-  readonly all_bounces: number;
-  /**
-   * Share of this scope's delivery attempts that resulted in an out-of-band bounce, computed as `oob_bounces / (delivered + bounced)`. Null when there were no attempts.
-   */
-  readonly oob_rate: number | null;
-  /**
-   * Share of this scope's delivery attempts that remained delivered after all bounce signals, computed as `effective_delivered / (delivered + bounced)`. Null when there were no attempts.
-   *
-   */
-  readonly delivery_rate: number | null;
-  /**
-   * Share of this scope's delivery attempts that ultimately failed (inband or out-of-band), computed as `all_bounces / (delivered + bounced)`. Because `oob_bounces` counts events rather than recipients, `all_bounces` can exceed the attempt count. The rate is clamped to 1. Null when there were no attempts.
-   *
-   */
-  readonly bounce_rate: number | null;
-  /**
-   * Spam complaints in this scope relative to effectively delivered recipients, computed as `complained / effective_delivered`. Complaints are attributed by event time, so a scope can record more of them than it effectively delivered, pushing the rate above 1. Null when `effective_delivered` is zero.
-   *
-   */
-  readonly complaint_rate: number | null;
-};
-
-/**
- * Engagement counts and rates for the scope of the containing row (a time bucket, a breakdown dimension, or the whole period). `opens`, `opens_non_prefetched` and `clicks` count distinct engagement events (deduplicated occurrences). The `unique_*` fields count distinct recipients. `unsubscribes` counts distinct unsubscribe events. An event counts in the time bucket when it occurs, even if the message was sent in an earlier bucket. Counts are deduplicated with a scalable approximate counting method, so very large counts are close estimates rather than exact tallies. Each rate divides the counts in this scope and is null when its denominator is zero.
- *
- */
-export type EmailEngagementStats = {
-  /**
-   * Distinct open events, counting repeat opens from the same recipient and opens auto-fetched by inbox privacy features (such as Apple Mail Privacy Protection and the Gmail image proxy).
-   *
-   */
-  readonly opens: number;
-  /**
-   * Distinct open events excluding those auto-fetched by inbox privacy features. Same event-counting semantics as `opens` (repeat opens from the same recipient count separately), with prefetched opens removed.
-   *
-   */
-  readonly opens_non_prefetched: number;
-  /**
-   * Distinct recipients who opened at least once, including opens auto-fetched by inbox privacy features.
-   */
-  readonly unique_opens: number;
-  /**
-   * Distinct recipients who opened at least once, excluding opens auto-fetched by inbox privacy features. This is the numerator used for open rate, so iOS-heavy audiences (Apple Mail Privacy Protection and similar) do not inflate it.
-   *
-   */
-  readonly unique_opens_non_prefetched: number;
-  /**
-   * Distinct click events, counting repeat clicks from the same recipient.
-   */
-  readonly clicks: number;
-  /**
-   * Distinct recipients who clicked at least once.
-   */
-  readonly unique_clicks: number;
-  /**
-   * Distinct unsubscribe events, recorded via the list-unsubscribe header or the footer link.
-   */
-  readonly unsubscribes: number;
-  /**
-   * Distinct non-prefetched openers relative to effectively delivered recipients in the same scope, computed as `unique_opens_non_prefetched / delivery.effective_delivered`; on rows without an `effective_delivered` field (the mailbox-provider breakdowns) the denominator equals `delivery.delivered`. The numerator excludes opens auto-fetched by inbox privacy features. Opens are attributed by event time, so engagement earned by earlier deliveries can push the rate above 1. Null when the denominator is zero.
-   *
-   */
-  readonly open_rate: number | null;
-  /**
-   * Distinct clickers relative to effectively delivered recipients in the same scope, computed as `unique_clicks / delivery.effective_delivered` (`delivery.delivered` on rows without an `effective_delivered` field). Clicks are attributed by event time, so engagement earned by earlier deliveries can push the rate above 1. Null when the denominator is zero.
-   *
-   */
-  readonly click_rate: number | null;
-  /**
-   * Unsubscribe events relative to effectively delivered recipients in the same scope, computed as `unsubscribes / delivery.effective_delivered` (`delivery.delivered` on rows without an `effective_delivered` field). Unsubscribes are attributed by event time, so the rate can exceed 1. Null when the denominator is zero.
-   *
-   */
-  readonly unsubscribe_rate: number | null;
-};
-
-/**
- * Approximate p50, p95, and p99 latency percentiles in milliseconds for one latency family over the bucket. All three are null when no qualifying event contributed a measurement.
- *
- */
-export type EmailLatencyQuantiles = {
-  /**
-   * Median (50th percentile) latency in milliseconds. Null when no qualifying event contributed a measurement.
-   */
-  readonly p50_ms: number | null;
-  /**
-   * 95th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
-   */
-  readonly p95_ms: number | null;
-  /**
-   * 99th percentile latency in milliseconds. Null when no qualifying event contributed a measurement.
-   */
-  readonly p99_ms: number | null;
-};
-
-/**
- * Latency percentiles (p50, p95, p99) in milliseconds for the bucket. On the summary endpoint these are computed across the whole period rather than per bucket. Three families are reported:
- *
- * - `processing`: Time from accepting the send to handing the message off for delivery. Measured per processed recipient; null when no recipient in the bucket has reached the processed stage.
- * - `delivery`: Time from handoff to the receiving mail server accepting the message, dominated by recipient-side delivery behavior. Measured per delivered recipient; null when no deliveries occurred in the bucket.
- * - `total`: End-to-end time from accepting the send to delivery, and the number most worth watching against your own delivery targets. Measured per delivered recipient; null when no deliveries occurred in the bucket.
- *
- * Each family is reported independently. A family is omitted when no qualifying
- * event contributed a latency measurement in the bucket. This also applies when
- * the workspace has not recorded latency for that stage yet. The `processing`
- * family can therefore be present while `delivery` and `total` are absent. A
- * client must handle a missing family, and a null p50/p95/p99 within a present
- * family, by rendering a placeholder rather than assuming a number.
- *
- */
-export type EmailLatencyStats = {
-  processing?: EmailLatencyQuantiles;
-  delivery?: EmailLatencyQuantiles;
-  total?: EmailLatencyQuantiles;
-};
-
-/**
- * Aggregate stats for one time bucket (a calendar day or hour, per the requested grain, in the requested `timezone` or UTC by default), bucketed by event time. Buckets with no activity are included with zero counts and null latency percentiles, so the series charts continuously without client-side gap handling.
- *
- */
-export type EmailStatsPoint = {
-  /**
-   * The day (YYYY-MM-DD, in the requested `timezone`) or hour this point covers, matching the period's grain. An hour bucket is an RFC 3339 UTC instant marking the start of the hour. It falls on a local hour boundary when `timezone` is set, which is on the UTC hour only for whole-hour offsets.
-   */
-  readonly bucket: string;
-  /**
-   * Distinct email messages accepted in this bucket, counted at the message level (one per accepted send regardless of how many recipients it addresses). Every other metric in `delivery` and `engagement` is recipient-level or event-level.
-   *
-   */
-  readonly sends_accepted: number;
-  readonly delivery: EmailDeliveryStats;
-  readonly engagement: EmailEngagementStats;
-  readonly latency: EmailLatencyStats;
-};
-
-/**
  * Time-series stats payload. `period` echoes the range and bucket grain actually computed against. `data` is one row per bucket in chronological order.
  *
  */
@@ -17444,150 +18376,6 @@ export type EmailStatsResponse = {
    * One row per bucket (day or hour, per the grain) in the period, in chronological order. Buckets with no activity are included with zero counts.
    */
   readonly data: Array<EmailStatsPoint>;
-};
-
-/**
- * Metric to rank breakdown rows by, applied descending. Shared by the breakdowns whose rows have the full delivery, engagement, and latency block: tags, sending domains, categories, recipient domains, templates, and broadcasts. Any count or rate can be used. A row whose rate is undefined, because its denominator was zero, sorts last. A bounce sub-type is nested under `bounces` in each row, so its sort name reflects that, for example `bounces.hard` and `bounces.hard_rate`. `oob_bounces` is distinct from `bounced`: it counts out-of-band bounces, failure notifications that arrive after delivery was already confirmed.
- *
- */
-export type EmailStatsSortMetric =
-  | "processed"
-  | "delivered"
-  | "bounced"
-  | "complained"
-  | "deferred"
-  | "rejected"
-  | "oob_bounces"
-  | "bounces.hard"
-  | "bounces.soft"
-  | "bounces.admin"
-  | "bounces.block"
-  | "bounces.undetermined"
-  | "opens"
-  | "opens_non_prefetched"
-  | "unique_opens"
-  | "unique_opens_non_prefetched"
-  | "clicks"
-  | "unique_clicks"
-  | "unsubscribes"
-  | "delivery_rate"
-  | "bounce_rate"
-  | "complaint_rate"
-  | "open_rate"
-  | "click_rate"
-  | "unsubscribe_rate"
-  | "bounces.hard_rate"
-  | "bounces.soft_rate"
-  | "bounces.admin_rate"
-  | "bounces.block_rate"
-  | "bounces.undetermined_rate";
-
-/**
- * The date range this response was actually computed against. Echoed back so clients can render the period without tracking it themselves and so cached responses can be keyed by what was queried.
- *
- */
-export type EmailStatsPeriod = {
-  /**
-   * Inclusive start date the response covers (YYYY-MM-DD).
-   */
-  readonly from: string;
-  /**
-   * Inclusive end date the response covers (YYYY-MM-DD).
-   */
-  readonly to: string;
-  /**
-   * The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.
-   *
-   */
-  readonly data_as_of?: string | null;
-};
-
-/**
- * One point in a breakdown row's trend series: the headline delivery and engagement rates for that row's dimension value over a single day or hour. Returned only when `include_trend=true`. The bucket grain (day or hour) follows the `trend_grain` parameter. Counts and rates are approximate at scale.
- *
- */
-export type EmailStatsSeriesPoint = {
-  /**
-   * The day (YYYY-MM-DD) or hour (ISO 8601, on the hour) this point covers, matching the requested `trend_grain`.
-   */
-  readonly bucket: string;
-  /**
-   * Delivered recipients in this bucket.
-   */
-  readonly delivered: number;
-  /**
-   * Bounced recipients in this bucket.
-   */
-  readonly bounced: number;
-  /**
-   * Delivery rate for this bucket, as a fraction. Null when nothing was delivered or bounced.
-   */
-  readonly delivery_rate: number | null;
-  /**
-   * Bounce rate for this bucket, as a fraction. Null when nothing was delivered or bounced.
-   */
-  readonly bounce_rate: number | null;
-  /**
-   * Complaint rate for this bucket, as a fraction. Event-time attribution can push it above 1 when complaints outrun the bucket's deliveries. Null when nothing was delivered in the bucket. On a sending-IP row complaints are not attributed to the IP, so this reads 0 in buckets that had deliveries and null in buckets that had none.
-   */
-  readonly complaint_rate: number | null;
-  /**
-   * Open rate for this bucket, as a fraction. Event-time attribution can push it above 1 when opens outrun the bucket's deliveries. Null when nothing was delivered in the bucket. On a sending-IP row engagement is not attributed to the IP, so this reads 0 in buckets that had deliveries and null in buckets that had none.
-   */
-  readonly open_rate: number | null;
-  /**
-   * Click rate for this bucket, as a fraction. Event-time attribution can push it above 1 when clicks outrun the bucket's deliveries. Null when nothing was delivered in the bucket. On a sending-IP row engagement is not attributed to the IP, so this reads 0 in buckets that had deliveries and null in buckets that had none.
-   */
-  readonly click_rate: number | null;
-};
-
-/**
- * Aggregate delivery and engagement stats for a single tag name-and-value pair over the requested period.
- */
-export type EmailTagStatsPoint = {
-  /**
-   * The tag this row aggregates, formatted as `name:value` from the tag set at send time (for example `campaign:welcome-series`). Each distinct name-and-value pair is its own row.
-   *
-   */
-  readonly tag: string;
-  readonly delivery: EmailDeliveryStats;
-  readonly engagement: EmailEngagementStats;
-  readonly latency: EmailLatencyStats;
-  /**
-   * Per-bucket rate series for this tag over the window. Present only when `include_trend=true`.
-   */
-  readonly trend?: Array<EmailStatsSeriesPoint>;
-};
-
-/**
- * Per-tag breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
- */
-export type EmailStatsTagsResponse = {
-  /**
-   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: EmailStatsPeriod;
-  /**
-   * Tag breakdown rows, ranked by the `sort` metric (default `processed`) descending. Empty when no tagged sends occurred in the period.
-   */
-  readonly data: Array<EmailTagStatsPoint>;
-  /**
-   * Total number of distinct tags (name and value pairs) with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
-   *
-   */
-  readonly total: number;
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
 };
 
 /**
@@ -17715,8 +18503,6 @@ export type EmailStatsQueryTagFilter = {
   include?: Array<string>;
   exclude?: Array<string>;
 };
-
-export type IpPoolId = string;
 
 /**
  * Match recorded values using include or exclude. Include values combine with OR; exclusions remove matches. Missing values survive exclude-only predicates. Supply a nonempty array; at most 20 distinct values across both arrays are accepted after normalization, with no overlap.
@@ -18123,196 +18909,6 @@ export type EmailStatsQueryResponse = {
 };
 
 /**
- * The window this response was actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants). The grain of `from` and `to` mirrors the grain of the request's bounds. Days and hour boundaries follow the requested `timezone` (UTC when omitted).
- *
- */
-export type EmailStatsSummaryPeriod = {
-  /**
-   * Inclusive start of the window the response covers. A calendar day (YYYY-MM-DD, in the requested `timezone`) for day windows. For hour windows, an RFC 3339 UTC instant marking the start of the first hour, which falls on a local hour boundary when `timezone` is set.
-   */
-  readonly from: string;
-  /**
-   * Inclusive end of the window the response covers. A calendar day (YYYY-MM-DD, in the requested `timezone`) for day windows. For hour windows, an RFC 3339 UTC instant marking the start of the last hour, which falls on a local hour boundary when `timezone` is set.
-   */
-  readonly to: string;
-  /**
-   * The instant the statistics in this response are current to: events recorded up to roughly this time are reflected, while more recent events may not be yet. Statistics are served from a rolling aggregation that refreshes every few seconds, so a response reflects data from up to a few seconds ago. Use this field to label data freshness (for example "as of 14:03") rather than assuming the numbers are to-the-second. Null when the freshness boundary is not being reported.
-   *
-   */
-  readonly data_as_of?: string | null;
-};
-
-/**
- * The change in each headline metric from the preceding period to the requested one. A `*_pct_change` field is a signed relative change in a count, computed as `(current - previous) / previous`, so `0.5` means 50% higher and `-0.2` means 20% lower. It is null when the previous period's count was zero because a relative change cannot be computed. A `*_rate_pp` field is the signed difference between the two periods' rate values. Each value is expressed as a fraction. A value of `0.012` means the rate rose by 1.2 percentage points. A value of `-0.003` means it fell by 0.3 points. The field is null when either period's rate is undefined, because its denominator was zero. `delivery_rate_pp` and `bounce_rate_pp` range from `-1` to `1`, because the rates behind them cannot exceed 1. The engagement deltas have no fixed bound, because events are counted when they arrive rather than when the message was sent, which can push their rate above 1.
- *
- */
-export type EmailStatsComparisonDelta = {
-  /**
-   * Relative change in accepted messages (the `sends_accepted` count) versus the previous period, as a signed fraction. Null when the previous period accepted none.
-   */
-  readonly sends_accepted_pct_change: number | null;
-  /**
-   * Relative change in effectively delivered recipients (`delivery.effective_delivered`, the delivery-rate numerator) versus the previous period, as a signed fraction. Null when the previous period effectively delivered none.
-   */
-  readonly delivered_pct_change: number | null;
-  /**
-   * Relative change in total bounces including out-of-band (`delivery.all_bounces`, the bounce-rate numerator) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly bounced_pct_change: number | null;
-  /**
-   * Relative change in spam complaints (`delivery.complained`) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly complained_pct_change: number | null;
-  /**
-   * Relative change in unique non-prefetched opens (`engagement.unique_opens_non_prefetched`, the same count the open rate uses) versus the previous period, as a signed fraction. Null when the previous period had none.
-   */
-  readonly opened_pct_change: number | null;
-  /**
-   * Signed difference between this period's and the previous period's delivery rate, both fractions in [0,1] (multiply by 100 for percentage points). Null when either period's delivery rate is undefined.
-   */
-  readonly delivery_rate_pp: number | null;
-  /**
-   * Signed difference between this period's and the previous period's open rate, both fractions (multiply by 100 for percentage points). Null when either period's open rate is undefined.
-   */
-  readonly open_rate_pp: number | null;
-  /**
-   * Signed difference between this period's and the previous period's click rate, both fractions (multiply by 100 for percentage points). Null when either period's click rate is undefined.
-   */
-  readonly click_rate_pp: number | null;
-  /**
-   * Signed difference between this period's and the previous period's bounce rate, both fractions in [0,1] (multiply by 100 for percentage points). Null when either period's bounce rate is undefined.
-   */
-  readonly bounce_rate_pp: number | null;
-  /**
-   * Signed difference between this period's and the previous period's complaint rate, both fractions (multiply by 100 for percentage points). Null when either period's complaint rate is undefined.
-   */
-  readonly complaint_rate_pp: number | null;
-  /**
-   * Signed difference between this period's and the previous period's unsubscribe rate, both fractions (multiply by 100 for percentage points). Null when either period's unsubscribe rate is undefined.
-   */
-  readonly unsubscribe_rate_pp: number | null;
-};
-
-/**
- * The same statistics for the equal-length, inclusive period ending the day immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
- *
- */
-export type EmailStatsComparison = {
-  /**
-   * The preceding window these comparison figures cover, the equal-length window ending immediately before the requested start (the prior day for day windows, the prior hour for hour windows). For a request covering 2026-05-01 to 2026-05-31, this is 2026-03-31 to 2026-04-30, both inclusive.
-   */
-  period: EmailStatsSummaryPeriod;
-  /**
-   * Distinct email messages accepted in the preceding period, counted at the message level.
-   */
-  readonly sends_accepted: number;
-  readonly delivery: EmailDeliveryStats;
-  readonly engagement: EmailEngagementStats;
-  readonly latency: EmailLatencyStats;
-  readonly delta: EmailStatsComparisonDelta;
-};
-
-/**
- * A single row that aggregates delivery and engagement counts, plus derived
- * rates, across the whole requested period. Use this endpoint for KPI
- * tiles, campaign reporting, and anywhere you need a rate with a meaningful
- * denominator. The daily and hourly endpoints report the same rates, but
- * per bucket, each one dividing that bucket's own counts.
- *
- * Distinct message, recipient, and event counts are computed across the whole
- * requested period. An identity present in more than one time bucket counts
- * once for that metric in the period summary, so adding daily or hourly
- * distinct counts can overstate the summary. Very large counts are close
- * estimates rather than exact tallies. Latency percentiles are also computed
- * across the whole period. A rate is null when its denominator is zero.
- *
- */
-export type EmailStatsSummary = {
-  /**
-   * The window the response covers (echoed back from the request, day or hour grain), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: EmailStatsSummaryPeriod;
-  /**
-   * Distinct email messages accepted, counted at the message level (one per accepted send regardless of recipient count) across the whole requested period. This field counts messages. `delivery.accepted` counts recipients, so the two values are not comparable (a single message to 500 recipients is 1 here and up to 500 there).
-   */
-  readonly sends_accepted: number;
-  readonly delivery: EmailDeliveryStats;
-  readonly engagement: EmailEngagementStats;
-  readonly latency: EmailLatencyStats;
-  readonly comparison?: EmailStatsComparison;
-};
-
-/**
- * Delivery counts and rates for messages attributed to a single sending IP. Per-IP results omit `accepted` and `processed` counts. The sending IP becomes known only after a message is delivered, bounced, deferred, or bounced late. Those earlier lifecycle states cannot be attributed to a specific IP. Spam complaints and out-of-band bounce notifications also lack per-IP attribution on this breakdown. The `complained` and `oob_bounces` fields therefore read 0. Their rates read 0 when the denominator is non-zero and null when it is zero. The `effective_delivered` field equals `delivered`, and `all_bounces` equals `bounced`.
- *
- */
-export type EmailSendingIpDeliveryStats = {
-  /**
-   * Distinct recipients whose message the receiving mail server accepted.
-   */
-  readonly delivered: number;
-  /**
-   * Distinct recipients whose delivery failed. This is approximately the sum of the five `bounces.*` sub-counts (hard, soft, admin, block, undetermined). The two are computed independently, so they can differ slightly.
-   */
-  readonly bounced: number;
-  /**
-   * Distinct recipients who reported the message as spam. Complaints are not attributed to a sending IP, so this reads 0 on this breakdown. Read complaint counts from the summary or time-series statistics instead.
-   */
-  readonly complained: number;
-  /**
-   * Distinct recipients in transient delivery deferral that is still being retried.
-   */
-  readonly deferred: number;
-  /**
-   * Out-of-band bounce events: failure notifications received after the receiving server had initially confirmed delivery. Not attributed to a sending IP on this breakdown, so this reads 0. Workspace-wide out-of-band counts are on the summary and time-series statistics.
-   *
-   */
-  readonly oob_bounces: number;
-  /**
-   * Recipients on this IP who remain delivered after all bounce signals resolve, computed as `delivered - oob_bounces`. Clamped to 0 when `oob_bounces` exceeds `delivered`.
-   */
-  readonly effective_delivered: number;
-  /**
-   * Total recipients on this IP who did not receive the message, computed as `bounced + oob_bounces`.
-   */
-  readonly all_bounces: number;
-  /**
-   * Share of this IP's delivery attempts that resulted in an out-of-band bounce, computed as `oob_bounces / (delivered + bounced)`. Null when `delivered + bounced` is zero (no attempts).
-   */
-  readonly oob_rate: number | null;
-  readonly bounces: EmailBounceStatsWithRates;
-  /**
-   * Share of this IP's delivery attempts that remained delivered after all bounce signals, computed as `effective_delivered / (delivered + bounced)`. Null when `delivered + bounced` is zero.
-   *
-   */
-  readonly delivery_rate: number | null;
-  /**
-   * Share of this IP's delivery attempts that ultimately failed (inband or out-of-band), computed as `all_bounces / (delivered + bounced)`. Null when `delivered + bounced` is zero (no attempts).
-   *
-   */
-  readonly bounce_rate: number | null;
-  /**
-   * Share of effectively delivered recipients on this IP who reported the message as spam, computed as `complained / effective_delivered`. Null when `effective_delivered` is zero.
-   *
-   */
-  readonly complaint_rate: number | null;
-};
-
-/**
- * Latency percentiles (p50, p95, p99) in milliseconds for the messages in this breakdown row, for breakdowns whose dimension is known only from delivery onward (sending IP, mailbox provider).
- *
- * - `delivery`: Time from handing the message off to the receiving mail server accepting it. Null when no deliveries occurred for this row in the period.
- * - `total`: End-to-end time from accepting the send to delivery. Null when no deliveries occurred for this row in the period.
- *
- * These breakdowns have no `processing` latency family. A message's row identifies which sending IP carried it or which mailbox provider received it. This becomes known only after the receiving mail server reports a delivery, bounce, deferral, or late bounce. The accept-to-processed phase ends before that attribution is known, preventing row-level processing latency. Use `GET /v1/email/stats/daily` for processing-latency percentiles across the whole workspace.
- *
- */
-export type EmailDeliveryLatencyStats = {
-  delivery: EmailLatencyQuantiles;
-  total: EmailLatencyQuantiles;
-};
-
-/**
  * Delivery and latency stats for messages sent from a single IP address over the requested period. Per-IP attribution begins only after a message is processed: we learn which IP a message used only from its delivery, bounce, deferral, and late-bounce events. Acceptance and processing events do not contribute to per-IP attribution. As a result, per-IP rows omit the `accepted` and `processed` counts and the `processing` latency family. Those fields never appear on a per-IP row. They are not returned as null.
  *
  */
@@ -18462,127 +19058,6 @@ export type EmailStatsByCategoryResponse = {
 };
 
 /**
- * Metric to rank rows by, applied descending. Shared by every breakdown whose attribution begins at delivery, so `processed`, `rejected`, and `oob_bounces` are not part of those rows and are not sortable. Any count or rate on the row can be used; rows whose rate is undefined (zero denominator) sort last. Bounce sub-types use their nested location in each row, for example `bounces.hard` and `bounces.hard_rate`.
- *
- */
-export type EmailMailboxProviderSortMetric =
-  | "delivered"
-  | "bounced"
-  | "complained"
-  | "deferred"
-  | "bounces.hard"
-  | "bounces.soft"
-  | "bounces.admin"
-  | "bounces.block"
-  | "bounces.undetermined"
-  | "opens"
-  | "opens_non_prefetched"
-  | "unique_opens"
-  | "unique_opens_non_prefetched"
-  | "clicks"
-  | "unique_clicks"
-  | "unsubscribes"
-  | "delivery_rate"
-  | "bounce_rate"
-  | "complaint_rate"
-  | "open_rate"
-  | "click_rate"
-  | "unsubscribe_rate"
-  | "bounces.hard_rate"
-  | "bounces.soft_rate"
-  | "bounces.admin_rate"
-  | "bounces.block_rate"
-  | "bounces.undetermined_rate";
-
-/**
- * Delivery counts and rates for messages attributed to a single recipient mailbox provider. Per-provider results do not include `accepted` or `processed` counts, because we only learn the recipient's mailbox provider once the receiving mail server reports delivery, a bounce, a deferral, or a late bounce. Earlier lifecycle states (accepted, processed) cannot be attributed to a specific provider.
- *
- */
-export type EmailMailboxProviderDeliveryStats = {
-  /**
-   * Distinct recipients whose message the receiving mail server accepted.
-   */
-  readonly delivered: number;
-  /**
-   * Distinct recipients whose delivery failed. Approximately the sum of the five `bounces.*` sub-counts (hard, soft, admin, block, undetermined); the totals are computed independently so they may differ slightly at the approximation error.
-   */
-  readonly bounced: number;
-  /**
-   * Distinct recipients who reported the message as spam.
-   */
-  readonly complained: number;
-  /**
-   * Distinct recipients in transient delivery deferral that is still being retried.
-   */
-  readonly deferred: number;
-  readonly bounces: EmailBounceStatsWithRates;
-  /**
-   * Share of attempted recipients on this mailbox provider that were delivered, computed as `delivered / (delivered + bounced)`. Null when `delivered + bounced` is zero (no attempts).
-   *
-   */
-  readonly delivery_rate: number | null;
-  /**
-   * Share of attempted recipients on this mailbox provider that bounced, computed as `bounced / (delivered + bounced)`. Null when `delivered + bounced` is zero (no attempts).
-   *
-   */
-  readonly bounce_rate: number | null;
-  /**
-   * Share of delivered recipients on this mailbox provider who reported the message as spam, computed as `complained / delivered`. Null when `delivered` is zero.
-   *
-   */
-  readonly complaint_rate: number | null;
-};
-
-/**
- * Delivery, engagement, and deliverability stats for messages grouped by a single recipient mailbox provider (`gmail`, `microsoft`, `yahoo`, `apple`, ...) over the requested period. We learn a recipient's mailbox provider from the receiving mail server. Per-provider rows therefore cover the delivery stage onward. They omit the `accepted` and `processed` counts and the `processing` latency family. These fields are absent rather than null. Engagement (opens and clicks, and their rates) is included because those events happen after delivery, once the mailbox provider is already known.
- *
- */
-export type EmailMailboxProviderStatsPoint = {
-  /**
-   * The recipient mailbox provider this row aggregates, as a lowercase classifier such as `gmail`, `yahoo`, `microsoft`, or `apple`. New classifiers may be added over time.
-   */
-  readonly mailbox_provider: string;
-  readonly delivery: EmailMailboxProviderDeliveryStats;
-  readonly engagement: EmailEngagementStats;
-  readonly latency: EmailDeliveryLatencyStats;
-  /**
-   * Per-bucket rate series for this mailbox provider over the window. Present only when `include_trend=true`.
-   */
-  readonly trend?: Array<EmailStatsSeriesPoint>;
-};
-
-/**
- * Per-mailbox-provider breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).
- */
-export type EmailStatsByMailboxProviderResponse = {
-  /**
-   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: EmailStatsPeriod;
-  /**
-   * Mailbox-provider breakdown rows, ranked by the `sort` metric (default `delivered`) descending. Empty when no eligible activity occurred in the period.
-   */
-  readonly data: Array<EmailMailboxProviderStatsPoint>;
-  /**
-   * Total number of distinct mailbox providers with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
-   *
-   */
-  readonly total: number;
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
-};
-
-/**
  * Delivery, engagement, and deliverability stats for messages grouped by a single mailbox provider and provider region pair over the requested period, for example `gmail` in `NA` or `microsoft` in `EU`. The provider region is the regional pod the receiving mail system reports for the recipient's provider; pairing it with the provider disambiguates a region label that several providers share. Like the mailbox-provider breakdown, rows cover the delivery stage onward: the `accepted` and `processed` counts and the `processing` latency family are omitted (a provider region cannot be attributed before delivery).
  *
  */
@@ -18618,54 +19093,6 @@ export type EmailStatsByMailboxProviderRegionResponse = {
   readonly data: Array<EmailMailboxProviderRegionStatsPoint>;
   /**
    * Total number of distinct mailbox provider and region pairs with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
-   *
-   */
-  readonly total: number;
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
-};
-
-/**
- * Aggregate delivery, engagement, and latency stats for messages sent to a single recipient mailbox domain over the requested period.
- */
-export type EmailRecipientDomainStatsPoint = {
-  /**
-   * The recipient mailbox domain this row aggregates (the part of the recipient address after the `@`), normalized to lowercase.
-   */
-  readonly recipient_domain: string;
-  readonly delivery: EmailDeliveryStats;
-  readonly engagement: EmailEngagementStats;
-  readonly latency: EmailLatencyStats;
-  /**
-   * Per-bucket rate series for this recipient domain over the window. Present only when `include_trend=true`.
-   */
-  readonly trend?: Array<EmailStatsSeriesPoint>;
-};
-
-/**
- * Per-recipient-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
- */
-export type EmailStatsByRecipientDomainResponse = {
-  /**
-   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: EmailStatsPeriod;
-  /**
-   * Recipient-domain breakdown rows, ranked by the `sort` metric (default `processed`) descending. Empty when no eligible activity occurred in the period.
-   */
-  readonly data: Array<EmailRecipientDomainStatsPoint>;
-  /**
-   * Total number of distinct recipient domains with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
@@ -18863,131 +19290,6 @@ export type EmailStatsByClientResponse = {
   readonly data: Array<EmailClientStatsPoint>;
   /**
    * Total number of distinct values of the requested `group_by` facet with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
-   *
-   */
-  readonly total: number;
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
-};
-
-/**
- * Breakdown of `bounced` by failure type. Each field counts distinct bounced recipients of that type in this row's scope; the five types approximately partition `bounced`.
- *
- */
-export type EmailBounceStats = {
-  /**
-   * Distinct recipients with a permanent delivery failure (invalid address or non-existent domain). The address is automatically added to the suppression list.
-   *
-   */
-  readonly hard: number;
-  /**
-   * Distinct recipients with a transient delivery failure (mailbox full or server temporarily unavailable). Delivery was retried.
-   *
-   */
-  readonly soft: number;
-  /**
-   * Distinct recipients refused by a policy at the receiving end, such as relaying denied or a blocklisted domain. Fix these by changing your content or sender configuration. Cleaning the recipient list does not usually help.
-   *
-   */
-  readonly admin: number;
-  /**
-   * Distinct recipients bounced because the receiving mail server blocked the sending IP for reputation reasons (mail block, spam block, spam content). Triage usually focuses on IP reputation and sending volume.
-   *
-   */
-  readonly block: number;
-  /**
-   * Distinct recipients bounced where the receiving server's response did not allow precise classification.
-   *
-   */
-  readonly undetermined: number;
-};
-
-/**
- * Bounce counts for a single SMTP status code over the requested period, with the per-type breakdown. This is a deliverability-debugging view keyed on what the receiving mail server returned, so it only reports the failure side: bounced recipients, and their `hard`, `soft`, `admin`, `block`, and `undetermined` split. It has no delivered, open, or rate fields.
- *
- */
-export type EmailBounceCodeStatsPoint = {
-  /**
-   * The SMTP error code the receiving mail server returned for these bounces, as reported by that server (for example `5.1.1` for an unknown recipient, `4.2.2` for a full mailbox). The form varies by server, and the set of codes is open.
-   */
-  readonly smtp_error_code: string;
-  /**
-   * Distinct recipients whose delivery failed with this SMTP status code, approximately equal to the sum of the five `bounces.*` sub-counts. The two are computed independently, so they can differ slightly because of approximation.
-   */
-  readonly bounced: number;
-  readonly bounces: EmailBounceStats;
-};
-
-/**
- * Per-SMTP-code bounce breakdown for the requested period, ranked by the `sort` metric (default `bounced`) descending and paginated with the requested `limit` (default 50, max 200).
- */
-export type EmailStatsByBounceCodeResponse = {
-  /**
-   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: EmailStatsPeriod;
-  /**
-   * Bounce-code breakdown rows, ranked by the `sort` metric (default `bounced`) descending. Empty when no bounces occurred in the period.
-   */
-  readonly data: Array<EmailBounceCodeStatsPoint>;
-  /**
-   * Total number of distinct SMTP error codes with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
-   *
-   */
-  readonly total: number;
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
-};
-
-/**
- * Complaint counts for a single feedback-loop complaint type over the requested period. A complaint type is recorded only on spam-complaint events, so this breakdown reports the complained count for each type and nothing else. A complaint event has no delivery or engagement information attached to it, so no other count applies.
- *
- */
-export type EmailComplaintTypeStatsPoint = {
-  /**
-   * The complaint classification reported by the mailbox provider's feedback loop, in the abuse-reporting-format vocabulary (for example `abuse`, `fraud`, `virus`, `other`). The set is open.
-   */
-  readonly feedback_type: string;
-  /**
-   * Distinct recipients who reported a message as spam with this complaint type at any point in the period.
-   */
-  readonly complained: number;
-};
-
-/**
- * Per-complaint-type breakdown for the requested period, ranked by `complained` descending and paginated with the requested `limit` (default 50, max 200).
- */
-export type EmailStatsByComplaintTypeResponse = {
-  /**
-   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
-   */
-  period: EmailStatsPeriod;
-  /**
-   * Complaint-type breakdown rows, ranked by `complained` descending. Empty when no complaints occurred in the period.
-   */
-  readonly data: Array<EmailComplaintTypeStatsPoint>;
-  /**
-   * Total number of distinct feedback types with activity in the period, regardless of `limit`. Pass `next_cursor` as `starting_after` to request the next page.
    *
    */
   readonly total: number;
@@ -19350,6 +19652,11 @@ export type DnsRecord = {
 };
 
 export type Domain = {
+  /**
+   * Default IP pool for this domain in this workspace. Used only when a send omits `ip_pool_id`; an explicit send option takes precedence. The pool must belong to the same organization. Set to `null` to use normal organization routing.
+   *
+   */
+  default_ip_pool_id?: IpPoolId | null;
   readonly id: DomainId;
   readonly workspace_id: WorkspaceId;
   /**
@@ -19509,6 +19816,11 @@ export type DomainInboundConfig = {
  *
  */
 export type DomainUpdate = {
+  /**
+   * Default IP pool for this domain in this workspace. Used only when a send omits `ip_pool_id`; an explicit send option takes precedence. The pool must belong to the same organization. Set to `null` to use normal organization routing.
+   *
+   */
+  default_ip_pool_id?: IpPoolId | null;
   settings?: DomainSettings;
   /**
    * Change the return-path name part. Cannot be removed: the return-path is required for sending.
@@ -20897,10 +21209,10 @@ export type EmailTemplateDuplicate = {
  * - `ttl`: a whole number from 1 to 999.
  * - `count`: a whole number from 1 to 999.
  * - `ref`: up to 16 uppercase letters, digits or hyphens.
- * - `date`: an ISO 8601 date (YYYY-MM-DD).
+ * - `date`: an ISO 8601 date (YYYY-MM-DD). A date and time is also accepted and shows as its date.
  * - `date_time`: an ISO 8601 date and time, with an optional offset.
  * - `amount`: a decimal amount in major units, with up to 4 decimal places.
- * - `currency`: an ISO 4217 currency code of 3 uppercase letters.
+ * - `currency`: a known ISO 4217 currency code of 3 uppercase letters.
  *
  */
 export type EmailTemplateParameterType =
@@ -22141,6 +22453,11 @@ export type MailboxCreate = {
     [key: string]: unknown;
   };
 };
+
+/**
+ * Mailbox ID beginning with mbx_, or the mailbox email address in this workspace. Email addresses are case-insensitive. Responses return the canonical mailbox ID.
+ */
+export type MailboxIdentifier = string;
 
 /**
  * Fields to update on a mailbox. Omitted fields are unchanged. Fields set to `null` are cleared. The address and domain are immutable.
@@ -24792,6 +25109,15 @@ export type EventSmsBase = {
    */
   template_content_hash: SmsTemplateContentHash | null;
   /**
+   * The messaging profile this message was sent or received under. Absent when no messaging profile applied.
+   */
+  messaging_profile_id?: SmsMessagingProfileId;
+  /**
+   * On an outbound message, the country of the recipient's number. On a received message, the country of the sender's number, or of your number that received it when the sender is not a phone number, such as a short code or an alphanumeric sender. Absent when not known.
+   *
+   */
+  country_code?: CountryCode;
+  /**
    * Message cost as of this event, split into the platform charge and any
    * third-party fees passed through. Null on an event that priced nothing.
    *
@@ -24803,6 +25129,11 @@ export type EventSmsBase = {
    *
    */
   cost?: MessageCost;
+  /**
+   * Preview feature: the `cost_center` applied to the message, from the send request or else its messaging profile, echoed on every event for the message. Absent when neither set one, and on inbound messages.
+   *
+   */
+  cost_center?: string;
 };
 
 /**
@@ -24936,6 +25267,11 @@ export type EventSmsReceivedData = EventSmsBase &
      * Mobile country code and mobile network code of the carrier. Absent when not known.
      */
     mcc_mnc?: string;
+    /**
+     * Preview feature: the outbound message this one was paired with through its messaging profile's outbound matching. Absent when it was not paired.
+     *
+     */
+    readonly in_reply_to_message?: SmsInReplyToMessage;
     /**
      * Subject line. Absent when the message carried none.
      */
@@ -25331,11 +25667,6 @@ export type VoiceCallId = string;
 export type VoiceSessionId = string;
 
 /**
- * Whether the call was placed from your side, by your PBX, the API, the browser or Bird dialing onward for you (outbound), or arrived from a remote party (inbound).
- */
-export type VoiceCallDirection = "inbound" | "outbound";
-
-/**
  * Identity fields shared by every voice call lifecycle event payload.
  */
 export type EventVoiceBase = {
@@ -25381,41 +25712,6 @@ export type EventVoiceCallAnswered = {
   timestamp: string;
   data: EventVoiceCallAnsweredData;
 };
-
-/**
- * Call status.
- *
- * A call that has ended carries one of:
- *
- * - `answered` means it connected and the far end picked up.
- * - `no_answer` means nobody picked up before the call timed out.
- * - `rejected` means it was refused rather than attempted. Either we turned it
- *   away before dialing a carrier, in which case `rejection_reason` names the
- *   check it failed where there was one, or the far end declined it.
- * - `failed` means it was attempted and did not work, and `sip_response_code`
- *   is what came back.
- * - `unknown` means the outcome could not be determined. Contact support with
- *   the call `id` if you see one.
- *
- * An active call carries `ringing` before it is picked up and `in_progress`
- * afterward. The call list's `status` filter takes any mix of the two sets.
- *
- * `busy` and `canceled` are reserved for incoming calls delivered to your own
- * numbers: `busy` for a called party that rejected the call as busy, `canceled`
- * for a caller who hung up before it was picked up. Neither is emitted yet and
- * both outcomes are reported as `failed` today.
- *
- */
-export type VoiceCallStatus =
-  | "answered"
-  | "no_answer"
-  | "busy"
-  | "canceled"
-  | "failed"
-  | "rejected"
-  | "unknown"
-  | "ringing"
-  | "in_progress";
 
 /**
  * Payload of the voice_call.ended event.
@@ -26054,8 +26350,6 @@ export type VoicePartyBridgePstnEndpoint = {
    */
   forward_as: VoiceInboundForwardAs;
 };
-
-export type SipTrunkId = string;
 
 export type VoicePartyBridgeSipEndpoint = {
   /**
@@ -26802,6 +27096,10 @@ export type AutomationPortKey = string;
 export type VoiceNumberId = string;
 
 export type BillingResolvedPrice = {
+  /**
+   * Whether a published price matched. True includes an explicitly published zero price. False means no price matched and the zero amounts are placeholders, not a quote.
+   */
+  is_priced: boolean;
   /**
    * The net unit price, before tax.
    */
@@ -29792,6 +30090,514 @@ export type WorkspaceQuotaListWritable = {
   configuration: WorkspaceQuotaConfigurationStatus;
 };
 
+/**
+ * Latency percentiles (p50, p95, p99) in milliseconds for the bucket. On the summary endpoint these are computed across the whole period rather than per bucket. Three families are reported:
+ *
+ * - `processing`: Time from accepting the send to handing the message off for delivery. Measured per processed recipient; null when no recipient in the bucket has reached the processed stage.
+ * - `delivery`: Time from handoff to the receiving mail server accepting the message, dominated by recipient-side delivery behavior. Measured per delivered recipient; null when no deliveries occurred in the bucket.
+ * - `total`: End-to-end time from accepting the send to delivery, and the number most worth watching against your own delivery targets. Measured per delivered recipient; null when no deliveries occurred in the bucket.
+ *
+ * Each family is reported independently. A family is omitted when no qualifying
+ * event contributed a latency measurement in the bucket. This also applies when
+ * the workspace has not recorded latency for that stage yet. The `processing`
+ * family can therefore be present while `delivery` and `total` are absent. A
+ * client must handle a missing family, and a null p50/p95/p99 within a present
+ * family, by rendering a placeholder rather than assuming a number.
+ *
+ */
+export type EmailLatencyStatsWritable = {
+  [key: string]: never;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending the day immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type EmailStatsComparisonWritable = {
+  [key: string]: never;
+};
+
+/**
+ * A single row that aggregates delivery and engagement counts, plus derived
+ * rates, across the whole requested period. Use this endpoint for KPI
+ * tiles, campaign reporting, and anywhere you need a rate with a meaningful
+ * denominator. The daily and hourly endpoints report the same rates, but
+ * per bucket, each one dividing that bucket's own counts.
+ *
+ * Distinct message, recipient, and event counts are computed across the whole
+ * requested period. An identity present in more than one time bucket counts
+ * once for that metric in the period summary, so adding daily or hourly
+ * distinct counts can overstate the summary. Very large counts are close
+ * estimates rather than exact tallies. Latency percentiles are also computed
+ * across the whole period. A rate is null when its denominator is zero.
+ *
+ */
+export type EmailStatsSummaryWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Aggregate stats for one time bucket (a calendar day or hour, per the requested grain, in the requested `timezone` or UTC by default), bucketed by event time. Buckets with no activity are included with zero counts and null latency percentiles, so the series charts continuously without client-side gap handling.
+ *
+ */
+export type EmailStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Latency percentiles (p50, p95, p99) in milliseconds for the messages in this breakdown row, for breakdowns whose dimension is known only from delivery onward (sending IP, mailbox provider).
+ *
+ * - `delivery`: Time from handing the message off to the receiving mail server accepting it. Null when no deliveries occurred for this row in the period.
+ * - `total`: End-to-end time from accepting the send to delivery. Null when no deliveries occurred for this row in the period.
+ *
+ * These breakdowns have no `processing` latency family. A message's row identifies which sending IP carried it or which mailbox provider received it. This becomes known only after the receiving mail server reports a delivery, bounce, deferral, or late bounce. The accept-to-processed phase ends before that attribution is known, preventing row-level processing latency. Use `GET /v1/email/stats/daily` for processing-latency percentiles across the whole workspace.
+ *
+ */
+export type EmailDeliveryLatencyStatsWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Aggregate delivery and engagement stats for a single tag name-and-value pair over the requested period.
+ */
+export type EmailTagStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-tag breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
+ */
+export type EmailStatsTagsResponseWritable = {
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
+/**
+ * Delivery, engagement, and deliverability stats for messages grouped by a single recipient mailbox provider (`gmail`, `microsoft`, `yahoo`, `apple`, ...) over the requested period. We learn a recipient's mailbox provider from the receiving mail server. Per-provider rows therefore cover the delivery stage onward. They omit the `accepted` and `processed` counts and the `processing` latency family. These fields are absent rather than null. Engagement (opens and clicks, and their rates) is included because those events happen after delivery, once the mailbox provider is already known.
+ *
+ */
+export type EmailMailboxProviderStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-mailbox-provider breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).
+ */
+export type EmailStatsByMailboxProviderResponseWritable = {
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
+/**
+ * Aggregate delivery, engagement, and latency stats for messages sent to a single recipient mailbox domain over the requested period.
+ */
+export type EmailRecipientDomainStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-recipient-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
+ */
+export type EmailStatsByRecipientDomainResponseWritable = {
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
+/**
+ * Per-SMTP-code bounce breakdown for the requested period, ranked by the `sort` metric (default `bounced`) descending and paginated with the requested `limit` (default 50, max 200).
+ */
+export type EmailStatsByBounceCodeResponseWritable = {
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
+/**
+ * Per-complaint-type breakdown for the requested period, ranked by `complained` descending and paginated with the requested `limit` (default 50, max 200).
+ */
+export type EmailStatsByComplaintTypeResponseWritable = {
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
+/**
+ * Latency percentiles in milliseconds for the requested scope:
+ *
+ * - `processing`: From acceptance to carrier handoff.
+ * - `delivery`: From carrier handoff to delivery confirmation.
+ * - `total`: From acceptance to delivery confirmation.
+ *
+ * Each family is omitted when no qualifying event contributes a measurement.
+ * Individual percentiles can also be null.
+ *
+ */
+export type SmsLatencyStatsWritable = {
+  [key: string]: never;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type SmsStatsComparisonWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Single-row aggregate across the full requested period, covering SMS lifecycle counts plus the derived delivery and failure rates, and latency percentiles. Use this endpoint for KPI tiles and reporting; the daily and hourly endpoints carry the same counts per bucket.
+ *
+ * Every count is a sum of per-bucket counts across the window. Latency percentiles are computed across the whole period rather than summed per bucket. Rates are null when their denominator is zero.
+ *
+ */
+export type SmsStatsSummaryWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Aggregate delivery and latency stats for a single destination country over the requested period.
+ */
+export type SmsCountryStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-country breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByCountryResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Aggregate delivery and latency stats for a single delivery carrier over the requested period.
+ */
+export type SmsCarrierStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-carrier breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByCarrierResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Aggregate delivery and latency stats for a single message category over the requested period.
+ */
+export type SmsCategoryStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-category breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByCategoryResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Aggregate delivery and latency stats for a single tag (`name:value`) over the requested period.
+ */
+export type SmsTagStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-tag breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByTagResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Delivery and latency statistics for one standardized failure reason over the requested period.
+ */
+export type SmsErrorCodeStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-error-code breakdown for the requested period, ranked by the `sort` metric (default `failed`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByErrorCodeResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type SmsInboundStatsComparisonWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Total received messages over the requested period.
+ *
+ */
+export type SmsInboundStatsSummaryResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Received-message volume broken down by country, ranked by volume.
+ *
+ */
+export type SmsInboundStatsByCountryResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Received-message volume broken down by operator, ranked by volume.
+ *
+ */
+export type SmsInboundStatsByOperatorResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Latency percentiles in milliseconds for the requested scope:
+ *
+ * - `processing`: From acceptance to WhatsApp handoff.
+ * - `delivery`: From WhatsApp handoff to delivery confirmation.
+ * - `total`: From acceptance to delivery confirmation.
+ *
+ * Each family is omitted when no qualifying message contributes a measurement.
+ * Individual percentiles can also be null. `delivery` is measured on a best-effort basis, so
+ * it can be absent for a scope whose `processing` and `total` are present.
+ *
+ */
+export type WhatsAppLatencyStatsWritable = {
+  [key: string]: never;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type WhatsAppStatsComparisonWritable = {
+  [key: string]: never;
+};
+
+/**
+ * WhatsApp lifecycle counts, rates, engagement, and latency percentiles for the full requested period. Counts aggregate the time buckets. Latency percentiles cover the whole period. Rates are null when their denominator is zero.
+ *
+ */
+export type WhatsAppStatsSummaryWritable = {
+  [key: string]: never;
+};
+
+/**
+ * WhatsApp lifecycle counts, engagement, and latency percentiles for one time bucket (a calendar day or hour), bucketed by send time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. Rates apply to the whole window rather than individual buckets.
+ *
+ */
+export type WhatsAppStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Lifecycle counts, derived rates, and engagement for a single WhatsApp template category over the requested period.
+ */
+export type WhatsAppTemplateCategoryStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-template-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByTemplateCategoryResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Lifecycle counts, derived rates, and engagement for a single tag (name:value) over the requested period.
+ */
+export type WhatsAppTagStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByTagResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Lifecycle counts, derived rates, engagement and latency for a single destination country over the requested period.
+ */
+export type WhatsAppCountryStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-country breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ *
+ */
+export type WhatsAppStatsByCountryResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-error-code failure breakdown for the requested period, ranked by failure count descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type WhatsAppStatsByErrorCodeResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
+ *
+ */
+export type WhatsAppInboundStatsComparisonWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Total received messages for the requested period.
+ *
+ */
+export type WhatsAppInboundStatsSummaryResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Processing-latency percentiles in milliseconds for the requested scope, from acceptance to Apple handoff. Apple Messages for Business has no delivery receipt, so there is no `delivery` or `total` member beside `processing`. Conversation response timing is reported separately in `first_response`. Always present; every percentile is null when no qualifying message in scope has a measurement.
+ *
+ */
+export type AmbStatsLatencyWritable = {
+  [key: string]: never;
+};
+
+/**
+ * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with computed changes for the message counts and rates listed in `delta`. Present only when `compare=previous_period` is requested. Monthly active contacts and latency values are returned for both periods without a computed change.
+ *
+ */
+export type AmbStatsComparisonWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound Apple Messages for Business counts and latency percentiles for the full requested period. Counts and percentiles are computed over the whole period rather than combined from the returned time-series values.
+ *
+ */
+export type AmbStatsSummaryWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound Apple Messages for Business counts and processing-latency percentiles for one time bucket (a calendar day or hour), bucketed by acceptance time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. There is no `first_response` here. Read first-response latency from the summary or a breakdown endpoint.
+ *
+ */
+export type AmbStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single message content kind over the requested period.
+ */
+export type AmbMessageKindStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-content-kind breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByMessageKindResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single message category over the requested period.
+ */
+export type AmbCategoryStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type AmbStatsByCategoryResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single tag over the requested period.
+ */
+export type AmbTagStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Only tagged messages appear.
+ */
+export type AmbStatsByTagResponseWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Outbound counts and latency percentiles for a single failure reason over the requested period.
+ */
+export type AmbErrorCodeStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-failure-reason breakdown for the requested period, ranked by `send_failed + rejected` descending and capped at the requested `limit` (default 50, max 200). Only messages carrying an error code appear: a `bird:` code is usually a rejection, an `apple:` code a send failure.
+ */
+export type AmbStatsByErrorCodeResponseWritable = {
+  [key: string]: never;
+};
+
 export type RealtimeAppWritable = {
   /**
    * Allow clients to trigger events directly (client events).
@@ -30374,7 +31180,33 @@ export type SmsErrorWritable = {
    * When the failure occurred.
    */
   occurred_at: string;
+  /**
+   * Whether the cause is permanent, so sending the same message again would fail the same way. Describes the cause, not whether Bird retries. Null when Bird cannot tell, which is currently always.
+   *
+   */
+  permanent?: boolean | null;
 } | null;
+
+/**
+ * Preview feature: the outbound message a received message was paired with. Bird pairs a reply with the last message the messaging profile sent this subscriber from the receiving number, within the profile's outbound-matching window. The pairing is inferred from timing; the subscriber does not report which message they answered.
+ *
+ */
+export type SmsInReplyToMessageWritable = {
+  /**
+   * ID of the outbound message.
+   */
+  id: SmsMessageId;
+  /**
+   * Text of the outbound message as Bird stored it. Authentication messages read `**REDACTED**`. Absent once that message is past the read window.
+   *
+   */
+  text?: string;
+  /**
+   * Time Bird handed the outbound message to the carrier; the matching window counts from here. Absent once that message is past the read window.
+   *
+   */
+  sent_at?: string;
+};
 
 export type SmsMessageWritable = {
   /**
@@ -30388,7 +31220,7 @@ export type SmsMessageWritable = {
    */
   from: string;
   /**
-   * The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text. For a template send, this is the rendered text after parameter substitution. When `category` is `authentication` (a message carrying a one-time code), this is `**REDACTED**`: the code still reaches the recipient, but the API does not retain it for later reads.
+   * The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text, and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. When `category` is `authentication` (a message carrying a one-time code), this is `**REDACTED**`: the code still reaches the recipient, but the API does not retain it for later reads.
    *
    */
   text?: string;
@@ -30583,7 +31415,7 @@ export type AttachmentListWritable = {
 } & ListEnvelopeWithTotal;
 
 /**
- * A file in the workspace's media library, hosted at a permanent public URL. Embed or link `url` anywhere hosted media is needed, including in email that has already been sent: an asset's bytes and URL never change.
+ * A file in the workspace's media library, hosted at a permanent public URL. Embed or link `url` in your content. Metadata changes and removing a library entry preserve the URL and bytes; an abuse or security takedown can make the file unavailable.
  */
 export type AssetWritable = {
   /**
@@ -30591,7 +31423,7 @@ export type AssetWritable = {
    */
   name: string;
   /**
-   * Default alternative text describing the asset, carried along whenever it is placed. Most mail clients block images by default, so for an image this is often the only thing a recipient reads.
+   * Default alternative text for the asset. Use it as the starting point for an image description when inserting the asset into content. Updating this field does not update descriptions already copied into saved content.
    */
   alt_text: string | null;
   /**
@@ -30635,39 +31467,6 @@ export type ComplianceSubmissionWritable = {
 };
 
 /**
- * Latency percentiles in milliseconds for the requested scope:
- *
- * - `processing`: From acceptance to carrier handoff.
- * - `delivery`: From carrier handoff to delivery confirmation.
- * - `total`: From acceptance to delivery confirmation.
- *
- * Each family is omitted when no qualifying event contributes a measurement.
- * Individual percentiles can also be null.
- *
- */
-export type SmsLatencyStatsWritable = {
-  [key: string]: never;
-};
-
-/**
- * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
- *
- */
-export type SmsStatsComparisonWritable = {
-  [key: string]: never;
-};
-
-/**
- * Single-row aggregate across the full requested period, covering SMS lifecycle counts plus the derived delivery and failure rates, and latency percentiles. Use this endpoint for KPI tiles and reporting; the daily and hourly endpoints carry the same counts per bucket.
- *
- * Every count is a sum of per-bucket counts across the window. Latency percentiles are computed across the whole period rather than summed per bucket. Rates are null when their denominator is zero.
- *
- */
-export type SmsStatsSummaryWritable = {
-  [key: string]: never;
-};
-
-/**
  * Time-series stats payload. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
  *
  */
@@ -30690,95 +31489,9 @@ export type SmsStatsByOriginatorResponseWritable = {
 };
 
 /**
- * Aggregate delivery and latency stats for a single destination country over the requested period.
- */
-export type SmsCountryStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-country breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
- */
-export type SmsStatsByCountryResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * Aggregate delivery and latency stats for a single message category over the requested period.
- */
-export type SmsCategoryStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-category breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
- */
-export type SmsStatsByCategoryResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * Delivery and latency statistics for one standardized failure reason over the requested period.
- */
-export type SmsErrorCodeStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-error-code breakdown for the requested period, ranked by the `sort` metric (default `failed`) descending and capped at the requested `limit` (default 50, max 200).
- */
-export type SmsStatsByErrorCodeResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * Aggregate delivery and latency stats for a single delivery carrier over the requested period.
- */
-export type SmsCarrierStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-carrier breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
- */
-export type SmsStatsByCarrierResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * Aggregate delivery and latency stats for a single tag (`name:value`) over the requested period.
- */
-export type SmsTagStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-tag breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
- */
-export type SmsStatsByTagResponseWritable = {
-  [key: string]: never;
-};
-
-/**
  * Lifecycle-status breakdown for the requested period, ordered by message count descending. Statuses with no activity are omitted.
  */
 export type SmsStatsByStatusResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
- *
- */
-export type SmsInboundStatsComparisonWritable = {
-  [key: string]: never;
-};
-
-/**
- * Total received messages over the requested period.
- *
- */
-export type SmsInboundStatsSummaryResponseWritable = {
   [key: string]: never;
 };
 
@@ -30787,22 +31500,6 @@ export type SmsInboundStatsSummaryResponseWritable = {
  *
  */
 export type SmsInboundStatsResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * Received-message volume broken down by country, ranked by volume.
- *
- */
-export type SmsInboundStatsByCountryResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * Received-message volume broken down by operator, ranked by volume.
- *
- */
-export type SmsInboundStatsByOperatorResponseWritable = {
   [key: string]: never;
 };
 
@@ -31397,6 +32094,10 @@ export type WhatsAppTemplateQualityWritable = {
  */
 export type WhatsAppTemplateLanguageWritable = {
   /**
+   * This language's maximum price, or `null` when Meta's standard rate applies.
+   */
+  optimization_spec?: WhatsAppTemplateOptimizationSpec | null;
+  /**
    * The canonical tag this language is addressed by.
    */
   language: LanguageTag;
@@ -31435,57 +32136,10 @@ export type WhatsAppTemplateLanguageWritable = {
 };
 
 /**
- * Latency percentiles in milliseconds for the requested scope:
- *
- * - `processing`: From acceptance to WhatsApp handoff.
- * - `delivery`: From WhatsApp handoff to delivery confirmation.
- * - `total`: From acceptance to delivery confirmation.
- *
- * Each family is omitted when no qualifying message contributes a measurement.
- * Individual percentiles can also be null. `delivery` is measured on a best-effort basis, so
- * it can be absent for a scope whose `processing` and `total` are present.
- *
- */
-export type WhatsAppLatencyStatsWritable = {
-  [key: string]: never;
-};
-
-/**
- * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
- *
- */
-export type WhatsAppStatsComparisonWritable = {
-  [key: string]: never;
-};
-
-/**
- * WhatsApp lifecycle counts, rates, engagement, and latency percentiles for the full requested period. Counts aggregate the time buckets. Latency percentiles cover the whole period. Rates are null when their denominator is zero.
- *
- */
-export type WhatsAppStatsSummaryWritable = {
-  [key: string]: never;
-};
-
-/**
- * WhatsApp lifecycle counts, engagement, and latency percentiles for one time bucket (a calendar day or hour), bucketed by send time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. Rates apply to the whole window rather than individual buckets.
- *
- */
-export type WhatsAppStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
  * Time-series stats payload. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
  *
  */
 export type WhatsAppStatsResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-error-code failure breakdown for the requested period, ranked by failure count descending and capped at the requested `limit` (default 50, max 200).
- */
-export type WhatsAppStatsByErrorCodeResponseWritable = {
   [key: string]: never;
 };
 
@@ -31504,34 +32158,6 @@ export type WhatsAppStatsByTemplateResponseWritable = {
 };
 
 /**
- * Lifecycle counts, derived rates, and engagement for a single WhatsApp template category over the requested period.
- */
-export type WhatsAppTemplateCategoryStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-template-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
- */
-export type WhatsAppStatsByTemplateCategoryResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * Lifecycle counts, derived rates, and engagement for a single tag (name:value) over the requested period.
- */
-export type WhatsAppTagStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
- */
-export type WhatsAppStatsByTagResponseWritable = {
-  [key: string]: never;
-};
-
-/**
  * Lifecycle counts, rates, and engagement for one business phone number over the requested period, including whether the number is shared.
  */
 export type WhatsAppPhoneNumberStatsPointWritable = {
@@ -31542,37 +32168,6 @@ export type WhatsAppPhoneNumberStatsPointWritable = {
  * Per-phone-number breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
  */
 export type WhatsAppStatsByPhoneNumberResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * Lifecycle counts, derived rates, engagement and latency for a single destination country over the requested period.
- */
-export type WhatsAppCountryStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-country breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
- *
- */
-export type WhatsAppStatsByCountryResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * The received-message count for the equal-length, inclusive period ending immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
- *
- */
-export type WhatsAppInboundStatsComparisonWritable = {
-  [key: string]: never;
-};
-
-/**
- * Total received messages for the requested period.
- *
- */
-export type WhatsAppInboundStatsSummaryResponseWritable = {
   [key: string]: never;
 };
 
@@ -31749,6 +32344,116 @@ export type AmbRoutingRuleListWritable = {
   data: Array<AmbRoutingRuleWritable>;
 };
 
+/**
+ * A file Apple holds for one business account. Send it again by passing `id` as `attachment_id` in `content.attachments`. Only the business account in `business_account_id` can send it; a send from another business account is refused with a `422` `AMBAttachmentBusinessMismatch`. `message_id` is absent for an uploaded attachment.
+ */
+export type AmbAttachmentWritable = {
+  /**
+   * Send it as `attachment_id`.
+   */
+  id: AmbAttachmentId;
+  /**
+   * The business account Apple holds the attachment for.
+   */
+  business_account_id: AmbBusinessId;
+  origin: AmbAttachmentOrigin;
+  /**
+   * The message the attachment belongs to.
+   */
+  message_id?: AmbMessageId;
+  /**
+   * Display filename. May be empty for an attachment stored before this release.
+   */
+  name: string;
+  /**
+   * Media type of the attachment. May be empty for an attachment stored before this release.
+   */
+  mime_type: string;
+  /**
+   * Attachment size in bytes. May be 0 for an attachment stored before this release.
+   */
+  size: number;
+  /**
+   * Bird's estimate of when Apple stops holding the attachment, 30 days after it was received, uploaded or last sent. A send within 24 hours of this time is refused.
+   */
+  expires_at: string;
+  /**
+   * When Bird stored the attachment.
+   */
+  created_at: string;
+};
+
+export type AmbNativeAttachmentWritable = (
+  | {
+      source_url: unknown;
+    }
+  | {
+      attachment_id: unknown;
+    }
+) & {
+  /**
+   * The attachment to send, or this attachment's ID on a read.
+   */
+  attachment_id?: AmbAttachmentId;
+  /**
+   * HTTPS URL Bird downloads and uploads to Apple. Required on a send unless attachment_id is given. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS. Returned on reads of attachments you sent this way.
+   */
+  source_url?: string;
+  /**
+   * Display filename.
+   */
+  name?: string;
+  /**
+   * Media type of the attachment.
+   */
+  mime_type?: string;
+};
+
+export type AmbNativeTextContentWritable = (
+  | unknown
+  | {
+      attachments: unknown;
+    }
+) & {
+  /**
+   * Always text.
+   */
+  type: AmbMessageType;
+  /**
+   * Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.
+   */
+  body?: string;
+  /**
+   * Subject displayed above the message body.
+   */
+  subject?: string;
+  /**
+   * Ordered attachments. A send supplies each one by source_url or attachment_id.
+   */
+  attachments?: Array<AmbNativeAttachmentWritable>;
+};
+
+export type AmbNativeRichLinkContentWritable = unknown & {
+  /**
+   * Always rich_link.
+   */
+  type: AmbMessageType;
+  /**
+   * Automatic introductions for rich links are enabled regionally in stages. When enabled for a new send, a nonblank body is sent as a separate text before the link. All parts belong to one message, which becomes sent after Apple accepts all parts. Before activation, and for retries retaining legacy behavior, body is included in the rich link request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the rich link. Use one U+FFFC object replacement character per attachment to control placement.
+   */
+  body?: string;
+  /**
+   * Subject displayed above the message body.
+   */
+  subject?: string;
+  /**
+   * Ordered attachments. A send supplies each one by source_url or attachment_id.
+   */
+  attachments?: Array<AmbNativeAttachmentWritable>;
+  rich_link_data?: AmbNativeRichLinkData;
+  rich_link_construct?: AmbRichLinkConstruct;
+};
+
 export type AmbNativeInteractivePayloadWritable = unknown & {
   /**
    * Correlation identifier for this interaction. Bird generates one when omitted. Use a new value for each message. A reply is linked to its request only when no other sent message in the conversation uses the same identifier.
@@ -31804,13 +32509,13 @@ export type AmbNativeInteractiveDataWritable = unknown & {
   data?: AmbNativeInteractivePayloadWritable;
 };
 
-export type AmbNativeInteractiveContentWritable = unknown & {
+export type AmbNativeInteractiveContentWritable = {
   /**
    * Always interactive.
    */
   type: AmbMessageType;
   /**
-   * Automatic introductions for inline quick replies are enabled regionally in stages. When enabled for a new send containing `interactive_data.data.quick_reply`, a nonblank body is sent as separate text before the choices. Messages using `interactive_data_ref` do not receive this automatic introduction, even after activation. All parts belong to one message, which becomes sent after Apple accepts all parts. For referenced interactions, before activation, and for retries retaining legacy behavior, body is included in the interactive request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the quick reply. Omit body to send choices only. For list pickers, time pickers and forms, use interactive_data.received_message for the visible introduction. Use one U+FFFC object replacement character per attachment to control placement.
+   * Automatic introductions for inline quick replies are enabled regionally in stages. When enabled for a new send containing `interactive_data.data.quick_reply`, a nonblank body is sent as separate text before the choices. All parts belong to one message, which becomes sent after Apple accepts all parts. Before activation, and for retries retaining legacy behavior, body is included in the interactive request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the quick reply. Omit body to send choices only. For list pickers, time pickers and forms, use interactive_data.received_message for the visible introduction. Use one U+FFFC object replacement character per attachment to control placement.
    */
   body?: string;
   /**
@@ -31818,11 +32523,10 @@ export type AmbNativeInteractiveContentWritable = unknown & {
    */
   subject?: string;
   /**
-   * Ordered attachments. Each object supplies a source URL or an encrypted Apple reference.
+   * Ordered attachments. A send supplies each one by source_url or attachment_id.
    */
-  attachments?: Array<AmbNativeAttachment>;
-  interactive_data?: AmbNativeInteractiveDataWritable;
-  interactive_data_ref?: AmbRichLinkReference;
+  attachments?: Array<AmbNativeAttachmentWritable>;
+  interactive_data: AmbNativeInteractiveDataWritable;
 };
 
 /**
@@ -31831,13 +32535,44 @@ export type AmbNativeInteractiveContentWritable = unknown & {
 export type AmbMessageContentWritable =
   | ({
       type: "text";
-    } & AmbNativeTextContent)
+    } & AmbNativeTextContentWritable)
   | ({
       type: "rich_link";
-    } & AmbNativeRichLinkContent)
+    } & AmbNativeRichLinkContentWritable)
   | ({
       type: "interactive";
     } & AmbNativeInteractiveContentWritable);
+
+export type AmbNativeInboundInteractiveContentWritable = {
+  /**
+   * Always interactive.
+   */
+  type: AmbMessageType;
+  /**
+   * Message body supplied by Apple.
+   */
+  body?: string;
+  /**
+   * Message subject supplied by Apple.
+   */
+  subject?: string;
+  /**
+   * Ordered attachments supplied by Apple.
+   */
+  attachments?: Array<AmbNativeAttachmentWritable>;
+  interactive_data: AmbNativeInboundInteractiveData;
+};
+
+/**
+ * Received text, attachments, and interactive replies, preserving Apple message structure.
+ */
+export type AmbInboundContentWritable =
+  | ({
+      type: "text";
+    } & AmbNativeTextContentWritable)
+  | ({
+      type: "interactive";
+    } & AmbNativeInboundInteractiveContentWritable);
 
 /**
  * Failure detail for a message or invitation that could not be sent or was rejected.
@@ -32012,38 +32747,6 @@ export type AmbSuppressionListWritable = {
 } & ListEnvelope;
 
 /**
- * Processing-latency percentiles in milliseconds for the requested scope, from acceptance to Apple handoff. Apple Messages for Business has no delivery receipt, so there is no `delivery` or `total` member beside `processing`. Conversation response timing is reported separately in `first_response`. Always present; every percentile is null when no qualifying message in scope has a measurement.
- *
- */
-export type AmbStatsLatencyWritable = {
-  [key: string]: never;
-};
-
-/**
- * The same statistics for the equal-length, inclusive period ending immediately before the requested start, together with computed changes for the message counts and rates listed in `delta`. Present only when `compare=previous_period` is requested. Monthly active contacts and latency values are returned for both periods without a computed change.
- *
- */
-export type AmbStatsComparisonWritable = {
-  [key: string]: never;
-};
-
-/**
- * Outbound Apple Messages for Business counts and latency percentiles for the full requested period. Counts and percentiles are computed over the whole period rather than combined from the returned time-series values.
- *
- */
-export type AmbStatsSummaryWritable = {
-  [key: string]: never;
-};
-
-/**
- * Outbound Apple Messages for Business counts and processing-latency percentiles for one time bucket (a calendar day or hour), bucketed by acceptance time. Every count in a bucket describes the messages accepted in it, regardless of when their later events arrived. There is no `first_response` here. Read first-response latency from the summary or a breakdown endpoint.
- *
- */
-export type AmbStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
  * Time-series stats payload. `period` echoes the range and bucket grain the server computed against; `data` is one row per bucket in chronological order.
  *
  */
@@ -32062,20 +32765,6 @@ export type AmbBusinessAccountStatsPointWritable = {
  * Per-business breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
  */
 export type AmbStatsByBusinessResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * Outbound counts and latency percentiles for a single message content kind over the requested period.
- */
-export type AmbMessageKindStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-content-kind breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
- */
-export type AmbStatsByMessageKindResponseWritable = {
   [key: string]: never;
 };
 
@@ -32104,48 +32793,6 @@ export type AmbGroupStatsPointWritable = {
  * Per-group breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
  */
 export type AmbStatsByGroupResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * Outbound counts and latency percentiles for a single message category over the requested period.
- */
-export type AmbCategoryStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
- */
-export type AmbStatsByCategoryResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * Outbound counts and latency percentiles for a single tag over the requested period.
- */
-export type AmbTagStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-tag breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Only tagged messages appear.
- */
-export type AmbStatsByTagResponseWritable = {
-  [key: string]: never;
-};
-
-/**
- * Outbound counts and latency percentiles for a single failure reason over the requested period.
- */
-export type AmbErrorCodeStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-failure-reason breakdown for the requested period, ranked by `send_failed + rejected` descending and capped at the requested `limit` (default 50, max 200). Only messages carrying an error code appear: a `bird:` code is usually a rejection, an `apple:` code a send failure.
- */
-export type AmbStatsByErrorCodeResponseWritable = {
   [key: string]: never;
 };
 
@@ -32410,63 +33057,11 @@ export type EmailInboxInsightsSeedTestsWritable =
 export type EmailInboxInsightsDomainsWritable = ListEnvelope;
 
 /**
- * Latency percentiles (p50, p95, p99) in milliseconds for the bucket. On the summary endpoint these are computed across the whole period rather than per bucket. Three families are reported:
- *
- * - `processing`: Time from accepting the send to handing the message off for delivery. Measured per processed recipient; null when no recipient in the bucket has reached the processed stage.
- * - `delivery`: Time from handoff to the receiving mail server accepting the message, dominated by recipient-side delivery behavior. Measured per delivered recipient; null when no deliveries occurred in the bucket.
- * - `total`: End-to-end time from accepting the send to delivery, and the number most worth watching against your own delivery targets. Measured per delivered recipient; null when no deliveries occurred in the bucket.
- *
- * Each family is reported independently. A family is omitted when no qualifying
- * event contributed a latency measurement in the bucket. This also applies when
- * the workspace has not recorded latency for that stage yet. The `processing`
- * family can therefore be present while `delivery` and `total` are absent. A
- * client must handle a missing family, and a null p50/p95/p99 within a present
- * family, by rendering a placeholder rather than assuming a number.
- *
- */
-export type EmailLatencyStatsWritable = {
-  [key: string]: never;
-};
-
-/**
- * Aggregate stats for one time bucket (a calendar day or hour, per the requested grain, in the requested `timezone` or UTC by default), bucketed by event time. Buckets with no activity are included with zero counts and null latency percentiles, so the series charts continuously without client-side gap handling.
- *
- */
-export type EmailStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
  * Time-series stats payload. `period` echoes the range and bucket grain actually computed against. `data` is one row per bucket in chronological order.
  *
  */
 export type EmailStatsResponseWritable = {
   [key: string]: never;
-};
-
-/**
- * Aggregate delivery and engagement stats for a single tag name-and-value pair over the requested period.
- */
-export type EmailTagStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-tag breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
- */
-export type EmailStatsTagsResponseWritable = {
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
 };
 
 /**
@@ -32617,46 +33212,6 @@ export type EmailStatsQueryResponseWritable = {
 };
 
 /**
- * The same statistics for the equal-length, inclusive period ending the day immediately before the requested start, together with the change between the two periods. Present only when `compare=previous_period` is requested. The change is already computed, so a percentage difference needs no second request.
- *
- */
-export type EmailStatsComparisonWritable = {
-  [key: string]: never;
-};
-
-/**
- * A single row that aggregates delivery and engagement counts, plus derived
- * rates, across the whole requested period. Use this endpoint for KPI
- * tiles, campaign reporting, and anywhere you need a rate with a meaningful
- * denominator. The daily and hourly endpoints report the same rates, but
- * per bucket, each one dividing that bucket's own counts.
- *
- * Distinct message, recipient, and event counts are computed across the whole
- * requested period. An identity present in more than one time bucket counts
- * once for that metric in the period summary, so adding daily or hourly
- * distinct counts can overstate the summary. Very large counts are close
- * estimates rather than exact tallies. Latency percentiles are also computed
- * across the whole period. A rate is null when its denominator is zero.
- *
- */
-export type EmailStatsSummaryWritable = {
-  [key: string]: never;
-};
-
-/**
- * Latency percentiles (p50, p95, p99) in milliseconds for the messages in this breakdown row, for breakdowns whose dimension is known only from delivery onward (sending IP, mailbox provider).
- *
- * - `delivery`: Time from handing the message off to the receiving mail server accepting it. Null when no deliveries occurred for this row in the period.
- * - `total`: End-to-end time from accepting the send to delivery. Null when no deliveries occurred for this row in the period.
- *
- * These breakdowns have no `processing` latency family. A message's row identifies which sending IP carried it or which mailbox provider received it. This becomes known only after the receiving mail server reports a delivery, bounce, deferral, or late bounce. The accept-to-processed phase ends before that attribution is known, preventing row-level processing latency. Use `GET /v1/email/stats/daily` for processing-latency percentiles across the whole workspace.
- *
- */
-export type EmailDeliveryLatencyStatsWritable = {
-  [key: string]: never;
-};
-
-/**
  * Delivery and latency stats for messages sent from a single IP address over the requested period. Per-IP attribution begins only after a message is processed: we learn which IP a message used only from its delivery, bounce, deferral, and late-bounce events. Acceptance and processing events do not contribute to per-IP attribution. As a result, per-IP rows omit the `accepted` and `processed` counts and the `processing` latency family. Those fields never appear on a per-IP row. They are not returned as null.
  *
  */
@@ -32733,32 +33288,6 @@ export type EmailStatsByCategoryResponseWritable = {
 };
 
 /**
- * Delivery, engagement, and deliverability stats for messages grouped by a single recipient mailbox provider (`gmail`, `microsoft`, `yahoo`, `apple`, ...) over the requested period. We learn a recipient's mailbox provider from the receiving mail server. Per-provider rows therefore cover the delivery stage onward. They omit the `accepted` and `processed` counts and the `processing` latency family. These fields are absent rather than null. Engagement (opens and clicks, and their rates) is included because those events happen after delivery, once the mailbox provider is already known.
- *
- */
-export type EmailMailboxProviderStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-mailbox-provider breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).
- */
-export type EmailStatsByMailboxProviderResponseWritable = {
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
-};
-
-/**
  * Delivery, engagement, and deliverability stats for messages grouped by a single mailbox provider and provider region pair over the requested period, for example `gmail` in `NA` or `microsoft` in `EU`. The provider region is the regional pod the receiving mail system reports for the recipient's provider; pairing it with the provider disambiguates a region label that several providers share. Like the mailbox-provider breakdown, rows cover the delivery stage onward: the `accepted` and `processed` counts and the `processing` latency family are omitted (a provider region cannot be attributed before delivery).
  *
  */
@@ -32770,31 +33299,6 @@ export type EmailMailboxProviderRegionStatsPointWritable = {
  * Per-(mailbox provider, provider region) breakdown for the requested period, ranked by the `sort` metric (default `delivered`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByMailboxProviderRegionResponseWritable = {
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
-};
-
-/**
- * Aggregate delivery, engagement, and latency stats for messages sent to a single recipient mailbox domain over the requested period.
- */
-export type EmailRecipientDomainStatsPointWritable = {
-  [key: string]: never;
-};
-
-/**
- * Per-recipient-domain breakdown for the requested period, ranked by the `sort` metric (default `processed`) descending and paginated with the requested `limit` (default 50, max 200).
- */
-export type EmailStatsByRecipientDomainResponseWritable = {
   /**
    * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
    */
@@ -32856,42 +33360,6 @@ export type EmailStatsByLocationResponseWritable = {
  * Per-client engagement breakdown for the requested period, grouped by the requested `group_by` facet, ranked by the `sort` metric (default `unique_opens`) descending and paginated with the requested `limit` (default 50, max 200).
  */
 export type EmailStatsByClientResponseWritable = {
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
-};
-
-/**
- * Per-SMTP-code bounce breakdown for the requested period, ranked by the `sort` metric (default `bounced`) descending and paginated with the requested `limit` (default 50, max 200).
- */
-export type EmailStatsByBounceCodeResponseWritable = {
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
-};
-
-/**
- * Per-complaint-type breakdown for the requested period, ranked by `complained` descending and paginated with the requested `limit` (default 50, max 200).
- */
-export type EmailStatsByComplaintTypeResponseWritable = {
   /**
    * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
    */
@@ -33028,6 +33496,11 @@ export type DnsRecordWritable = {
 };
 
 export type DomainWritable = {
+  /**
+   * Default IP pool for this domain in this workspace. Used only when a send omits `ip_pool_id`; an explicit send option takes precedence. The pool must belong to the same organization. Set to `null` to use normal organization routing.
+   *
+   */
+  default_ip_pool_id?: IpPoolId | null;
   settings: DomainSettings;
   capabilities: DomainCapabilitiesWritable;
 };
@@ -34023,6 +34496,20 @@ export type EventSmsBaseWritable = {
    * The rendered language's source fingerprint, or null for a free-text message.
    */
   template_content_hash: null;
+  /**
+   * The messaging profile this message was sent or received under. Absent when no messaging profile applied.
+   */
+  messaging_profile_id?: SmsMessagingProfileId;
+  /**
+   * On an outbound message, the country of the recipient's number. On a received message, the country of the sender's number, or of your number that received it when the sender is not a phone number, such as a short code or an alphanumeric sender. Absent when not known.
+   *
+   */
+  country_code?: CountryCode;
+  /**
+   * Preview feature: the `cost_center` applied to the message, from the send request or else its messaging profile, echoed on every event for the message. Absent when neither set one, and on inbound messages.
+   *
+   */
+  cost_center?: string;
 };
 
 /**
@@ -34663,6 +35150,10 @@ export type NumbersOrderListWritable = {
 
 export type BillingResolvedPriceWritable = {
   /**
+   * Whether a published price matched. True includes an explicitly published zero price. False means no price matched and the zero amounts are placeholders, not a quote.
+   */
+  is_priced: boolean;
+  /**
    * The net unit price, before tax.
    */
   unit_price: Money;
@@ -35170,6 +35661,32 @@ export type EsimCompatibleOfferListWritable = {
 };
 
 /**
+ * Maximum number of items to return per page.
+ */
+export type PaginationLimit = number;
+
+/**
+ * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+ */
+export type StartingAfter = string;
+
+/**
+ * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+ */
+export type EndingBefore = string;
+
+/**
+ * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+ *
+ */
+export type OrderDesc = SortOrder;
+
+/**
+ * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+ */
+export type IncludeTotal = boolean;
+
+/**
  * Client-supplied key. On operations supporting request deduplication, a retained
  * response is replayed for duplicate requests with the same key within the
  * idempotency window (3 hours by default). This protection requires a workspace,
@@ -35205,36 +35722,16 @@ export type XWorkspaceId = string;
 export type XOrganizationId = string;
 
 /**
- * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
- */
-export type StartingAfter = string;
-
-/**
- * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
- */
-export type EndingBefore = string;
-
-/**
- * Maximum number of items to return per page.
- */
-export type PaginationLimit = number;
-
-/**
- * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
- *
- */
-export type OrderDesc = SortOrder;
-
-/**
  * Sort direction. Defaults to `asc`, which sorts alphabetically or from oldest to newest, depending on the selected sort field.
  *
  */
 export type OrderAsc = SortOrder;
 
 /**
- * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+ * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+ *
  */
-export type IncludeTotal = boolean;
+export type StatsTimezone = string;
 
 /**
  * Limits the response to resources created at or after this timestamp. Combine it with `created_before` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
@@ -35292,12 +35789,6 @@ export type EmailBroadcastSearchFilter = string;
 export type BroadcastTestIdempotencyKey = string;
 
 /**
- * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
- *
- */
-export type StatsTimezone = string;
-
-/**
  * Filter by workspace inbox status. Omit to include open and resolved conversations.
  */
 export type ConversationInboxStatusFilter = ConversationInboxStatus;
@@ -35317,6 +35808,11 @@ export type ConversationLabelFilter = Array<string>;
  *
  */
 export type WhatsAppStatsTemplateFilter = string;
+
+/**
+ * Required client-supplied deduplication key for this write. Reuse it for retries of the same intent. Successful results replay within the configured idempotency window (three hours by default); selected connected-app writes also replay uncertain-write conflicts. Use a new key only after confirming the prior result and beginning a different action.
+ */
+export type RequiredIdempotencyKey = string;
 
 /**
  * WhatsApp Business Account ID (`waa_` prefix) or the WhatsApp Business Account ID Meta reports in `waba`. A value that parses as a valid ID resolves by ID; any other value resolves as Meta's ID.
@@ -35341,11 +35837,6 @@ export type EmailCompetitiveRange = 7 | 30 | 90;
  *
  */
 export type EmailCompetitiveTimezone = Timezone;
-
-/**
- * Required client-supplied deduplication key for this write. Reuse it for retries of the same intent. Successful results replay within the configured idempotency window (three hours by default); selected connected-app writes also replay uncertain-write conflicts. Use a new key only after confirming the prior result and beginning a different action.
- */
-export type RequiredIdempotencyKey = string;
 
 /**
  * Return eSIMs assigned to this subscriber.
@@ -40454,6 +40945,11 @@ export type ListSmsMessagesData = {
      * Filter by sender (E.164, alphanumeric, or short code; exact match).
      */
     from?: string;
+    /**
+     * Filter by destination country, as an ISO 3166-1 alpha-2 code. An outbound message's country is the recipient's; a received message's is the country of the Bird number it arrived on.
+     *
+     */
+    country?: CountryCode;
     /**
      * Filter by tag. Accepts `name` to match any record carrying that tag name, or `name:value` to match a specific tag pair (for example `category:welcome`). Repeat the parameter to add more tags. A record must match every tag listed to be returned.
      *
@@ -64990,9 +65486,9 @@ export type DeleteMailboxData = {
   };
   path: {
     /**
-     * Mailbox identifier. Starts with `mbx_`.
+     * Mailbox ID or email address in this workspace.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
   };
   query?: never;
   url: "/v1/email/mailboxes/{mailbox_id}";
@@ -65065,9 +65561,9 @@ export type GetMailboxData = {
   };
   path: {
     /**
-     * Mailbox identifier. Starts with `mbx_`.
+     * Mailbox ID or email address in this workspace.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
   };
   query?: never;
   url: "/v1/email/mailboxes/{mailbox_id}";
@@ -65154,9 +65650,9 @@ export type UpdateMailboxData = {
   };
   path: {
     /**
-     * Mailbox identifier. Starts with `mbx_`.
+     * Mailbox ID or email address in this workspace.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
   };
   query?: {
     /**
@@ -65262,9 +65758,9 @@ export type RestoreMailboxData = {
   };
   path: {
     /**
-     * Mailbox identifier. Starts with `mbx_`.
+     * Mailbox ID or email address in this workspace.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
   };
   query?: never;
   url: "/v1/email/mailboxes/{mailbox_id}/restore";
@@ -65338,9 +65834,9 @@ export type GetMailboxStatsData = {
   };
   path: {
     /**
-     * Mailbox identifier. Starts with `mbx_`.
+     * Mailbox ID or email address in this workspace.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
   };
   query?: {
     /**
@@ -65455,9 +65951,9 @@ export type ResumeMailboxData = {
   };
   path: {
     /**
-     * Mailbox identifier. Starts with `mbx_`.
+     * Mailbox ID or email address in this workspace.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
   };
   query?: never;
   url: "/v1/email/mailboxes/{mailbox_id}/resume";
@@ -65530,9 +66026,9 @@ export type ListMailboxReceiveRulesData = {
   };
   path: {
     /**
-     * Mailbox identifier. Starts with `mbx_`.
+     * Mailbox ID or email address in this workspace.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
   };
   query?: {
     /**
@@ -65638,9 +66134,9 @@ export type CreateMailboxReceiveRuleData = {
   };
   path: {
     /**
-     * Mailbox identifier. Starts with `mbx_`.
+     * Mailbox ID or email address in this workspace.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
   };
   query?: never;
   url: "/v1/email/mailboxes/{mailbox_id}/receive-rules";
@@ -65738,9 +66234,9 @@ export type DeleteMailboxReceiveRuleData = {
   };
   path: {
     /**
-     * Mailbox identifier. Starts with `mbx_`.
+     * Mailbox ID or email address in this workspace.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
     /**
      * Receive-rule identifier. Starts with `erl_`.
      */
@@ -65815,9 +66311,9 @@ export type ListEmailThreadsData = {
   path?: never;
   query?: {
     /**
-     * Filter to conversations in a specific mailbox.
+     * Filter to conversations in a mailbox by ID or email address in this workspace. An unknown or ambiguous email address returns 404; a valid mailbox ID with no matching threads returns an empty page.
      */
-    mailbox_id?: MailboxId;
+    mailbox_id?: MailboxIdentifier;
     /**
      * Filter to conversations linked to a specific contact.
      */
@@ -66637,9 +67133,9 @@ export type ListMailboxScheduledMessagesData = {
   };
   path: {
     /**
-     * Mailbox that owns the scheduled send.
+     * Mailbox ID or email address in this workspace that owns the scheduled send.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
   };
   query?: {
     /**
@@ -66730,9 +67226,9 @@ export type GetMailboxScheduledMessageData = {
   };
   path: {
     /**
-     * Mailbox that owns the scheduled send.
+     * Mailbox ID or email address in this workspace that owns the scheduled send.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
     /**
      * Scheduled send identifier from scheduled_message_id in the acceptance response.
      */
@@ -66830,9 +67326,9 @@ export type CancelMailboxScheduledMessageData = {
   };
   path: {
     /**
-     * Mailbox that owns the scheduled send.
+     * Mailbox ID or email address in this workspace that owns the scheduled send.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
     /**
      * Scheduled send identifier from scheduled_message_id in the acceptance response.
      */
@@ -66934,9 +67430,9 @@ export type CreateMailboxMessageData = {
   };
   path: {
     /**
-     * Mailbox identifier. Starts with `mbx_`.
+     * Mailbox ID or email address in this workspace.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
   };
   query?: never;
   url: "/v1/email/mailboxes/{mailbox_id}/messages";
@@ -67014,9 +67510,9 @@ export type ListMailboxLabelsData = {
   };
   path: {
     /**
-     * Mailbox identifier. Starts with `mbx_`.
+     * Mailbox ID or email address in this workspace.
      */
-    mailbox_id: MailboxId;
+    mailbox_id: MailboxIdentifier;
   };
   query?: never;
   url: "/v1/email/mailboxes/{mailbox_id}/labels";
