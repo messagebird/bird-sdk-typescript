@@ -367,7 +367,7 @@ export const QuotaErrorContextSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "The quota limit that refused a resource change. A change in a workspace is checked against its organization's limit and any limit set for its workspace; the organization limit is reported when both refuse. When scope is workspace, follow the response remediation instead of the error code's organization-wide recovery guidance. An organization administrator can raise or remove the workspace ceiling; the shared organization limit still applies.\n",
+    "The quota limit that refused a resource change. A change in a workspace is checked against its organization's limit and its workspace's limit, whether set manually or derived from the organization's automatic allocation; the organization limit is reported when both refuse. When scope is workspace, follow the response remediation instead of the error code's organization-wide recovery guidance. An organization administrator can adjust the workspace limit or the automatic allocation; the shared organization limit still applies.\n",
   required: ["quota_key", "scope"],
   properties: {
     quota_key: {
@@ -962,6 +962,14 @@ export const WorkspaceQuotaCeilingSchema = {
   },
 } as const;
 
+export const WorkspaceQuotaLimitSourceSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["manual", "automatic", "organization"],
+  description:
+    "Which limit bounds the workspace's own usage.\n\n- `manual`: the workspace's own active limit.\n- `automatic`: the workspace's share of the organization limit under its automatic allocation.\n- `organization`: no workspace limit applies; only the shared organization limit does. This includes an automatic allocation of an unlimited organization limit.\n",
+} as const;
+
 export const WorkspaceQuotaUsageStatusSchema = {
   type: "string",
   minLength: 1,
@@ -1057,6 +1065,9 @@ export const WorkspaceQuotaSchema = {
     "organization_source",
     "workspace_limit",
     "limit",
+    "limit_source",
+    "automatic_limit",
+    "allocation_enabled",
     "usage",
   ],
   properties: {
@@ -1105,7 +1116,7 @@ export const WorkspaceQuotaSchema = {
     },
     workspace_limit: {
       description:
-        "The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.",
+        "The workspace's own saved limit. `null` when none is saved; `limit_source` and `automatic_limit` then show whether an automatic share applies.",
       oneOf: [
         {
           $ref: "#/components/schemas/WorkspaceQuotaCeiling",
@@ -1120,7 +1131,22 @@ export const WorkspaceQuotaSchema = {
       format: "int64",
       minimum: 0,
       description:
-        "The lower of the organization limit currently applied to requests and any active workspace limit. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.",
+        "The lower of the organization limit currently applied to requests and the workspace's active limit or automatic share. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.",
+    },
+    limit_source: {
+      $ref: "#/components/schemas/WorkspaceQuotaLimitSource",
+    },
+    automatic_limit: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "The workspace's share under the organization's automatic allocation. Set only when `limit_source` is `automatic`; it is never saved as a workspace limit.",
+    },
+    allocation_enabled: {
+      type: "boolean",
+      description:
+        "Whether the organization has an automatic allocation of this quota. It can be `true` while `limit_source` is `manual`, or `organization` when the organization limit is unlimited. When `true`, changing or removing this workspace's limit can change other workspaces' automatic shares.",
     },
     usage: {
       description:
@@ -5928,6 +5954,34 @@ export const RealtimeAppIDSchema = {
   example: "rap_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const WorkspaceSortFieldSchema = {
+  type: "string",
+  description: "Field used to order workspaces.",
+  enum: ["created_at", "name"],
+  default: "created_at",
+} as const;
+
+export const OrganizationWorkspaceListSchema = {
+  readOnly: true,
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/Workspace",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
 export const WorkspaceCreateSchema = {
   type: "object",
   additionalProperties: false,
@@ -5936,6 +5990,19 @@ export const WorkspaceCreateSchema = {
     name: {
       $ref: "#/components/schemas/TenantName",
       example: "Production",
+    },
+  },
+} as const;
+
+export const OrganizationWorkspaceUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    name: {
+      $ref: "#/components/schemas/TenantName",
+      description:
+        "New display name for the workspace, as it appears in the dashboard and in workspace lists. Must include at least one letter or number.\n",
+      example: "Staging",
     },
   },
 } as const;
@@ -6637,6 +6704,15 @@ export const EmailMessageStatusSchema = {
     "Aggregate delivery status of an email, derived from its recipients' states.\n\nIn flight:\n\n- `scheduled`: The message is queued to send at a future time and has not been dispatched yet.\n- `accepted`: The initial status of an immediate send. The message is queued for its recipients.\n- `processed`: Delivery is underway, so at least one recipient's message is on its way out and none has failed.\n- `deferred`: At least one recipient's mailbox provider asked for a retry, and delivery attempts continue.\n\nFinal:\n\n- `delivered`: Every recipient's mail server accepted the message.\n- `bounced`: Every recipient permanently failed (bounced or was rejected).\n- `rejected`: Every recipient was rejected before a delivery attempt (for example, all recipients were suppressed).\n- `partial_failure`: Some recipients permanently failed while others were delivered or are still in flight.\n- `canceled`: A scheduled message was canceled before it was sent.\n\n`complained` takes precedence over every other status: at least one recipient reported\nthe message as spam, regardless of what happened to the rest.\n",
 } as const;
 
+export const MessageReferenceSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 255,
+  description:
+    "Your own reference for a message, such as an order or ticket identifier. Several messages can share one.",
+  example: "INV-1234",
+} as const;
+
 export const EmailMessageCategorySchema = {
   type: "string",
   minLength: 1,
@@ -7036,6 +7112,16 @@ export const EmailMessageSchema = {
         "Any JSON you kept on the message. We store it and hand it back in webhook payloads, and that is all it does. If you want to search or filter by it, use `tags` instead.",
       additionalProperties: true,
     },
+    reference: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "The `reference` from the send request. Absent when the send set none.",
+    },
     parameters: {
       type: ["object", "null"],
       additionalProperties: true,
@@ -7327,6 +7413,15 @@ export const EmailMessageSendRequestSchema = {
       description:
         "Arbitrary JSON object returned on API reads and included in webhook payloads. You can query its paths in analytics, such as `metadata.order_id`, but it is not a dashboard filter. The serialized object is limited to 2 KB. Use metadata for per-send context such as order IDs, customer references, and structured event data. For low-cardinality filterable labels, use `tags` instead.\n",
       additionalProperties: true,
+    },
+    reference: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "An identifier you want to find this message by, such as an order or ticket number, matched exactly by the message list's `reference` filter. Set it only when you need to search on it, and put any other data in `metadata`. Stored on the message, returned on reads and echoed in webhook payloads. Several messages can share one.\n",
     },
     parameters: {
       type: "object",
@@ -10748,7 +10843,7 @@ export const SMSSegmentsSchema = {
       readOnly: true,
       enum: ["GSM_7BIT", "UCS2", "BINARY"],
       description:
-        "Encoding used for the body. The `GSM_7BIT` encoding fits 160 septets\n(seven-bit units) in one segment, or 153 per part in a multi-segment\nmessage. The `UCS2` encoding applies when the body contains a character\noutside the GSM 03.38 alphabet, including emoji, CJK, and some accented\ncharacters. It fits 70 UTF-16 code units in one segment, or 67 per part.\n\nNeither limit counts characters, and both alphabets have characters that\ncost two units. Under `GSM_7BIT` there are ten such entries, and they are\nthe whole set: `^`, `{`, `}`, `\\`, `[`, `]`, `~`, `|`, `€`, and the form\nfeed control. Eighty of those fill a single segment. Under `UCS2` an emoji\noutside the Basic Multilingual Plane is a surrogate pair costing two code\nunits, so 35 of those fill a single segment.\n\n`BINARY` marks an 8-bit binary payload, sent as one segment, where `characters` counts its octets. Only the preview binary send produces it; it is declared ahead of general availability so clients see the value before any message carries it outside the preview.\n",
+        "Encoding used for the body. The `GSM_7BIT` encoding fits 160 septets\n(seven-bit units) in one segment, or 153 per part in a multi-segment\nmessage. The `UCS2` encoding applies when the body contains a character\noutside the GSM 03.38 alphabet, including emoji, CJK, and some accented\ncharacters. It fits 70 UTF-16 code units in one segment, or 67 per part.\n\nNeither limit counts characters, and both alphabets have characters that\ncost two units. Under `GSM_7BIT` there are ten such entries, and they are\nthe whole set: `^`, `{`, `}`, `\\`, `[`, `]`, `~`, `|`, `€`, and the form\nfeed control. Eighty of those fill a single segment. Under `UCS2` an emoji\noutside the Basic Multilingual Plane is a surrogate pair costing two code\nunits, so 35 of those fill a single segment.\n\n`BINARY` marks an 8-bit binary payload, sent as one segment, where `characters` counts its octets. Only a binary send produces it.\n",
     },
     characters: {
       type: "integer",
@@ -10817,20 +10912,15 @@ export const SMSMessageEffectiveOptionsSchema = {
       description:
         "Whether Bird replaced characters outside the GSM-7 alphabet in this message's body with their closest equivalent before sending it. When `true`, `text` is the body as sent and `segments` describes that body.\n",
     },
-    ignore_delivery_window: {
-      type: "boolean",
-      description:
-        "Preview feature: `true` when this message is excluded from any future quiet-hours delivery window. Absent otherwise.",
-    },
     ignore_suppression: {
       type: "boolean",
       description:
-        "Preview feature: `true` when the send asked to skip opt-outs. Recorded only: every opt-out still applied. Absent otherwise.",
+        "`true` when the send may reach the recipient even if they are suppressed for the sender, including after replying STOP. Only `authentication` and `transactional` messages can set it. Absent otherwise.",
     },
     callback_url: {
       type: "string",
       description:
-        "Preview feature: the callback URL the send recorded. Absent when it recorded none. Recorded only: status events go to your webhook subscriptions either way.\n",
+        "The callback URL that applies to this message, which receives its events instead of your webhook endpoints. Absent when the message has none, in which case its events go to your webhook subscriptions.\n",
     },
   },
   example: {
@@ -10870,7 +10960,7 @@ export const SMSErrorSchema = {
     permanent: {
       type: ["boolean", "null"],
       description:
-        "Whether the cause is permanent, so sending the same message again would fail the same way. Describes the cause, not whether Bird retries. Null when Bird cannot tell, which is currently always.\n",
+        "Whether the cause is permanent, so sending the same message again would fail the same way. Describes the cause, not whether Bird retries. Null when Bird cannot tell, such as when the provider returned no code or one without a known permanence, or when Bird blocked the message itself.\n",
     },
   },
 } as const;
@@ -10880,7 +10970,7 @@ export const SMSInReplyToMessageSchema = {
   additionalProperties: false,
   readOnly: true,
   description:
-    "Preview feature: the outbound message a received message was paired with. Bird pairs a reply with the last message the messaging profile sent this subscriber from the receiving number, within the profile's outbound-matching window. The pairing is inferred from timing; the subscriber does not report which message they answered.\n",
+    "The outbound message a received message was paired with. Bird pairs a reply with the last message the messaging profile sent this subscriber from the receiving number, within the profile's outbound-matching window. The pairing is inferred from timing; the subscriber does not report which message they answered.\n",
   required: ["id"],
   properties: {
     id: {
@@ -10972,7 +11062,7 @@ export const SMSMessageSchema = {
         },
       ],
       description:
-        "Preview feature: the payload of a binary send, in place of `text`. Absent on every other message.",
+        "The payload of a binary send, in place of `text`. Absent on every other message.",
     },
     category: {
       oneOf: [
@@ -11088,19 +11178,29 @@ export const SMSMessageSchema = {
         },
       ],
       description:
-        "The settings applied to this message, with any option you omitted filled in with the default in force when you sent it. Absent on inbound messages, and on any outbound message for which no settings were recorded.\n",
+        "The settings applied to this message, with any option you omitted filled in with the default in force when you sent it. Absent on received messages, and on any outbound message for which no settings were recorded.\n",
     },
     validity_period: {
       type: "integer",
       readOnly: true,
       description:
-        "Preview feature: the `validity_period` applied to the message, in seconds: the send's own, or else its messaging profile's. Absent when neither set one.",
+        "The `validity_period` applied to the message, in seconds: the send's own, or else its messaging profile's. Absent when neither set one.",
+    },
+    reference: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "The `reference` from the send request. Absent when the send set none, and on inbound messages.",
     },
     cost_center: {
       type: "string",
       readOnly: true,
       description:
-        "Preview feature: the `cost_center` applied to the message: the send's own, or else its messaging profile's. Absent when neither set one, and on inbound messages.",
+        "The `cost_center` applied to the message: the send's own, or else its messaging profile's. Absent when neither set one, and on inbound messages.",
       example: "CC001234",
     },
     carrier: {
@@ -11140,7 +11240,7 @@ export const SMSMessageSchema = {
         },
       ],
       description:
-        "Preview feature: on a received message, the outbound message it was paired with through its messaging profile's outbound matching. Absent on outbound messages and on received messages that were not paired.\n",
+        "On a received message, the outbound message it was paired with through its messaging profile's outbound matching. Absent on outbound messages and on received messages that were not paired.\n",
     },
     created_at: {
       type: "string",
@@ -11199,6 +11299,20 @@ export const SMSSendOptionsSchema = {
       default: false,
       description:
         "Replace characters outside the GSM-7 alphabet with their closest GSM-7 equivalent before sending: typically curly quotes, dashes, ellipses, fullwidth forms, and non-breaking spaces.\n\nOne such character forces the whole body into `UCS2`, which more than halves the characters that fit in a segment, so replacing them often lowers the segment count and the cost.\n\nDisabled by default, because it alters the body you composed. The replacement is all-or-nothing: a body that still holds a character outside the alphabet afterwards, such as an emoji or a non-Latin script, is sent exactly as you supplied it. Read the message back to see what was applied: `text` is the body as sent.\n",
+    },
+    ignore_suppression: {
+      type: "boolean",
+      default: false,
+      description:
+        "Send this message even if the recipient is suppressed for the sender, including after replying STOP. Bird skips every suppression reason and records the flag on the message; communication preferences the recipient revoked still apply. Only `authentication` and `transactional` messages can use it; setting it to `true` on a `marketing` or `service` message returns `422`. Bird must enable it for your workspace first; until then, a message that uses it is refused with `422`. Omit it to use the setting of the messaging profile in `messaging_profile_id`.\n",
+    },
+    callback_url: {
+      type: ["string", "null"],
+      format: "uri",
+      maxLength: 2048,
+      description:
+        "An HTTPS URL that receives this message's events instead of your webhook endpoints. It must be a public address: a private, loopback or link-local host returns `422`. Bird fixes the URL when it accepts the message, so later profile changes do not reroute it. Each event is a signed POST, retried on failure, and signed with your workspace callback signing secret, which `rotateWebhookCallbackSigningSecret` creates and returns once. While a URL applies, this message's events skip your plain webhook endpoints, and a failed callback never falls back to them. MCP Events subscriptions and connector endpoints still receive them. The `callback_events` of the messaging profile in `messaging_profile_id` choose which events go to the URL. Omit the field to use the callback URL of that profile; send `null` to send this message's events to your webhook subscriptions.\n",
+      example: "https://receipts.example.com/bird/sms",
     },
     track_clicks: {
       type: "boolean",
@@ -11281,7 +11395,7 @@ export const SMSMessageSendRequestSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A message to send. Supply exactly one of `text` (free-text, which also requires `category` unless a messaging profile supplies a default), `template` (a stored template, whose category is derived), or the preview `binary` (which also requires `category`). Supplying more than one, or none, is rejected.\n",
+    "A message to send. Supply exactly one of `text` (free-text, which also requires `category` unless a messaging profile supplies a default), `template` (a stored template, whose category is derived), or `binary` (which also requires `category`). Supplying more than one, or none, is rejected.\n",
   required: ["to"],
   anyOf: [
     {
@@ -11341,6 +11455,13 @@ export const SMSMessageSendRequestSchema = {
         "Recipient phone number in E.164 format (for example `+14155550100`), or in national format when you also pass `to_country_code`. One recipient per message. The number is stored and returned in canonical E.164; a recipient that cannot be routed returns a `422` `SMSInvalidRecipient`.\n",
       example: "+14155550100",
     },
+    to_country_code: {
+      type: "string",
+      pattern: "^[A-Z]{2}$",
+      description:
+        "The ISO 3166-1 alpha-2 country whose national numbering plan `to` is written in, such as `NL` for `0612345678`. Bird converts `to` to E.164 before checking the destination, price and sender. An E.164 `to` is still accepted when its country calling code matches this country; a mismatch, or a national number that is not valid in this country, returns a `422` `SMSInvalidRecipient`. Omit it to send `to` in E.164.\n",
+      example: "NL",
+    },
     from: {
       type: "string",
       minLength: 1,
@@ -11354,6 +11475,15 @@ export const SMSMessageSendRequestSchema = {
       description:
         "Free-text message body. Required unless `template` is supplied (the two are mutually exclusive). At least 1 character, up to a 12-segment cap (roughly 1836 GSM-7 or 804 UCS-2 characters). Bird does not truncate; a body exceeding 12 segments is rejected with a 422. The cap applies to segments because GSM-7 and UCS-2 encodings differ in characters per segment.\n",
       example: "Your verification code is 123456.",
+    },
+    binary: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSBinary",
+        },
+      ],
+      description:
+        "Send an 8-bit binary payload instead of `text` or `template`. Requires `category` `transactional` and refuses `options.smart_encoding`. It is sent and charged as one segment.\n",
     },
     category: {
       allOf: [
@@ -11369,7 +11499,24 @@ export const SMSMessageSendRequestSchema = {
       minimum: 60,
       maximum: 172800,
       description:
-        "Preview feature: how long, in seconds (60-172800), the message may wait for delivery, counted from acceptance. Bird does not submit the message to the carrier after this deadline and passes the remaining time to the carrier where the route supports it. A message that misses the deadline before reaching the carrier ends `rejected` or `failed`, not `expired`; `expired` comes only from a carrier report. Omit it to use the validity period of the messaging profile in `messaging_profile_id`, or the carrier's own validity rules when the profile sets none. Organizations outside the preview receive `422 SMSUnsupportedFeature`.\n",
+        "How long, in seconds (60-172800), the message may wait for delivery, counted from acceptance. Bird does not submit the message to the carrier after this deadline and passes the remaining time to the carrier where the route supports it. A message that misses the deadline before reaching the carrier ends `rejected` or `failed`, not `expired`; `expired` comes only from a carrier report. Omit it to use the validity period of the messaging profile in `messaging_profile_id`, or the carrier's own validity rules when the profile sets none.\n",
+    },
+    reference: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "An identifier you want to find this message by, such as an order or ticket number, matched exactly by the message list's `reference` filter. Set it only when you need to search on it, and put any other data in `metadata`. Stored on the message, returned on reads and echoed in webhook payloads. Several messages can share one.\n",
+    },
+    cost_center: {
+      type: "string",
+      minLength: 1,
+      maxLength: 64,
+      description:
+        "Your accounting identifier for this message, such as a department code. Stored on the message and its usage record, returned on reads, and echoed in webhook payloads. Omit it to use the cost center of the messaging profile in `messaging_profile_id`. Accepting it does not change how the message is priced.\n",
+      example: "CC001234",
     },
     tags: {
       type: "array",
@@ -11406,7 +11553,7 @@ export const SMSMessageSendRequestSchema = {
     messaging_profile_id: {
       type: "string",
       description:
-        "Preview feature: the messaging profile that supplies this message's sender and defaults. When `from` is omitted, Bird sends from the profile's sender for the destination country, or its default sender. An omitted `category` on a free-text send takes the profile's default category, and `smart_encoding`, `cost_center` and `validity_period` take the profile's settings. So do `options.callback_url`, `options.ignore_delivery_window` and `options.ignore_suppression`, which Bird records on the message; the profile's `options.validation.network` is not inherited. Values you set on the message take precedence. A built-in template sends from Bird's system sender and ignores the profile's senders. A profile that does not exist in this workspace returns `422` `SMSMessagingProfileNotFound`; a `from` bound to a different profile returns `422` `SMSMessagingProfileSenderBound`. Organizations outside the preview get `422` `SMSUnsupportedFeature`.\n",
+        "The messaging profile that supplies this message's sender and defaults. When `from` is omitted, Bird sends from the profile's sender for the destination country, or its default sender. An omitted `category` on a free-text send takes the profile's default category, and `smart_encoding`, `cost_center` and `validity_period` take the profile's settings. So do `options.callback_url` and `options.ignore_suppression`, which apply to the message. Values you set on the message take precedence. A built-in template sends from Bird's system sender and ignores the profile's senders. A profile that does not exist in this workspace returns `422` `SMSMessagingProfileNotFound`; a `from` bound to a different profile returns `422` `SMSMessagingProfileSenderBound`.\n",
     },
     scheduled_at: {
       type: "string",
@@ -12091,7 +12238,7 @@ export const TemplateVariableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A single variable slot a template fills in when it sends. Most slots are filled from the values supplied when sending; on email, a slot with `system` true is filled by Bird itself, per recipient. The same shape on email, SMS and WhatsApp, so reading what a template needs works the same way whichever channel you are sending on.\n",
+    "A single variable slot a template fills in when it sends. Most slots are filled from the values supplied when sending; a slot with `system` true is filled by Bird itself, per recipient. The same shape on email, SMS and WhatsApp, so reading what a template needs works the same way whichever channel you are sending on.\n",
   required: ["key", "type", "required", "constraint"],
   properties: {
     key: {
@@ -12099,7 +12246,7 @@ export const TemplateVariableSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the `name` you repeat on the matching parameter inside `components`, or, for a template whose placeholders are positional, the position itself as `1`, `2` and so on.\n",
+        "The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the `name` on the matching parameter inside `components`, or, in the template parameters preview, the key in the send's `template.parameters`. A WhatsApp template whose placeholders are positional uses the position itself as `1`, `2` and so on, and values with no placeholder use fixed keys: `header_url`, `header_filename`, `header_location` and `code`.\n",
     },
     type: {
       type: "string",
@@ -12117,10 +12264,11 @@ export const TemplateVariableSchema = {
         "url",
         "image",
         "timestamp",
+        "location",
         "text",
       ],
       description:
-        "The value type this slot accepts. Each typed slot rejects a value that does not match its `constraint`. Built-in SMS templates use typed slots (`code`, `amount` and the rest). Apple Messages templates type a variable from its content: the field it fills (`url`, `image`, `timestamp`) or the formatting filter applied to it (`date`, `date_time`, `amount`, `currency`). Email, WhatsApp and workspace SMS templates use `text`. Workspace SMS parameters must be scalar values. Open enum: treat an unrecognized value as a future type rather than an error.\n",
+        "The value type this slot accepts. Each typed slot rejects a value that does not match its `constraint`. Built-in SMS templates use typed slots (`code`, `amount` and the rest). Apple Messages templates type a variable from its content: the field it fills (`url`, `image`, `timestamp`) or the formatting filter applied to it (`date`, `date_time`, `amount`, `currency`). Email and workspace SMS templates use `text`. WhatsApp templates use `text`, plus `url` for a media header's file and `location` for a location header. Workspace SMS parameters must be scalar values. Open enum: treat an unrecognized value as a future type rather than an error.\n",
     },
     required: {
       type: "boolean",
@@ -12147,7 +12295,7 @@ export const TemplateVariableSchema = {
       readOnly: true,
       default: false,
       description:
-        "Whether the value comes from Bird rather than from the send. Absent means false. Only email templates have system slots, identified by the reserved `bird` key or a dotted path beneath it; every SMS and WhatsApp slot is yours to fill. A draft can also name a reserved key no Bird value fills, including `bird` itself: `constraint` says so, and publishing that draft is rejected.\n",
+        "Whether the value comes from Bird rather than from the send. Absent means false. System slots are identified by the reserved `bird` key or a dotted path beneath it. They appear on email templates, and, in the template parameters preview, on WhatsApp templates whose parameter bindings read contact data; every SMS slot is yours to fill. A draft can also name a reserved key no Bird value fills, including `bird` itself: `constraint` says so, and publishing that draft is rejected.\n",
     },
   },
 } as const;
@@ -13027,11 +13175,582 @@ export const SMSKeywordRuleUpdateSchema = {
   },
 } as const;
 
+export const SMSMessagingProfileSortFieldSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Field to sort messaging profiles by.",
+} as const;
+
 export const SMSSenderIDSchema = {
   type: "string",
   minLength: 1,
   pattern: "^snd_[0-9a-hjkmnp-tv-z]{26}$",
   example: "snd_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const SMSMessagingProfileSenderSelectorSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["sender_id"],
+  description:
+    "Chooses the sender for messages to one destination country, or the default sender when `country_code` is omitted.\n",
+  properties: {
+    country_code: {
+      type: "string",
+      description:
+        "The destination country this sender is used for, as an uppercase ISO 3166-1 alpha-2 code. Omit it to make this the default sender, which is used for every destination country that has no entry of its own. A profile can have one entry per country and one default. An empty string is rejected rather than treated as the default.\n",
+      example: "US",
+    },
+    sender_id: {
+      $ref: "#/components/schemas/SMSSenderID",
+      description:
+        "The sender to use, as returned by the list SMS senders operation.",
+    },
+  },
+} as const;
+
+export const SMSMessagingProfileInboundNumberSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["number"],
+  description: "A number that receives replies for a profile.",
+  properties: {
+    country_code: {
+      type: "string",
+      description:
+        "The country of a short code, as an uppercase ISO 3166-1 alpha-2 code. Required for a short code. Omit it for a number in E.164 format, which receives replies from subscribers in any country.\n",
+      example: "US",
+    },
+    number: {
+      type: "string",
+      minLength: 1,
+      description:
+        "A short code as digits, or a number in E.164 format. It must be a number your workspace holds that can receive SMS, and it can belong to one profile at a time.\n",
+      example: "34001",
+    },
+  },
+} as const;
+
+export const SMSMessagingProfileTimeWindowSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["1h", "1d", "7d"],
+  description:
+    "How long after a message is sent a reply can still be paired with it: one hour (`1h`), 24 hours (`1d`), or 168 hours (`7d`). `1d` is the default.\n",
+  example: "1d",
+} as const;
+
+export const SMSMessagingProfileOutboundMatchingSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["enabled", "time_window"],
+  description:
+    "Settings for pairing each reply with the message it answers, reported as the reply's `in_reply_to_message`. Bird pairs only messages sent from one of this profile's reply numbers while matching is on. Turning it off stops pairing, and turning it back on resumes it for messages still inside their window.\n",
+  properties: {
+    enabled: {
+      type: "boolean",
+      description: "Whether replies are paired with the messages they answer.",
+      example: false,
+    },
+    time_window: {
+      $ref: "#/components/schemas/SMSMessagingProfileTimeWindow",
+    },
+  },
+} as const;
+
+export const SMSMessagingProfileInboundSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["numbers", "callback_url", "outbound_matching"],
+  description:
+    "How the profile receives replies. A profile without numbers only sends.",
+  properties: {
+    numbers: {
+      type: "array",
+      maxItems: 100,
+      description: "The numbers that receive replies for this profile.",
+      items: {
+        $ref: "#/components/schemas/SMSMessagingProfileInboundNumber",
+      },
+    },
+    callback_url: {
+      type: ["string", "null"],
+      description:
+        "The HTTPS URL that receives `sms.received` events for replies on this profile's numbers, signed with your workspace callback signing secret. Null when none is set, in which case replies use `options.callback_url`, then your webhook subscriptions. While a URL applies, a reply skips your plain webhook endpoints.\n",
+      example: "https://receipts.example.com/bird/sms/inbound",
+    },
+    outbound_matching: {
+      $ref: "#/components/schemas/SMSMessagingProfileOutboundMatching",
+    },
+  },
+} as const;
+
+export const SMSMessagingProfileOptionsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["smart_encoding", "ignore_suppression", "callback_url"],
+  description:
+    "Sending options that messages from this profile use when a message does not set its own.",
+  properties: {
+    smart_encoding: {
+      type: "boolean",
+      description:
+        "Whether text is converted to the GSM-7 character set where possible, to fit more characters in a segment.",
+      example: false,
+    },
+    ignore_suppression: {
+      type: "boolean",
+      description:
+        "Whether messages are sent even if the recipient is suppressed for the sender, including after replying STOP. Messages that do not set `ignore_suppression` use this value. Only `authentication` and `transactional` messages can skip suppressions. It cannot be `true` while `default_category` is `marketing` or `service`. Bird must enable it for your workspace; until then, messages that use it are refused.\n",
+      example: false,
+    },
+    callback_url: {
+      type: ["string", "null"],
+      description:
+        "The HTTPS URL that receives this profile's message events instead of your webhook endpoints. Null when none is set. Messages that do not set `callback_url` use it, and so do replies on the profile's numbers that have no `inbound.callback_url`. Each event is a signed POST, signed with your workspace callback signing secret, which `rotateWebhookCallbackSigningSecret` creates and returns once. While a URL applies, a message's events skip your plain webhook endpoints. MCP Events subscriptions and connector endpoints still receive them.\n",
+      example: "https://receipts.example.com/bird/sms/activation",
+    },
+  },
+} as const;
+
+export const SMSMessagingProfileCallbackEventSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "An outbound SMS event type. A write accepts only the listed values; a newer server can add events, so read an unknown one as a string.",
+  "x-extensible-enum": [
+    "sms.accepted",
+    "sms.sent",
+    "sms.delivered",
+    "sms.undelivered",
+    "sms.failed",
+    "sms.rejected",
+    "sms.expired",
+  ],
+  example: "sms.delivered",
+} as const;
+
+export const SMSMessagingProfileSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "name",
+    "senders",
+    "inbound",
+    "default_category",
+    "validity_period",
+    "cost_center",
+    "options",
+    "callback_events",
+    "created_at",
+    "updated_at",
+  ],
+  description:
+    "A messaging profile: the senders, reply numbers, and defaults for one program in your workspace. A send that names the profile takes its sender, default category, smart encoding, validity period, cost center, and options from it when the send leaves them out. A message that names the profile sends its events to the profile's `options.callback_url`, filtered by `callback_events`, and a reply on one of the profile's numbers goes to `inbound.callback_url`, then `options.callback_url`. With outbound matching on, a reply is paired with the message it answers.\n",
+  properties: {
+    id: {
+      $ref: "#/components/schemas/SMSMessagingProfileID",
+      description: "Identifier of this profile.",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "A label for the profile. Names are not unique, so two profiles can share one.",
+      example: "device-activation",
+    },
+    senders: {
+      type: "array",
+      maxItems: 300,
+      description:
+        "The sender for each destination country, and the default sender when an entry has no `country_code`.",
+      items: {
+        $ref: "#/components/schemas/SMSMessagingProfileSenderSelector",
+      },
+    },
+    inbound: {
+      $ref: "#/components/schemas/SMSMessagingProfileInbound",
+    },
+    default_category: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSMessageCategory",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The category a free-text send that names this profile uses when it sets none: `transactional`, `marketing`, `authentication`, or `service`. A template send takes the template's category. Null when none is set.\n",
+      example: "authentication",
+    },
+    validity_period: {
+      type: ["integer", "null"],
+      minimum: 60,
+      maximum: 172800,
+      description:
+        "How many seconds a message stays valid before it expires undelivered. Null when none is set. A send that omits `validity_period` uses it.\n",
+      example: 3600,
+    },
+    cost_center: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 64,
+      description:
+        "A label for assigning the cost of this profile's messages. Null when none is set. A send that omits `cost_center` uses it.\n",
+      example: "CC001234",
+    },
+    options: {
+      $ref: "#/components/schemas/SMSMessagingProfileOptions",
+    },
+    callback_events: {
+      type: ["array", "null"],
+      uniqueItems: true,
+      minItems: 1,
+      items: {
+        $ref: "#/components/schemas/SMSMessagingProfileCallbackEvent",
+      },
+      example: ["sms.delivered", "sms.failed"],
+      description:
+        "The events of this profile's outbound messages that go to a callback URL: `sms.accepted`, `sms.sent`, `sms.delivered`, `sms.undelivered`, `sms.failed`, `sms.rejected`, and `sms.expired`. The list is fixed when a message is accepted, and applies only while the message has a callback URL: an event outside it then reaches neither the URL nor a plain webhook endpoint. Without a callback URL the list has no effect, and every event goes to your webhook endpoints. `sms.received` is never filtered. Null means every outbound event goes to the URL.\n",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When the profile was created.",
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When the profile was last changed.",
+    },
+  },
+} as const;
+
+export const SMSMessagingProfileListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Your workspace's messaging profiles, newest first.",
+          items: {
+            $ref: "#/components/schemas/SMSMessagingProfile",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const SMSMessagingProfileOutboundMatchingInputSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Settings for pairing each reply with the message it answers, reported as the reply's `in_reply_to_message`. Bird pairs only messages sent from one of this profile's reply numbers while matching is on. Turning it off stops pairing, and turning it back on resumes it for messages still inside their window.\n",
+  properties: {
+    enabled: {
+      type: "boolean",
+      description:
+        "Whether replies are paired with the messages they answer. A new profile defaults to `false`.",
+      example: false,
+    },
+    time_window: {
+      $ref: "#/components/schemas/SMSMessagingProfileTimeWindow",
+    },
+  },
+} as const;
+
+export const SMSMessagingProfileInboundCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "How the profile receives replies. Omit it for a profile that only sends.",
+  properties: {
+    numbers: {
+      type: "array",
+      maxItems: 100,
+      description: "The numbers that receive replies for this profile.",
+      items: {
+        $ref: "#/components/schemas/SMSMessagingProfileInboundNumber",
+      },
+    },
+    callback_url: {
+      type: "string",
+      minLength: 1,
+      maxLength: 2048,
+      format: "uri",
+      description:
+        "The HTTPS URL that receives `sms.received` events for replies on this profile's numbers, signed with your workspace callback signing secret. Without it, replies use `options.callback_url`, then your webhook subscriptions. While a URL applies, a reply skips your plain webhook endpoints. It must be an absolute HTTPS URL of at most 2048 characters with a public host: an HTTP URL, a malformed one, or a private, loopback or link-local host returns `422`.\n",
+      example: "https://receipts.example.com/bird/sms/inbound",
+    },
+    outbound_matching: {
+      $ref: "#/components/schemas/SMSMessagingProfileOutboundMatchingInput",
+    },
+  },
+} as const;
+
+export const SMSMessagingProfileOptionsCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Sending options for messages that do not set their own. Booleans default to `false`.",
+  properties: {
+    smart_encoding: {
+      type: "boolean",
+      description:
+        "Whether text is converted to the GSM-7 character set where possible.",
+      example: false,
+    },
+    ignore_suppression: {
+      type: "boolean",
+      description:
+        "Whether messages are sent even if the recipient is suppressed for the sender, including after replying STOP. Messages that do not set `ignore_suppression` use this value. Only `authentication` and `transactional` messages can skip suppressions. It cannot be `true` when `default_category` is `marketing` or `service`. Bird must enable it for your workspace; until then, messages that use it are refused.\n",
+      example: false,
+    },
+    callback_url: {
+      type: "string",
+      minLength: 1,
+      maxLength: 2048,
+      format: "uri",
+      description:
+        "The HTTPS URL that receives this profile's message events instead of your webhook endpoints. Messages that do not set `callback_url` use it, and so do replies on the profile's numbers that have no `inbound.callback_url`. Each event is a signed POST, signed with your workspace callback signing secret, which `rotateWebhookCallbackSigningSecret` creates and returns once. While a URL applies, a message's events skip your plain webhook endpoints. MCP Events subscriptions and connector endpoints still receive them. It must be an absolute HTTPS URL of at most 2048 characters with a public host: an HTTP URL, a malformed one, or a private, loopback or link-local host returns `422`.\n",
+      example: "https://receipts.example.com/bird/sms/activation",
+    },
+  },
+} as const;
+
+export const SMSMessagingProfileCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  description:
+    "Parameters for creating a messaging profile. Omitted booleans are `false`, the matching window is `1d`, and everything else is unset.\n",
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "A label for the profile. Names are not unique, so two profiles can share one.",
+      example: "device-activation",
+    },
+    senders: {
+      type: "array",
+      maxItems: 300,
+      description:
+        "The sender for each destination country, and optionally a default sender. Each country appears at most once, and at most one entry omits `country_code`.\n",
+      items: {
+        $ref: "#/components/schemas/SMSMessagingProfileSenderSelector",
+      },
+    },
+    inbound: {
+      $ref: "#/components/schemas/SMSMessagingProfileInboundCreate",
+    },
+    default_category: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSMessageCategory",
+        },
+      ],
+      description:
+        "The category a free-text send that names this profile uses when it sets none: `transactional`, `marketing`, `authentication`, or `service`. A template send takes the template's category.\n",
+      example: "authentication",
+    },
+    validity_period: {
+      type: "integer",
+      minimum: 60,
+      maximum: 172800,
+      description:
+        "How many seconds a message stays valid before it expires undelivered. A send that omits `validity_period` uses it.\n",
+      example: 3600,
+    },
+    cost_center: {
+      type: "string",
+      minLength: 1,
+      maxLength: 64,
+      description:
+        "A label for assigning the cost of this profile's messages. A send that omits `cost_center` uses it.\n",
+      example: "CC001234",
+    },
+    options: {
+      $ref: "#/components/schemas/SMSMessagingProfileOptionsCreate",
+    },
+    callback_events: {
+      type: "array",
+      uniqueItems: true,
+      minItems: 1,
+      items: {
+        $ref: "#/components/schemas/SMSMessagingProfileCallbackEvent",
+      },
+      example: ["sms.delivered", "sms.failed"],
+      description:
+        "The events of this profile's outbound messages that go to a callback URL. The list is fixed when a message is accepted, and applies only while the message has a callback URL: an event outside it then reaches neither the URL nor a plain webhook endpoint. Without a callback URL the list has no effect, and every event goes to your webhook endpoints. A value other than `sms.accepted`, `sms.sent`, `sms.delivered`, `sms.undelivered`, `sms.failed`, `sms.rejected` or `sms.expired` returns `422`. `sms.received` is never filtered. Omit it to deliver every event.\n",
+    },
+  },
+  example: {
+    name: "device-activation",
+    senders: [
+      {
+        country_code: "US",
+        sender_id: "snd_01krdgeqcxet5s7t44vh8rt9mg",
+      },
+    ],
+    inbound: {
+      numbers: [
+        {
+          number: "+14155550100",
+        },
+      ],
+    },
+    default_category: "authentication",
+  },
+} as const;
+
+export const SMSMessagingProfileInboundUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Changes how the profile receives replies. Omitted properties keep their value.",
+  properties: {
+    numbers: {
+      type: "array",
+      maxItems: 100,
+      description:
+        "Replaces the numbers that receive replies. Send an empty array to remove them all.",
+      items: {
+        $ref: "#/components/schemas/SMSMessagingProfileInboundNumber",
+      },
+    },
+    callback_url: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 2048,
+      format: "uri",
+      description:
+        "The HTTPS URL that receives `sms.received` events for replies on this profile's numbers, signed with your workspace callback signing secret. Send `null` to clear it, so replies use `options.callback_url`, then your webhook subscriptions. While a URL applies, a reply skips your plain webhook endpoints. It must be an absolute HTTPS URL of at most 2048 characters with a public host: an HTTP URL, a malformed one, or a private, loopback or link-local host returns `422`.\n",
+      example: "https://receipts.example.com/bird/sms/inbound",
+    },
+    outbound_matching: {
+      $ref: "#/components/schemas/SMSMessagingProfileOutboundMatchingInput",
+    },
+  },
+} as const;
+
+export const SMSMessagingProfileOptionsUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Changes the sending options for messages that do not set their own. Omitted properties keep their value.",
+  properties: {
+    smart_encoding: {
+      type: "boolean",
+      description:
+        "Whether text is converted to the GSM-7 character set where possible.",
+      example: false,
+    },
+    ignore_suppression: {
+      type: "boolean",
+      description:
+        "Whether messages are sent even if the recipient is suppressed for the sender, including after replying STOP. Messages that do not set `ignore_suppression` use this value. Only `authentication` and `transactional` messages can skip suppressions. It cannot be `true` when `default_category` is `marketing` or `service`. Bird must enable it for your workspace; until then, messages that use it are refused.\n",
+      example: false,
+    },
+    callback_url: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 2048,
+      format: "uri",
+      description:
+        "The HTTPS URL that receives this profile's message events instead of your webhook endpoints. Send `null` to clear it. Messages that do not set `callback_url` use it, and so do replies on the profile's numbers that have no `inbound.callback_url`. Each event is a signed POST, signed with your workspace callback signing secret, which `rotateWebhookCallbackSigningSecret` creates and returns once. While a URL applies, a message's events skip your plain webhook endpoints. MCP Events subscriptions and connector endpoints still receive them. It must be an absolute HTTPS URL of at most 2048 characters with a public host: an HTTP URL, a malformed one, or a private, loopback or link-local host returns `422`.\n",
+      example: "https://receipts.example.com/bird/sms/activation",
+    },
+  },
+} as const;
+
+export const SMSMessagingProfileUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Changes a messaging profile. Omitted properties keep their value, including inside `inbound` and `options`. Send `null` to clear a property that accepts it. `senders` and `inbound.numbers` replace the whole list.\n",
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "A new label for the profile. Names are not unique, so two profiles can share one.",
+      example: "device-activation",
+    },
+    senders: {
+      type: "array",
+      maxItems: 300,
+      description:
+        "Replaces the profile's senders. Each country appears at most once, and at most one entry omits `country_code`. Send an empty array to remove them all.\n",
+      items: {
+        $ref: "#/components/schemas/SMSMessagingProfileSenderSelector",
+      },
+    },
+    inbound: {
+      $ref: "#/components/schemas/SMSMessagingProfileInboundUpdate",
+    },
+    default_category: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/SMSMessageCategory",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The category a free-text send that names this profile uses when it sets none: `transactional`, `marketing`, `authentication`, or `service`. A template send takes the template's category. Send `null` to clear it.\n",
+      example: "authentication",
+    },
+    validity_period: {
+      type: ["integer", "null"],
+      minimum: 60,
+      maximum: 172800,
+      description:
+        "How many seconds a message stays valid before it expires undelivered. Send `null` to clear it. A send that omits `validity_period` uses it.\n",
+      example: 3600,
+    },
+    cost_center: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 64,
+      description:
+        "A label for assigning the cost of this profile's messages. Send `null` to clear it. A send that omits `cost_center` uses it.\n",
+      example: "CC001234",
+    },
+    options: {
+      $ref: "#/components/schemas/SMSMessagingProfileOptionsUpdate",
+    },
+    callback_events: {
+      type: ["array", "null"],
+      uniqueItems: true,
+      minItems: 1,
+      items: {
+        $ref: "#/components/schemas/SMSMessagingProfileCallbackEvent",
+      },
+      example: ["sms.delivered", "sms.failed"],
+      description:
+        "The events of this profile's outbound messages that go to a callback URL. The list is fixed when a message is accepted, and applies only while the message has a callback URL: an event outside it then reaches neither the URL nor a plain webhook endpoint. Without a callback URL the list has no effect, and every event goes to your webhook endpoints. A value other than `sms.accepted`, `sms.sent`, `sms.delivered`, `sms.undelivered`, `sms.failed`, `sms.rejected` or `sms.expired` returns `422`. `sms.received` is never filtered. Send `null` to deliver every event.\n",
+    },
+  },
+  example: {
+    name: "device-activation",
+    default_category: "transactional",
+  },
 } as const;
 
 export const ComplianceDataTypeSchema = {
@@ -18367,6 +19086,16 @@ export const WhatsAppMessageSchema = {
       additionalProperties: true,
       description: "Arbitrary JSON metadata stored on the message.",
     },
+    reference: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "The `reference` from the send request. Absent when the send set none, and on inbound messages.",
+    },
   },
 } as const;
 
@@ -19927,6 +20656,15 @@ export const WhatsAppMessageSendRequestSchema = {
       additionalProperties: true,
       description:
         "Arbitrary JSON object stored on the message and returned on API reads. Maximum 2 KB serialized. Use metadata for per-send context like internal IDs and foreign keys. For low-cardinality filterable labels, use `tags` instead.\n",
+    },
+    reference: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "An identifier you want to find this message by, such as an order or ticket number, matched exactly by the message list's `reference` filter. Set it only when you need to search on it, and put any other data in `metadata`. Stored on the message, returned on reads and echoed in webhook payloads. Several messages can share one.\n",
     },
   },
   example: {
@@ -22440,6 +23178,52 @@ export const WhatsAppTemplateCreateSchema = {
   },
 } as const;
 
+export const WhatsAppTemplateSubmitProblemSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "One problem found while checking a version.",
+  required: ["code", "message"],
+  properties: {
+    language: {
+      readOnly: true,
+      description:
+        "The language the problem belongs to, or null when it concerns the version as a whole. Always null in an analysis, which checks one language's unsaved content.\n",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    field: {
+      type: ["string", "null"],
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Where the problem sits inside the language's content, as a dotted path with indexes, or null when it is not about one field. The path is rooted at the language you wrote, so `components[0].text` is the first block's text.\n",
+      example: "components[2].cards[0].components[1].example_parameters[0].url",
+    },
+    code: {
+      type: "string",
+      minLength: 1,
+      pattern: "^E\\d{5}$",
+      readOnly: true,
+      description:
+        "The error code a real submit fails with. Look it up in the error catalog for what to do about it.\n",
+      example: "E15025",
+    },
+    message: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "What is wrong, in a form you can show the author.",
+      example: "A body block needs text.",
+    },
+  },
+} as const;
+
 export const WhatsAppTemplateUpdateSchema = {
   type: "object",
   additionalProperties: false,
@@ -22771,52 +23555,6 @@ export const WhatsAppTemplateSubmitSchema = {
   },
   example: {
     validate_only: true,
-  },
-} as const;
-
-export const WhatsAppTemplateSubmitProblemSchema = {
-  type: "object",
-  additionalProperties: false,
-  description: "One problem found while checking a version.",
-  required: ["code", "message"],
-  properties: {
-    language: {
-      readOnly: true,
-      description:
-        "The language the problem belongs to, or null when it concerns the version as a whole.\n",
-      oneOf: [
-        {
-          $ref: "#/components/schemas/LanguageTag",
-        },
-        {
-          type: "null",
-        },
-      ],
-    },
-    field: {
-      type: ["string", "null"],
-      minLength: 1,
-      readOnly: true,
-      description:
-        "Where the problem sits inside the language's content, as a dotted path with indexes, or null when it is not about one field. The path is rooted at the language you wrote, so `components[0].text` is the first block's text.\n",
-      example: "components[2].cards[0].components[1].example_parameters[0].url",
-    },
-    code: {
-      type: "string",
-      minLength: 1,
-      pattern: "^E\\d{5}$",
-      readOnly: true,
-      description:
-        "The error code a real submit fails with. Look it up in the error catalog for what to do about it.\n",
-      example: "E15025",
-    },
-    message: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description: "What is wrong, in a form you can show the author.",
-      example: "A body block needs text.",
-    },
   },
 } as const;
 
@@ -27915,6 +28653,16 @@ export const AMBMessageSchema = {
       description:
         "Structured `{name, value}` filter labels applied to this message. Absent on an inbound message.",
     },
+    reference: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "The `reference` from the send request. Absent when the send set none, and on inbound messages.",
+    },
     cost: {
       readOnly: true,
       $ref: "#/components/schemas/MessageCost",
@@ -28185,6 +28933,15 @@ export const AMBMessageSendRequestSchema = {
       description:
         "Structured `{name, value}` labels for filtering. Maximum 20 tags per send.",
     },
+    reference: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "An identifier you want to find this message by, such as an order or ticket number, matched exactly by the message list's `reference` filter. Set it only when you need to search on it, and put any other data in `metadata`. Stored on the message, returned on reads and echoed in webhook payloads. Several messages can share one.\n",
+    },
     group: {
       type: "string",
       description: "Department identifier for this message.",
@@ -28434,6 +29191,7 @@ export const AMBConversationClosedReasonSchema = {
 
 export const AMBConversationSchema = {
   type: "object",
+  readOnly: true,
   additionalProperties: false,
   description:
     "A conversation between your business and one customer on Apple Messages for Business. It holds the customer's device capabilities, the console's read state, assignment, and labels, and the routing queue the conversation is in.\n",
@@ -28493,37 +29251,31 @@ export const AMBConversationSchema = {
         "Most recent message, or null when its identity has not been recorded.",
     },
     id: {
-      readOnly: true,
       $ref: "#/components/schemas/AMBConversationID",
       description: "Conversation ID.",
     },
     business_account_id: {
-      readOnly: true,
       $ref: "#/components/schemas/AMBBusinessID",
       description: "Business this conversation belongs to.",
     },
     status: {
       $ref: "#/components/schemas/AMBConversationStatus",
-      readOnly: true,
     },
     origin: {
       $ref: "#/components/schemas/AMBConversationOrigin",
-      readOnly: true,
     },
     device_capabilities: {
       type: "array",
-      readOnly: true,
       items: {
         type: "string",
         minLength: 1,
       },
       description:
-        "The capability tokens the customer's device advertised on its most recent message, replaced by each inbound rather than accumulated, so this describes the device in use now. An empty list means the device's capabilities are unknown. Implemented message types may still be sent, but device rendering support has not been confirmed. Authentication requires an explicitly advertised AUTH2 capability.\n",
+        "The device capability tokens recorded for this conversation. When an inbound message creates, reopens, or updates an open conversation, a non-empty list replaces the previous tokens. Empty lists and delayed messages that leave the conversation closed preserve the previous tokens. An empty stored list means the device's capabilities are unknown. Implemented message types may still be sent, but device rendering support has not been confirmed. Authentication requires an explicitly advertised AUTH2 capability.\n",
       example: ["QUICK", "LIST", "TIME"],
     },
     supported_content_kinds: {
       type: "array",
-      readOnly: true,
       items: {
         $ref: "#/components/schemas/AMBContentKind",
       },
@@ -28532,15 +29284,13 @@ export const AMBConversationSchema = {
     },
     locale: {
       type: "string",
-      readOnly: true,
-      minLength: 1,
+      minLength: 0,
       description:
-        "The customer's locale from the most recent inbound message, or your business's default locale before any inbound arrives. Preserved in Apple's locale format, for example `en_US@rg=nlzzzz`.\n",
+        "The customer's locale recorded for this conversation. Messages without a locale and delayed messages that leave the conversation closed preserve the previous value. Empty when no locale is known. Preserved in Apple's locale format, for example `en_US@rg=nlzzzz`.\n",
       example: "en-US",
     },
     unread_count: {
       type: "integer",
-      readOnly: true,
       minimum: 0,
       description:
         "Number of inbound messages the workspace has not acknowledged. Shared across the workspace. Pass read with a date-time to acknowledge received inbound messages through that timestamp. Sending a reply does not change this count.\n",
@@ -28563,7 +29313,6 @@ export const AMBConversationSchema = {
     closed_at: {
       type: ["string", "null"],
       format: "date-time",
-      readOnly: true,
       description:
         "When the native Apple conversation was closed. Null while its native status is open; independent of inbox status.",
     },
@@ -28576,7 +29325,6 @@ export const AMBConversationSchema = {
           type: "null",
         },
       ],
-      readOnly: true,
       description:
         "Why the native Apple conversation was closed. Null while its native status is open; independent of inbox status.",
     },
@@ -28584,14 +29332,12 @@ export const AMBConversationSchema = {
       type: "string",
       format: "date-time",
       minLength: 1,
-      readOnly: true,
       description: "When this conversation was created.",
     },
     updated_at: {
       type: "string",
       format: "date-time",
       minLength: 1,
-      readOnly: true,
       description: "When this conversation last changed.",
     },
   },
@@ -30501,6 +31247,32 @@ export const WhatsAppBusinessAccountSchema = {
       readOnly: true,
       description:
         "WhatsApp's ban on this account, absent unless Bird was told of one. `status` is what the account said when Bird last read it; this is what WhatsApp announced, which arrives only on the webhook that announces it and is never re-read.",
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next about this account's ban. Each entry names one action and says why\nit is worth taking. An empty list means Bird holds no `ban` record for this account.\nA ban Bird was never told of still shows as `banned` on the account's numbers, whose\nown `next` carries the appeal, and as Meta error `141014` on the `waba` entity in\n`meta_health_status`. Neither list says whether the account can send;\n`meta_health_status` does.\n\nWhile `ban` is present this links the account restrictions and appeals guide, which\nnames `ban.appeal_url`, because neither Bird nor this API can lift a ban.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+      example: [
+        {
+          kind: "external",
+          url: "https://bird.com/docs/knowledge-base/whatsapp/account-restrictions-and-appeals",
+          description:
+            "WhatsApp disabled this account, and neither Bird nor this API can lift it. Request a review at `ban.appeal_url`, or in Meta's Business Support Home for the owning portfolio when it is absent; the linked guide walks through it.",
+        },
+        {
+          kind: "operation",
+          operation: "getWhatsAppBusinessAccount",
+          params: {
+            business_account_ref: "waa_01krdgeqcxet5s7t44vh8rt9mg",
+          },
+          description:
+            "Read the account again after Meta responds, to see whether it still carries `ban`.",
+        },
+      ],
     },
     meta_health_status: {
       allOf: [
@@ -42309,7 +43081,7 @@ export const WebhookConnectorIDSchema = {
   maxLength: 64,
   pattern: "^[a-z][a-z0-9_]{0,63}$",
   description:
-    "The connector to deliver through. Each connector, its fields and the setup to do on its\nplatform first:\n\n- `claude_managed_agents`: Claude Managed Agents. Send each message you receive to your Claude managed agent.\n  - `agent_id` (`config`, required): Returned when you create the agent. Sessions use its latest version.\n  - `environment_id` (`config`, required): Returned when you create the environment.\n  - `vault_id` (`config`, optional): A credential vault the agent uses, such as the one holding its Bird MCP credential, so it can reply through Bird.\n  - `api_key` (secret, in `credentials`, required): From the Claude workspace your agent runs in.\n  - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.\n  - Setup 1: First, set up your agent in Claude. In the Claude Console, create the agent, its environment and an API key in the same workspace, then come back here with their IDs and the key. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.\n  - Setup 2: Create an API key. In the Claude workspace your agent runs in. See https://platform.claude.com/settings/keys.\n  - Setup 3: Copy the agent and environment IDs. Each create returns its ID. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.\n  - Setup 4: Optionally, add a credential vault. To let the agent reply through Bird, store its Bird MCP credential in a Claude credential vault and give the vault ID here. Each session gets that vault. See https://platform.claude.com/docs/en/managed-agents/vaults.\n- `grok_bot`: Grok Bot. Send each message you receive to a Grok Bot routine.\n  - `webhook_url` (`config`, required): The routine's webhook URL.\n  - `sender_key` (secret, in `credentials`, required): The routine's sender key. Bird sends it only as the Bearer token.\n  - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.\n  - Setup 1: First, ask Grok Bot to create a routine. Ask Grok Bot to create a routine with a webhook trigger, then paste the webhook URL and sender key it gives you below. See https://cursor.com/docs/cloud-agent/automations#webhook-triggers.\n",
+    "The connector to deliver through; [Webhook connectors](/docs/ai/webhook-connectors) lists each one's fields, accepted events and platform setup.",
   example: "claude_managed_agents",
 } as const;
 
@@ -43358,6 +44130,15 @@ export const EventEmailBaseSchema = {
         order_id: "ord_123",
       },
     },
+    reference: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "The `reference` from the send request, echoed on the message's events. Absent when the send set none, and on `email.unsubscribed` and `email.list_unsubscribed` events Bird records from its own unsubscribe links, which carry no send fields.\n",
+    },
     broadcast_id: {
       oneOf: [
         {
@@ -43528,6 +44309,15 @@ export const EventEmailMessageBaseSchema = {
       example: {
         order_id: "ord_123",
       },
+    },
+    reference: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "The `reference` from the send request. Absent when the send set none.\n",
     },
   },
 } as const;
@@ -44975,7 +45765,7 @@ export const EventPreferenceRevokedSchema = {
 
 export const EventSMSBaseSchema = {
   type: "object",
-  description: "Identity fields shared by every SMS lifecycle event payload.",
+  description: "Fields shared by every outbound SMS lifecycle event payload.",
   required: [
     "sms_id",
     "workspace_id",
@@ -44988,6 +45778,7 @@ export const EventSMSBaseSchema = {
     "template_id",
     "template_version_id",
     "template_content_hash",
+    "segments",
   ],
   properties: {
     sms_id: {
@@ -45001,15 +45792,14 @@ export const EventSMSBaseSchema = {
     to: {
       type: "string",
       minLength: 1,
-      description:
-        "Where the message went. On an outbound message this is the recipient's phone number in E.164 format; on an inbound one it is your own number that received it.\n",
+      description: "The recipient's phone number, in E.164 format.\n",
       example: "+15551234567",
     },
     from: {
       type: "string",
       minLength: 1,
       description:
-        "Where the message came from. On an outbound message this is the sender you sent it from: an E.164 number, an alphanumeric sender ID, or a short code. On an inbound one it is the phone number that sent it to you.\n",
+        "The sender you sent the message from: an E.164 number, an alphanumeric sender ID, or a short code.\n",
       example: "+15557654321",
     },
     tags: {
@@ -45091,7 +45881,7 @@ export const EventSMSBaseSchema = {
     },
     messaging_profile_id: {
       description:
-        "The messaging profile this message was sent or received under. Absent when no messaging profile applied.",
+        "The messaging profile this message was sent under. Absent when no messaging profile applied.",
       $ref: "#/components/schemas/SMSMessagingProfileID",
     },
     country_code: {
@@ -45101,17 +45891,30 @@ export const EventSMSBaseSchema = {
         },
       ],
       description:
-        "On an outbound message, the country of the recipient's number. On a received message, the country of the sender's number, or of your number that received it when the sender is not a phone number, such as a short code or an alphanumeric sender. Absent when not known.\n",
+        "The country of the recipient's number. Absent when not known.\n",
+    },
+    segments: {
+      $ref: "#/components/schemas/SMSSegments",
+      description: "Segment breakdown used to calculate the message charge.",
     },
     cost: {
       $ref: "#/components/schemas/MessageCost",
       description:
         "Message cost as of this event, split into the platform charge and any\nthird-party fees passed through. Null on an event that priced nothing.\n\nComponents are named so you can merge them per component rather than replacing the\nobject: webhook delivery is not ordered, so an older event arriving late would\notherwise overwrite a newer figure. Take the latest `occurred_at` you have seen for\neach component. `amount` is the sum of the components in this payload and does not\nrepresent a settled total.\n",
     },
+    reference: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "The `reference` from the send request, echoed on every event for the message. Absent when the send set none.\n",
+    },
     cost_center: {
       type: "string",
       description:
-        "Preview feature: the `cost_center` applied to the message, from the send request or else its messaging profile, echoed on every event for the message. Absent when neither set one, and on inbound messages.\n",
+        "The `cost_center` applied to the message, from the send request or else its messaging profile, echoed on every event for the message. Absent when neither set one.\n",
       example: "CC001234",
     },
   },
@@ -45123,17 +45926,6 @@ export const EventSMSAcceptedDataSchema = {
   allOf: [
     {
       $ref: "#/components/schemas/EventSMSBase",
-    },
-    {
-      type: "object",
-      required: ["segments"],
-      properties: {
-        segments: {
-          $ref: "#/components/schemas/SMSSegments",
-          description:
-            "Segment breakdown used to calculate the message charge.",
-        },
-      },
     },
   ],
 } as const;
@@ -45235,6 +46027,18 @@ export const EventSMSExpiredDataSchema = {
           description:
             "Why the message was still undelivered when its validity period elapsed. Typically `unreachable`, the handset having stayed off or out of coverage for the whole window.",
         },
+        carrier: {
+          type: "string",
+          description:
+            "Carrier that reported the expiry. Absent when the carrier does not report one.",
+          example: "Verizon",
+        },
+        mcc_mnc: {
+          type: "string",
+          description:
+            "Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.",
+          example: "311480",
+        },
       },
     },
   ],
@@ -45282,6 +46086,18 @@ export const EventSMSFailedDataSchema = {
           $ref: "#/components/schemas/SMSError",
           description: "Why the message terminally failed.",
         },
+        carrier: {
+          type: "string",
+          description:
+            "Carrier that reported the failure. Absent when the carrier does not report one.",
+          example: "Verizon",
+        },
+        mcc_mnc: {
+          type: "string",
+          description:
+            "Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.",
+          example: "311480",
+        },
       },
     },
   ],
@@ -45326,11 +46142,8 @@ export const EventSMSReceivedDataSchema = {
   description: "Payload of the sms.received event.",
   allOf: [
     {
-      $ref: "#/components/schemas/EventSMSBase",
-    },
-    {
       type: "object",
-      required: ["segments"],
+      required: ["sms_id", "workspace_id", "to", "from", "segments"],
       anyOf: [
         {
           required: ["text"],
@@ -45340,6 +46153,38 @@ export const EventSMSReceivedDataSchema = {
         },
       ],
       properties: {
+        sms_id: {
+          $ref: "#/components/schemas/SMSMessageID",
+          description: "ID of the SMS message.",
+        },
+        workspace_id: {
+          $ref: "#/components/schemas/WorkspaceID",
+          description: "ID of the workspace that owns this event.",
+        },
+        to: {
+          type: "string",
+          minLength: 1,
+          description:
+            "Your number that received the message: an E.164 number, or a short code.\n",
+          example: "+15551234567",
+        },
+        from: {
+          type: "string",
+          minLength: 1,
+          description:
+            "The sender: an E.164 number, or a short code or alphanumeric sender ID when the message came from one.\n",
+          example: "+15557654321",
+        },
+        messaging_profile_id: {
+          description:
+            "The messaging profile this message was received under. Absent when no messaging profile applied.",
+          $ref: "#/components/schemas/SMSMessagingProfileID",
+        },
+        cost: {
+          $ref: "#/components/schemas/MessageCost",
+          description:
+            "Message cost as of this event, split into the platform charge and any\nthird-party fees passed through. Null on an event that priced nothing.\n\nComponents are named so you can merge them per component rather than replacing the\nobject: webhook delivery is not ordered, so an older event arriving late would\notherwise overwrite a newer figure. Take the latest `occurred_at` you have seen for\neach component. `amount` is the sum of the components in this payload and does not\nrepresent a settled total.\n",
+        },
         text: {
           type: "string",
           minLength: 1,
@@ -45363,6 +46208,15 @@ export const EventSMSReceivedDataSchema = {
             "Mobile country code and mobile network code of the carrier. Absent when not known.",
           example: "311480",
         },
+        country_code: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/CountryCode",
+            },
+          ],
+          description:
+            "Country of the sender's number. When the sender is not a phone number, such as a short code or an alphanumeric sender, the country of your number that received the message. Absent when neither is known.\n",
+        },
         in_reply_to_message: {
           readOnly: true,
           allOf: [
@@ -45371,7 +46225,7 @@ export const EventSMSReceivedDataSchema = {
             },
           ],
           description:
-            "Preview feature: the outbound message this one was paired with through its messaging profile's outbound matching. Absent when it was not paired.\n",
+            "The outbound message this one was paired with through its messaging profile's outbound matching. Absent when it was not paired.\n",
         },
         subject: {
           type: "string",
@@ -45417,8 +46271,19 @@ export const EventSMSRejectedDataSchema = {
       properties: {
         error: {
           $ref: "#/components/schemas/SMSError",
+          description: "Why Bird or the carrier refused the message.",
+        },
+        carrier: {
+          type: "string",
           description:
-            "Why the message was rejected before reaching the carrier.",
+            "Carrier the message was routed to. Absent when Bird rejected the message before routing it, or the carrier does not report one.",
+          example: "Verizon",
+        },
+        mcc_mnc: {
+          type: "string",
+          description:
+            "Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.",
+          example: "311480",
         },
       },
     },
@@ -45519,6 +46384,18 @@ export const EventSMSUndeliveredDataSchema = {
         error: {
           $ref: "#/components/schemas/SMSError",
           description: "Why the message was not delivered.",
+        },
+        carrier: {
+          type: "string",
+          description:
+            "Carrier that reported the delivery failure. Absent when the carrier does not report one.",
+          example: "Verizon",
+        },
+        mcc_mnc: {
+          type: "string",
+          description:
+            "Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.",
+          example: "311480",
         },
       },
     },
@@ -46304,7 +47181,7 @@ export const EventVoiceCallInitiatedSchema = {
 export const EventWhatsAppBaseSchema = {
   type: "object",
   description:
-    "Identity fields shared by every WhatsApp lifecycle event payload.",
+    "Fields shared by every outbound WhatsApp message event payload.",
   required: [
     "whatsapp_id",
     "workspace_id",
@@ -46332,13 +47209,11 @@ export const EventWhatsAppBaseSchema = {
     },
     from: {
       $ref: "#/components/schemas/WhatsAppAddress",
-      description:
-        "Sender of the message. On outbound messages, the business number it was sent from; on inbound, the WhatsApp contact.",
+      description: "The business number the message was sent from.",
     },
     to: {
       $ref: "#/components/schemas/WhatsAppAddress",
-      description:
-        "Recipient of the message. On outbound messages, the WhatsApp contact; on inbound, the business number.",
+      description: "The WhatsApp contact or group the message was sent to.",
     },
     tags: {
       type: ["array", "null"],
@@ -46357,6 +47232,15 @@ export const EventWhatsAppBaseSchema = {
         order_id: "ord_123",
       },
     },
+    reference: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "The `reference` from the send request, echoed on every event for the message. Absent when the send set none.\n",
+    },
     in_reply_to_message_id: {
       allOf: [
         {
@@ -46364,7 +47248,7 @@ export const EventWhatsAppBaseSchema = {
         },
       ],
       description:
-        "The message this one answers. On an outbound message it is the message it quoted: for a send request, its `in_reply_to_message_id`. On an inbound message it is what WhatsApp reports as the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. Absent when the message answers nothing, and absent on an inbound message whose target we cannot match to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.\n",
+        "The message this one quoted: for a send request, its `in_reply_to_message_id`. Absent when the message quoted nothing, or quoted one we cannot match to a message we hold.\n",
     },
     origin: {
       allOf: [
@@ -46373,7 +47257,7 @@ export const EventWhatsAppBaseSchema = {
         },
       ],
       description:
-        "Where the message came from when it did not come through Bird live, the same value `GET /v1/whatsapp/messages/{message_id}` returns. Absent when your workspace sent the message through Bird, or the contact sent it to Bird.\n",
+        "Where the message came from when it did not come through Bird live, the same value `GET /v1/whatsapp/messages/{message_id}` returns. Absent when your workspace sent the message through Bird.\n",
     },
   },
 } as const;
@@ -46788,14 +47672,53 @@ export const WhatsAppReceivedEventTypeSchema = {
 export const EventWhatsAppReceivedDataSchema = {
   type: "object",
   description:
-    "Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back.\n",
+    "Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back. `from` is the WhatsApp contact who sent the message, the participant who wrote it in a group; `to` is the business number that received it, with the group's `group_id` on a group message.\n",
   allOf: [
     {
-      $ref: "#/components/schemas/EventWhatsAppBase",
-    },
-    {
       type: "object",
+      required: ["whatsapp_id", "workspace_id", "direction", "from", "to"],
       properties: {
+        whatsapp_id: {
+          $ref: "#/components/schemas/WhatsAppMessageID",
+          description: "ID of the WhatsApp message.",
+        },
+        workspace_id: {
+          $ref: "#/components/schemas/WorkspaceID",
+          description: "ID of the workspace that owns this event.",
+        },
+        direction: {
+          $ref: "#/components/schemas/MessageDirection",
+          description:
+            "Always `inbound`, for a message received from the contact.",
+        },
+        from: {
+          $ref: "#/components/schemas/WhatsAppAddress",
+          description:
+            "The WhatsApp contact who sent the message; in a group, the participant who wrote it.",
+        },
+        to: {
+          $ref: "#/components/schemas/WhatsAppAddress",
+          description:
+            "The business number that received the message, and the group it arrived through on a group message.",
+        },
+        in_reply_to_message_id: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppMessageID",
+            },
+          ],
+          description:
+            "The message this one answers, as WhatsApp reports the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. Absent when the message answers nothing, and absent when we cannot match the target to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.\n",
+        },
+        origin: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppMessageOrigin",
+            },
+          ],
+          description:
+            "Where the message came from when it did not come through Bird live, the same value `GET /v1/whatsapp/messages/{message_id}` returns. Absent when the contact sent the message to Bird.\n",
+        },
         text: {
           allOf: [
             {
@@ -47185,14 +48108,14 @@ export const WebhookAttemptSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "URL the request was sent to: the endpoint's `url` at the time of the attempt, which can differ from the current configuration after an update.\n",
+        "URL the request was sent to. For a webhook endpoint, its `url` at the time of the attempt, which can differ from the current configuration after an update. For an SMS callback, the callback URL resolved for the message's event.\n",
       example: "https://example.com/webhooks",
     },
     failure_reason: {
       type: "string",
       minLength: 1,
       description:
-        "Why the attempt failed before any request was sent, for example a connector body that could not be rendered or an endpoint whose connection changed after the event was queued. Absent for an attempt that reached the network.\n",
+        "Why the attempt failed when no HTTP response explains it: a failure before any request was sent, such as a connector body that could not be rendered, or a TLS failure, such as an endpoint certificate that could not be verified. Absent for other attempts.\n",
       example:
         "The endpoint's connection changed after this delivery was queued.",
     },
@@ -47229,7 +48152,7 @@ export const WebhookAttemptSchema = {
 export const WebhookAttemptListSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["data"],
+  required: ["data", "next_cursor", "prev_cursor", "refresh_cursor"],
   properties: {
     data: {
       type: "array",
@@ -47237,6 +48160,26 @@ export const WebhookAttemptListSchema = {
       items: {
         $ref: "#/components/schemas/WebhookAttempt",
       },
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -47680,6 +48623,33 @@ export const VoiceMediaQualitySchema = {
   },
 } as const;
 
+export const VoiceLegMediaEncryptionSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["none", "sdes", "dtls"],
+  description:
+    "How a leg's audio was encrypted between us and the party it connects us to.\n\n- `none`: plain RTP.\n- `sdes`: SRTP with keys exchanged in the SDP over TLS signalling (SDES, RFC 4568).\n- `dtls`: DTLS-SRTP, which every call placed from a browser uses.\n",
+  example: "sdes",
+} as const;
+
+export const VoiceLegMediaPathSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["encryption"],
+  properties: {
+    encryption: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegMediaEncryption",
+        },
+      ],
+      description:
+        "How the audio between us and your side of the leg was encrypted: your SIP trunk's equipment, or the browser that placed the call. On a leg with neither, such as an incoming call a Sequence answered, it describes the carrier's side. Use it to confirm that a call on a trunk with `preferred` media encryption was actually encrypted: such a trunk delivers plain audio to a gateway not reached over TLS or behind an `exit_region`.\n\n- `none`: plain RTP.\n- `sdes`: SRTP with keys exchanged in the SDP over TLS signalling (SDES, RFC 4568). The audio between us and the carrier stays plain RTP.\n- `dtls`: DTLS-SRTP, which every call placed from a browser uses.\n\nAbsent when we did not record it: on a leg whose audio bypassed us, on an encrypted offer to a SIP trunk whose media encryption is `off`, on a leg placed without an SDP offer in its INVITE, on an incoming leg that was not answered, and on legs recorded before this field existed.\n",
+    },
+  },
+} as const;
+
 export const VoiceLegCostSchema = {
   type: "object",
   additionalProperties: false,
@@ -47932,6 +48902,16 @@ export const VoiceLegSchema = {
       readOnly: true,
       description:
         "How the audio sounded, as opposed to whether the leg connected. Absent when the leg carried no audio, or when the far end reported nothing to measure from.",
+    },
+    media: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegMediaPath",
+        },
+      ],
+      description:
+        "How the leg's audio travelled between us and your side. Absent when we recorded nothing about it, including on legs recorded before this field existed.",
     },
     cost: {
       $ref: "#/components/schemas/VoiceLegCost",
@@ -49096,10 +50076,42 @@ export const VoiceTrunkCoreSchema = {
   },
 } as const;
 
+export const VoiceTrunkMediaEncryptionSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["off", "preferred", "required"],
+  description:
+    "Whether audio between your equipment and Bird is encrypted with SRTP, keyed with SDES (`a=crypto`) over TLS signalling. Audio between Bird and the carrier network stays plain RTP.\n\n`preferred` encrypts when it can. A call your equipment places is encrypted when it offers `RTP/SAVP` or `RTP/SAVPF` with an `AES_CM_128_HMAC_SHA1_80` or `_32` key over TLS, and carried plain when it offers plain RTP. A call Bird delivers is encrypted to a gateway reached over TLS (`sips:` or `;transport=tls`) and plain to the rest. Deliveries through a gateway `exit_region`, and on a trunk with `media_bypass`, stay plain.\n\n`required` refuses a plain call with `488 Not Acceptable Here` and delivers encrypted to every gateway, so every gateway must use TLS.\n\nWith `preferred` or `required`, an SDES offer over plain SIP (UDP or TCP), an offer without a usable key, and DTLS-SRTP are refused with `488` and a `Warning` header naming why. `required` cannot be set alongside `media_bypass` or a gateway `exit_region`, since their audio does not pass through the relay that encrypts it. `off` encrypts nothing and relays an SRTP offer as it is. Calls from a web browser are always encrypted with DTLS-SRTP, whatever this says.\n",
+  example: "preferred",
+} as const;
+
+export const VoiceTrunkMediaSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["encryption"],
+  description:
+    "How the trunk carries call audio. Set it through the trunk update operation.",
+  properties: {
+    encryption: {
+      $ref: "#/components/schemas/VoiceTrunkMediaEncryption",
+    },
+  },
+} as const;
+
 export const VoiceTrunkSchema = {
   allOf: [
     {
       $ref: "#/components/schemas/VoiceTrunkCore",
+    },
+    {
+      type: "object",
+      required: ["media"],
+      properties: {
+        media: {
+          readOnly: true,
+          $ref: "#/components/schemas/VoiceTrunkMedia",
+        },
+      },
     },
     {
       $ref: "#/components/schemas/Timestamps",
@@ -49125,6 +50137,24 @@ export const VoiceTrunkListSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
+} as const;
+
+export const VoiceTrunkMediaCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "How the new trunk carries call audio. An omitted member takes its default.",
+  properties: {
+    encryption: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceTrunkMediaEncryption",
+        },
+      ],
+      description:
+        "Omit it for `preferred`, which encrypts whenever your equipment and gateways allow and otherwise carries calls as before.\n",
+    },
+  },
 } as const;
 
 export const VoiceTrunkCreateSchema = {
@@ -49160,6 +50190,9 @@ export const VoiceTrunkCreateSchema = {
         "Whether we take ourselves out of the audio path for calls we forward to this trunk. Omit it to create the trunk with this off, which is what suits equipment behind NAT and any account that wants call recording. It is an inbound setting, so `true` is accepted only alongside `inbound_enabled: true`; `false` is always accepted. It can be changed later.\n",
       example: true,
     },
+    media: {
+      $ref: "#/components/schemas/VoiceTrunkMediaCreate",
+    },
     digest_algorithms: {
       type: "array",
       minItems: 1,
@@ -49176,6 +50209,19 @@ export const VoiceTrunkCreateSchema = {
       description:
         "Whether a session credential may be used to connect to this trunk from a web browser, the CLI or MCP. Omit it to create the trunk with this off, which is what a trunk reached only by a PBX wants. It can be changed later.\n",
       example: true,
+    },
+  },
+} as const;
+
+export const VoiceTrunkMediaUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  description:
+    "A change to how the trunk carries call audio. An omitted member is left unchanged.",
+  properties: {
+    encryption: {
+      $ref: "#/components/schemas/VoiceTrunkMediaEncryption",
     },
   },
 } as const;
@@ -49232,6 +50278,9 @@ export const VoiceTrunkUpdateSchema = {
       description:
         "Whether we take ourselves out of the audio path for calls we forward to this trunk. Turning it on takes effect at the next call setup and leaves calls already up untouched. It is an inbound setting, so the trunk must have `inbound_enabled` on; one update can do both. While it is on we cannot record those calls, report their audio quality, or end one because its audio stopped, and your equipment must be reachable for audio from the public internet. Turning it off puts us back in the path at the next call setup. Omit the field to leave it unchanged.\n",
       example: true,
+    },
+    media: {
+      $ref: "#/components/schemas/VoiceTrunkMediaUpdate",
     },
     ip_acls: {
       type: "array",
@@ -54464,6 +55513,9 @@ export const WorkspaceQuotaWritableSchema = {
     "organization_source",
     "workspace_limit",
     "limit",
+    "limit_source",
+    "automatic_limit",
+    "allocation_enabled",
     "usage",
   ],
   properties: {
@@ -54512,7 +55564,7 @@ export const WorkspaceQuotaWritableSchema = {
     },
     workspace_limit: {
       description:
-        "The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.",
+        "The workspace's own saved limit. `null` when none is saved; `limit_source` and `automatic_limit` then show whether an automatic share applies.",
       oneOf: [
         {
           $ref: "#/components/schemas/WorkspaceQuotaCeilingWritable",
@@ -54527,7 +55579,22 @@ export const WorkspaceQuotaWritableSchema = {
       format: "int64",
       minimum: 0,
       description:
-        "The lower of the organization limit currently applied to requests and any active workspace limit. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.",
+        "The lower of the organization limit currently applied to requests and the workspace's active limit or automatic share. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.",
+    },
+    limit_source: {
+      $ref: "#/components/schemas/WorkspaceQuotaLimitSource",
+    },
+    automatic_limit: {
+      type: ["integer", "null"],
+      format: "int64",
+      minimum: 0,
+      description:
+        "The workspace's share under the organization's automatic allocation. Set only when `limit_source` is `automatic`; it is never saved as a workspace limit.",
+    },
+    allocation_enabled: {
+      type: "boolean",
+      description:
+        "Whether the organization has an automatic allocation of this quota. It can be `true` while `limit_source` is `manual`, or `organization` when the organization limit is unlimited. When `true`, changing or removing this workspace's limit can change other workspaces' automatic shares.",
     },
     usage: {
       description:
@@ -55088,6 +56155,27 @@ export const AMBStatsByErrorCodeResponseWritableSchema = {
   additionalProperties: false,
   description:
     "Per-failure-reason breakdown for the requested period, ranked by `send_failed + rejected` descending and capped at the requested `limit` (default 50, max 200). Only messages carrying an error code appear: a `bird:` code is usually a rejection, an `apple:` code a send failure.",
+} as const;
+
+export const OrganizationWorkspaceListWritableSchema = {
+  readOnly: true,
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/WorkspaceWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
 } as const;
 
 export const RealtimeAppWritableSchema = {
@@ -56127,7 +57215,7 @@ export const SMSErrorWritableSchema = {
     permanent: {
       type: ["boolean", "null"],
       description:
-        "Whether the cause is permanent, so sending the same message again would fail the same way. Describes the cause, not whether Bird retries. Null when Bird cannot tell, which is currently always.\n",
+        "Whether the cause is permanent, so sending the same message again would fail the same way. Describes the cause, not whether Bird retries. Null when Bird cannot tell, such as when the provider returned no code or one without a known permanence, or when Bird blocked the message itself.\n",
     },
   },
 } as const;
@@ -56137,7 +57225,7 @@ export const SMSInReplyToMessageWritableSchema = {
   additionalProperties: false,
   readOnly: true,
   description:
-    "Preview feature: the outbound message a received message was paired with. Bird pairs a reply with the last message the messaging profile sent this subscriber from the receiving number, within the profile's outbound-matching window. The pairing is inferred from timing; the subscriber does not report which message they answered.\n",
+    "The outbound message a received message was paired with. Bird pairs a reply with the last message the messaging profile sent this subscriber from the receiving number, within the profile's outbound-matching window. The pairing is inferred from timing; the subscriber does not report which message they answered.\n",
   required: ["id"],
   properties: {
     id: {
@@ -59129,6 +60217,15 @@ export const AMBMessageSendRequestWritableSchema = {
       description:
         "Structured `{name, value}` labels for filtering. Maximum 20 tags per send.",
     },
+    reference: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "An identifier you want to find this message by, such as an order or ticket number, matched exactly by the message list's `reference` filter. Set it only when you need to search on it, and put any other data in `metadata`. Stored on the message, returned on reads and echoed in webhook payloads. Several messages can share one.\n",
+    },
     group: {
       type: "string",
       description: "Department identifier for this message.",
@@ -59255,17 +60352,30 @@ export const AMBConversationLastMessageWritableSchema = {
 
 export const AMBConversationWritableSchema = {
   type: "object",
+  readOnly: true,
   additionalProperties: false,
   description:
     "A conversation between your business and one customer on Apple Messages for Business. It holds the customer's device capabilities, the console's read state, assignment, and labels, and the routing queue the conversation is in.\n",
   required: [
+    "id",
+    "business_account_id",
+    "status",
     "inbox_status",
     "recipient",
     "routing",
     "routing_change",
     "last_message",
+    "origin",
+    "device_capabilities",
+    "supported_content_kinds",
+    "locale",
+    "unread_count",
     "assigned_to",
     "labels",
+    "closed_at",
+    "closed_reason",
+    "created_at",
+    "updated_at",
   ],
   properties: {
     inbox_status: {
@@ -59301,6 +60411,51 @@ export const AMBConversationWritableSchema = {
       description:
         "Most recent message, or null when its identity has not been recorded.",
     },
+    id: {
+      $ref: "#/components/schemas/AMBConversationID",
+      description: "Conversation ID.",
+    },
+    business_account_id: {
+      $ref: "#/components/schemas/AMBBusinessID",
+      description: "Business this conversation belongs to.",
+    },
+    status: {
+      $ref: "#/components/schemas/AMBConversationStatus",
+    },
+    origin: {
+      $ref: "#/components/schemas/AMBConversationOrigin",
+    },
+    device_capabilities: {
+      type: "array",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      description:
+        "The device capability tokens recorded for this conversation. When an inbound message creates, reopens, or updates an open conversation, a non-empty list replaces the previous tokens. Empty lists and delayed messages that leave the conversation closed preserve the previous tokens. An empty stored list means the device's capabilities are unknown. Implemented message types may still be sent, but device rendering support has not been confirmed. Authentication requires an explicitly advertised AUTH2 capability.\n",
+      example: ["QUICK", "LIST", "TIME"],
+    },
+    supported_content_kinds: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBContentKind",
+      },
+      description:
+        "Implemented baseline types plus interactive types confirmed by `device_capabilities`. An empty capability list yields text, attachments and rich links; it does not establish support for other types. Unadvertised quick replies, list pickers, time pickers and forms are refused when capabilities are known. Custom apps and opaque interactive references are not included because their device support cannot be inferred from these tokens. Unsupported roadmap types cannot be sent.\n",
+    },
+    locale: {
+      type: "string",
+      minLength: 0,
+      description:
+        "The customer's locale recorded for this conversation. Messages without a locale and delayed messages that leave the conversation closed preserve the previous value. Empty when no locale is known. Preserved in Apple's locale format, for example `en_US@rg=nlzzzz`.\n",
+      example: "en-US",
+    },
+    unread_count: {
+      type: "integer",
+      minimum: 0,
+      description:
+        "Number of inbound messages the workspace has not acknowledged. Shared across the workspace. Pass read with a date-time to acknowledge received inbound messages through that timestamp. Sending a reply does not change this count.\n",
+    },
     assigned_to: {
       oneOf: [
         {
@@ -59315,6 +60470,36 @@ export const AMBConversationWritableSchema = {
     },
     labels: {
       $ref: "#/components/schemas/ConversationLabels",
+    },
+    closed_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When the native Apple conversation was closed. Null while its native status is open; independent of inbox status.",
+    },
+    closed_reason: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBConversationClosedReason",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Why the native Apple conversation was closed. Null while its native status is open; independent of inbox status.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When this conversation was created.",
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When this conversation last changed.",
     },
   },
 } as const;
@@ -59582,6 +60767,11 @@ export const AMBTemplateLanguageWritableSchema = {
   },
 } as const;
 
+export const WhatsAppBusinessAccountWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
 export const WhatsAppBusinessAccountListWritableSchema = {
   allOf: [
     {
@@ -59592,6 +60782,9 @@ export const WhatsAppBusinessAccountListWritableSchema = {
           type: "array",
           description:
             "The WhatsApp Business Accounts your workspace has connected.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppBusinessAccountWritable",
+          },
         },
       },
     },
@@ -62405,7 +63598,7 @@ export const EventAMBSentWritableSchema = {
 
 export const EventSMSBaseWritableSchema = {
   type: "object",
-  description: "Identity fields shared by every SMS lifecycle event payload.",
+  description: "Fields shared by every outbound SMS lifecycle event payload.",
   required: [
     "sms_id",
     "workspace_id",
@@ -62431,15 +63624,14 @@ export const EventSMSBaseWritableSchema = {
     to: {
       type: "string",
       minLength: 1,
-      description:
-        "Where the message went. On an outbound message this is the recipient's phone number in E.164 format; on an inbound one it is your own number that received it.\n",
+      description: "The recipient's phone number, in E.164 format.\n",
       example: "+15551234567",
     },
     from: {
       type: "string",
       minLength: 1,
       description:
-        "Where the message came from. On an outbound message this is the sender you sent it from: an E.164 number, an alphanumeric sender ID, or a short code. On an inbound one it is the phone number that sent it to you.\n",
+        "The sender you sent the message from: an E.164 number, an alphanumeric sender ID, or a short code.\n",
       example: "+15557654321",
     },
     tags: {
@@ -62518,7 +63710,7 @@ export const EventSMSBaseWritableSchema = {
     },
     messaging_profile_id: {
       description:
-        "The messaging profile this message was sent or received under. Absent when no messaging profile applied.",
+        "The messaging profile this message was sent under. Absent when no messaging profile applied.",
       $ref: "#/components/schemas/SMSMessagingProfileID",
     },
     country_code: {
@@ -62528,12 +63720,21 @@ export const EventSMSBaseWritableSchema = {
         },
       ],
       description:
-        "On an outbound message, the country of the recipient's number. On a received message, the country of the sender's number, or of your number that received it when the sender is not a phone number, such as a short code or an alphanumeric sender. Absent when not known.\n",
+        "The country of the recipient's number. Absent when not known.\n",
+    },
+    reference: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "The `reference` from the send request, echoed on every event for the message. Absent when the send set none.\n",
     },
     cost_center: {
       type: "string",
       description:
-        "Preview feature: the `cost_center` applied to the message, from the send request or else its messaging profile, echoed on every event for the message. Absent when neither set one, and on inbound messages.\n",
+        "The `cost_center` applied to the message, from the send request or else its messaging profile, echoed on every event for the message. Absent when neither set one.\n",
       example: "CC001234",
     },
   },
@@ -62646,6 +63847,18 @@ export const EventSMSExpiredDataWritableSchema = {
           description:
             "Why the message was still undelivered when its validity period elapsed. Typically `unreachable`, the handset having stayed off or out of coverage for the whole window.",
         },
+        carrier: {
+          type: "string",
+          description:
+            "Carrier that reported the expiry. Absent when the carrier does not report one.",
+          example: "Verizon",
+        },
+        mcc_mnc: {
+          type: "string",
+          description:
+            "Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.",
+          example: "311480",
+        },
       },
     },
   ],
@@ -62693,6 +63906,18 @@ export const EventSMSFailedDataWritableSchema = {
           $ref: "#/components/schemas/SMSErrorWritable",
           description: "Why the message terminally failed.",
         },
+        carrier: {
+          type: "string",
+          description:
+            "Carrier that reported the failure. Absent when the carrier does not report one.",
+          example: "Verizon",
+        },
+        mcc_mnc: {
+          type: "string",
+          description:
+            "Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.",
+          example: "311480",
+        },
       },
     },
   ],
@@ -62729,10 +63954,8 @@ export const EventSMSReceivedDataWritableSchema = {
   description: "Payload of the sms.received event.",
   allOf: [
     {
-      $ref: "#/components/schemas/EventSMSBaseWritable",
-    },
-    {
       type: "object",
+      required: ["sms_id", "workspace_id", "to", "from"],
       anyOf: [
         {
           required: ["text"],
@@ -62742,6 +63965,33 @@ export const EventSMSReceivedDataWritableSchema = {
         },
       ],
       properties: {
+        sms_id: {
+          $ref: "#/components/schemas/SMSMessageID",
+          description: "ID of the SMS message.",
+        },
+        workspace_id: {
+          $ref: "#/components/schemas/WorkspaceID",
+          description: "ID of the workspace that owns this event.",
+        },
+        to: {
+          type: "string",
+          minLength: 1,
+          description:
+            "Your number that received the message: an E.164 number, or a short code.\n",
+          example: "+15551234567",
+        },
+        from: {
+          type: "string",
+          minLength: 1,
+          description:
+            "The sender: an E.164 number, or a short code or alphanumeric sender ID when the message came from one.\n",
+          example: "+15557654321",
+        },
+        messaging_profile_id: {
+          description:
+            "The messaging profile this message was received under. Absent when no messaging profile applied.",
+          $ref: "#/components/schemas/SMSMessagingProfileID",
+        },
         text: {
           type: "string",
           minLength: 1,
@@ -62760,6 +64010,15 @@ export const EventSMSReceivedDataWritableSchema = {
           description:
             "Mobile country code and mobile network code of the carrier. Absent when not known.",
           example: "311480",
+        },
+        country_code: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/CountryCode",
+            },
+          ],
+          description:
+            "Country of the sender's number. When the sender is not a phone number, such as a short code or an alphanumeric sender, the country of your number that received the message. Absent when neither is known.\n",
         },
         subject: {
           type: "string",
@@ -62805,8 +64064,19 @@ export const EventSMSRejectedDataWritableSchema = {
       properties: {
         error: {
           $ref: "#/components/schemas/SMSErrorWritable",
+          description: "Why Bird or the carrier refused the message.",
+        },
+        carrier: {
+          type: "string",
           description:
-            "Why the message was rejected before reaching the carrier.",
+            "Carrier the message was routed to. Absent when Bird rejected the message before routing it, or the carrier does not report one.",
+          example: "Verizon",
+        },
+        mcc_mnc: {
+          type: "string",
+          description:
+            "Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.",
+          example: "311480",
         },
       },
     },
@@ -62908,6 +64178,18 @@ export const EventSMSUndeliveredDataWritableSchema = {
           $ref: "#/components/schemas/SMSErrorWritable",
           description: "Why the message was not delivered.",
         },
+        carrier: {
+          type: "string",
+          description:
+            "Carrier that reported the delivery failure. Absent when the carrier does not report one.",
+          example: "Verizon",
+        },
+        mcc_mnc: {
+          type: "string",
+          description:
+            "Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.",
+          example: "311480",
+        },
       },
     },
   ],
@@ -62989,14 +64271,53 @@ export const EventWhatsAppFailedWritableSchema = {
 export const EventWhatsAppReceivedDataWritableSchema = {
   type: "object",
   description:
-    "Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back.\n",
+    "Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back. `from` is the WhatsApp contact who sent the message, the participant who wrote it in a group; `to` is the business number that received it, with the group's `group_id` on a group message.\n",
   allOf: [
     {
-      $ref: "#/components/schemas/EventWhatsAppBase",
-    },
-    {
       type: "object",
+      required: ["whatsapp_id", "workspace_id", "direction", "from", "to"],
       properties: {
+        whatsapp_id: {
+          $ref: "#/components/schemas/WhatsAppMessageID",
+          description: "ID of the WhatsApp message.",
+        },
+        workspace_id: {
+          $ref: "#/components/schemas/WorkspaceID",
+          description: "ID of the workspace that owns this event.",
+        },
+        direction: {
+          $ref: "#/components/schemas/MessageDirection",
+          description:
+            "Always `inbound`, for a message received from the contact.",
+        },
+        from: {
+          $ref: "#/components/schemas/WhatsAppAddress",
+          description:
+            "The WhatsApp contact who sent the message; in a group, the participant who wrote it.",
+        },
+        to: {
+          $ref: "#/components/schemas/WhatsAppAddress",
+          description:
+            "The business number that received the message, and the group it arrived through on a group message.",
+        },
+        in_reply_to_message_id: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppMessageID",
+            },
+          ],
+          description:
+            "The message this one answers, as WhatsApp reports the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. Absent when the message answers nothing, and absent when we cannot match the target to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.\n",
+        },
+        origin: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/WhatsAppMessageOrigin",
+            },
+          ],
+          description:
+            "Where the message came from when it did not come through Bird live, the same value `GET /v1/whatsapp/messages/{message_id}` returns. Absent when the contact sent the message to Bird.\n",
+        },
         text: {
           allOf: [
             {
@@ -63238,14 +64559,14 @@ export const WebhookAttemptWritableSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "URL the request was sent to: the endpoint's `url` at the time of the attempt, which can differ from the current configuration after an update.\n",
+        "URL the request was sent to. For a webhook endpoint, its `url` at the time of the attempt, which can differ from the current configuration after an update. For an SMS callback, the callback URL resolved for the message's event.\n",
       example: "https://example.com/webhooks",
     },
     failure_reason: {
       type: "string",
       minLength: 1,
       description:
-        "Why the attempt failed before any request was sent, for example a connector body that could not be rendered or an endpoint whose connection changed after the event was queued. Absent for an attempt that reached the network.\n",
+        "Why the attempt failed when no HTTP response explains it: a failure before any request was sent, such as a connector body that could not be rendered, or a TLS failure, such as an endpoint certificate that could not be verified. Absent for other attempts.\n",
       example:
         "The endpoint's connection changed after this delivery was queued.",
     },
@@ -63273,7 +64594,7 @@ export const WebhookAttemptWritableSchema = {
 export const WebhookAttemptListWritableSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["data"],
+  required: ["data", "next_cursor", "prev_cursor", "refresh_cursor"],
   properties: {
     data: {
       type: "array",
@@ -63281,6 +64602,26 @@ export const WebhookAttemptListWritableSchema = {
       items: {
         $ref: "#/components/schemas/WebhookAttemptWritable",
       },
+    },
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -63353,6 +64694,24 @@ export const VoicePartyEndpointWritableSchema = {
 export const VoicePartyWritableSchema = {
   type: "object",
   additionalProperties: false,
+} as const;
+
+export const VoiceLegMediaPathWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["encryption"],
+  properties: {
+    encryption: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegMediaEncryption",
+        },
+      ],
+      description:
+        "How the audio between us and your side of the leg was encrypted: your SIP trunk's equipment, or the browser that placed the call. On a leg with neither, such as an incoming call a Sequence answered, it describes the carrier's side. Use it to confirm that a call on a trunk with `preferred` media encryption was actually encrypted: such a trunk delivers plain audio to a gateway not reached over TLS or behind an `exit_region`.\n\n- `none`: plain RTP.\n- `sdes`: SRTP with keys exchanged in the SDP over TLS signalling (SDES, RFC 4568). The audio between us and the carrier stays plain RTP.\n- `dtls`: DTLS-SRTP, which every call placed from a browser uses.\n\nAbsent when we did not record it: on a leg whose audio bypassed us, on an encrypted offer to a SIP trunk whose media encryption is `off`, on a leg placed without an SDP offer in its INVITE, on an incoming leg that was not answered, and on legs recorded before this field existed.\n",
+    },
+  },
 } as const;
 
 export const VoiceLegWritableSchema = {

@@ -453,7 +453,7 @@ export type {
   WebhookEndpoint,
   WebhookEndpointCreated,
   WebhookTestResponse,
-  WebhookAttemptList,
+  WebhookAttempt,
   WebhookRotateSecretResponse,
   WebhooksListQuery,
   WebhooksCreateParams,
@@ -540,6 +540,7 @@ export {
   QuotaSource,
   SMSErrorCode,
   SMSKeywordOperation,
+  SMSMessagingProfileCallbackEvent,
   SMSSuppressionCoverage,
   SMSSuppressionEndReason,
   SMSSuppressionOrigin,
@@ -549,6 +550,7 @@ export {
   VerificationAttemptFailureReason,
   VerificationChannel,
   VerificationTerminalReason,
+  VoiceLegMediaEncryption,
   VoicePartyEndpointType,
   WhatsAppBusinessAccountMarketingMessagesStatus,
   WhatsAppBusinessAccountReviewStatus,
@@ -581,6 +583,7 @@ export {
   WhatsAppTemplateQualityScore,
   WhatsAppTemplateRejectionCategory,
   WhatsAppUsernameStatus,
+  WorkspaceQuotaLimitSource,
 } from "./open-enums.gen.js";
 export type {
   AssetKindValue,
@@ -639,6 +642,7 @@ export type {
   QuotaSourceValue,
   SMSErrorCodeValue,
   SMSKeywordOperationValue,
+  SMSMessagingProfileCallbackEventValue,
   SMSSuppressionCoverageValue,
   SMSSuppressionEndReasonValue,
   SMSSuppressionOriginValue,
@@ -648,6 +652,7 @@ export type {
   VerificationAttemptFailureReasonValue,
   VerificationChannelValue,
   VerificationTerminalReasonValue,
+  VoiceLegMediaEncryptionValue,
   VoicePartyEndpointTypeValue,
   WhatsAppBusinessAccountMarketingMessagesStatusValue,
   WhatsAppBusinessAccountReviewStatusValue,
@@ -680,6 +685,7 @@ export type {
   WhatsAppTemplateQualityScoreValue,
   WhatsAppTemplateRejectionCategoryValue,
   WhatsAppUsernameStatusValue,
+  WorkspaceQuotaLimitSourceValue,
 } from "./open-enums.gen.js";
 export type {
   Mailbox,
@@ -1008,6 +1014,7 @@ export type {
 } from "./resources/billingPrices.gen.js";
 
 export type { BillingWalletList } from "./resources/billingWallets.gen.js";
+export type { BillingWallet } from "./generated/types.gen.js";
 
 export type {
   EmailMailboxScheduledMessage,
@@ -1018,3 +1025,10 @@ export type {
   Actor,
   EmailMailboxScheduledMessageStatus,
 } from "./generated/types.gen.js";
+
+export type {
+  OrganizationWorkspacesCreateParams,
+  OrganizationWorkspacesListQuery,
+  OrganizationWorkspacesUpdateParams,
+} from "./resources/organizationWorkspaces.gen.js";
+export type { WorkspaceSortField } from "./generated/types.gen.js";

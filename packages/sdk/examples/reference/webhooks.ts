@@ -44,10 +44,9 @@ export async function webhookTest() {
 }
 
 export async function webhookAttempts() {
-  const attempts = await bird.webhooks.attempts(
+  for await (const attempt of bird.webhooks.attempts(
     "whk_01krdgeqcxet5s7t44vh8rt9mg",
-  );
-  for (const attempt of attempts.data) {
+  )) {
     console.log(attempt.status, attempt.response_status_code);
   }
 }

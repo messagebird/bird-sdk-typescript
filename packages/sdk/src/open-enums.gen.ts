@@ -887,6 +887,24 @@ export const SMSKeywordOperation = {
 export type SMSKeywordOperationValue = (typeof SMSKeywordOperation)[keyof typeof SMSKeywordOperation];
 
 /**
+ * Values of SMSMessagingProfileCallbackEvent known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const SMSMessagingProfileCallbackEvent = {
+  SmsAccepted: "sms.accepted",
+  SmsDelivered: "sms.delivered",
+  SmsExpired: "sms.expired",
+  SmsFailed: "sms.failed",
+  SmsRejected: "sms.rejected",
+  SmsSent: "sms.sent",
+  SmsUndelivered: "sms.undelivered",
+} as const;
+
+/** A known SMSMessagingProfileCallbackEvent value. */
+export type SMSMessagingProfileCallbackEventValue = (typeof SMSMessagingProfileCallbackEvent)[keyof typeof SMSMessagingProfileCallbackEvent];
+
+/**
  * Values of SMSRegistrationProgram known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -1073,6 +1091,20 @@ export const VerificationTerminalReason = {
 
 /** A known VerificationTerminalReason value. */
 export type VerificationTerminalReasonValue = (typeof VerificationTerminalReason)[keyof typeof VerificationTerminalReason];
+
+/**
+ * Values of VoiceLegMediaEncryption known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const VoiceLegMediaEncryption = {
+  Dtls: "dtls",
+  None: "none",
+  Sdes: "sdes",
+} as const;
+
+/** A known VoiceLegMediaEncryption value. */
+export type VoiceLegMediaEncryptionValue = (typeof VoiceLegMediaEncryption)[keyof typeof VoiceLegMediaEncryption];
 
 /**
  * Values of VoicePartyEndpointType known at this SDK version. The wire value is an open
@@ -1612,3 +1644,17 @@ export const WhatsAppUsernameStatus = {
 
 /** A known WhatsAppUsernameStatus value. */
 export type WhatsAppUsernameStatusValue = (typeof WhatsAppUsernameStatus)[keyof typeof WhatsAppUsernameStatus];
+
+/**
+ * Values of WorkspaceQuotaLimitSource known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WorkspaceQuotaLimitSource = {
+  Automatic: "automatic",
+  Manual: "manual",
+  Organization: "organization",
+} as const;
+
+/** A known WorkspaceQuotaLimitSource value. */
+export type WorkspaceQuotaLimitSourceValue = (typeof WorkspaceQuotaLimitSource)[keyof typeof WorkspaceQuotaLimitSource];

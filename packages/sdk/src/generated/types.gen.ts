@@ -270,7 +270,7 @@ export type NextAction = {
 export type QuotaScope = "organization" | "workspace";
 
 /**
- * The quota limit that refused a resource change. A change in a workspace is checked against its organization's limit and any limit set for its workspace; the organization limit is reported when both refuse. When scope is workspace, follow the response remediation instead of the error code's organization-wide recovery guidance. An organization administrator can raise or remove the workspace ceiling; the shared organization limit still applies.
+ * The quota limit that refused a resource change. A change in a workspace is checked against its organization's limit and its workspace's limit, whether set manually or derived from the organization's automatic allocation; the organization limit is reported when both refuse. When scope is workspace, follow the response remediation instead of the error code's organization-wide recovery guidance. An organization administrator can adjust the workspace limit or the automatic allocation; the shared organization limit still applies.
  *
  */
 export type QuotaErrorContext = {
@@ -611,6 +611,17 @@ export type WorkspaceQuotaCeiling = {
 };
 
 /**
+ * Which limit bounds the workspace's own usage.
+ *
+ * - `manual`: the workspace's own active limit.
+ * - `automatic`: the workspace's share of the organization limit under its automatic allocation.
+ * - `organization`: no workspace limit applies; only the shared organization limit does. This includes an automatic allocation of an unlimited organization limit.
+ *
+ */
+export type WorkspaceQuotaLimitSource =
+  "manual" | "automatic" | "organization" | (string & {});
+
+/**
  * Whether current usage could be read.
  *
  * - `available`: the counts reflect usage at `observed_at`.
@@ -680,13 +691,22 @@ export type WorkspaceQuota = {
   organization_limit: number;
   organization_source: QuotaSource;
   /**
-   * The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.
+   * The workspace's own saved limit. `null` when none is saved; `limit_source` and `automatic_limit` then show whether an automatic share applies.
    */
   workspace_limit: WorkspaceQuotaCeiling | null;
   /**
-   * The lower of the organization limit currently applied to requests and any active workspace limit. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.
+   * The lower of the organization limit currently applied to requests and the workspace's active limit or automatic share. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.
    */
   limit: number;
+  limit_source: WorkspaceQuotaLimitSource;
+  /**
+   * The workspace's share under the organization's automatic allocation. Set only when `limit_source` is `automatic`; it is never saved as a workspace limit.
+   */
+  automatic_limit: number | null;
+  /**
+   * Whether the organization has an automatic allocation of this quota. It can be `true` while `limit_source` is `manual`, or `organization` when the organization limit is unlimited. When `true`, changing or removing this workspace's limit can change other workspaces' automatic shares.
+   */
+  allocation_enabled: boolean;
   /**
    * Current usage. `null` for a `value` quota, which counts nothing.
    */
@@ -3249,8 +3269,25 @@ export type VerificationAttemptFailureReason =
 
 export type RealtimeAppId = string;
 
+/**
+ * Field used to order workspaces.
+ */
+export type WorkspaceSortField = "created_at" | "name";
+
+export type OrganizationWorkspaceList = {
+  data: Array<Workspace>;
+} & ListEnvelopeWithTotal;
+
 export type WorkspaceCreate = {
   name: TenantName;
+};
+
+export type OrganizationWorkspaceUpdate = {
+  /**
+   * New display name for the workspace, as it appears in the dashboard and in workspace lists. Must include at least one letter or number.
+   *
+   */
+  name?: TenantName;
 };
 
 export type RealtimeRegion = {
@@ -3628,6 +3665,11 @@ export type EmailMessageStatus =
   | "canceled";
 
 /**
+ * Your own reference for a message, such as an order or ticket identifier. Several messages can share one.
+ */
+export type MessageReference = string;
+
+/**
  * Content classification, which controls suppression policy:
  *
  * - `marketing`: Blocks on all suppression reasons.
@@ -3838,6 +3880,10 @@ export type EmailMessage = {
     [key: string]: unknown;
   };
   /**
+   * The `reference` from the send request. Absent when the send set none.
+   */
+  readonly reference?: MessageReference;
+  /**
    * The substitution values this send supplied, whether inline or from a template, or null if none were supplied. They are the values applied to `subject` and to the bodies the content endpoint returns, kept so you can see what produced the delivered copy and not only the result.
    *
    */
@@ -4020,6 +4066,11 @@ export type EmailMessageSendRequest = {
   metadata?: {
     [key: string]: unknown;
   };
+  /**
+   * An identifier you want to find this message by, such as an order or ticket number, matched exactly by the message list's `reference` filter. Set it only when you need to search on it, and put any other data in `metadata`. Stored on the message, returned on reads and echoed in webhook payloads. Several messages can share one.
+   *
+   */
+  reference?: MessageReference;
   /**
    * Parameter values used to personalize inline content, shared across all recipients of this send. Tokens such as `{{ animal }}` are replaced with matching values; missing values render empty. Include this object, even as `{}`, to use Liquid, or omit it to leave tokens unchanged. Use single-word names other than `bird`. Cap: 16 KB serialized. For a stored template, use `template.parameters` instead. See [inline personalization](https://bird.com/docs/guides/email/sending-email#content) for validation and URL encoding examples.
    *
@@ -6062,7 +6113,7 @@ export type SmsSegments = {
    * outside the Basic Multilingual Plane is a surrogate pair costing two code
    * units, so 35 of those fill a single segment.
    *
-   * `BINARY` marks an 8-bit binary payload, sent as one segment, where `characters` counts its octets. Only the preview binary send produces it; it is declared ahead of general availability so clients see the value before any message carries it outside the preview.
+   * `BINARY` marks an 8-bit binary payload, sent as one segment, where `characters` counts its octets. Only a binary send produces it.
    *
    */
   readonly encoding: "GSM_7BIT" | "UCS2" | "BINARY";
@@ -6110,15 +6161,11 @@ export type SmsMessageEffectiveOptions = {
    */
   smart_encoding: boolean;
   /**
-   * Preview feature: `true` when this message is excluded from any future quiet-hours delivery window. Absent otherwise.
-   */
-  ignore_delivery_window?: boolean;
-  /**
-   * Preview feature: `true` when the send asked to skip opt-outs. Recorded only: every opt-out still applied. Absent otherwise.
+   * `true` when the send may reach the recipient even if they are suppressed for the sender, including after replying STOP. Only `authentication` and `transactional` messages can set it. Absent otherwise.
    */
   ignore_suppression?: boolean;
   /**
-   * Preview feature: the callback URL the send recorded. Absent when it recorded none. Recorded only: status events go to your webhook subscriptions either way.
+   * The callback URL that applies to this message, which receives its events instead of your webhook endpoints. Absent when the message has none, in which case its events go to your webhook subscriptions.
    *
    */
   callback_url?: string;
@@ -6142,14 +6189,14 @@ export type SmsError = {
    */
   occurred_at: string;
   /**
-   * Whether the cause is permanent, so sending the same message again would fail the same way. Describes the cause, not whether Bird retries. Null when Bird cannot tell, which is currently always.
+   * Whether the cause is permanent, so sending the same message again would fail the same way. Describes the cause, not whether Bird retries. Null when Bird cannot tell, such as when the provider returned no code or one without a known permanence, or when Bird blocked the message itself.
    *
    */
   permanent?: boolean | null;
 } | null;
 
 /**
- * Preview feature: the outbound message a received message was paired with. Bird pairs a reply with the last message the messaging profile sent this subscriber from the receiving number, within the profile's outbound-matching window. The pairing is inferred from timing; the subscriber does not report which message they answered.
+ * The outbound message a received message was paired with. Bird pairs a reply with the last message the messaging profile sent this subscriber from the receiving number, within the profile's outbound-matching window. The pairing is inferred from timing; the subscriber does not report which message they answered.
  *
  */
 export type SmsInReplyToMessage = {
@@ -6196,7 +6243,7 @@ export type SmsMessage = {
    */
   text?: string;
   /**
-   * Preview feature: the payload of a binary send, in place of `text`. Absent on every other message.
+   * The payload of a binary send, in place of `text`. Absent on every other message.
    */
   readonly binary?: SmsBinary;
   /**
@@ -6249,16 +6296,20 @@ export type SmsMessage = {
     [key: string]: unknown;
   };
   /**
-   * The settings applied to this message, with any option you omitted filled in with the default in force when you sent it. Absent on inbound messages, and on any outbound message for which no settings were recorded.
+   * The settings applied to this message, with any option you omitted filled in with the default in force when you sent it. Absent on received messages, and on any outbound message for which no settings were recorded.
    *
    */
   readonly options?: SmsMessageEffectiveOptions;
   /**
-   * Preview feature: the `validity_period` applied to the message, in seconds: the send's own, or else its messaging profile's. Absent when neither set one.
+   * The `validity_period` applied to the message, in seconds: the send's own, or else its messaging profile's. Absent when neither set one.
    */
   readonly validity_period?: number;
   /**
-   * Preview feature: the `cost_center` applied to the message: the send's own, or else its messaging profile's. Absent when neither set one, and on inbound messages.
+   * The `reference` from the send request. Absent when the send set none, and on inbound messages.
+   */
+  readonly reference?: MessageReference;
+  /**
+   * The `cost_center` applied to the message: the send's own, or else its messaging profile's. Absent when neither set one, and on inbound messages.
    */
   readonly cost_center?: string;
   /**
@@ -6279,7 +6330,7 @@ export type SmsMessage = {
    */
   readonly country_code?: CountryCode;
   /**
-   * Preview feature: on a received message, the outbound message it was paired with through its messaging profile's outbound matching. Absent on outbound messages and on received messages that were not paired.
+   * On a received message, the outbound message it was paired with through its messaging profile's outbound matching. Absent on outbound messages and on received messages that were not paired.
    *
    */
   readonly in_reply_to_message?: SmsInReplyToMessage;
@@ -6318,6 +6369,16 @@ export type SmsSendOptions = {
    *
    */
   smart_encoding?: boolean;
+  /**
+   * Send this message even if the recipient is suppressed for the sender, including after replying STOP. Bird skips every suppression reason and records the flag on the message; communication preferences the recipient revoked still apply. Only `authentication` and `transactional` messages can use it; setting it to `true` on a `marketing` or `service` message returns `422`. Bird must enable it for your workspace first; until then, a message that uses it is refused with `422`. Omit it to use the setting of the messaging profile in `messaging_profile_id`.
+   *
+   */
+  ignore_suppression?: boolean;
+  /**
+   * An HTTPS URL that receives this message's events instead of your webhook endpoints. It must be a public address: a private, loopback or link-local host returns `422`. Bird fixes the URL when it accepts the message, so later profile changes do not reroute it. Each event is a signed POST, retried on failure, and signed with your workspace callback signing secret, which `rotateWebhookCallbackSigningSecret` creates and returns once. While a URL applies, this message's events skip your plain webhook endpoints, and a failed callback never falls back to them. MCP Events subscriptions and connector endpoints still receive them. The `callback_events` of the messaging profile in `messaging_profile_id` choose which events go to the URL. Omit the field to use the callback URL of that profile; send `null` to send this message's events to your webhook subscriptions.
+   *
+   */
+  callback_url?: string | null;
   /**
    * Preview feature: link click tracking. Defaults to `false`. Currently unavailable; setting this to `true` returns `422 SMSUnsupportedFeature`.
    */
@@ -6366,6 +6427,11 @@ export type SmsMessageSendRequest = unknown & {
    */
   to: string;
   /**
+   * The ISO 3166-1 alpha-2 country whose national numbering plan `to` is written in, such as `NL` for `0612345678`. Bird converts `to` to E.164 before checking the destination, price and sender. An E.164 `to` is still accepted when its country calling code matches this country; a mismatch, or a national number that is not valid in this country, returns a `422` `SMSInvalidRecipient`. Omit it to send `to` in E.164.
+   *
+   */
+  to_country_code?: string;
+  /**
    * Sender to send from. It must be a sender the workspace holds: a number it owns in E.164, such as `+15557654321`, a short code it holds, such as `24680`, or an alphanumeric sender ID it has claimed, such as `MyBrand`. A sender the workspace does not hold returns a `422` `SMSSenderNotConfigured`, and an alphanumeric sender must also be permitted, and where required registered, for the destination country. Required on a free-text send and when sending a workspace template, unless `messaging_profile_id` is set and the profile selects a sender for the destination country or has a default sender. Omitting it otherwise returns `422`. A built-in template selects its sender automatically and rejects `from`.
    *
    */
@@ -6376,15 +6442,30 @@ export type SmsMessageSendRequest = unknown & {
    */
   text?: string;
   /**
+   * Send an 8-bit binary payload instead of `text` or `template`. Requires `category` `transactional` and refuses `options.smart_encoding`. It is sent and charged as one segment.
+   *
+   */
+  binary?: SmsBinary;
+  /**
    * Content classification: why you are sending. Required on a free-text send unless the messaging profile in `messaging_profile_id` sets a default category; omit it on a template send, where the category is derived from the template. Where the destination country requires the sender to be registered, a category outside what that registration covers returns a `422` `SenderCategoryNotPermitted`.
    *
    */
   category?: SmsMessageCategory;
   /**
-   * Preview feature: how long, in seconds (60-172800), the message may wait for delivery, counted from acceptance. Bird does not submit the message to the carrier after this deadline and passes the remaining time to the carrier where the route supports it. A message that misses the deadline before reaching the carrier ends `rejected` or `failed`, not `expired`; `expired` comes only from a carrier report. Omit it to use the validity period of the messaging profile in `messaging_profile_id`, or the carrier's own validity rules when the profile sets none. Organizations outside the preview receive `422 SMSUnsupportedFeature`.
+   * How long, in seconds (60-172800), the message may wait for delivery, counted from acceptance. Bird does not submit the message to the carrier after this deadline and passes the remaining time to the carrier where the route supports it. A message that misses the deadline before reaching the carrier ends `rejected` or `failed`, not `expired`; `expired` comes only from a carrier report. Omit it to use the validity period of the messaging profile in `messaging_profile_id`, or the carrier's own validity rules when the profile sets none.
    *
    */
   validity_period?: number;
+  /**
+   * An identifier you want to find this message by, such as an order or ticket number, matched exactly by the message list's `reference` filter. Set it only when you need to search on it, and put any other data in `metadata`. Stored on the message, returned on reads and echoed in webhook payloads. Several messages can share one.
+   *
+   */
+  reference?: MessageReference;
+  /**
+   * Your accounting identifier for this message, such as a department code. Stored on the message and its usage record, returned on reads, and echoed in webhook payloads. Omit it to use the cost center of the messaging profile in `messaging_profile_id`. Accepting it does not change how the message is priced.
+   *
+   */
+  cost_center?: string;
   /**
    * Structured `{name, value}` labels for filtering and analytics. Tags become first-class query dimensions: filter the list endpoint by tag name, slice analytics by tag, and surface in webhook payloads. Maximum 20 tags per send. Use tags for low-cardinality dimensions (`category`, `experiment_variant`). For arbitrary structured context you do not need as a filter dimension, use `metadata` instead.
    *
@@ -6407,7 +6488,7 @@ export type SmsMessageSendRequest = unknown & {
    */
   media_urls?: Array<string>;
   /**
-   * Preview feature: the messaging profile that supplies this message's sender and defaults. When `from` is omitted, Bird sends from the profile's sender for the destination country, or its default sender. An omitted `category` on a free-text send takes the profile's default category, and `smart_encoding`, `cost_center` and `validity_period` take the profile's settings. So do `options.callback_url`, `options.ignore_delivery_window` and `options.ignore_suppression`, which Bird records on the message; the profile's `options.validation.network` is not inherited. Values you set on the message take precedence. A built-in template sends from Bird's system sender and ignores the profile's senders. A profile that does not exist in this workspace returns `422` `SMSMessagingProfileNotFound`; a `from` bound to a different profile returns `422` `SMSMessagingProfileSenderBound`. Organizations outside the preview get `422` `SMSUnsupportedFeature`.
+   * The messaging profile that supplies this message's sender and defaults. When `from` is omitted, Bird sends from the profile's sender for the destination country, or its default sender. An omitted `category` on a free-text send takes the profile's default category, and `smart_encoding`, `cost_center` and `validity_period` take the profile's settings. So do `options.callback_url` and `options.ignore_suppression`, which apply to the message. Values you set on the message take precedence. A built-in template sends from Bird's system sender and ignores the profile's senders. A profile that does not exist in this workspace returns `422` `SMSMessagingProfileNotFound`; a `from` bound to a different profile returns `422` `SMSMessagingProfileSenderBound`.
    *
    */
   messaging_profile_id?: string;
@@ -6781,17 +6862,17 @@ export type SmsTemplate = {
 };
 
 /**
- * A single variable slot a template fills in when it sends. Most slots are filled from the values supplied when sending; on email, a slot with `system` true is filled by Bird itself, per recipient. The same shape on email, SMS and WhatsApp, so reading what a template needs works the same way whichever channel you are sending on.
+ * A single variable slot a template fills in when it sends. Most slots are filled from the values supplied when sending; a slot with `system` true is filled by Bird itself, per recipient. The same shape on email, SMS and WhatsApp, so reading what a template needs works the same way whichever channel you are sending on.
  *
  */
 export type TemplateVariable = {
   /**
-   * The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the `name` you repeat on the matching parameter inside `components`, or, for a template whose placeholders are positional, the position itself as `1`, `2` and so on.
+   * The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the `name` on the matching parameter inside `components`, or, in the template parameters preview, the key in the send's `template.parameters`. A WhatsApp template whose placeholders are positional uses the position itself as `1`, `2` and so on, and values with no placeholder use fixed keys: `header_url`, `header_filename`, `header_location` and `code`.
    *
    */
   readonly key: string;
   /**
-   * The value type this slot accepts. Each typed slot rejects a value that does not match its `constraint`. Built-in SMS templates use typed slots (`code`, `amount` and the rest). Apple Messages templates type a variable from its content: the field it fills (`url`, `image`, `timestamp`) or the formatting filter applied to it (`date`, `date_time`, `amount`, `currency`). Email, WhatsApp and workspace SMS templates use `text`. Workspace SMS parameters must be scalar values. Open enum: treat an unrecognized value as a future type rather than an error.
+   * The value type this slot accepts. Each typed slot rejects a value that does not match its `constraint`. Built-in SMS templates use typed slots (`code`, `amount` and the rest). Apple Messages templates type a variable from its content: the field it fills (`url`, `image`, `timestamp`) or the formatting filter applied to it (`date`, `date_time`, `amount`, `currency`). Email and workspace SMS templates use `text`. WhatsApp templates use `text`, plus `url` for a media header's file and `location` for a location header. Workspace SMS parameters must be scalar values. Open enum: treat an unrecognized value as a future type rather than an error.
    *
    */
   readonly type: string;
@@ -6811,7 +6892,7 @@ export type TemplateVariable = {
    */
   readonly sensitive?: boolean;
   /**
-   * Whether the value comes from Bird rather than from the send. Absent means false. Only email templates have system slots, identified by the reserved `bird` key or a dotted path beneath it; every SMS and WhatsApp slot is yours to fill. A draft can also name a reserved key no Bird value fills, including `bird` itself: `constraint` says so, and publishing that draft is rejected.
+   * Whether the value comes from Bird rather than from the send. Absent means false. System slots are identified by the reserved `bird` key or a dotted path beneath it. They appear on email templates, and, in the template parameters preview, on WhatsApp templates whose parameter bindings read contact data; every SMS slot is yours to fill. A draft can also name a reserved key no Bird value fills, including `bird` itself: `constraint` says so, and publishing that draft is rejected.
    *
    */
   readonly system?: boolean;
@@ -7287,7 +7368,327 @@ export type SmsKeywordRuleUpdate = {
   confirmed_self_managed?: boolean;
 };
 
+/**
+ * Field to sort messaging profiles by.
+ */
+export type SmsMessagingProfileSortField = "created_at";
+
 export type SmsSenderId = string;
+
+/**
+ * Chooses the sender for messages to one destination country, or the default sender when `country_code` is omitted.
+ *
+ */
+export type SmsMessagingProfileSenderSelector = {
+  /**
+   * The destination country this sender is used for, as an uppercase ISO 3166-1 alpha-2 code. Omit it to make this the default sender, which is used for every destination country that has no entry of its own. A profile can have one entry per country and one default. An empty string is rejected rather than treated as the default.
+   *
+   */
+  country_code?: string;
+  /**
+   * The sender to use, as returned by the list SMS senders operation.
+   */
+  sender_id: SmsSenderId;
+};
+
+/**
+ * A number that receives replies for a profile.
+ */
+export type SmsMessagingProfileInboundNumber = {
+  /**
+   * The country of a short code, as an uppercase ISO 3166-1 alpha-2 code. Required for a short code. Omit it for a number in E.164 format, which receives replies from subscribers in any country.
+   *
+   */
+  country_code?: string;
+  /**
+   * A short code as digits, or a number in E.164 format. It must be a number your workspace holds that can receive SMS, and it can belong to one profile at a time.
+   *
+   */
+  number: string;
+};
+
+/**
+ * How long after a message is sent a reply can still be paired with it: one hour (`1h`), 24 hours (`1d`), or 168 hours (`7d`). `1d` is the default.
+ *
+ */
+export type SmsMessagingProfileTimeWindow = "1h" | "1d" | "7d";
+
+/**
+ * Settings for pairing each reply with the message it answers, reported as the reply's `in_reply_to_message`. Bird pairs only messages sent from one of this profile's reply numbers while matching is on. Turning it off stops pairing, and turning it back on resumes it for messages still inside their window.
+ *
+ */
+export type SmsMessagingProfileOutboundMatching = {
+  /**
+   * Whether replies are paired with the messages they answer.
+   */
+  enabled: boolean;
+  time_window: SmsMessagingProfileTimeWindow;
+};
+
+/**
+ * How the profile receives replies. A profile without numbers only sends.
+ */
+export type SmsMessagingProfileInbound = {
+  /**
+   * The numbers that receive replies for this profile.
+   */
+  numbers: Array<SmsMessagingProfileInboundNumber>;
+  /**
+   * The HTTPS URL that receives `sms.received` events for replies on this profile's numbers, signed with your workspace callback signing secret. Null when none is set, in which case replies use `options.callback_url`, then your webhook subscriptions. While a URL applies, a reply skips your plain webhook endpoints.
+   *
+   */
+  callback_url: string | null;
+  outbound_matching: SmsMessagingProfileOutboundMatching;
+};
+
+/**
+ * Sending options that messages from this profile use when a message does not set its own.
+ */
+export type SmsMessagingProfileOptions = {
+  /**
+   * Whether text is converted to the GSM-7 character set where possible, to fit more characters in a segment.
+   */
+  smart_encoding: boolean;
+  /**
+   * Whether messages are sent even if the recipient is suppressed for the sender, including after replying STOP. Messages that do not set `ignore_suppression` use this value. Only `authentication` and `transactional` messages can skip suppressions. It cannot be `true` while `default_category` is `marketing` or `service`. Bird must enable it for your workspace; until then, messages that use it are refused.
+   *
+   */
+  ignore_suppression: boolean;
+  /**
+   * The HTTPS URL that receives this profile's message events instead of your webhook endpoints. Null when none is set. Messages that do not set `callback_url` use it, and so do replies on the profile's numbers that have no `inbound.callback_url`. Each event is a signed POST, signed with your workspace callback signing secret, which `rotateWebhookCallbackSigningSecret` creates and returns once. While a URL applies, a message's events skip your plain webhook endpoints. MCP Events subscriptions and connector endpoints still receive them.
+   *
+   */
+  callback_url: string | null;
+};
+
+/**
+ * An outbound SMS event type. A write accepts only the listed values; a newer server can add events, so read an unknown one as a string.
+ */
+export type SmsMessagingProfileCallbackEvent =
+  | "sms.accepted"
+  | "sms.sent"
+  | "sms.delivered"
+  | "sms.undelivered"
+  | "sms.failed"
+  | "sms.rejected"
+  | "sms.expired"
+  | (string & {});
+
+/**
+ * A messaging profile: the senders, reply numbers, and defaults for one program in your workspace. A send that names the profile takes its sender, default category, smart encoding, validity period, cost center, and options from it when the send leaves them out. A message that names the profile sends its events to the profile's `options.callback_url`, filtered by `callback_events`, and a reply on one of the profile's numbers goes to `inbound.callback_url`, then `options.callback_url`. With outbound matching on, a reply is paired with the message it answers.
+ *
+ */
+export type SmsMessagingProfile = {
+  /**
+   * Identifier of this profile.
+   */
+  id: SmsMessagingProfileId;
+  /**
+   * A label for the profile. Names are not unique, so two profiles can share one.
+   */
+  name: string;
+  /**
+   * The sender for each destination country, and the default sender when an entry has no `country_code`.
+   */
+  senders: Array<SmsMessagingProfileSenderSelector>;
+  inbound: SmsMessagingProfileInbound;
+  /**
+   * The category a free-text send that names this profile uses when it sets none: `transactional`, `marketing`, `authentication`, or `service`. A template send takes the template's category. Null when none is set.
+   *
+   */
+  default_category: SmsMessageCategory | null;
+  /**
+   * How many seconds a message stays valid before it expires undelivered. Null when none is set. A send that omits `validity_period` uses it.
+   *
+   */
+  validity_period: number | null;
+  /**
+   * A label for assigning the cost of this profile's messages. Null when none is set. A send that omits `cost_center` uses it.
+   *
+   */
+  cost_center: string | null;
+  options: SmsMessagingProfileOptions;
+  /**
+   * The events of this profile's outbound messages that go to a callback URL: `sms.accepted`, `sms.sent`, `sms.delivered`, `sms.undelivered`, `sms.failed`, `sms.rejected`, and `sms.expired`. The list is fixed when a message is accepted, and applies only while the message has a callback URL: an event outside it then reaches neither the URL nor a plain webhook endpoint. Without a callback URL the list has no effect, and every event goes to your webhook endpoints. `sms.received` is never filtered. Null means every outbound event goes to the URL.
+   *
+   */
+  callback_events: Array<SmsMessagingProfileCallbackEvent> | null;
+  /**
+   * When the profile was created.
+   */
+  created_at: string;
+  /**
+   * When the profile was last changed.
+   */
+  updated_at: string;
+};
+
+export type SmsMessagingProfileList = {
+  /**
+   * Your workspace's messaging profiles, newest first.
+   */
+  data: Array<SmsMessagingProfile>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * Settings for pairing each reply with the message it answers, reported as the reply's `in_reply_to_message`. Bird pairs only messages sent from one of this profile's reply numbers while matching is on. Turning it off stops pairing, and turning it back on resumes it for messages still inside their window.
+ *
+ */
+export type SmsMessagingProfileOutboundMatchingInput = {
+  /**
+   * Whether replies are paired with the messages they answer. A new profile defaults to `false`.
+   */
+  enabled?: boolean;
+  time_window?: SmsMessagingProfileTimeWindow;
+};
+
+/**
+ * How the profile receives replies. Omit it for a profile that only sends.
+ */
+export type SmsMessagingProfileInboundCreate = {
+  /**
+   * The numbers that receive replies for this profile.
+   */
+  numbers?: Array<SmsMessagingProfileInboundNumber>;
+  /**
+   * The HTTPS URL that receives `sms.received` events for replies on this profile's numbers, signed with your workspace callback signing secret. Without it, replies use `options.callback_url`, then your webhook subscriptions. While a URL applies, a reply skips your plain webhook endpoints. It must be an absolute HTTPS URL of at most 2048 characters with a public host: an HTTP URL, a malformed one, or a private, loopback or link-local host returns `422`.
+   *
+   */
+  callback_url?: string;
+  outbound_matching?: SmsMessagingProfileOutboundMatchingInput;
+};
+
+/**
+ * Sending options for messages that do not set their own. Booleans default to `false`.
+ */
+export type SmsMessagingProfileOptionsCreate = {
+  /**
+   * Whether text is converted to the GSM-7 character set where possible.
+   */
+  smart_encoding?: boolean;
+  /**
+   * Whether messages are sent even if the recipient is suppressed for the sender, including after replying STOP. Messages that do not set `ignore_suppression` use this value. Only `authentication` and `transactional` messages can skip suppressions. It cannot be `true` when `default_category` is `marketing` or `service`. Bird must enable it for your workspace; until then, messages that use it are refused.
+   *
+   */
+  ignore_suppression?: boolean;
+  /**
+   * The HTTPS URL that receives this profile's message events instead of your webhook endpoints. Messages that do not set `callback_url` use it, and so do replies on the profile's numbers that have no `inbound.callback_url`. Each event is a signed POST, signed with your workspace callback signing secret, which `rotateWebhookCallbackSigningSecret` creates and returns once. While a URL applies, a message's events skip your plain webhook endpoints. MCP Events subscriptions and connector endpoints still receive them. It must be an absolute HTTPS URL of at most 2048 characters with a public host: an HTTP URL, a malformed one, or a private, loopback or link-local host returns `422`.
+   *
+   */
+  callback_url?: string;
+};
+
+/**
+ * Parameters for creating a messaging profile. Omitted booleans are `false`, the matching window is `1d`, and everything else is unset.
+ *
+ */
+export type SmsMessagingProfileCreate = {
+  /**
+   * A label for the profile. Names are not unique, so two profiles can share one.
+   */
+  name: string;
+  /**
+   * The sender for each destination country, and optionally a default sender. Each country appears at most once, and at most one entry omits `country_code`.
+   *
+   */
+  senders?: Array<SmsMessagingProfileSenderSelector>;
+  inbound?: SmsMessagingProfileInboundCreate;
+  /**
+   * The category a free-text send that names this profile uses when it sets none: `transactional`, `marketing`, `authentication`, or `service`. A template send takes the template's category.
+   *
+   */
+  default_category?: SmsMessageCategory;
+  /**
+   * How many seconds a message stays valid before it expires undelivered. A send that omits `validity_period` uses it.
+   *
+   */
+  validity_period?: number;
+  /**
+   * A label for assigning the cost of this profile's messages. A send that omits `cost_center` uses it.
+   *
+   */
+  cost_center?: string;
+  options?: SmsMessagingProfileOptionsCreate;
+  /**
+   * The events of this profile's outbound messages that go to a callback URL. The list is fixed when a message is accepted, and applies only while the message has a callback URL: an event outside it then reaches neither the URL nor a plain webhook endpoint. Without a callback URL the list has no effect, and every event goes to your webhook endpoints. A value other than `sms.accepted`, `sms.sent`, `sms.delivered`, `sms.undelivered`, `sms.failed`, `sms.rejected` or `sms.expired` returns `422`. `sms.received` is never filtered. Omit it to deliver every event.
+   *
+   */
+  callback_events?: Array<SmsMessagingProfileCallbackEvent>;
+};
+
+/**
+ * Changes how the profile receives replies. Omitted properties keep their value.
+ */
+export type SmsMessagingProfileInboundUpdate = {
+  /**
+   * Replaces the numbers that receive replies. Send an empty array to remove them all.
+   */
+  numbers?: Array<SmsMessagingProfileInboundNumber>;
+  /**
+   * The HTTPS URL that receives `sms.received` events for replies on this profile's numbers, signed with your workspace callback signing secret. Send `null` to clear it, so replies use `options.callback_url`, then your webhook subscriptions. While a URL applies, a reply skips your plain webhook endpoints. It must be an absolute HTTPS URL of at most 2048 characters with a public host: an HTTP URL, a malformed one, or a private, loopback or link-local host returns `422`.
+   *
+   */
+  callback_url?: string | null;
+  outbound_matching?: SmsMessagingProfileOutboundMatchingInput;
+};
+
+/**
+ * Changes the sending options for messages that do not set their own. Omitted properties keep their value.
+ */
+export type SmsMessagingProfileOptionsUpdate = {
+  /**
+   * Whether text is converted to the GSM-7 character set where possible.
+   */
+  smart_encoding?: boolean;
+  /**
+   * Whether messages are sent even if the recipient is suppressed for the sender, including after replying STOP. Messages that do not set `ignore_suppression` use this value. Only `authentication` and `transactional` messages can skip suppressions. It cannot be `true` when `default_category` is `marketing` or `service`. Bird must enable it for your workspace; until then, messages that use it are refused.
+   *
+   */
+  ignore_suppression?: boolean;
+  /**
+   * The HTTPS URL that receives this profile's message events instead of your webhook endpoints. Send `null` to clear it. Messages that do not set `callback_url` use it, and so do replies on the profile's numbers that have no `inbound.callback_url`. Each event is a signed POST, signed with your workspace callback signing secret, which `rotateWebhookCallbackSigningSecret` creates and returns once. While a URL applies, a message's events skip your plain webhook endpoints. MCP Events subscriptions and connector endpoints still receive them. It must be an absolute HTTPS URL of at most 2048 characters with a public host: an HTTP URL, a malformed one, or a private, loopback or link-local host returns `422`.
+   *
+   */
+  callback_url?: string | null;
+};
+
+/**
+ * Changes a messaging profile. Omitted properties keep their value, including inside `inbound` and `options`. Send `null` to clear a property that accepts it. `senders` and `inbound.numbers` replace the whole list.
+ *
+ */
+export type SmsMessagingProfileUpdate = {
+  /**
+   * A new label for the profile. Names are not unique, so two profiles can share one.
+   */
+  name?: string;
+  /**
+   * Replaces the profile's senders. Each country appears at most once, and at most one entry omits `country_code`. Send an empty array to remove them all.
+   *
+   */
+  senders?: Array<SmsMessagingProfileSenderSelector>;
+  inbound?: SmsMessagingProfileInboundUpdate;
+  /**
+   * The category a free-text send that names this profile uses when it sets none: `transactional`, `marketing`, `authentication`, or `service`. A template send takes the template's category. Send `null` to clear it.
+   *
+   */
+  default_category?: SmsMessageCategory | null;
+  /**
+   * How many seconds a message stays valid before it expires undelivered. Send `null` to clear it. A send that omits `validity_period` uses it.
+   *
+   */
+  validity_period?: number | null;
+  /**
+   * A label for assigning the cost of this profile's messages. Send `null` to clear it. A send that omits `cost_center` uses it.
+   *
+   */
+  cost_center?: string | null;
+  options?: SmsMessagingProfileOptionsUpdate;
+  /**
+   * The events of this profile's outbound messages that go to a callback URL. The list is fixed when a message is accepted, and applies only while the message has a callback URL: an event outside it then reaches neither the URL nor a plain webhook endpoint. Without a callback URL the list has no effect, and every event goes to your webhook endpoints. A value other than `sms.accepted`, `sms.sent`, `sms.delivered`, `sms.undelivered`, `sms.failed`, `sms.rejected` or `sms.expired` returns `422`. `sms.received` is never filtered. Send `null` to deliver every event.
+   *
+   */
+  callback_events?: Array<SmsMessagingProfileCallbackEvent> | null;
+};
 
 /**
  * The kind of value a requirement takes. The `string` value is a single line, while `text` runs to several. The `enum` value accepts only the values listed with the requirement. The `number`, `boolean`, and `date` values take their corresponding data types. The `url` value takes a link. The `country` value takes an uppercase ISO 3166-1 alpha-2 code, such as `NL`. The `document` value means a file you upload first and then reference. All other values are supplied inline.
@@ -10378,6 +10779,10 @@ export type WhatsAppMessage = {
   metadata?: {
     [key: string]: unknown;
   };
+  /**
+   * The `reference` from the send request. Absent when the send set none, and on inbound messages.
+   */
+  readonly reference?: MessageReference;
 };
 
 export type WhatsAppMessageList = {
@@ -11022,6 +11427,11 @@ export type WhatsAppMessageSendRequest = {
   metadata?: {
     [key: string]: unknown;
   };
+  /**
+   * An identifier you want to find this message by, such as an order or ticket number, matched exactly by the message list's `reference` filter. Set it only when you need to search on it, and put any other data in `metadata`. Stored on the message, returned on reads and echoed in webhook payloads. Several messages can share one.
+   *
+   */
+  reference?: MessageReference;
 };
 
 /**
@@ -12520,6 +12930,31 @@ export type WhatsAppTemplateCreate = {
 };
 
 /**
+ * One problem found while checking a version.
+ */
+export type WhatsAppTemplateSubmitProblem = {
+  /**
+   * The language the problem belongs to, or null when it concerns the version as a whole. Always null in an analysis, which checks one language's unsaved content.
+   *
+   */
+  readonly language?: LanguageTag | null;
+  /**
+   * Where the problem sits inside the language's content, as a dotted path with indexes, or null when it is not about one field. The path is rooted at the language you wrote, so `components[0].text` is the first block's text.
+   *
+   */
+  readonly field?: string | null;
+  /**
+   * The error code a real submit fails with. Look it up in the error catalog for what to do about it.
+   *
+   */
+  readonly code: string;
+  /**
+   * What is wrong, in a form you can show the author.
+   */
+  readonly message: string;
+};
+
+/**
  * Partial update of a template's metadata and language policies. Only the fields you send are changed; the rest are left as they stand. The slug can change only before the first submission.
  *
  */
@@ -12711,31 +13146,6 @@ export type WhatsAppTemplateSubmit = {
    *
    */
   validate_only?: boolean;
-};
-
-/**
- * One problem found while checking a version.
- */
-export type WhatsAppTemplateSubmitProblem = {
-  /**
-   * The language the problem belongs to, or null when it concerns the version as a whole.
-   *
-   */
-  readonly language?: LanguageTag | null;
-  /**
-   * Where the problem sits inside the language's content, as a dotted path with indexes, or null when it is not about one field. The path is rooted at the language you wrote, so `components[0].text` is the first block's text.
-   *
-   */
-  readonly field?: string | null;
-  /**
-   * The error code a real submit fails with. Look it up in the error catalog for what to do about it.
-   *
-   */
-  readonly code: string;
-  /**
-   * What is wrong, in a form you can show the author.
-   */
-  readonly message: string;
 };
 
 /**
@@ -15287,6 +15697,10 @@ export type AmbMessage = {
    */
   readonly tags?: Array<Tag>;
   /**
+   * The `reference` from the send request. Absent when the send set none, and on inbound messages.
+   */
+  readonly reference?: MessageReference;
+  /**
    * Recorded per-message charge before MAC pricing. Null in the initial send response, while unpriced, and for MAC-covered replies. MAC fees belong to monthly contact usage, not individual messages. Historical charges have no priced passthrough component.
    */
   readonly cost: MessageCost;
@@ -15402,6 +15816,11 @@ export type AmbMessageSendRequest = unknown & {
    * Structured `{name, value}` labels for filtering. Maximum 20 tags per send.
    */
   tags?: Array<Tag>;
+  /**
+   * An identifier you want to find this message by, such as an order or ticket number, matched exactly by the message list's `reference` filter. Set it only when you need to search on it, and put any other data in `metadata`. Stored on the message, returned on reads and echoed in webhook payloads. Several messages can share one.
+   *
+   */
+  reference?: MessageReference;
   /**
    * Department identifier for this message.
    */
@@ -15578,33 +15997,33 @@ export type AmbConversation = {
   /**
    * Conversation ID.
    */
-  readonly id: AmbConversationId;
+  id: AmbConversationId;
   /**
    * Business this conversation belongs to.
    */
-  readonly business_account_id: AmbBusinessId;
-  readonly status: AmbConversationStatus;
-  readonly origin: AmbConversationOrigin;
+  business_account_id: AmbBusinessId;
+  status: AmbConversationStatus;
+  origin: AmbConversationOrigin;
   /**
-   * The capability tokens the customer's device advertised on its most recent message, replaced by each inbound rather than accumulated, so this describes the device in use now. An empty list means the device's capabilities are unknown. Implemented message types may still be sent, but device rendering support has not been confirmed. Authentication requires an explicitly advertised AUTH2 capability.
+   * The device capability tokens recorded for this conversation. When an inbound message creates, reopens, or updates an open conversation, a non-empty list replaces the previous tokens. Empty lists and delayed messages that leave the conversation closed preserve the previous tokens. An empty stored list means the device's capabilities are unknown. Implemented message types may still be sent, but device rendering support has not been confirmed. Authentication requires an explicitly advertised AUTH2 capability.
    *
    */
-  readonly device_capabilities: Array<string>;
+  device_capabilities: Array<string>;
   /**
    * Implemented baseline types plus interactive types confirmed by `device_capabilities`. An empty capability list yields text, attachments and rich links; it does not establish support for other types. Unadvertised quick replies, list pickers, time pickers and forms are refused when capabilities are known. Custom apps and opaque interactive references are not included because their device support cannot be inferred from these tokens. Unsupported roadmap types cannot be sent.
    *
    */
-  readonly supported_content_kinds: Array<AmbContentKind>;
+  supported_content_kinds: Array<AmbContentKind>;
   /**
-   * The customer's locale from the most recent inbound message, or your business's default locale before any inbound arrives. Preserved in Apple's locale format, for example `en_US@rg=nlzzzz`.
+   * The customer's locale recorded for this conversation. Messages without a locale and delayed messages that leave the conversation closed preserve the previous value. Empty when no locale is known. Preserved in Apple's locale format, for example `en_US@rg=nlzzzz`.
    *
    */
-  readonly locale: string;
+  locale: string;
   /**
    * Number of inbound messages the workspace has not acknowledged. Shared across the workspace. Pass read with a date-time to acknowledge received inbound messages through that timestamp. Sending a reply does not change this count.
    *
    */
-  readonly unread_count: number;
+  unread_count: number;
   /**
    * The user this conversation is assigned to, or null when unassigned. Assignment is not rechecked against workspace membership on read, so it can still name a user whose access was removed.
    *
@@ -15614,19 +16033,19 @@ export type AmbConversation = {
   /**
    * When the native Apple conversation was closed. Null while its native status is open; independent of inbox status.
    */
-  readonly closed_at: string | null;
+  closed_at: string | null;
   /**
    * Why the native Apple conversation was closed. Null while its native status is open; independent of inbox status.
    */
-  readonly closed_reason: AmbConversationClosedReason | null;
+  closed_reason: AmbConversationClosedReason | null;
   /**
    * When this conversation was created.
    */
-  readonly created_at: string;
+  created_at: string;
   /**
    * When this conversation last changed.
    */
-  readonly updated_at: string;
+  updated_at: string;
 };
 
 export type AmbConversationList = {
@@ -16561,6 +16980,19 @@ export type WhatsAppBusinessAccount = {
    * WhatsApp's ban on this account, absent unless Bird was told of one. `status` is what the account said when Bird last read it; this is what WhatsApp announced, which arrives only on the webhook that announces it and is never re-read.
    */
   readonly ban?: WhatsAppBusinessAccountBan;
+  /**
+   * What to do next about this account's ban. Each entry names one action and says why
+   * it is worth taking. An empty list means Bird holds no `ban` record for this account.
+   * A ban Bird was never told of still shows as `banned` on the account's numbers, whose
+   * own `next` carries the appeal, and as Meta error `141014` on the `waba` entity in
+   * `meta_health_status`. Neither list says whether the account can send;
+   * `meta_health_status` does.
+   *
+   * While `ban` is present this links the account restrictions and appeals guide, which
+   * names `ban.appeal_url`, because neither Bird nor this API can lift a ban.
+   *
+   */
+  readonly next?: Array<NextAction>;
   /**
    * Meta's own messaging health for this account as of `meta_synced_at`. Absent until Bird has read it, and absent again when the stored reading did not parse at all. An entity whose verdict falls outside this vocabulary is dropped on its own and the rest of the report still ships, so `entities` can be shorter than Meta's. A `blocked` verdict on the `waba` entity is why template sends fail with Meta's `#200` even though the number reads `active`: for example `error_code` `141006` names a payment method Meta rejected on the account.
    */
@@ -23590,25 +24022,7 @@ export type WebhookEndpointList = {
 } & ListEnvelopeWithTotal;
 
 /**
- * The connector to deliver through. Each connector, its fields and the setup to do on its
- * platform first:
- *
- * - `claude_managed_agents`: Claude Managed Agents. Send each message you receive to your Claude managed agent.
- *   - `agent_id` (`config`, required): Returned when you create the agent. Sessions use its latest version.
- *   - `environment_id` (`config`, required): Returned when you create the environment.
- *   - `vault_id` (`config`, optional): A credential vault the agent uses, such as the one holding its Bird MCP credential, so it can reply through Bird.
- *   - `api_key` (secret, in `credentials`, required): From the Claude workspace your agent runs in.
- *   - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.
- *   - Setup 1: First, set up your agent in Claude. In the Claude Console, create the agent, its environment and an API key in the same workspace, then come back here with their IDs and the key. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.
- *   - Setup 2: Create an API key. In the Claude workspace your agent runs in. See https://platform.claude.com/settings/keys.
- *   - Setup 3: Copy the agent and environment IDs. Each create returns its ID. See https://platform.claude.com/docs/en/managed-agents/quickstart#create-your-first-session.
- *   - Setup 4: Optionally, add a credential vault. To let the agent reply through Bird, store its Bird MCP credential in a Claude credential vault and give the vault ID here. Each session gets that vault. See https://platform.claude.com/docs/en/managed-agents/vaults.
- * - `grok_bot`: Grok Bot. Send each message you receive to a Grok Bot routine.
- *   - `webhook_url` (`config`, required): The routine's webhook URL.
- *   - `sender_key` (secret, in `credentials`, required): The routine's sender key. Bird sends it only as the Bearer token.
- *   - Events: `whatsapp.received`, `sms.received`, `email_mailbox.message_received`, `amb.received`.
- *   - Setup 1: First, ask Grok Bot to create a routine. Ask Grok Bot to create a routine with a webhook trigger, then paste the webhook URL and sender key it gives you below. See https://cursor.com/docs/cloud-agent/automations#webhook-triggers.
- *
+ * The connector to deliver through; [Webhook connectors](/docs/ai/webhook-connectors) lists each one's fields, accepted events and platform setup.
  */
 export type WebhookConnectorId = string;
 
@@ -24114,6 +24528,11 @@ export type EventEmailBase = {
     [key: string]: unknown;
   } | null;
   /**
+   * The `reference` from the send request, echoed on the message's events. Absent when the send set none, and on `email.unsubscribed` and `email.list_unsubscribed` events Bird records from its own unsubscribe links, which carry no send fields.
+   *
+   */
+  reference?: MessageReference;
+  /**
    * The broadcast this send went out as part of, echoed on every per-recipient event for the send so you can attribute engagement to the broadcast without an extra lookup. Null when the send was not part of a broadcast. On `email.unsubscribed` and `email.list_unsubscribed`, null can also mean the recipient used an unsubscribe link that names no broadcast, so on those two events null does not rule a broadcast out.
    *
    */
@@ -24216,6 +24635,11 @@ export type EventEmailMessageBase = {
   metadata: {
     [key: string]: unknown;
   } | null;
+  /**
+   * The `reference` from the send request. Absent when the send set none.
+   *
+   */
+  reference?: MessageReference;
 };
 
 /**
@@ -25052,7 +25476,7 @@ export type EventPreferenceRevoked = {
 };
 
 /**
- * Identity fields shared by every SMS lifecycle event payload.
+ * Fields shared by every outbound SMS lifecycle event payload.
  */
 export type EventSmsBase = {
   /**
@@ -25064,12 +25488,12 @@ export type EventSmsBase = {
    */
   workspace_id: WorkspaceId;
   /**
-   * Where the message went. On an outbound message this is the recipient's phone number in E.164 format; on an inbound one it is your own number that received it.
+   * The recipient's phone number, in E.164 format.
    *
    */
   to: string;
   /**
-   * Where the message came from. On an outbound message this is the sender you sent it from: an E.164 number, an alphanumeric sender ID, or a short code. On an inbound one it is the phone number that sent it to you.
+   * The sender you sent the message from: an E.164 number, an alphanumeric sender ID, or a short code.
    *
    */
   from: string;
@@ -25109,14 +25533,18 @@ export type EventSmsBase = {
    */
   template_content_hash: SmsTemplateContentHash | null;
   /**
-   * The messaging profile this message was sent or received under. Absent when no messaging profile applied.
+   * The messaging profile this message was sent under. Absent when no messaging profile applied.
    */
   messaging_profile_id?: SmsMessagingProfileId;
   /**
-   * On an outbound message, the country of the recipient's number. On a received message, the country of the sender's number, or of your number that received it when the sender is not a phone number, such as a short code or an alphanumeric sender. Absent when not known.
+   * The country of the recipient's number. Absent when not known.
    *
    */
   country_code?: CountryCode;
+  /**
+   * Segment breakdown used to calculate the message charge.
+   */
+  segments: SmsSegments;
   /**
    * Message cost as of this event, split into the platform charge and any
    * third-party fees passed through. Null on an event that priced nothing.
@@ -25130,7 +25558,12 @@ export type EventSmsBase = {
    */
   cost?: MessageCost;
   /**
-   * Preview feature: the `cost_center` applied to the message, from the send request or else its messaging profile, echoed on every event for the message. Absent when neither set one, and on inbound messages.
+   * The `reference` from the send request, echoed on every event for the message. Absent when the send set none.
+   *
+   */
+  reference?: MessageReference;
+  /**
+   * The `cost_center` applied to the message, from the send request or else its messaging profile, echoed on every event for the message. Absent when neither set one.
    *
    */
   cost_center?: string;
@@ -25139,12 +25572,7 @@ export type EventSmsBase = {
 /**
  * Payload of the sms.accepted event.
  */
-export type EventSmsAcceptedData = EventSmsBase & {
-  /**
-   * Segment breakdown used to calculate the message charge.
-   */
-  segments: SmsSegments;
-};
+export type EventSmsAcceptedData = EventSmsBase;
 
 /**
  * The API accepted the SMS send request and queued it for processing.
@@ -25198,6 +25626,14 @@ export type EventSmsExpiredData = EventSmsBase & {
    * Why the message was still undelivered when its validity period elapsed. Typically `unreachable`, the handset having stayed off or out of coverage for the whole window.
    */
   error: SmsError;
+  /**
+   * Carrier that reported the expiry. Absent when the carrier does not report one.
+   */
+  carrier?: string;
+  /**
+   * Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.
+   */
+  mcc_mnc?: string;
 };
 
 /**
@@ -25223,6 +25659,14 @@ export type EventSmsFailedData = EventSmsBase & {
    * Why the message terminally failed.
    */
   error: SmsError;
+  /**
+   * Carrier that reported the failure. Absent when the carrier does not report one.
+   */
+  carrier?: string;
+  /**
+   * Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.
+   */
+  mcc_mnc?: string;
 };
 
 /**
@@ -25248,35 +25692,73 @@ export type SmsReceivedEventType = "sms.received";
 /**
  * Payload of the sms.received event.
  */
-export type EventSmsReceivedData = EventSmsBase &
-  unknown & {
-    /**
-     * The message body, so you can act on it without a follow-up read. Absent when the message carried only attachments and no text of its own.
-     *
-     */
-    text?: string;
-    /**
-     * Segment breakdown of the received body.
-     */
-    segments: SmsSegments;
-    /**
-     * Carrier the message came in over. Absent where the carrier does not report one.
-     */
-    carrier?: string;
-    /**
-     * Mobile country code and mobile network code of the carrier. Absent when not known.
-     */
-    mcc_mnc?: string;
-    /**
-     * Preview feature: the outbound message this one was paired with through its messaging profile's outbound matching. Absent when it was not paired.
-     *
-     */
-    readonly in_reply_to_message?: SmsInReplyToMessage;
-    /**
-     * Subject line. Absent when the message carried none.
-     */
-    subject?: string;
-  };
+export type EventSmsReceivedData = unknown & {
+  /**
+   * ID of the SMS message.
+   */
+  sms_id: SmsMessageId;
+  /**
+   * ID of the workspace that owns this event.
+   */
+  workspace_id: WorkspaceId;
+  /**
+   * Your number that received the message: an E.164 number, or a short code.
+   *
+   */
+  to: string;
+  /**
+   * The sender: an E.164 number, or a short code or alphanumeric sender ID when the message came from one.
+   *
+   */
+  from: string;
+  /**
+   * The messaging profile this message was received under. Absent when no messaging profile applied.
+   */
+  messaging_profile_id?: SmsMessagingProfileId;
+  /**
+   * Message cost as of this event, split into the platform charge and any
+   * third-party fees passed through. Null on an event that priced nothing.
+   *
+   * Components are named so you can merge them per component rather than replacing the
+   * object: webhook delivery is not ordered, so an older event arriving late would
+   * otherwise overwrite a newer figure. Take the latest `occurred_at` you have seen for
+   * each component. `amount` is the sum of the components in this payload and does not
+   * represent a settled total.
+   *
+   */
+  cost?: MessageCost;
+  /**
+   * The message body, so you can act on it without a follow-up read. Absent when the message carried only attachments and no text of its own.
+   *
+   */
+  text?: string;
+  /**
+   * Segment breakdown of the received body.
+   */
+  segments: SmsSegments;
+  /**
+   * Carrier the message came in over. Absent where the carrier does not report one.
+   */
+  carrier?: string;
+  /**
+   * Mobile country code and mobile network code of the carrier. Absent when not known.
+   */
+  mcc_mnc?: string;
+  /**
+   * Country of the sender's number. When the sender is not a phone number, such as a short code or an alphanumeric sender, the country of your number that received the message. Absent when neither is known.
+   *
+   */
+  country_code?: CountryCode;
+  /**
+   * The outbound message this one was paired with through its messaging profile's outbound matching. Absent when it was not paired.
+   *
+   */
+  readonly in_reply_to_message?: SmsInReplyToMessage;
+  /**
+   * Subject line. Absent when the message carried none.
+   */
+  subject?: string;
+};
 
 /**
  * A message was received on one of your numbers.
@@ -25295,9 +25777,17 @@ export type EventSmsReceived = {
  */
 export type EventSmsRejectedData = EventSmsBase & {
   /**
-   * Why the message was rejected before reaching the carrier.
+   * Why Bird or the carrier refused the message.
    */
   error: SmsError;
+  /**
+   * Carrier the message was routed to. Absent when Bird rejected the message before routing it, or the carrier does not report one.
+   */
+  carrier?: string;
+  /**
+   * Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.
+   */
+  mcc_mnc?: string;
 };
 
 /**
@@ -25352,6 +25842,14 @@ export type EventSmsUndeliveredData = EventSmsBase & {
    * Why the message was not delivered.
    */
   error: SmsError;
+  /**
+   * Carrier that reported the delivery failure. Absent when the carrier does not report one.
+   */
+  carrier?: string;
+  /**
+   * Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.
+   */
+  mcc_mnc?: string;
 };
 
 /**
@@ -25768,7 +26266,7 @@ export type EventVoiceCallInitiated = {
 };
 
 /**
- * Identity fields shared by every WhatsApp lifecycle event payload.
+ * Fields shared by every outbound WhatsApp message event payload.
  */
 export type EventWhatsAppBase = {
   /**
@@ -25784,11 +26282,11 @@ export type EventWhatsAppBase = {
    */
   direction: "outbound" | "inbound";
   /**
-   * Sender of the message. On outbound messages, the business number it was sent from; on inbound, the WhatsApp contact.
+   * The business number the message was sent from.
    */
   from: WhatsAppAddress;
   /**
-   * Recipient of the message. On outbound messages, the WhatsApp contact; on inbound, the business number.
+   * The WhatsApp contact or group the message was sent to.
    */
   to: WhatsAppAddress;
   /**
@@ -25804,12 +26302,17 @@ export type EventWhatsAppBase = {
     [key: string]: unknown;
   } | null;
   /**
-   * The message this one answers. On an outbound message it is the message it quoted: for a send request, its `in_reply_to_message_id`. On an inbound message it is what WhatsApp reports as the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. Absent when the message answers nothing, and absent on an inbound message whose target we cannot match to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.
+   * The `reference` from the send request, echoed on every event for the message. Absent when the send set none.
+   *
+   */
+  reference?: MessageReference;
+  /**
+   * The message this one quoted: for a send request, its `in_reply_to_message_id`. Absent when the message quoted nothing, or quoted one we cannot match to a message we hold.
    *
    */
   in_reply_to_message_id?: WhatsAppMessageId;
   /**
-   * Where the message came from when it did not come through Bird live, the same value `GET /v1/whatsapp/messages/{message_id}` returns. Absent when your workspace sent the message through Bird, or the contact sent it to Bird.
+   * Where the message came from when it did not come through Bird live, the same value `GET /v1/whatsapp/messages/{message_id}` returns. Absent when your workspace sent the message through Bird.
    *
    */
   origin?: WhatsAppMessageOrigin;
@@ -26049,10 +26552,40 @@ export type EventWhatsAppRead = {
 export type WhatsAppReceivedEventType = "whatsapp.received";
 
 /**
- * Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back.
+ * Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back. `from` is the WhatsApp contact who sent the message, the participant who wrote it in a group; `to` is the business number that received it, with the group's `group_id` on a group message.
  *
  */
-export type EventWhatsAppReceivedData = EventWhatsAppBase & {
+export type EventWhatsAppReceivedData = {
+  /**
+   * ID of the WhatsApp message.
+   */
+  whatsapp_id: WhatsAppMessageId;
+  /**
+   * ID of the workspace that owns this event.
+   */
+  workspace_id: WorkspaceId;
+  /**
+   * Always `inbound`, for a message received from the contact.
+   */
+  direction: MessageDirection;
+  /**
+   * The WhatsApp contact who sent the message; in a group, the participant who wrote it.
+   */
+  from: WhatsAppAddress;
+  /**
+   * The business number that received the message, and the group it arrived through on a group message.
+   */
+  to: WhatsAppAddress;
+  /**
+   * The message this one answers, as WhatsApp reports the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. Absent when the message answers nothing, and absent when we cannot match the target to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.
+   *
+   */
+  in_reply_to_message_id?: WhatsAppMessageId;
+  /**
+   * Where the message came from when it did not come through Bird live, the same value `GET /v1/whatsapp/messages/{message_id}` returns. Absent when the contact sent the message to Bird.
+   *
+   */
+  origin?: WhatsAppMessageOrigin;
   /**
    * Text the contact sent.
    */
@@ -26270,12 +26803,12 @@ export type WebhookAttempt = {
    */
   status: "delivered" | "pending" | "failed";
   /**
-   * URL the request was sent to: the endpoint's `url` at the time of the attempt, which can differ from the current configuration after an update.
+   * URL the request was sent to. For a webhook endpoint, its `url` at the time of the attempt, which can differ from the current configuration after an update. For an SMS callback, the callback URL resolved for the message's event.
    *
    */
   url: string;
   /**
-   * Why the attempt failed before any request was sent, for example a connector body that could not be rendered or an endpoint whose connection changed after the event was queued. Absent for an attempt that reached the network.
+   * Why the attempt failed when no HTTP response explains it: a failure before any request was sent, such as a connector body that could not be rendered, or a TLS failure, such as an endpoint certificate that could not be verified. Absent for other attempts.
    *
    */
   failure_reason?: string;
@@ -26304,6 +26837,18 @@ export type WebhookAttemptList = {
    * Delivery attempts, newest first.
    */
   data: Array<WebhookAttempt>;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 /**
@@ -26594,6 +27139,30 @@ export type VoiceMediaQuality = {
 };
 
 /**
+ * How a leg's audio was encrypted between us and the party it connects us to.
+ *
+ * - `none`: plain RTP.
+ * - `sdes`: SRTP with keys exchanged in the SDP over TLS signalling (SDES, RFC 4568).
+ * - `dtls`: DTLS-SRTP, which every call placed from a browser uses.
+ *
+ */
+export type VoiceLegMediaEncryption = "none" | "sdes" | "dtls" | (string & {});
+
+export type VoiceLegMediaPath = {
+  /**
+   * How the audio between us and your side of the leg was encrypted: your SIP trunk's equipment, or the browser that placed the call. On a leg with neither, such as an incoming call a Sequence answered, it describes the carrier's side. Use it to confirm that a call on a trunk with `preferred` media encryption was actually encrypted: such a trunk delivers plain audio to a gateway not reached over TLS or behind an `exit_region`.
+   *
+   * - `none`: plain RTP.
+   * - `sdes`: SRTP with keys exchanged in the SDP over TLS signalling (SDES, RFC 4568). The audio between us and the carrier stays plain RTP.
+   * - `dtls`: DTLS-SRTP, which every call placed from a browser uses.
+   *
+   * Absent when we did not record it: on a leg whose audio bypassed us, on an encrypted offer to a SIP trunk whose media encryption is `off`, on a leg placed without an SDP offer in its INVITE, on an incoming leg that was not answered, and on legs recorded before this field existed.
+   *
+   */
+  encryption: VoiceLegMediaEncryption;
+};
+
+/**
  * What was charged for a leg, split into the components that make it up.
  *
  */
@@ -26718,6 +27287,10 @@ export type VoiceLeg = {
    * How the audio sounded, as opposed to whether the leg connected. Absent when the leg carried no audio, or when the far end reported nothing to measure from.
    */
   readonly media_quality?: VoiceMediaQuality;
+  /**
+   * How the leg's audio travelled between us and your side. Absent when we recorded nothing about it, including on legs recorded before this field existed.
+   */
+  readonly media?: VoiceLegMediaPath;
   /**
    * What the leg cost, net of tax, at full precision, split into the components that make it up. Absent until the leg has been rated; unanswered or unpriced legs have no cost, and neither does a verification call Bird places and answers on your behalf, which is exempt from rating.
    */
@@ -27315,11 +27888,43 @@ export type VoiceTrunkCore = {
   readonly session_credentials_enabled: boolean;
 };
 
-export type VoiceTrunk = VoiceTrunkCore & Timestamps;
+/**
+ * Whether audio between your equipment and Bird is encrypted with SRTP, keyed with SDES (`a=crypto`) over TLS signalling. Audio between Bird and the carrier network stays plain RTP.
+ *
+ * `preferred` encrypts when it can. A call your equipment places is encrypted when it offers `RTP/SAVP` or `RTP/SAVPF` with an `AES_CM_128_HMAC_SHA1_80` or `_32` key over TLS, and carried plain when it offers plain RTP. A call Bird delivers is encrypted to a gateway reached over TLS (`sips:` or `;transport=tls`) and plain to the rest. Deliveries through a gateway `exit_region`, and on a trunk with `media_bypass`, stay plain.
+ *
+ * `required` refuses a plain call with `488 Not Acceptable Here` and delivers encrypted to every gateway, so every gateway must use TLS.
+ *
+ * With `preferred` or `required`, an SDES offer over plain SIP (UDP or TCP), an offer without a usable key, and DTLS-SRTP are refused with `488` and a `Warning` header naming why. `required` cannot be set alongside `media_bypass` or a gateway `exit_region`, since their audio does not pass through the relay that encrypts it. `off` encrypts nothing and relays an SRTP offer as it is. Calls from a web browser are always encrypted with DTLS-SRTP, whatever this says.
+ *
+ */
+export type VoiceTrunkMediaEncryption = "off" | "preferred" | "required";
+
+/**
+ * How the trunk carries call audio. Set it through the trunk update operation.
+ */
+export type VoiceTrunkMedia = {
+  encryption: VoiceTrunkMediaEncryption;
+};
+
+export type VoiceTrunk = VoiceTrunkCore & {
+  readonly media: VoiceTrunkMedia;
+} & Timestamps;
 
 export type VoiceTrunkList = {
   data: Array<VoiceTrunk>;
 } & ListEnvelope;
+
+/**
+ * How the new trunk carries call audio. An omitted member takes its default.
+ */
+export type VoiceTrunkMediaCreate = {
+  /**
+   * Omit it for `preferred`, which encrypts whenever your equipment and gateways allow and otherwise carries calls as before.
+   *
+   */
+  encryption?: VoiceTrunkMediaEncryption;
+};
 
 export type VoiceTrunkCreate = {
   /**
@@ -27341,6 +27946,7 @@ export type VoiceTrunkCreate = {
    *
    */
   media_bypass?: boolean;
+  media?: VoiceTrunkMediaCreate;
   /**
    * The Digest hash algorithms to offer, in the order they should be offered. Omit this to use the default of `["SHA-256", "MD5"]`, which suits most equipment. Send `["MD5"]` for a PBX that only implements MD5 and rejects or ignores a challenge offering SHA-256 first. This can be changed later without re-issuing credentials.
    *
@@ -27351,6 +27957,13 @@ export type VoiceTrunkCreate = {
    *
    */
   session_credentials_enabled?: boolean;
+};
+
+/**
+ * A change to how the trunk carries call audio. An omitted member is left unchanged.
+ */
+export type VoiceTrunkMediaUpdate = {
+  encryption?: VoiceTrunkMediaEncryption;
 };
 
 export type VoiceTrunkIpaclCreate = {
@@ -27395,6 +28008,7 @@ export type VoiceTrunkUpdate = {
    *
    */
   media_bypass?: boolean;
+  media?: VoiceTrunkMediaUpdate;
   /**
    * Replaces the trunk's entire IP allow list. When present, the allow list is set to exactly these CIDR blocks: ranges not listed are removed and new ones are added. Send an empty array to clear the list, turning IP filtering off. Omit the field to leave the allow list unchanged.
    *
@@ -30072,13 +30686,22 @@ export type WorkspaceQuotaWritable = {
   organization_limit: number;
   organization_source: QuotaSource;
   /**
-   * The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.
+   * The workspace's own saved limit. `null` when none is saved; `limit_source` and `automatic_limit` then show whether an automatic share applies.
    */
   workspace_limit: WorkspaceQuotaCeilingWritable | null;
   /**
-   * The lower of the organization limit currently applied to requests and any active workspace limit. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.
+   * The lower of the organization limit currently applied to requests and the workspace's active limit or automatic share. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.
    */
   limit: number;
+  limit_source: WorkspaceQuotaLimitSource;
+  /**
+   * The workspace's share under the organization's automatic allocation. Set only when `limit_source` is `automatic`; it is never saved as a workspace limit.
+   */
+  automatic_limit: number | null;
+  /**
+   * Whether the organization has an automatic allocation of this quota. It can be `true` while `limit_source` is `manual`, or `organization` when the organization limit is unlimited. When `true`, changing or removing this workspace's limit can change other workspaces' automatic shares.
+   */
+  allocation_enabled: boolean;
   /**
    * Current usage. `null` for a `value` quota, which counts nothing.
    */
@@ -30597,6 +31220,10 @@ export type AmbErrorCodeStatsPointWritable = {
 export type AmbStatsByErrorCodeResponseWritable = {
   [key: string]: never;
 };
+
+export type OrganizationWorkspaceListWritable = {
+  data: Array<WorkspaceWritable>;
+} & ListEnvelopeWithTotal;
 
 export type RealtimeAppWritable = {
   /**
@@ -31181,14 +31808,14 @@ export type SmsErrorWritable = {
    */
   occurred_at: string;
   /**
-   * Whether the cause is permanent, so sending the same message again would fail the same way. Describes the cause, not whether Bird retries. Null when Bird cannot tell, which is currently always.
+   * Whether the cause is permanent, so sending the same message again would fail the same way. Describes the cause, not whether Bird retries. Null when Bird cannot tell, such as when the provider returned no code or one without a known permanence, or when Bird blocked the message itself.
    *
    */
   permanent?: boolean | null;
 } | null;
 
 /**
- * Preview feature: the outbound message a received message was paired with. Bird pairs a reply with the last message the messaging profile sent this subscriber from the receiving number, within the profile's outbound-matching window. The pairing is inferred from timing; the subscriber does not report which message they answered.
+ * The outbound message a received message was paired with. Bird pairs a reply with the last message the messaging profile sent this subscriber from the receiving number, within the profile's outbound-matching window. The pairing is inferred from timing; the subscriber does not report which message they answered.
  *
  */
 export type SmsInReplyToMessageWritable = {
@@ -32637,6 +33264,11 @@ export type AmbMessageSendRequestWritable = unknown & {
    */
   tags?: Array<Tag>;
   /**
+   * An identifier you want to find this message by, such as an order or ticket number, matched exactly by the message list's `reference` filter. Set it only when you need to search on it, and put any other data in `metadata`. Stored on the message, returned on reads and echoed in webhook payloads. Several messages can share one.
+   *
+   */
+  reference?: MessageReference;
+  /**
    * Department identifier for this message.
    */
   group?: string;
@@ -32724,11 +33356,57 @@ export type AmbConversationWritable = {
    */
   last_message: AmbConversationLastMessageWritable | null;
   /**
+   * Conversation ID.
+   */
+  id: AmbConversationId;
+  /**
+   * Business this conversation belongs to.
+   */
+  business_account_id: AmbBusinessId;
+  status: AmbConversationStatus;
+  origin: AmbConversationOrigin;
+  /**
+   * The device capability tokens recorded for this conversation. When an inbound message creates, reopens, or updates an open conversation, a non-empty list replaces the previous tokens. Empty lists and delayed messages that leave the conversation closed preserve the previous tokens. An empty stored list means the device's capabilities are unknown. Implemented message types may still be sent, but device rendering support has not been confirmed. Authentication requires an explicitly advertised AUTH2 capability.
+   *
+   */
+  device_capabilities: Array<string>;
+  /**
+   * Implemented baseline types plus interactive types confirmed by `device_capabilities`. An empty capability list yields text, attachments and rich links; it does not establish support for other types. Unadvertised quick replies, list pickers, time pickers and forms are refused when capabilities are known. Custom apps and opaque interactive references are not included because their device support cannot be inferred from these tokens. Unsupported roadmap types cannot be sent.
+   *
+   */
+  supported_content_kinds: Array<AmbContentKind>;
+  /**
+   * The customer's locale recorded for this conversation. Messages without a locale and delayed messages that leave the conversation closed preserve the previous value. Empty when no locale is known. Preserved in Apple's locale format, for example `en_US@rg=nlzzzz`.
+   *
+   */
+  locale: string;
+  /**
+   * Number of inbound messages the workspace has not acknowledged. Shared across the workspace. Pass read with a date-time to acknowledge received inbound messages through that timestamp. Sending a reply does not change this count.
+   *
+   */
+  unread_count: number;
+  /**
    * The user this conversation is assigned to, or null when unassigned. Assignment is not rechecked against workspace membership on read, so it can still name a user whose access was removed.
    *
    */
   assigned_to: UserId | null;
   labels: ConversationLabels;
+  /**
+   * When the native Apple conversation was closed. Null while its native status is open; independent of inbox status.
+   */
+  closed_at: string | null;
+  /**
+   * Why the native Apple conversation was closed. Null while its native status is open; independent of inbox status.
+   */
+  closed_reason: AmbConversationClosedReason | null;
+  /**
+   * When this conversation was created.
+   */
+  created_at: string;
+  /**
+   * When this conversation last changed.
+   */
+  updated_at: string;
 };
 
 export type AmbConversationListWritable = {
@@ -32870,11 +33548,15 @@ export type AmbTemplateLanguageWritable = {
   [key: string]: never;
 };
 
+export type WhatsAppBusinessAccountWritable = {
+  [key: string]: never;
+};
+
 export type WhatsAppBusinessAccountListWritable = {
   /**
    * The WhatsApp Business Accounts your workspace has connected.
    */
-  data: Array<unknown>;
+  data: Array<WhatsAppBusinessAccountWritable>;
 } & ListEnvelope;
 
 /**
@@ -34440,7 +35122,7 @@ export type EventAmbSentWritable = {
 };
 
 /**
- * Identity fields shared by every SMS lifecycle event payload.
+ * Fields shared by every outbound SMS lifecycle event payload.
  */
 export type EventSmsBaseWritable = {
   /**
@@ -34452,12 +35134,12 @@ export type EventSmsBaseWritable = {
    */
   workspace_id: WorkspaceId;
   /**
-   * Where the message went. On an outbound message this is the recipient's phone number in E.164 format; on an inbound one it is your own number that received it.
+   * The recipient's phone number, in E.164 format.
    *
    */
   to: string;
   /**
-   * Where the message came from. On an outbound message this is the sender you sent it from: an E.164 number, an alphanumeric sender ID, or a short code. On an inbound one it is the phone number that sent it to you.
+   * The sender you sent the message from: an E.164 number, an alphanumeric sender ID, or a short code.
    *
    */
   from: string;
@@ -34497,16 +35179,21 @@ export type EventSmsBaseWritable = {
    */
   template_content_hash: null;
   /**
-   * The messaging profile this message was sent or received under. Absent when no messaging profile applied.
+   * The messaging profile this message was sent under. Absent when no messaging profile applied.
    */
   messaging_profile_id?: SmsMessagingProfileId;
   /**
-   * On an outbound message, the country of the recipient's number. On a received message, the country of the sender's number, or of your number that received it when the sender is not a phone number, such as a short code or an alphanumeric sender. Absent when not known.
+   * The country of the recipient's number. Absent when not known.
    *
    */
   country_code?: CountryCode;
   /**
-   * Preview feature: the `cost_center` applied to the message, from the send request or else its messaging profile, echoed on every event for the message. Absent when neither set one, and on inbound messages.
+   * The `reference` from the send request, echoed on every event for the message. Absent when the send set none.
+   *
+   */
+  reference?: MessageReference;
+  /**
+   * The `cost_center` applied to the message, from the send request or else its messaging profile, echoed on every event for the message. Absent when neither set one.
    *
    */
   cost_center?: string;
@@ -34569,6 +35256,14 @@ export type EventSmsExpiredDataWritable = EventSmsBaseWritable & {
    * Why the message was still undelivered when its validity period elapsed. Typically `unreachable`, the handset having stayed off or out of coverage for the whole window.
    */
   error: SmsErrorWritable;
+  /**
+   * Carrier that reported the expiry. Absent when the carrier does not report one.
+   */
+  carrier?: string;
+  /**
+   * Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.
+   */
+  mcc_mnc?: string;
 };
 
 /**
@@ -34594,6 +35289,14 @@ export type EventSmsFailedDataWritable = EventSmsBaseWritable & {
    * Why the message terminally failed.
    */
   error: SmsErrorWritable;
+  /**
+   * Carrier that reported the failure. Absent when the carrier does not report one.
+   */
+  carrier?: string;
+  /**
+   * Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.
+   */
+  mcc_mnc?: string;
 };
 
 /**
@@ -34614,26 +35317,52 @@ export type EventSmsFailedWritable = {
 /**
  * Payload of the sms.received event.
  */
-export type EventSmsReceivedDataWritable = EventSmsBaseWritable &
-  unknown & {
-    /**
-     * The message body, so you can act on it without a follow-up read. Absent when the message carried only attachments and no text of its own.
-     *
-     */
-    text?: string;
-    /**
-     * Carrier the message came in over. Absent where the carrier does not report one.
-     */
-    carrier?: string;
-    /**
-     * Mobile country code and mobile network code of the carrier. Absent when not known.
-     */
-    mcc_mnc?: string;
-    /**
-     * Subject line. Absent when the message carried none.
-     */
-    subject?: string;
-  };
+export type EventSmsReceivedDataWritable = unknown & {
+  /**
+   * ID of the SMS message.
+   */
+  sms_id: SmsMessageId;
+  /**
+   * ID of the workspace that owns this event.
+   */
+  workspace_id: WorkspaceId;
+  /**
+   * Your number that received the message: an E.164 number, or a short code.
+   *
+   */
+  to: string;
+  /**
+   * The sender: an E.164 number, or a short code or alphanumeric sender ID when the message came from one.
+   *
+   */
+  from: string;
+  /**
+   * The messaging profile this message was received under. Absent when no messaging profile applied.
+   */
+  messaging_profile_id?: SmsMessagingProfileId;
+  /**
+   * The message body, so you can act on it without a follow-up read. Absent when the message carried only attachments and no text of its own.
+   *
+   */
+  text?: string;
+  /**
+   * Carrier the message came in over. Absent where the carrier does not report one.
+   */
+  carrier?: string;
+  /**
+   * Mobile country code and mobile network code of the carrier. Absent when not known.
+   */
+  mcc_mnc?: string;
+  /**
+   * Country of the sender's number. When the sender is not a phone number, such as a short code or an alphanumeric sender, the country of your number that received the message. Absent when neither is known.
+   *
+   */
+  country_code?: CountryCode;
+  /**
+   * Subject line. Absent when the message carried none.
+   */
+  subject?: string;
+};
 
 /**
  * A message was received on one of your numbers.
@@ -34652,9 +35381,17 @@ export type EventSmsReceivedWritable = {
  */
 export type EventSmsRejectedDataWritable = EventSmsBaseWritable & {
   /**
-   * Why the message was rejected before reaching the carrier.
+   * Why Bird or the carrier refused the message.
    */
   error: SmsErrorWritable;
+  /**
+   * Carrier the message was routed to. Absent when Bird rejected the message before routing it, or the carrier does not report one.
+   */
+  carrier?: string;
+  /**
+   * Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.
+   */
+  mcc_mnc?: string;
 };
 
 /**
@@ -34709,6 +35446,14 @@ export type EventSmsUndeliveredDataWritable = EventSmsBaseWritable & {
    * Why the message was not delivered.
    */
   error: SmsErrorWritable;
+  /**
+   * Carrier that reported the delivery failure. Absent when the carrier does not report one.
+   */
+  carrier?: string;
+  /**
+   * Mobile country code and mobile network code of the carrier. Absent when the carrier does not report one.
+   */
+  mcc_mnc?: string;
 };
 
 /**
@@ -34752,10 +35497,40 @@ export type EventWhatsAppFailedWritable = {
 };
 
 /**
- * Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back.
+ * Payload of the whatsapp.received event. Carries the message's content so a subscriber can act on it without reading the message back. `from` is the WhatsApp contact who sent the message, the participant who wrote it in a group; `to` is the business number that received it, with the group's `group_id` on a group message.
  *
  */
-export type EventWhatsAppReceivedDataWritable = EventWhatsAppBase & {
+export type EventWhatsAppReceivedDataWritable = {
+  /**
+   * ID of the WhatsApp message.
+   */
+  whatsapp_id: WhatsAppMessageId;
+  /**
+   * ID of the workspace that owns this event.
+   */
+  workspace_id: WorkspaceId;
+  /**
+   * Always `inbound`, for a message received from the contact.
+   */
+  direction: MessageDirection;
+  /**
+   * The WhatsApp contact who sent the message; in a group, the participant who wrote it.
+   */
+  from: WhatsAppAddress;
+  /**
+   * The business number that received the message, and the group it arrived through on a group message.
+   */
+  to: WhatsAppAddress;
+  /**
+   * The message this one answers, as WhatsApp reports the reply's target: a tap on a button or a list row, and equally a text or media message the contact sent as a quoted reply. Absent when the message answers nothing, and absent when we cannot match the target to a message we hold, which is the case for one sent before this workspace started recording them or one already past the 15-day window we keep provider ids for.
+   *
+   */
+  in_reply_to_message_id?: WhatsAppMessageId;
+  /**
+   * Where the message came from when it did not come through Bird live, the same value `GET /v1/whatsapp/messages/{message_id}` returns. Absent when the contact sent the message to Bird.
+   *
+   */
+  origin?: WhatsAppMessageOrigin;
   /**
    * Text the contact sent.
    */
@@ -34888,12 +35663,12 @@ export type WebhookAttemptWritable = {
    */
   status: "delivered" | "pending" | "failed";
   /**
-   * URL the request was sent to: the endpoint's `url` at the time of the attempt, which can differ from the current configuration after an update.
+   * URL the request was sent to. For a webhook endpoint, its `url` at the time of the attempt, which can differ from the current configuration after an update. For an SMS callback, the callback URL resolved for the message's event.
    *
    */
   url: string;
   /**
-   * Why the attempt failed before any request was sent, for example a connector body that could not be rendered or an endpoint whose connection changed after the event was queued. Absent for an attempt that reached the network.
+   * Why the attempt failed when no HTTP response explains it: a failure before any request was sent, such as a connector body that could not be rendered, or a TLS failure, such as an endpoint certificate that could not be verified. Absent for other attempts.
    *
    */
   failure_reason?: string;
@@ -34917,6 +35692,18 @@ export type WebhookAttemptListWritable = {
    * Delivery attempts, newest first.
    */
   data: Array<WebhookAttemptWritable>;
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
 };
 
 export type VoicePartyBridgePstnEndpointWritable = {
@@ -34958,6 +35745,20 @@ export type VoicePartyEndpointWritable = {
 
 export type VoicePartyWritable = {
   [key: string]: never;
+};
+
+export type VoiceLegMediaPathWritable = {
+  /**
+   * How the audio between us and your side of the leg was encrypted: your SIP trunk's equipment, or the browser that placed the call. On a leg with neither, such as an incoming call a Sequence answered, it describes the carrier's side. Use it to confirm that a call on a trunk with `preferred` media encryption was actually encrypted: such a trunk delivers plain audio to a gateway not reached over TLS or behind an `exit_region`.
+   *
+   * - `none`: plain RTP.
+   * - `sdes`: SRTP with keys exchanged in the SDP over TLS signalling (SDES, RFC 4568). The audio between us and the carrier stays plain RTP.
+   * - `dtls`: DTLS-SRTP, which every call placed from a browser uses.
+   *
+   * Absent when we did not record it: on a leg whose audio bypassed us, on an encrypted offer to a SIP trunk whose media encryption is `off`, on a leg placed without an SDP offer in its INVITE, on an incoming leg that was not answered, and on legs recorded before this field existed.
+   *
+   */
+  encryption: VoiceLegMediaEncryption;
 };
 
 export type VoiceLegWritable = {
@@ -35750,6 +36551,12 @@ export type CreatedBefore = string;
 export type TagFilter = Array<string>;
 
 /**
+ * Keep only messages whose `reference` is exactly this value. The match is case-sensitive, and several messages can share a reference.
+ *
+ */
+export type MessageReferenceFilter = MessageReference;
+
+/**
  * Filter by lifecycle status. Repeat the parameter to match more than one status, for example `?status=accepted&status=sending`.
  *
  */
@@ -35978,6 +36785,436 @@ export type ListWorkspaceQuotasResponses = {
 
 export type ListWorkspaceQuotasResponse =
   ListWorkspaceQuotasResponses[keyof ListWorkspaceQuotasResponses];
+
+export type ListWorkspacesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Substring match against the workspace name (case-insensitive).
+     */
+    name?: string;
+    /**
+     * Sort by `created_at` or `name`. Defaults to `created_at`.
+     */
+    sort?: WorkspaceSortField;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+  };
+  url: "/v1/organization/workspaces";
+};
+
+export type ListWorkspacesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWorkspacesError =
+  ListWorkspacesErrors[keyof ListWorkspacesErrors];
+
+export type ListWorkspacesResponses = {
+  /**
+   * The organization's workspaces.
+   */
+  200: OrganizationWorkspaceList;
+};
+
+export type ListWorkspacesResponse =
+  ListWorkspacesResponses[keyof ListWorkspacesResponses];
+
+export type CreateWorkspaceData = {
+  body: WorkspaceCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/organization/workspaces";
+};
+
+export type CreateWorkspaceErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateWorkspaceError =
+  CreateWorkspaceErrors[keyof CreateWorkspaceErrors];
+
+export type CreateWorkspaceResponses = {
+  /**
+   * The newly created workspace.
+   */
+  201: Workspace;
+};
+
+export type CreateWorkspaceResponse =
+  CreateWorkspaceResponses[keyof CreateWorkspaceResponses];
+
+export type DeleteOrganizationWorkspaceData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Workspace identifier. Starts with `ws_`.
+     */
+    workspace_id: WorkspaceId;
+  };
+  query?: never;
+  url: "/v1/organization/workspaces/{workspace_id}";
+};
+
+export type DeleteOrganizationWorkspaceErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteOrganizationWorkspaceError =
+  DeleteOrganizationWorkspaceErrors[keyof DeleteOrganizationWorkspaceErrors];
+
+export type DeleteOrganizationWorkspaceResponses = {
+  /**
+   * The workspace is scheduled for permanent deletion.
+   */
+  204: void;
+};
+
+export type DeleteOrganizationWorkspaceResponse =
+  DeleteOrganizationWorkspaceResponses[keyof DeleteOrganizationWorkspaceResponses];
+
+export type GetOrganizationWorkspaceData = {
+  body?: never;
+  headers?: {
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Workspace identifier. Starts with `ws_`.
+     */
+    workspace_id: WorkspaceId;
+  };
+  query?: never;
+  url: "/v1/organization/workspaces/{workspace_id}";
+};
+
+export type GetOrganizationWorkspaceErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetOrganizationWorkspaceError =
+  GetOrganizationWorkspaceErrors[keyof GetOrganizationWorkspaceErrors];
+
+export type GetOrganizationWorkspaceResponses = {
+  /**
+   * The requested workspace.
+   */
+  200: Workspace;
+};
+
+export type GetOrganizationWorkspaceResponse =
+  GetOrganizationWorkspaceResponses[keyof GetOrganizationWorkspaceResponses];
+
+export type UpdateOrganizationWorkspaceData = {
+  body: OrganizationWorkspaceUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Workspace identifier. Starts with `ws_`.
+     */
+    workspace_id: WorkspaceId;
+  };
+  query?: never;
+  url: "/v1/organization/workspaces/{workspace_id}";
+};
+
+export type UpdateOrganizationWorkspaceErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateOrganizationWorkspaceError =
+  UpdateOrganizationWorkspaceErrors[keyof UpdateOrganizationWorkspaceErrors];
+
+export type UpdateOrganizationWorkspaceResponses = {
+  /**
+   * The workspace with the updated fields.
+   */
+  200: Workspace;
+};
+
+export type UpdateOrganizationWorkspaceResponse =
+  UpdateOrganizationWorkspaceResponses[keyof UpdateOrganizationWorkspaceResponses];
 
 export type PublishRealtimeAppEventData = {
   body: RealtimePublish;
@@ -36641,6 +37878,11 @@ export type ListEmailMessagesData = {
      *
      */
     tag?: Array<string>;
+    /**
+     * Keep only messages whose `reference` is exactly this value. The match is case-sensitive, and several messages can share a reference.
+     *
+     */
+    reference?: MessageReference;
     /**
      * Filter by category.
      */
@@ -40955,6 +42197,11 @@ export type ListSmsMessagesData = {
      *
      */
     tag?: Array<string>;
+    /**
+     * Keep only messages whose `reference` is exactly this value. The match is case-sensitive, and several messages can share a reference.
+     *
+     */
+    reference?: MessageReference;
   };
   url: "/v1/sms/messages";
 };
@@ -44803,22 +46050,22 @@ export type GetSmsStatsSummaryData = {
      */
     timezone?: string;
     /**
-     * Restrict the statistics to a single originator (the sender address messages were sent from). Mutually exclusive with the other dimension filters (`country`, `category`, `carrier`); only one may be set per request. Matches the message `from`.
+     * Restrict the statistics to a single originator (the sender address messages were sent from). Mutually exclusive with the other dimension filters; only one may be set per request. Matches the message `from`.
      *
      */
     originator?: string;
     /**
-     * Restrict the statistics to a single destination country, as an ISO 3166-1 alpha-2 code. Mutually exclusive with the other dimension filters (`originator`, `category`, `carrier`); only one may be set per request.
+     * Restrict the statistics to a single destination country, as an ISO 3166-1 alpha-2 code. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     country?: string;
     /**
-     * Restrict the statistics to a single category. Mutually exclusive with the other dimension filters (`originator`, `country`, `carrier`); only one may be set per request.
+     * Restrict the statistics to a single category. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     category?: string;
     /**
-     * Restrict the statistics to a single delivery carrier. Mutually exclusive with the other dimension filters (`originator`, `country`, `category`); only one may be set per request.
+     * Restrict the statistics to a single delivery carrier. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     carrier?: string;
@@ -44909,22 +46156,22 @@ export type GetSmsStatsDailyData = {
      */
     timezone?: string;
     /**
-     * Restrict the statistics to a single originator (the sender address messages were sent from). Mutually exclusive with the other dimension filters (`country`, `category`, `carrier`); only one may be set per request. Matches the message `from`.
+     * Restrict the statistics to a single originator (the sender address messages were sent from). Mutually exclusive with the other dimension filters; only one may be set per request. Matches the message `from`.
      *
      */
     originator?: string;
     /**
-     * Restrict the statistics to a single destination country, as an ISO 3166-1 alpha-2 code. Mutually exclusive with the other dimension filters (`originator`, `category`, `carrier`); only one may be set per request.
+     * Restrict the statistics to a single destination country, as an ISO 3166-1 alpha-2 code. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     country?: string;
     /**
-     * Restrict the statistics to a single category. Mutually exclusive with the other dimension filters (`originator`, `country`, `carrier`); only one may be set per request.
+     * Restrict the statistics to a single category. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     category?: string;
     /**
-     * Restrict the statistics to a single delivery carrier. Mutually exclusive with the other dimension filters (`originator`, `country`, `category`); only one may be set per request.
+     * Restrict the statistics to a single delivery carrier. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     carrier?: string;
@@ -45010,22 +46257,22 @@ export type GetSmsStatsHourlyData = {
      */
     timezone?: string;
     /**
-     * Restrict the statistics to a single originator (the sender address messages were sent from). Mutually exclusive with the other dimension filters (`country`, `category`, `carrier`); only one may be set per request. Matches the message `from`.
+     * Restrict the statistics to a single originator (the sender address messages were sent from). Mutually exclusive with the other dimension filters; only one may be set per request. Matches the message `from`.
      *
      */
     originator?: string;
     /**
-     * Restrict the statistics to a single destination country, as an ISO 3166-1 alpha-2 code. Mutually exclusive with the other dimension filters (`originator`, `category`, `carrier`); only one may be set per request.
+     * Restrict the statistics to a single destination country, as an ISO 3166-1 alpha-2 code. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     country?: string;
     /**
-     * Restrict the statistics to a single category. Mutually exclusive with the other dimension filters (`originator`, `country`, `carrier`); only one may be set per request.
+     * Restrict the statistics to a single category. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     category?: string;
     /**
-     * Restrict the statistics to a single delivery carrier. Mutually exclusive with the other dimension filters (`originator`, `country`, `category`); only one may be set per request.
+     * Restrict the statistics to a single delivery carrier. Mutually exclusive with the other dimension filters; only one may be set per request.
      *
      */
     carrier?: string;
@@ -47355,6 +48602,11 @@ export type ListWhatsAppMessagesData = {
      *
      */
     tag?: Array<string>;
+    /**
+     * Keep only messages whose `reference` is exactly this value. The match is case-sensitive, and several messages can share a reference.
+     *
+     */
+    reference?: MessageReference;
   };
   url: "/v1/whatsapp/messages";
 };
@@ -52728,7 +53980,7 @@ export type ListWhatsAppNumbersData = {
      */
     waba?: string;
     /**
-     * Filter to a single number, given in E.164 format. The value is normalized before matching, so `+31612340001` and `+31 6 1234 0001` are the same filter. A value that cannot be normalized is matched exactly as given. A number this workspace cannot send from returns an empty page, rather than being rejected.
+     * Filter to a single number. The value is read as an international number and normalized before matching, so `+31612340001`, `+31 6 1234 0001`, `0031612340001` and `31612340001` are the same filter. A value that cannot be normalized is matched exactly as given. A number this workspace cannot send from returns an empty page, rather than being rejected.
      */
     phone_number?: string;
     /**
@@ -54521,6 +55773,11 @@ export type ListAmbMessagesData = {
      *
      */
     tag?: Array<string>;
+    /**
+     * Keep only messages whose `reference` is exactly this value. The match is case-sensitive, and several messages can share a reference.
+     *
+     */
+    reference?: MessageReference;
     /**
      * Limits the response to resources created at or after this timestamp. Combine it with `created_before` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
      */
@@ -68320,6 +69577,14 @@ export type ListWebhookAttemptsData = {
      * Only return attempts strictly after this timestamp.
      */
     after?: string;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
   };
   url: "/v1/webhooks/{webhook_id}/attempts";
 };

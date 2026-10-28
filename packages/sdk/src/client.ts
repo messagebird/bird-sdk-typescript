@@ -28,6 +28,7 @@ import { ContactsResource } from "./resources/contacts.js";
 import { PreferencesResource } from "./resources/preferences.js";
 import { AssetsResource } from "./resources/assets.js";
 import { BroadcastsResource } from "./resources/broadcasts.js";
+import { OrganizationResource } from "./resources/organization.js";
 import { WorkspaceResource } from "./resources/workspace.js";
 import { AmbResource } from "./resources/amb.js";
 import { EsimResource } from "./resources/esim.js";
@@ -252,6 +253,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
 
   /** Read the current workspace with `bird.workspace.get()` and its quotas with `bird.workspace.quotas.list()`. */
   readonly workspace: WorkspaceResource;
+  readonly organization: OrganizationResource;
 
   /** Audiences: `bird.audiences.create(...)`, `.list(...)`, `.addContacts(...)`, … */
   readonly audiences: AudiencesResource;
@@ -426,6 +428,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
       opts.email as EmailDefaultsOf<O>,
     );
     this.workspace = new WorkspaceResource(this.core, this.#client);
+    this.organization = new OrganizationResource(this.core, this.#client);
     this.audiences = new AudiencesResource(this.core, this.#client);
     this.contactProperties = new ContactPropertiesResource(
       this.core,

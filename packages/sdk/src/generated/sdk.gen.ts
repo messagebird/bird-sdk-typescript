@@ -208,6 +208,9 @@ import type {
   CreateWorkspaceComplianceSubmissionData,
   CreateWorkspaceComplianceSubmissionErrors,
   CreateWorkspaceComplianceSubmissionResponses,
+  CreateWorkspaceData,
+  CreateWorkspaceErrors,
+  CreateWorkspaceResponses,
   CreateWorkspaceSmsSenderData,
   CreateWorkspaceSmsSenderErrors,
   CreateWorkspaceSmsSenderRegistrationData,
@@ -274,6 +277,9 @@ import type {
   DeleteMailboxReceiveRuleErrors,
   DeleteMailboxReceiveRuleResponses,
   DeleteMailboxResponses,
+  DeleteOrganizationWorkspaceData,
+  DeleteOrganizationWorkspaceErrors,
+  DeleteOrganizationWorkspaceResponses,
   DeletePreferenceData,
   DeletePreferenceErrors,
   DeletePreferenceResponses,
@@ -652,6 +658,9 @@ import type {
   GetNumbersOrderData,
   GetNumbersOrderErrors,
   GetNumbersOrderResponses,
+  GetOrganizationWorkspaceData,
+  GetOrganizationWorkspaceErrors,
+  GetOrganizationWorkspaceResponses,
   GetPreferenceData,
   GetPreferenceErrors,
   GetPreferenceResponses,
@@ -1110,12 +1119,15 @@ import type {
   ListWorkspaceQuotasData,
   ListWorkspaceQuotasErrors,
   ListWorkspaceQuotasResponses,
+  ListWorkspacesData,
+  ListWorkspacesErrors,
   ListWorkspaceSmsSenderRequirementsData,
   ListWorkspaceSmsSenderRequirementsErrors,
   ListWorkspaceSmsSenderRequirementsResponses,
   ListWorkspaceSmsSendersData,
   ListWorkspaceSmsSendersErrors,
   ListWorkspaceSmsSendersResponses,
+  ListWorkspacesResponses,
   PreviewEmailBroadcastData,
   PreviewEmailBroadcastErrors,
   PreviewEmailBroadcastResponses,
@@ -1251,6 +1263,9 @@ import type {
   UpdateMailboxData,
   UpdateMailboxErrors,
   UpdateMailboxResponses,
+  UpdateOrganizationWorkspaceData,
+  UpdateOrganizationWorkspaceErrors,
+  UpdateOrganizationWorkspaceResponses,
   UpdateSmsKeywordRuleData,
   UpdateSmsKeywordRuleErrors,
   UpdateSmsKeywordRuleResponses,
@@ -1400,6 +1415,160 @@ export const listWorkspaceQuotas = <ThrowOnError extends boolean = false>(
     ],
     url: "/v1/workspace/quotas",
     ...options,
+  });
+
+/**
+ * List workspaces
+ *
+ * Returns a paginated list of workspaces in the organization, ordered by creation date descending by default. Organization master keys and authorized CLI or MCP access tokens need organization workspace read access. Workspace API keys cannot list the organization's workspaces.
+ */
+export const listWorkspaces = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWorkspacesData, ThrowOnError>,
+): RequestResult<ListWorkspacesResponses, ListWorkspacesErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListWorkspacesResponses,
+    ListWorkspacesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/organization/workspaces",
+    ...options,
+  });
+
+/**
+ * Create a workspace
+ *
+ * Creates a workspace in the caller's organization. The caller needs organization workspace write access, which organization master keys and signed-in organization owners and administrators have, as do CLI or MCP access tokens they authorize with that access. Workspace API keys cannot create workspaces. The organization's workspace limit counts every workspace it holds, including workspaces awaiting permanent deletion, and a request beyond the limit fails with `E10014`.
+ */
+export const createWorkspace = <ThrowOnError extends boolean = false>(
+  options: Options<CreateWorkspaceData, ThrowOnError>,
+): RequestResult<
+  CreateWorkspaceResponses,
+  CreateWorkspaceErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateWorkspaceResponses,
+    CreateWorkspaceErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/organization/workspaces",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a workspace in the organization
+ *
+ * Deletes the workspace. Access ends immediately: the workspace is hidden and its API keys are revoked. Its data and configuration are retained for 7 days and can be restored by contacting support within that window, after which everything is permanently purged. Returns a conflict if this is the organization's only workspace or a retained receiving claim depends on it. Receiving dependencies are checked before the workspace is hidden or its keys are revoked. Disable receiving for the affected domain in this workspace, poll it until `capabilities.inbound.status` is `not_configured`, then retry deletion. Failed or pending receiving claims still block deletion. Organization master keys and authorized CLI or MCP access tokens need organization workspace write access. Workspace API keys cannot call this operation.
+ *
+ */
+export const deleteOrganizationWorkspace = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<DeleteOrganizationWorkspaceData, ThrowOnError>,
+): RequestResult<
+  DeleteOrganizationWorkspaceResponses,
+  DeleteOrganizationWorkspaceErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteOrganizationWorkspaceResponses,
+    DeleteOrganizationWorkspaceErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/organization/workspaces/{workspace_id}",
+    ...options,
+  });
+
+/**
+ * Get a workspace in the organization
+ *
+ * Returns any workspace in the organization by ID. Organization administrators can read workspaces without holding a workspace-level role. Organization master keys and authorized CLI or MCP access tokens need organization workspace read access. Workspace API keys cannot call this operation.
+ */
+export const getOrganizationWorkspace = <ThrowOnError extends boolean = false>(
+  options: Options<GetOrganizationWorkspaceData, ThrowOnError>,
+): RequestResult<
+  GetOrganizationWorkspaceResponses,
+  GetOrganizationWorkspaceErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetOrganizationWorkspaceResponses,
+    GetOrganizationWorkspaceErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/organization/workspaces/{workspace_id}",
+    ...options,
+  });
+
+/**
+ * Update a workspace in the organization
+ *
+ * Updates mutable fields on any workspace in the organization by ID. Organization administrators can manage workspaces without holding a workspace-level role. Organization master keys and authorized CLI or MCP access tokens need organization workspace write access. Workspace API keys cannot call this operation.
+ */
+export const updateOrganizationWorkspace = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<UpdateOrganizationWorkspaceData, ThrowOnError>,
+): RequestResult<
+  UpdateOrganizationWorkspaceResponses,
+  UpdateOrganizationWorkspaceErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateOrganizationWorkspaceResponses,
+    UpdateOrganizationWorkspaceErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/organization/workspaces/{workspace_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**
@@ -10109,8 +10278,8 @@ export const listWhatsAppBusinessAccounts = <
  * Support once Bird knows the account's portfolio. `ban` is what WhatsApp announced on
  * its own notification, not part of the reading `meta_synced_at` dates, because WhatsApp
  * reports a ban's state and timing nowhere else. It is absent on an account in good
- * standing and on one whose ban Bird was never told about, so `status` is what says
- * whether an account can send.
+ * standing and on one whose ban Bird was never told about, so `meta_health_status` is
+ * what says whether an account can send.
  *
  */
 export const getWhatsAppBusinessAccount = <
@@ -14148,9 +14317,10 @@ export const createWebhookReplay = <ThrowOnError extends boolean = false>(
  * before requesting redelivery with
  * [Replay failed deliveries](/docs/api/reference/create-webhook-replay).
  *
- * Bound the window with the `before`/`after` timestamps and cap the page with `limit`.
- * To page further back without a cursor, pass the oldest `attempted_at`
- * you received as `before`.
+ * Cap the page with `limit`, and pass `next_cursor` from the response as `starting_after` to
+ * get the next, older page. Narrow the time window with the `before`/`after` timestamps;
+ * they combine with a cursor. Send only one of `starting_after` and `ending_before`; passing
+ * both returns 422.
  *
  */
 export const listWebhookAttempts = <ThrowOnError extends boolean = false>(
