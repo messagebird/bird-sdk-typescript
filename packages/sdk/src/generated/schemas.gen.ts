@@ -12509,7 +12509,7 @@ export const TemplateVariableSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the `name` on the matching parameter inside `components`, or, in the template parameters preview, the key in the send's `template.parameters`. A WhatsApp template whose placeholders are positional uses the position itself as `1`, `2` and so on, and values with no placeholder use fixed keys: `header_url`, `header_filename`, `header_location` and `code`.\n",
+        "The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the `name` on the matching parameter inside `components`, or, in the template parameters preview, the key in the send's `template.parameters`. A WhatsApp template whose placeholders are positional uses the position itself as `1`, `2` and so on, and values with no placeholder use fixed keys: `header_url`, `header_filename`, `header_location` and `code`, plus `button_url` (or `button_url_1`, `button_url_2` for a carousel card) for a url button whose suffix is numbered.\n",
     },
     type: {
       type: "string",
@@ -17899,6 +17899,325 @@ export const WhatsAppNumberIDSchema = {
   example: "wan_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const WhatsAppMessageIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^wam_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "wam_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppEventIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^ev_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "ev_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppErrorSchema = {
+  type: ["object", "null"],
+  additionalProperties: false,
+  readOnly: true,
+  required: ["code", "description", "occurred_at"],
+  description:
+    "Failure detail for a message that could not be delivered or was rejected.",
+  properties: {
+    code: {
+      $ref: "#/components/schemas/WhatsAppErrorCode",
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "Human-readable explanation of the failure.",
+      example: "Message could not be delivered.",
+    },
+    meta_error_code: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "Raw error code from the WhatsApp Cloud API, when available, for low-level debugging.",
+      example: "131026",
+    },
+    occurred_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the failure occurred.",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateParameterTypeSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "text",
+    "image",
+    "video",
+    "gif",
+    "document",
+    "location",
+  ],
+  description:
+    "The kind of value a template parameter carries, which follows the block it fills. The `text` type is a plain string substituted into a placeholder. This includes a coupon button's code, which the recipient copies from the button. The `image`, `video`, `gif`, and `document` types carry a media header's file in `url`. Each matches its header's `format`. The `location` type fills a location header and carries a point on the map. Open enum: more kinds may be added over time.\n",
+} as const;
+
+export const WhatsAppTemplateExampleParameterSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateParameterType",
+        },
+      ],
+      readOnly: true,
+      description: "The kind of value this parameter accepts.",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "An example value for a text parameter. Present when `type` is `text`.",
+      example: "123456",
+    },
+    url: {
+      type: "string",
+      format: "uri",
+      readOnly: true,
+      description:
+        "The address of the file a media header shows, as it was given when the header was authored rather than WhatsApp's copy of it. Present when `type` is `image`, `video`, `gif` or `document`.\n",
+      example: "https://www.example.com/holiday/banner.jpg",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The named placeholder this example fills. Present whenever the template declares named parameters, which is what a send must name; absent only for a positional template, whose values go in `{{n}}` order.\n",
+      example: "first_name",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateButtonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": [
+        "url",
+        "quick_reply",
+        "phone_number",
+        "otp",
+        "copy_code",
+        "request_contact_info",
+      ],
+      description:
+        "The button's behavior.\n\n- `url`: opens a link.\n- `quick_reply`: sends its own label back to you as an inbound message.\n- `phone_number`: dials the number it carries.\n- `otp`: copies a one-time passcode. It belongs only on an authentication\n  template, and that template takes no other button type.\n- `copy_code`: copies a coupon code to the recipient's clipboard. It\n  belongs only on a marketing template, which takes at most one.\n- `request_contact_info`: asks the recipient to share the phone number\n  their WhatsApp account carries. It belongs only on a utility or\n  marketing template, as that template's only button.\n\nThis is an open enum. Accept unrecognized values.\n",
+      example: "url",
+    },
+    otp_type: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": ["copy_code"],
+      description:
+        "How the recipient receives the one-time passcode. Present on authentication-template OTP buttons.",
+      example: "copy_code",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The button's label. Absent on an authentication template's passcode button until the language has been submitted, since WhatsApp writes that label itself. Absent on a `request_contact_info` draft for a related reason: WhatsApp fixes that label, so a draft that carried it reads back without it. Once the language is submitted, this carries the label WhatsApp wrote, which is `Share Contact Info` in every language today.\n",
+      example: "Copy code",
+    },
+    url: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The address the button opens, with any variable placeholder shown inline. Present on link buttons.",
+      example: "https://www.example.com/orders/{{1}}",
+    },
+    phone_number: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "The number the button dials. Present on dial buttons.",
+      example: "+14155550100",
+    },
+    example_parameters: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Example values for this button's variables, in placeholder order. Present when the button address has variables, and on a `copy_code` button, where the single value is the sample coupon code WhatsApp reviewed.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateExampleParameter",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateCardComponentSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  description: "One content block inside a carousel card.",
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": ["header", "body", "buttons"],
+      description: "The card block's type.",
+      example: "header",
+    },
+    format: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": ["image", "video"],
+      description:
+        "The card header's content type. Present on a card's header block.",
+      example: "image",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The block's text content, with any variable placeholders shown inline.",
+      example: "Chronograph, brown leather",
+    },
+    example_parameters: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Example values for this block's variables, in placeholder order.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateExampleParameter",
+      },
+    },
+    buttons: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The buttons this card carries. Present on a card's buttons block.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateButton",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateCardSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["components"],
+  description: "One card in a carousel.",
+  properties: {
+    components: {
+      type: "array",
+      readOnly: true,
+      description: "This card's content blocks, in display order.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateCardComponent",
+      },
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateComponentSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": ["header", "body", "footer", "buttons", "carousel"],
+      description: "The content block's type within the template.",
+      example: "body",
+    },
+    format: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      "x-extensible-enum": [
+        "text",
+        "image",
+        "video",
+        "gif",
+        "document",
+        "location",
+      ],
+      description:
+        "The header block's content type. Present on a header block. A `text` header carries a line of copy. The `image`, `video`, `gif`, and `document` formats each show a file whose address is in the block's `example_parameters`. The `location` format shows a map. It carries no content because the coordinates belong to the message rather than the template.\n",
+      example: "text",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The block's text content, with any variable placeholders shown inline. Present when the block carries text. An authentication template's body and footer are written by WhatsApp from the two settings below rather than by you, so their text is absent until the language has been submitted and WhatsApp has supplied it.\n",
+      example: "Your verification code is {{1}}.",
+    },
+    add_security_recommendation: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this authentication template's body ends with WhatsApp's advice not to share the code. Present on an authentication template's body block.\n",
+    },
+    code_expiration_minutes: {
+      type: "integer",
+      readOnly: true,
+      description:
+        "How long the passcode stays valid, which WhatsApp states in this footer. Present on an authentication template's footer block. Omitting it on a write leaves the footer off entirely.\n",
+      example: 60,
+    },
+    example_parameters: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Example values for this block's variables, in placeholder order (one per `{{n}}`). Use them to see what a filled message looks like. Present when the block has variables.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateExampleParameter",
+      },
+    },
+    buttons: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The buttons attached to this block. Present when the block carries buttons.",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateButton",
+      },
+    },
+    cards: {
+      type: "array",
+      readOnly: true,
+      description:
+        "The cards this block scrolls through, in display order. Present on a `carousel` block.\n",
+      items: {
+        $ref: "#/components/schemas/WhatsAppTemplateCard",
+      },
+    },
+  },
+} as const;
+
 export const WhatsAppMessageStatusSchema = {
   type: "string",
   minLength: 1,
@@ -17921,13 +18240,6 @@ export const WhatsAppGroupIDSchema = {
   minLength: 1,
   pattern: "^wag_[0-9a-hjkmnp-tv-z]{26}$",
   example: "wag_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const WhatsAppMessageIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^wam_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "wam_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const WhatsAppAddressSchema = {
@@ -17971,21 +18283,6 @@ export const WhatsAppAddressSchema = {
         "Present only on a message received from a WhatsApp user, on `from`; never on an outbound send's `to`, where the profile is not known. Absent when the message carries no profile, and on a message received before this workspace started recording them.\n",
     },
   },
-} as const;
-
-export const WhatsAppTemplateParameterTypeSchema = {
-  type: "string",
-  minLength: 1,
-  "x-extensible-enum": [
-    "text",
-    "image",
-    "video",
-    "gif",
-    "document",
-    "location",
-  ],
-  description:
-    "The kind of value a template parameter carries, which follows the block it fills. The `text` type is a plain string substituted into a placeholder. This includes a coupon button's code, which the recipient copies from the button. The `image`, `video`, `gif`, and `document` types carry a media header's file in `url`. Each matches its header's `format`. The `location` type fills a location header and carries a point on the map. Open enum: more kinds may be added over time.\n",
 } as const;
 
 export const WhatsAppLocationSendSchema = {
@@ -19132,41 +19429,6 @@ export const WhatsAppMessageOriginSchema = {
   description:
     "Where a message came from when it did not come through Bird live: its provenance. It does not say who answers the contact. On a number shared with the WhatsApp Business app, a message can come from the app while Bird keeps answering.\n\n- `business_agent_echo`: the Meta Business Agent on this number composed it.\n- `business_app_echo`: someone sent it from the WhatsApp Business app on a number shared with it.\n- `history_sync`: WhatsApp copied it, in either direction, from the WhatsApp Business app's chat history when the number was shared. Neither `/v1/whatsapp/messages` nor a webhook event reports an imported message, so neither carries this value.\n",
   example: "business_agent_echo",
-} as const;
-
-export const WhatsAppErrorSchema = {
-  type: ["object", "null"],
-  additionalProperties: false,
-  readOnly: true,
-  required: ["code", "description", "occurred_at"],
-  description:
-    "Failure detail for a message that could not be delivered or was rejected.",
-  properties: {
-    code: {
-      $ref: "#/components/schemas/WhatsAppErrorCode",
-    },
-    description: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description: "Human-readable explanation of the failure.",
-      example: "Message could not be delivered.",
-    },
-    meta_error_code: {
-      type: ["string", "null"],
-      readOnly: true,
-      description:
-        "Raw error code from the WhatsApp Cloud API, when available, for low-level debugging.",
-      example: "131026",
-    },
-    occurred_at: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      readOnly: true,
-      description: "When the failure occurred.",
-    },
-  },
 } as const;
 
 export const WhatsAppMessageSchema = {
@@ -21063,13 +21325,6 @@ export const WhatsAppEventTypeSchema = {
   example: "whatsapp.delivered",
 } as const;
 
-export const WhatsAppEventIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^ev_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "ev_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
 export const WhatsAppEventSchema = {
   type: "object",
   additionalProperties: false,
@@ -22341,261 +22596,6 @@ export const WhatsAppGroupJoinRequestDecisionResultSchema = {
         "The join requests WhatsApp refused, each with its reason. Empty when the whole batch was applied.",
       items: {
         $ref: "#/components/schemas/WhatsAppGroupJoinRequestFailure",
-      },
-    },
-  },
-} as const;
-
-export const WhatsAppTemplateExampleParameterSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["type"],
-  properties: {
-    type: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppTemplateParameterType",
-        },
-      ],
-      readOnly: true,
-      description: "The kind of value this parameter accepts.",
-    },
-    text: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "An example value for a text parameter. Present when `type` is `text`.",
-      example: "123456",
-    },
-    url: {
-      type: "string",
-      format: "uri",
-      readOnly: true,
-      description:
-        "The address of the file a media header shows, as it was given when the header was authored rather than WhatsApp's copy of it. Present when `type` is `image`, `video`, `gif` or `document`.\n",
-      example: "https://www.example.com/holiday/banner.jpg",
-    },
-    name: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "The named placeholder this example fills. Present whenever the template declares named parameters, which is what a send must name; absent only for a positional template, whose values go in `{{n}}` order.\n",
-      example: "first_name",
-    },
-  },
-} as const;
-
-export const WhatsAppTemplateButtonSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["type"],
-  properties: {
-    type: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      "x-extensible-enum": [
-        "url",
-        "quick_reply",
-        "phone_number",
-        "otp",
-        "copy_code",
-        "request_contact_info",
-      ],
-      description:
-        "The button's behavior.\n\n- `url`: opens a link.\n- `quick_reply`: sends its own label back to you as an inbound message.\n- `phone_number`: dials the number it carries.\n- `otp`: copies a one-time passcode. It belongs only on an authentication\n  template, and that template takes no other button type.\n- `copy_code`: copies a coupon code to the recipient's clipboard. It\n  belongs only on a marketing template, which takes at most one.\n- `request_contact_info`: asks the recipient to share the phone number\n  their WhatsApp account carries. It belongs only on a utility or\n  marketing template, as that template's only button.\n\nThis is an open enum. Accept unrecognized values.\n",
-      example: "url",
-    },
-    otp_type: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      "x-extensible-enum": ["copy_code"],
-      description:
-        "How the recipient receives the one-time passcode. Present on authentication-template OTP buttons.",
-      example: "copy_code",
-    },
-    text: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "The button's label. Absent on an authentication template's passcode button until the language has been submitted, since WhatsApp writes that label itself. Absent on a `request_contact_info` draft for a related reason: WhatsApp fixes that label, so a draft that carried it reads back without it. Once the language is submitted, this carries the label WhatsApp wrote, which is `Share Contact Info` in every language today.\n",
-      example: "Copy code",
-    },
-    url: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "The address the button opens, with any variable placeholder shown inline. Present on link buttons.",
-      example: "https://www.example.com/orders/{{1}}",
-    },
-    phone_number: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description: "The number the button dials. Present on dial buttons.",
-      example: "+14155550100",
-    },
-    example_parameters: {
-      type: "array",
-      readOnly: true,
-      description:
-        "Example values for this button's variables, in placeholder order. Present when the button address has variables, and on a `copy_code` button, where the single value is the sample coupon code WhatsApp reviewed.\n",
-      items: {
-        $ref: "#/components/schemas/WhatsAppTemplateExampleParameter",
-      },
-    },
-  },
-} as const;
-
-export const WhatsAppTemplateCardComponentSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["type"],
-  description: "One content block inside a carousel card.",
-  properties: {
-    type: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      "x-extensible-enum": ["header", "body", "buttons"],
-      description: "The card block's type.",
-      example: "header",
-    },
-    format: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      "x-extensible-enum": ["image", "video"],
-      description:
-        "The card header's content type. Present on a card's header block.",
-      example: "image",
-    },
-    text: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "The block's text content, with any variable placeholders shown inline.",
-      example: "Chronograph, brown leather",
-    },
-    example_parameters: {
-      type: "array",
-      readOnly: true,
-      description:
-        "Example values for this block's variables, in placeholder order.",
-      items: {
-        $ref: "#/components/schemas/WhatsAppTemplateExampleParameter",
-      },
-    },
-    buttons: {
-      type: "array",
-      readOnly: true,
-      description:
-        "The buttons this card carries. Present on a card's buttons block.",
-      items: {
-        $ref: "#/components/schemas/WhatsAppTemplateButton",
-      },
-    },
-  },
-} as const;
-
-export const WhatsAppTemplateCardSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["components"],
-  description: "One card in a carousel.",
-  properties: {
-    components: {
-      type: "array",
-      readOnly: true,
-      description: "This card's content blocks, in display order.",
-      items: {
-        $ref: "#/components/schemas/WhatsAppTemplateCardComponent",
-      },
-    },
-  },
-} as const;
-
-export const WhatsAppTemplateComponentSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["type"],
-  properties: {
-    type: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      "x-extensible-enum": ["header", "body", "footer", "buttons", "carousel"],
-      description: "The content block's type within the template.",
-      example: "body",
-    },
-    format: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      "x-extensible-enum": [
-        "text",
-        "image",
-        "video",
-        "gif",
-        "document",
-        "location",
-      ],
-      description:
-        "The header block's content type. Present on a header block. A `text` header carries a line of copy. The `image`, `video`, `gif`, and `document` formats each show a file whose address is in the block's `example_parameters`. The `location` format shows a map. It carries no content because the coordinates belong to the message rather than the template.\n",
-      example: "text",
-    },
-    text: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "The block's text content, with any variable placeholders shown inline. Present when the block carries text. An authentication template's body and footer are written by WhatsApp from the two settings below rather than by you, so their text is absent until the language has been submitted and WhatsApp has supplied it.\n",
-      example: "Your verification code is {{1}}.",
-    },
-    add_security_recommendation: {
-      type: "boolean",
-      readOnly: true,
-      description:
-        "Whether this authentication template's body ends with WhatsApp's advice not to share the code. Present on an authentication template's body block.\n",
-    },
-    code_expiration_minutes: {
-      type: "integer",
-      readOnly: true,
-      description:
-        "How long the passcode stays valid, which WhatsApp states in this footer. Present on an authentication template's footer block. Omitting it on a write leaves the footer off entirely.\n",
-      example: 60,
-    },
-    example_parameters: {
-      type: "array",
-      readOnly: true,
-      description:
-        "Example values for this block's variables, in placeholder order (one per `{{n}}`). Use them to see what a filled message looks like. Present when the block has variables.",
-      items: {
-        $ref: "#/components/schemas/WhatsAppTemplateExampleParameter",
-      },
-    },
-    buttons: {
-      type: "array",
-      readOnly: true,
-      description:
-        "The buttons attached to this block. Present when the block carries buttons.",
-      items: {
-        $ref: "#/components/schemas/WhatsAppTemplateButton",
-      },
-    },
-    cards: {
-      type: "array",
-      readOnly: true,
-      description:
-        "The cards this block scrolls through, in display order. Present on a `carousel` block.\n",
-      items: {
-        $ref: "#/components/schemas/WhatsAppTemplateCard",
       },
     },
   },
@@ -29284,6 +29284,12 @@ export const AMBMessageSendRequestSchema = {
       type: "string",
       description:
         "Apple locale identifier, for example en_US. Defaults to the conversation locale.",
+    },
+    skip_typing: {
+      type: "boolean",
+      default: false,
+      description:
+        "Send the first part without the typing indicator and one-second pause Bird otherwise shows before it. Set it only after you sent `typing_start` with the conversation typing operation, so the customer already sees typing. A first part that Apple accepts clears that indicator when it arrives. If Bird accepts the message but it fails before then, such as a failed send or a rejection during processing, Bird sends `typing_end` instead. If the request itself returns an error, nothing is sent, so send `typing_end` yourself. When Bird splits the message into several parts, such as text around a link, the parts after the first keep their typing indicator.\n",
     },
   },
   example: {
@@ -50701,7 +50707,7 @@ export const VoiceTrunkGatewayIDSchema = {
 
 export const VoiceTrunkGatewaySchema = {
   description:
-    "One address an inbound call to this trunk is forwarded to, and how that peer wants the call's two numbers spelled. A trunk can have several, tried in priority order until one answers.\n",
+    "One address an inbound call to this trunk is forwarded to, and how that peer wants the call's two numbers spelled. A trunk can have several, and its **All gateways (automatic)** hunt group tries them in priority order until one answers.\n",
   allOf: [
     {
       type: "object",
@@ -50735,7 +50741,7 @@ export const VoiceTrunkGatewaySchema = {
           type: "integer",
           minimum: 0,
           description:
-            "The order gateways are tried in, lowest first. Gateways sharing a priority take an equal share of calls, and any of them may be tried first on a given call.\n",
+            "The gateway's place in the trunk's **All gateways (automatic)** hunt group, which tries the lowest priority first. Gateways sharing a priority take an equal share of calls, and any of them may be tried first on a given call. Hunt groups you build in the trunk's inbound routing in the dashboard set their own order.\n",
           example: 0,
         },
         origination_format: {
@@ -50797,7 +50803,7 @@ export const VoiceTrunkGatewayCreateSchema = {
       minimum: 0,
       maximum: 2147483647,
       description:
-        "The order gateways are tried in, lowest first. Give two gateways the same priority to share calls between them evenly.\n",
+        "The gateway's place in the trunk's **All gateways (automatic)** hunt group, which tries the lowest priority first. Give two gateways the same priority to share calls between them evenly. Hunt groups you build in the trunk's inbound routing in the dashboard set their own order.\n",
       example: 0,
     },
     origination_format: {
@@ -50837,7 +50843,7 @@ export const VoiceTrunkGatewayUpdateSchema = {
       minimum: 0,
       maximum: 2147483647,
       description:
-        "The order gateways are tried in, lowest first. Give two gateways the same priority to share calls between them evenly.\n",
+        "The gateway's place in the trunk's **All gateways (automatic)** hunt group, which tries the lowest priority first. Give two gateways the same priority to share calls between them evenly. Hunt groups you build in the trunk's inbound routing in the dashboard set their own order.\n",
       example: 0,
     },
     origination_format: {
@@ -58498,6 +58504,20 @@ export const VerificationCheckResultWritableSchema = {
   },
 } as const;
 
+export const WhatsAppErrorWritableSchema = {
+  type: ["object", "null"],
+  additionalProperties: false,
+  readOnly: true,
+  required: ["code"],
+  description:
+    "Failure detail for a message that could not be delivered or was rejected.",
+  properties: {
+    code: {
+      $ref: "#/components/schemas/WhatsAppErrorCode",
+    },
+  },
+} as const;
+
 export const WhatsAppMessageTemplateWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -58671,20 +58691,6 @@ export const ActorWritableSchema = {
       description:
         "New actor types may be added. Treat unrecognized values as future types, not errors.\n- `user`: a member's own session.\n- `api_key`: a workspace API key.\n- `oauth_token`: a token issued to a caller on a member's behalf.\n- `system`: an action we perform without a customer actor.\n- `sso`: an organization's SSO connection.\n- `service_account`: a workspace's connected Integration acting with no member behind it.\n- `automation`: an automation execution in your workspace.",
       example: "user",
-    },
-  },
-} as const;
-
-export const WhatsAppErrorWritableSchema = {
-  type: ["object", "null"],
-  additionalProperties: false,
-  readOnly: true,
-  required: ["code"],
-  description:
-    "Failure detail for a message that could not be delivered or was rejected.",
-  properties: {
-    code: {
-      $ref: "#/components/schemas/WhatsAppErrorCode",
     },
   },
 } as const;
@@ -60659,6 +60665,12 @@ export const AMBMessageSendRequestWritableSchema = {
       type: "string",
       description:
         "Apple locale identifier, for example en_US. Defaults to the conversation locale.",
+    },
+    skip_typing: {
+      type: "boolean",
+      default: false,
+      description:
+        "Send the first part without the typing indicator and one-second pause Bird otherwise shows before it. Set it only after you sent `typing_start` with the conversation typing operation, so the customer already sees typing. A first part that Apple accepts clears that indicator when it arrives. If Bird accepts the message but it fails before then, such as a failed send or a rejection during processing, Bird sends `typing_end` instead. If the request itself returns an error, nothing is sent, so send `typing_end` yourself. When Bird splits the message into several parts, such as text around a link, the parts after the first keep their typing indicator.\n",
     },
   },
   example: {
@@ -65808,7 +65820,7 @@ export const VoiceTrunkListWritableSchema = {
 
 export const VoiceTrunkGatewayWritableSchema = {
   description:
-    "One address an inbound call to this trunk is forwarded to, and how that peer wants the call's two numbers spelled. A trunk can have several, tried in priority order until one answers.\n",
+    "One address an inbound call to this trunk is forwarded to, and how that peer wants the call's two numbers spelled. A trunk can have several, and its **All gateways (automatic)** hunt group tries them in priority order until one answers.\n",
   allOf: [
     {
       type: "object",
@@ -65831,7 +65843,7 @@ export const VoiceTrunkGatewayWritableSchema = {
           type: "integer",
           minimum: 0,
           description:
-            "The order gateways are tried in, lowest first. Gateways sharing a priority take an equal share of calls, and any of them may be tried first on a given call.\n",
+            "The gateway's place in the trunk's **All gateways (automatic)** hunt group, which tries the lowest priority first. Gateways sharing a priority take an equal share of calls, and any of them may be tried first on a given call. Hunt groups you build in the trunk's inbound routing in the dashboard set their own order.\n",
           example: 0,
         },
         origination_format: {

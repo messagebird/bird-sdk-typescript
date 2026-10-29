@@ -197,6 +197,12 @@ export async function mailboxResume() {
   console.log(mailbox.state); // "active"
 }
 
+export async function mailboxForwardingAddressCreate() {
+  const mailbox =
+    await bird.email.mailboxes.forwardingAddress.create("mbx_01abc");
+  console.log(mailbox.forwarding_address);
+}
+
 export async function mailboxStats() {
   const stats = await bird.email.mailboxes.stats("mbx_01abc");
   console.log(stats.summary?.sends_accepted);

@@ -9,6 +9,12 @@
 packages:
   - "packages/*"
   - "packages/*/examples"
+# rolldown-plugin-dts@0.28.x breaks the realtime SDK build with
+# "TypeError: Cannot read properties of undefined (reading 'useCaseSensitiveFileNames')".
+# Pin to the last known-good version until upstream fixes the bug.
+# Mirrors the same override in the root pnpm-workspace.yaml.
+overrides:
+  rolldown-plugin-dts: 0.27.14
 # esbuild and sharp need their build scripts (native binary) for the release build.
 allowBuilds:
   esbuild: true

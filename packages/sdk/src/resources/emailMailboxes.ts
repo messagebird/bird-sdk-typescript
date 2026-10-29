@@ -1,8 +1,6 @@
-// `bird.email.mailboxes` — the generated mailbox facade plus its nested
-// collections (messages, receiveRules), which a generated class can't declare.
-
 import { Resource } from "./base.js";
 import type { EmailChannelDefaults } from "./emailDefaults.js";
+import { EmailMailboxesForwardingAddressResource } from "./emailMailboxesForwardingAddress.gen.js";
 import { EmailMailboxesResourceBase } from "./emailMailboxes.gen.js";
 import { EmailMailboxesMessagesResource } from "./emailMailboxesMessages.js";
 import { EmailMailboxesReceiveRulesResource } from "./emailMailboxesReceiveRules.gen.js";
@@ -10,7 +8,7 @@ import { EmailMailboxesReceiveRulesResource } from "./emailMailboxesReceiveRules
 import { EmailMailboxesScheduledMessagesResource } from "./emailMailboxesScheduledMessages.gen.js";
 
 export class EmailMailboxesResource extends EmailMailboxesResourceBase {
-  /** Messages sent from the mailbox's own address — `bird.email.mailboxes.messages.create(...)`. */
+  readonly forwardingAddress: EmailMailboxesForwardingAddressResource;
   readonly scheduledMessages: EmailMailboxesScheduledMessagesResource;
 
   readonly messages: EmailMailboxesMessagesResource;
@@ -24,6 +22,10 @@ export class EmailMailboxesResource extends EmailMailboxesResourceBase {
     defaults?: EmailChannelDefaults,
   ) {
     super(core, client);
+    this.forwardingAddress = new EmailMailboxesForwardingAddressResource(
+      core,
+      client,
+    );
     this.messages = new EmailMailboxesMessagesResource(core, client, defaults);
     this.scheduledMessages = new EmailMailboxesScheduledMessagesResource(
       core,

@@ -120,6 +120,9 @@ import type {
   CreateEsimSubscriberResponses,
   CreateMailboxData,
   CreateMailboxErrors,
+  CreateMailboxForwardingAddressData,
+  CreateMailboxForwardingAddressErrors,
+  CreateMailboxForwardingAddressResponses,
   CreateMailboxMessageData,
   CreateMailboxMessageErrors,
   CreateMailboxMessageResponses,
@@ -9347,7 +9350,7 @@ export const listAmbConversationMessages = <
 /**
  * Send a typing indicator
  *
- * Sends a typing indicator to the customer's device on this conversation. Send `typing_start` before the reply it precedes; sending it again before that reply is not meaningful and may be dropped. Apple's own behavior for `typing_end` sent with no reply following is unproven, so treat it as best-effort. This conversation must be open: the same checks that gate a message on this conversation gate a typing indicator, other than the content checks, since a typing indicator has no content. Apple can still refuse the indicator for this customer: `AMBRecipientUnreachable` means none of their devices can receive it, and `AMBConversationClosed` can also mean Apple reports that the customer left the conversation, which then closes when the next message is sent.
+ * Sends a typing indicator to the customer's device on this conversation. Send `typing_start` before the reply it precedes; sending it again before that reply is not meaningful and may be dropped. Bird also shows a typing indicator before each reply it sends, so set `skip_typing` on that reply to avoid a second one. Apple's own behavior for `typing_end` sent with no reply following is unproven, so treat it as best-effort. This conversation must be open: the same checks that gate a message on this conversation gate a typing indicator, other than the content checks, since a typing indicator has no content. Apple can still refuse the indicator for this customer: `AMBRecipientUnreachable` means none of their devices can receive it, and `AMBConversationClosed` can also mean Apple reports that the customer left the conversation, which then closes when the next message is sent.
  *
  */
 export const createAmbConversationTyping = <
@@ -13515,6 +13518,54 @@ export const restoreMailbox = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Create a mailbox forwarding address
+ *
+ * Gives a mailbox on your own domain an address on our receiving domain.
+ * Forward mail for the mailbox's `address` to it from your current email
+ * provider, and the mail lands in this mailbox. We choose the address; the
+ * request takes no body. The response is the mailbox with
+ * `forwarding_address` set.
+ *
+ * If the mailbox already has a forwarding address, it is returned
+ * unchanged, so retrying is safe. The address stays the same for the life
+ * of the mailbox, including after a delete and restore. A suspended
+ * mailbox can get one too; it stays suspended. Setting up the address does
+ * not change DNS or your email provider, and does not show that forwarding
+ * works. Add the forwarding rule at your provider, then send a new test
+ * message to `address`.
+ *
+ * Returns `422` for a mailbox on the shared inbox.ai domain, which already
+ * receives mail directly. Also returns `422` when the mailbox's domain is
+ * not verified in this workspace or another workspace receives mail for it.
+ *
+ */
+export const createMailboxForwardingAddress = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateMailboxForwardingAddressData, ThrowOnError>,
+): RequestResult<
+  CreateMailboxForwardingAddressResponses,
+  CreateMailboxForwardingAddressErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateMailboxForwardingAddressResponses,
+    CreateMailboxForwardingAddressErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/mailboxes/{mailbox_id}/forwarding-address",
+    ...options,
+  });
+
+/**
  * Get mailbox email statistics
  *
  * Returns the mailbox's sent and received email statistics over a time window: a period-wide summary plus a bucketed series. Sent-mail metrics have the same delivery, engagement, and latency breakdowns as the email stats endpoints. `received` counts mail that arrived at the mailbox.
@@ -15036,10 +15087,14 @@ export const listVoiceTrunkGateways = <ThrowOnError extends boolean = false>(
  *
  * Adds a gateway address for forwarding inbound calls to this trunk.
  *
- * Gateways are tried in `priority` order, lowest first, until one answers.
- * Gateways with equal priority share calls evenly. `sip_uri` identifies the
- * peer host, while `destination_format` and `origination_format` control the
- * called and calling number formats. Both number formats default to E.164.
+ * Unless the trunk's inbound routing in the dashboard sends calls elsewhere,
+ * calls hunt the trunk's **All gateways (automatic)** group. It holds every
+ * gateway and tries them in `priority` order, lowest first, until one
+ * answers. Gateways with equal priority share calls evenly.
+ *
+ * `sip_uri` identifies the peer host, while `destination_format` and
+ * `origination_format` control the called and calling number formats. Both
+ * number formats default to E.164.
  *
  * A SIP URI already registered on this trunk returns `409 Conflict`. An
  * invalid SIP URI, a SIP URI carrying a user part, or a malformed number
@@ -15080,7 +15135,7 @@ export const createVoiceTrunkGateway = <ThrowOnError extends boolean = false>(
 /**
  * Delete a SIP trunk gateway
  *
- * Removes the gateway. Calls already ringing this address are not affected. Removing the last gateway leaves inbound calling enabled but removes its delivery targets. New inbound calls to numbers routed to this trunk are refused until a gateway is added back. The trunk must have inbound calling enabled, otherwise this returns `412 Precondition Failed`.
+ * Removes the gateway. Calls already ringing this address are not affected. Removing the last gateway leaves inbound calling enabled but removes its delivery targets. New inbound calls to numbers routed to this trunk are refused until a gateway is added back. The trunk must have inbound calling enabled, otherwise this returns `412 Precondition Failed`. If a hunt group you built in the trunk's inbound routing uses the gateway, the delete returns `409 Conflict`: remove the gateway from that group in the dashboard first. The **All gateways (automatic)** group never blocks a delete.
  *
  */
 export const deleteVoiceTrunkGateway = <ThrowOnError extends boolean = false>(

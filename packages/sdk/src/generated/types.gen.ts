@@ -7027,7 +7027,7 @@ export type SmsTemplate = {
  */
 export type TemplateVariable = {
   /**
-   * The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the `name` on the matching parameter inside `components`, or, in the template parameters preview, the key in the send's `template.parameters`. A WhatsApp template whose placeholders are positional uses the position itself as `1`, `2` and so on, and values with no placeholder use fixed keys: `header_url`, `header_filename`, `header_location` and `code`.
+   * The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the `name` on the matching parameter inside `components`, or, in the template parameters preview, the key in the send's `template.parameters`. A WhatsApp template whose placeholders are positional uses the position itself as `1`, `2` and so on, and values with no placeholder use fixed keys: `header_url`, `header_filename`, `header_location` and `code`, plus `button_url` (or `button_url_1`, `button_url_2` for a carousel card) for a url button whose suffix is numbered.
    *
    */
   readonly key: string;
@@ -10010,6 +10010,176 @@ export type DomainId = string;
 
 export type WhatsAppNumberId = string;
 
+export type WhatsAppMessageId = string;
+
+export type WhatsAppEventId = string;
+
+/**
+ * Failure detail for a message that could not be delivered or was rejected.
+ */
+export type WhatsAppError = {
+  code: WhatsAppErrorCode;
+  /**
+   * Human-readable explanation of the failure.
+   */
+  readonly description: string;
+  /**
+   * Raw error code from the WhatsApp Cloud API, when available, for low-level debugging.
+   */
+  readonly meta_error_code?: string | null;
+  /**
+   * When the failure occurred.
+   */
+  readonly occurred_at: string;
+} | null;
+
+/**
+ * The kind of value a template parameter carries, which follows the block it fills. The `text` type is a plain string substituted into a placeholder. This includes a coupon button's code, which the recipient copies from the button. The `image`, `video`, `gif`, and `document` types carry a media header's file in `url`. Each matches its header's `format`. The `location` type fills a location header and carries a point on the map. Open enum: more kinds may be added over time.
+ *
+ */
+export type WhatsAppTemplateParameterType =
+  "text" | "image" | "video" | "gif" | "document" | "location" | (string & {});
+
+export type WhatsAppTemplateExampleParameter = {
+  /**
+   * The kind of value this parameter accepts.
+   */
+  readonly type: WhatsAppTemplateParameterType;
+  /**
+   * An example value for a text parameter. Present when `type` is `text`.
+   */
+  readonly text?: string;
+  /**
+   * The address of the file a media header shows, as it was given when the header was authored rather than WhatsApp's copy of it. Present when `type` is `image`, `video`, `gif` or `document`.
+   *
+   */
+  readonly url?: string;
+  /**
+   * The named placeholder this example fills. Present whenever the template declares named parameters, which is what a send must name; absent only for a positional template, whose values go in `{{n}}` order.
+   *
+   */
+  readonly name?: string;
+};
+
+export type WhatsAppTemplateButton = {
+  /**
+   * The button's behavior.
+   *
+   * - `url`: opens a link.
+   * - `quick_reply`: sends its own label back to you as an inbound message.
+   * - `phone_number`: dials the number it carries.
+   * - `otp`: copies a one-time passcode. It belongs only on an authentication
+   *   template, and that template takes no other button type.
+   * - `copy_code`: copies a coupon code to the recipient's clipboard. It
+   *   belongs only on a marketing template, which takes at most one.
+   * - `request_contact_info`: asks the recipient to share the phone number
+   *   their WhatsApp account carries. It belongs only on a utility or
+   *   marketing template, as that template's only button.
+   *
+   * This is an open enum. Accept unrecognized values.
+   *
+   */
+  readonly type: string;
+  /**
+   * How the recipient receives the one-time passcode. Present on authentication-template OTP buttons.
+   */
+  readonly otp_type?: string;
+  /**
+   * The button's label. Absent on an authentication template's passcode button until the language has been submitted, since WhatsApp writes that label itself. Absent on a `request_contact_info` draft for a related reason: WhatsApp fixes that label, so a draft that carried it reads back without it. Once the language is submitted, this carries the label WhatsApp wrote, which is `Share Contact Info` in every language today.
+   *
+   */
+  readonly text?: string;
+  /**
+   * The address the button opens, with any variable placeholder shown inline. Present on link buttons.
+   */
+  readonly url?: string;
+  /**
+   * The number the button dials. Present on dial buttons.
+   */
+  readonly phone_number?: string;
+  /**
+   * Example values for this button's variables, in placeholder order. Present when the button address has variables, and on a `copy_code` button, where the single value is the sample coupon code WhatsApp reviewed.
+   *
+   */
+  readonly example_parameters?: Array<WhatsAppTemplateExampleParameter>;
+};
+
+/**
+ * One content block inside a carousel card.
+ */
+export type WhatsAppTemplateCardComponent = {
+  /**
+   * The card block's type.
+   */
+  readonly type: string;
+  /**
+   * The card header's content type. Present on a card's header block.
+   */
+  readonly format?: string;
+  /**
+   * The block's text content, with any variable placeholders shown inline.
+   */
+  readonly text?: string;
+  /**
+   * Example values for this block's variables, in placeholder order.
+   */
+  readonly example_parameters?: Array<WhatsAppTemplateExampleParameter>;
+  /**
+   * The buttons this card carries. Present on a card's buttons block.
+   */
+  readonly buttons?: Array<WhatsAppTemplateButton>;
+};
+
+/**
+ * One card in a carousel.
+ */
+export type WhatsAppTemplateCard = {
+  /**
+   * This card's content blocks, in display order.
+   */
+  readonly components: Array<WhatsAppTemplateCardComponent>;
+};
+
+export type WhatsAppTemplateComponent = {
+  /**
+   * The content block's type within the template.
+   */
+  readonly type: string;
+  /**
+   * The header block's content type. Present on a header block. A `text` header carries a line of copy. The `image`, `video`, `gif`, and `document` formats each show a file whose address is in the block's `example_parameters`. The `location` format shows a map. It carries no content because the coordinates belong to the message rather than the template.
+   *
+   */
+  readonly format?: string;
+  /**
+   * The block's text content, with any variable placeholders shown inline. Present when the block carries text. An authentication template's body and footer are written by WhatsApp from the two settings below rather than by you, so their text is absent until the language has been submitted and WhatsApp has supplied it.
+   *
+   */
+  readonly text?: string;
+  /**
+   * Whether this authentication template's body ends with WhatsApp's advice not to share the code. Present on an authentication template's body block.
+   *
+   */
+  readonly add_security_recommendation?: boolean;
+  /**
+   * How long the passcode stays valid, which WhatsApp states in this footer. Present on an authentication template's footer block. Omitting it on a write leaves the footer off entirely.
+   *
+   */
+  readonly code_expiration_minutes?: number;
+  /**
+   * Example values for this block's variables, in placeholder order (one per `{{n}}`). Use them to see what a filled message looks like. Present when the block has variables.
+   */
+  readonly example_parameters?: Array<WhatsAppTemplateExampleParameter>;
+  /**
+   * The buttons attached to this block. Present when the block carries buttons.
+   */
+  readonly buttons?: Array<WhatsAppTemplateButton>;
+  /**
+   * The cards this block scrolls through, in display order. Present on a `carousel` block.
+   *
+   */
+  readonly cards?: Array<WhatsAppTemplateCard>;
+};
+
 /**
  * Delivery status:
  *
@@ -10038,8 +10208,6 @@ export type WhatsAppMessageStatus =
   | "received";
 
 export type WhatsAppGroupId = string;
-
-export type WhatsAppMessageId = string;
 
 /**
  * Sender or recipient of a WhatsApp message: a phone number, a business-scoped user ID, or both. A message received from a WhatsApp user carries whatever profile they publish, which may be neither.
@@ -10070,13 +10238,6 @@ export type WhatsAppAddress = {
    */
   display_name?: string;
 };
-
-/**
- * The kind of value a template parameter carries, which follows the block it fills. The `text` type is a plain string substituted into a placeholder. This includes a coupon button's code, which the recipient copies from the button. The `image`, `video`, `gif`, and `document` types carry a media header's file in `url`. Each matches its header's `format`. The `location` type fills a location header and carries a point on the map. Open enum: more kinds may be added over time.
- *
- */
-export type WhatsAppTemplateParameterType =
-  "text" | "image" | "video" | "gif" | "document" | "location" | (string & {});
 
 /**
  * A free-form location to send: a point on the map the recipient can open in their maps app. Deliverable only inside an open 24-hour customer service window; outside one, send a template instead.
@@ -10785,25 +10946,6 @@ export type Actor = {
  */
 export type WhatsAppMessageOrigin =
   "business_agent_echo" | "business_app_echo" | "history_sync" | (string & {});
-
-/**
- * Failure detail for a message that could not be delivered or was rejected.
- */
-export type WhatsAppError = {
-  code: WhatsAppErrorCode;
-  /**
-   * Human-readable explanation of the failure.
-   */
-  readonly description: string;
-  /**
-   * Raw error code from the WhatsApp Cloud API, when available, for low-level debugging.
-   */
-  readonly meta_error_code?: string | null;
-  /**
-   * When the failure occurred.
-   */
-  readonly occurred_at: string;
-} | null;
 
 export type WhatsAppMessage = {
   /**
@@ -11625,8 +11767,6 @@ export type WhatsAppEventType =
   | "whatsapp.sent"
   | (string & {});
 
-export type WhatsAppEventId = string;
-
 export type WhatsAppEvent = {
   /**
    * ID of the event, unique within the message's timeline.
@@ -12354,146 +12494,6 @@ export type WhatsAppGroupJoinRequestDecisionResult = {
    * The join requests WhatsApp refused, each with its reason. Empty when the whole batch was applied.
    */
   readonly failed: Array<WhatsAppGroupJoinRequestFailure>;
-};
-
-export type WhatsAppTemplateExampleParameter = {
-  /**
-   * The kind of value this parameter accepts.
-   */
-  readonly type: WhatsAppTemplateParameterType;
-  /**
-   * An example value for a text parameter. Present when `type` is `text`.
-   */
-  readonly text?: string;
-  /**
-   * The address of the file a media header shows, as it was given when the header was authored rather than WhatsApp's copy of it. Present when `type` is `image`, `video`, `gif` or `document`.
-   *
-   */
-  readonly url?: string;
-  /**
-   * The named placeholder this example fills. Present whenever the template declares named parameters, which is what a send must name; absent only for a positional template, whose values go in `{{n}}` order.
-   *
-   */
-  readonly name?: string;
-};
-
-export type WhatsAppTemplateButton = {
-  /**
-   * The button's behavior.
-   *
-   * - `url`: opens a link.
-   * - `quick_reply`: sends its own label back to you as an inbound message.
-   * - `phone_number`: dials the number it carries.
-   * - `otp`: copies a one-time passcode. It belongs only on an authentication
-   *   template, and that template takes no other button type.
-   * - `copy_code`: copies a coupon code to the recipient's clipboard. It
-   *   belongs only on a marketing template, which takes at most one.
-   * - `request_contact_info`: asks the recipient to share the phone number
-   *   their WhatsApp account carries. It belongs only on a utility or
-   *   marketing template, as that template's only button.
-   *
-   * This is an open enum. Accept unrecognized values.
-   *
-   */
-  readonly type: string;
-  /**
-   * How the recipient receives the one-time passcode. Present on authentication-template OTP buttons.
-   */
-  readonly otp_type?: string;
-  /**
-   * The button's label. Absent on an authentication template's passcode button until the language has been submitted, since WhatsApp writes that label itself. Absent on a `request_contact_info` draft for a related reason: WhatsApp fixes that label, so a draft that carried it reads back without it. Once the language is submitted, this carries the label WhatsApp wrote, which is `Share Contact Info` in every language today.
-   *
-   */
-  readonly text?: string;
-  /**
-   * The address the button opens, with any variable placeholder shown inline. Present on link buttons.
-   */
-  readonly url?: string;
-  /**
-   * The number the button dials. Present on dial buttons.
-   */
-  readonly phone_number?: string;
-  /**
-   * Example values for this button's variables, in placeholder order. Present when the button address has variables, and on a `copy_code` button, where the single value is the sample coupon code WhatsApp reviewed.
-   *
-   */
-  readonly example_parameters?: Array<WhatsAppTemplateExampleParameter>;
-};
-
-/**
- * One content block inside a carousel card.
- */
-export type WhatsAppTemplateCardComponent = {
-  /**
-   * The card block's type.
-   */
-  readonly type: string;
-  /**
-   * The card header's content type. Present on a card's header block.
-   */
-  readonly format?: string;
-  /**
-   * The block's text content, with any variable placeholders shown inline.
-   */
-  readonly text?: string;
-  /**
-   * Example values for this block's variables, in placeholder order.
-   */
-  readonly example_parameters?: Array<WhatsAppTemplateExampleParameter>;
-  /**
-   * The buttons this card carries. Present on a card's buttons block.
-   */
-  readonly buttons?: Array<WhatsAppTemplateButton>;
-};
-
-/**
- * One card in a carousel.
- */
-export type WhatsAppTemplateCard = {
-  /**
-   * This card's content blocks, in display order.
-   */
-  readonly components: Array<WhatsAppTemplateCardComponent>;
-};
-
-export type WhatsAppTemplateComponent = {
-  /**
-   * The content block's type within the template.
-   */
-  readonly type: string;
-  /**
-   * The header block's content type. Present on a header block. A `text` header carries a line of copy. The `image`, `video`, `gif`, and `document` formats each show a file whose address is in the block's `example_parameters`. The `location` format shows a map. It carries no content because the coordinates belong to the message rather than the template.
-   *
-   */
-  readonly format?: string;
-  /**
-   * The block's text content, with any variable placeholders shown inline. Present when the block carries text. An authentication template's body and footer are written by WhatsApp from the two settings below rather than by you, so their text is absent until the language has been submitted and WhatsApp has supplied it.
-   *
-   */
-  readonly text?: string;
-  /**
-   * Whether this authentication template's body ends with WhatsApp's advice not to share the code. Present on an authentication template's body block.
-   *
-   */
-  readonly add_security_recommendation?: boolean;
-  /**
-   * How long the passcode stays valid, which WhatsApp states in this footer. Present on an authentication template's footer block. Omitting it on a write leaves the footer off entirely.
-   *
-   */
-  readonly code_expiration_minutes?: number;
-  /**
-   * Example values for this block's variables, in placeholder order (one per `{{n}}`). Use them to see what a filled message looks like. Present when the block has variables.
-   */
-  readonly example_parameters?: Array<WhatsAppTemplateExampleParameter>;
-  /**
-   * The buttons attached to this block. Present when the block carries buttons.
-   */
-  readonly buttons?: Array<WhatsAppTemplateButton>;
-  /**
-   * The cards this block scrolls through, in display order. Present on a `carousel` block.
-   *
-   */
-  readonly cards?: Array<WhatsAppTemplateCard>;
 };
 
 /**
@@ -15921,6 +15921,11 @@ export type AmbMessageSendRequest = {
    * Apple locale identifier, for example en_US. Defaults to the conversation locale.
    */
   locale?: string;
+  /**
+   * Send the first part without the typing indicator and one-second pause Bird otherwise shows before it. Set it only after you sent `typing_start` with the conversation typing operation, so the customer already sees typing. A first part that Apple accepts clears that indicator when it arrives. If Bird accepts the message but it fails before then, such as a failed send or a rejection during processing, Bird sends `typing_end` instead. If the request itself returns an error, nothing is sent, so send `typing_end` yourself. When Bird splits the message into several parts, such as text around a link, the parts after the first keep their typing indicator.
+   *
+   */
+  skip_typing?: boolean;
 };
 
 /**
@@ -28143,7 +28148,7 @@ export type VoiceTrunkUpdate = {
 export type VoiceTrunkGatewayId = string;
 
 /**
- * One address an inbound call to this trunk is forwarded to, and how that peer wants the call's two numbers spelled. A trunk can have several, tried in priority order until one answers.
+ * One address an inbound call to this trunk is forwarded to, and how that peer wants the call's two numbers spelled. A trunk can have several, and its **All gateways (automatic)** hunt group tries them in priority order until one answers.
  *
  */
 export type VoiceTrunkGateway = {
@@ -28158,7 +28163,7 @@ export type VoiceTrunkGateway = {
    */
   sip_uri: string;
   /**
-   * The order gateways are tried in, lowest first. Gateways sharing a priority take an equal share of calls, and any of them may be tried first on a given call.
+   * The gateway's place in the trunk's **All gateways (automatic)** hunt group, which tries the lowest priority first. Gateways sharing a priority take an equal share of calls, and any of them may be tried first on a given call. Hunt groups you build in the trunk's inbound routing in the dashboard set their own order.
    *
    */
   priority: number;
@@ -28205,7 +28210,7 @@ export type VoiceTrunkGatewayCreate = {
    */
   sip_uri: string;
   /**
-   * The order gateways are tried in, lowest first. Give two gateways the same priority to share calls between them evenly.
+   * The gateway's place in the trunk's **All gateways (automatic)** hunt group, which tries the lowest priority first. Give two gateways the same priority to share calls between them evenly. Hunt groups you build in the trunk's inbound routing in the dashboard set their own order.
    *
    */
   priority: number;
@@ -28252,7 +28257,7 @@ export type VoiceTrunkGatewayUpdate = {
    */
   sip_uri?: string;
   /**
-   * The order gateways are tried in, lowest first. Give two gateways the same priority to share calls between them evenly.
+   * The gateway's place in the trunk's **All gateways (automatic)** hunt group, which tries the lowest priority first. Give two gateways the same priority to share calls between them evenly. Hunt groups you build in the trunk's inbound routing in the dashboard set their own order.
    *
    */
   priority?: number;
@@ -32370,6 +32375,13 @@ export type VerificationCheckResultWritable = {
 };
 
 /**
+ * Failure detail for a message that could not be delivered or was rejected.
+ */
+export type WhatsAppErrorWritable = {
+  code: WhatsAppErrorCode;
+} | null;
+
+/**
  * The template a message was sent from. On reads `slug`, `language`, `category`, and `components` are always present; `components` is an empty array for an authentication template (the filled-in values, for example a verification code, are never returned).
  *
  */
@@ -32479,13 +32491,6 @@ export type ActorWritable = {
    */
   type: string;
 };
-
-/**
- * Failure detail for a message that could not be delivered or was rejected.
- */
-export type WhatsAppErrorWritable = {
-  code: WhatsAppErrorCode;
-} | null;
 
 export type WhatsAppMessageWritable = {
   /**
@@ -33372,6 +33377,11 @@ export type AmbMessageSendRequestWritable = {
    * Apple locale identifier, for example en_US. Defaults to the conversation locale.
    */
   locale?: string;
+  /**
+   * Send the first part without the typing indicator and one-second pause Bird otherwise shows before it. Set it only after you sent `typing_start` with the conversation typing operation, so the customer already sees typing. A first part that Apple accepts clears that indicator when it arrives. If Bird accepts the message but it fails before then, such as a failed send or a rejection during processing, Bird sends `typing_end` instead. If the request itself returns an error, nothing is sent, so send `typing_end` yourself. When Bird splits the message into several parts, such as text around a link, the parts after the first keep their typing indicator.
+   *
+   */
+  skip_typing?: boolean;
 };
 
 export type AmbMessageEventWritable = {
@@ -36170,7 +36180,7 @@ export type VoiceTrunkListWritable = {
 } & ListEnvelope;
 
 /**
- * One address an inbound call to this trunk is forwarded to, and how that peer wants the call's two numbers spelled. A trunk can have several, tried in priority order until one answers.
+ * One address an inbound call to this trunk is forwarded to, and how that peer wants the call's two numbers spelled. A trunk can have several, and its **All gateways (automatic)** hunt group tries them in priority order until one answers.
  *
  */
 export type VoiceTrunkGatewayWritable = {
@@ -36180,7 +36190,7 @@ export type VoiceTrunkGatewayWritable = {
    */
   sip_uri: string;
   /**
-   * The order gateways are tried in, lowest first. Gateways sharing a priority take an equal share of calls, and any of them may be tried first on a given call.
+   * The gateway's place in the trunk's **All gateways (automatic)** hunt group, which tries the lowest priority first. Gateways sharing a priority take an equal share of calls, and any of them may be tried first on a given call. Hunt groups you build in the trunk's inbound routing in the dashboard set their own order.
    *
    */
   priority: number;
@@ -36657,13 +36667,13 @@ export type EmailBroadcastStatusFilter = Array<EmailBroadcastStatus>;
 /**
  * Filter by audience. Only broadcasts that use this audience are returned.
  */
-export type EmailBroadcastAudienceFilter = AudienceId;
+export type BroadcastAudienceFilter = AudienceId;
 
 /**
  * Filter by tag. Pass `name` to match any broadcast that has that tag name, or pass `name:value` to match a specific tag pair, for example `campaign:spring_launch`.
  *
  */
-export type EmailBroadcastTagFilter = string;
+export type BroadcastTagFilter = string;
 
 /**
  * Case-insensitive literal substring match against the broadcast's tags or the referenced template's name. With `email_management` read access, also matches the subject in the effective language of the template version resolved when this broadcast's execution starts. Draft and scheduled broadcasts have no execution subject to search. Percent signs, underscores, and backslashes are literal characters.
@@ -36675,8 +36685,8 @@ export type EmailBroadcastSearchFilter = string;
  * caller and this operation. Reuse the same key and the exact same request when retrying.
  *
  * - A confirmed `202` response replays unchanged for the same key and request within the
- *   configured window, 3 hours by default. Authorization and the destination's member access are
- *   checked again on every retry.
+ *   configured window, 3 hours by default. Authorization is checked again on every retry; on an
+ *   email test, so is the destination's member access.
  * - `409 request_in_progress` (E01004) or `503 IdempotencyUnavailable` (E01033): retry with
  *   backoff using the same key. Switching keys can send another test.
  * - `409 idempotency_key_reuse` (E01005): the key was used for a different request or
@@ -39518,8 +39528,8 @@ export type SendEmailBroadcastTestData = {
      * caller and this operation. Reuse the same key and the exact same request when retrying.
      *
      * - A confirmed `202` response replays unchanged for the same key and request within the
-     *   configured window, 3 hours by default. Authorization and the destination's member access are
-     *   checked again on every retry.
+     *   configured window, 3 hours by default. Authorization is checked again on every retry; on an
+     *   email test, so is the destination's member access.
      * - `409 request_in_progress` (E01004) or `503 IdempotencyUnavailable` (E01033): retry with
      *   backoff using the same key. Switching keys can send another test.
      * - `409 idempotency_key_reuse` (E01005): the key was used for a different request or
@@ -67349,6 +67359,106 @@ export type RestoreMailboxResponses = {
 
 export type RestoreMailboxResponse =
   RestoreMailboxResponses[keyof RestoreMailboxResponses];
+
+export type CreateMailboxForwardingAddressData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Mailbox ID or email address in this workspace.
+     */
+    mailbox_id: MailboxIdentifier;
+  };
+  query?: never;
+  url: "/v1/email/mailboxes/{mailbox_id}/forwarding-address";
+};
+
+export type CreateMailboxForwardingAddressErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateMailboxForwardingAddressError =
+  CreateMailboxForwardingAddressErrors[keyof CreateMailboxForwardingAddressErrors];
+
+export type CreateMailboxForwardingAddressResponses = {
+  /**
+   * The mailbox, with its forwarding address.
+   */
+  200: Mailbox;
+};
+
+export type CreateMailboxForwardingAddressResponse =
+  CreateMailboxForwardingAddressResponses[keyof CreateMailboxForwardingAddressResponses];
 
 export type GetMailboxStatsData = {
   body?: never;
