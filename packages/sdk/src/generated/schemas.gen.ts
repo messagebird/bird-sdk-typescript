@@ -12264,17 +12264,18 @@ export const TemplateVariableSchema = {
         "url",
         "image",
         "timestamp",
+        "timezone",
         "location",
         "text",
       ],
       description:
-        "The value type this slot accepts. Each typed slot rejects a value that does not match its `constraint`. Built-in SMS templates use typed slots (`code`, `amount` and the rest). Apple Messages templates type a variable from its content: the field it fills (`url`, `image`, `timestamp`) or the formatting filter applied to it (`date`, `date_time`, `amount`, `currency`). Email and workspace SMS templates use `text`. WhatsApp templates use `text`, plus `url` for a media header's file and `location` for a location header. Workspace SMS parameters must be scalar values. Open enum: treat an unrecognized value as a future type rather than an error.\n",
+        "The value type this slot accepts. Each typed slot rejects a value that does not match its `constraint`. Built-in SMS templates use typed slots (`code`, `amount` and the rest). Apple Messages templates type a variable from its content: the field it fills (`url`, `image`, `timestamp`, `location`, `timezone`) or the formatting filter applied to it (`date`, `date_time`, `amount`, `currency`). Email and workspace SMS templates use `text`. WhatsApp templates use `text`, plus `url` for a media header's file and `location` for a location header. A `location` value is an object with `latitude` and `longitude`, and optionally `name` and `address`. On Apple Messages, `name` becomes the location's title and `address` is not shown. Workspace SMS parameters must be scalar values.\n",
     },
     required: {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether the send must supply this variable. Omitting a required value returns `422` on email, SMS, and WhatsApp sends. Always false when `system` is true, because you do not supply that slot's value.\n",
+        "Whether the send must supply this variable. Omitting a required value returns `422` on every channel. On Apple Messages, a later time slot's start that is used nowhere else is optional: a send that omits it drops that slot. Always false when `system` is true, because you do not supply that slot's value.\n",
     },
     constraint: {
       type: "string",
@@ -26960,6 +26961,13 @@ export const AMBLocationSchema = {
     latitude: ["longitude"],
     longitude: ["latitude"],
   },
+  not: {
+    required: ["coordinates", "latitude"],
+    properties: {
+      coordinates: {},
+      latitude: {},
+    },
+  },
   properties: {
     title: {
       type: "string",
@@ -26978,6 +26986,13 @@ export const AMBLocationSchema = {
       minimum: -180,
       maximum: 180,
       description: "Longitude in degrees. Set together with `latitude`.",
+    },
+    coordinates: {
+      type: "string",
+      pattern: "^\\{\\{[ \\t]*[a-z_][a-z0-9_]*[ \\t]*\\}\\}$",
+      description:
+        "Apple Messages template content only: exactly one placeholder, such as `{{ store }}`, set instead of `latitude` and `longitude`. When the template is sent, a `location` variable fills it with its `latitude` and `longitude`, and its `name`, when it has one, replaces `title`. A direct send that includes it returns `422`. Never present on an inbound event.",
+      example: "{{ store }}",
     },
     radius: {
       type: "number",
@@ -27006,7 +27021,7 @@ export const AMBTimeSlotSchema = {
       pattern:
         "^(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2}(\\.\\d+)?)?(Z|[+-]\\d{2}:\\d{2})|\\{\\{[ \\t]*[a-z_][a-z0-9_]*[ \\t]*\\}\\})$",
       description:
-        "When this slot begins, as an ISO 8601 date-time with a UTC offset. Seconds and fractional seconds must be zero, for example `2026-09-02T14:30:00Z`; any other value returns `422` with error code `E01001`. The timestamp is converted to UTC for Apple while preserving the instant. In Apple Messages template content it may instead be exactly one placeholder, such as `{{ slot_1 }}`, filled with a `timestamp` variable when the template is sent.",
+        "When this slot begins, as an ISO 8601 date-time with a UTC offset. Seconds and fractional seconds must be zero, for example `2026-09-02T14:30:00Z`; any other value returns `422` with error code `E01001`. The timestamp is converted to UTC for Apple while preserving the instant. In Apple Messages template content it may instead be exactly one placeholder, such as `{{ slot_1 }}`, filled with a `timestamp` variable when the template is sent. A slot after the first whose variable is used nowhere else is optional: a send that omits that variable drops the slot.",
       example: "2026-09-02T14:30:00Z",
     },
     duration_seconds: {
@@ -27021,6 +27036,13 @@ export const AMBNativeEventSchema = {
   type: "object",
   additionalProperties: false,
   required: ["timeslots"],
+  not: {
+    required: ["timezone", "timezone_offset"],
+    properties: {
+      timezone: {},
+      timezone_offset: {},
+    },
+  },
   properties: {
     identifier: {
       type: "string",
@@ -27035,7 +27057,16 @@ export const AMBNativeEventSchema = {
     timezone_offset: {
       type: "integer",
       description:
-        "Minutes from GMT at the event location. Omit to use the customer's time zone.",
+        "Minutes from GMT at the event location. Omit it and `timezone` to use the customer's time zone.",
+    },
+    timezone: {
+      type: "string",
+      minLength: 1,
+      pattern:
+        "^(\\{\\{[ \\t]*[a-z_][a-z0-9_]*[ \\t]*\\}\\}|[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*)$",
+      description:
+        "IANA time zone of the event location. Apple receives the zone's offset at the time slots, so a template keeps the right offset across a daylight-saving change. Every slot must have the same offset in the zone: slots on both sides of a clock change return `422`. Set it instead of `timezone_offset`. An unknown zone returns `422`. In Apple Messages template content it may instead be exactly one placeholder, such as `{{ timezone }}`, filled with a `timezone` variable when the template is sent. A direct send with a placeholder returns `422`.",
+      example: "Europe/Amsterdam",
     },
     timeslots: {
       type: "array",
@@ -28836,7 +28867,7 @@ export const AMBTemplateSendSchema = {
       type: "object",
       additionalProperties: true,
       description:
-        "Values for the template's variables, keyed by variable name. Read the live version to see the accepted keys and formats. A missing key, an undeclared key, an invalid value, or a serialized object over 16 KiB returns `422`.\n",
+        "Values for the template's variables, keyed by variable name. Read the live version to see the accepted keys and formats. A `location` variable takes an object with `latitude` and `longitude`, and optionally `name`, which becomes the location's title. `address` is accepted for parity with WhatsApp and is not shown on Apple Messages. Every other variable takes a string, number or boolean. A missing required key, an undeclared key, an invalid value, or a serialized object over 16 KiB returns `422`.\n",
       example: {
         name: "Jamie",
       },
@@ -33839,6 +33870,18 @@ export const EmailInboxInsightsSeedTestsSchema = {
   ],
 } as const;
 
+export const EmailInboxInsightsSeedRegionsSchema = {
+  type: "array",
+  minItems: 1,
+  description:
+    "Region names exactly as returned by the seed-test configuration.",
+  items: {
+    type: "string",
+    minLength: 1,
+  },
+  example: ["Primary Webmail"],
+} as const;
+
 export const EmailInboxInsightsSeedTestCreateSchema = {
   type: "object",
   additionalProperties: false,
@@ -33864,14 +33907,9 @@ export const EmailInboxInsightsSeedTestCreateSchema = {
         "Which engagement behaviour the seeds should simulate. Mixing both behaviours is what makes the engaged-against-dormant comparison measurable.\n",
     },
     regions: {
-      type: "array",
-      minItems: 1,
+      $ref: "#/components/schemas/EmailInboxInsightsSeedRegions",
       description:
         "The regions to place seeds in, as the seed-test configuration names them.",
-      items: {
-        type: "string",
-        minLength: 1,
-      },
       example: ["North America - US", "Europe - UK"],
     },
     label: {
@@ -48936,6 +48974,15 @@ export const WalletTransactionIDSchema = {
   example: "wtx_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const BillingProductSlugSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$",
+  description:
+    "URL-safe identifier for a billing product. Lowercase letters and digits, separated by underscores. Must start with a letter.",
+  example: "email_sends",
+} as const;
+
 export const BillingIntervalSchema = {
   type: "string",
   minLength: 1,
@@ -48963,15 +49010,6 @@ export const BillingPricingIntervalSchema = {
       example: 3,
     },
   },
-} as const;
-
-export const BillingProductSlugSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^[a-z][a-z0-9]*(_[a-z0-9]+)*$",
-  description:
-    "URL-safe identifier for a billing product. Lowercase letters and digits, separated by underscores. Must start with a letter.",
-  example: "email_sends",
 } as const;
 
 export const BillingPricingModelSchema = {

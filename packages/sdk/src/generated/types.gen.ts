@@ -6872,12 +6872,12 @@ export type TemplateVariable = {
    */
   readonly key: string;
   /**
-   * The value type this slot accepts. Each typed slot rejects a value that does not match its `constraint`. Built-in SMS templates use typed slots (`code`, `amount` and the rest). Apple Messages templates type a variable from its content: the field it fills (`url`, `image`, `timestamp`) or the formatting filter applied to it (`date`, `date_time`, `amount`, `currency`). Email and workspace SMS templates use `text`. WhatsApp templates use `text`, plus `url` for a media header's file and `location` for a location header. Workspace SMS parameters must be scalar values. Open enum: treat an unrecognized value as a future type rather than an error.
+   * The value type this slot accepts. Each typed slot rejects a value that does not match its `constraint`. Built-in SMS templates use typed slots (`code`, `amount` and the rest). Apple Messages templates type a variable from its content: the field it fills (`url`, `image`, `timestamp`, `location`, `timezone`) or the formatting filter applied to it (`date`, `date_time`, `amount`, `currency`). Email and workspace SMS templates use `text`. WhatsApp templates use `text`, plus `url` for a media header's file and `location` for a location header. A `location` value is an object with `latitude` and `longitude`, and optionally `name` and `address`. On Apple Messages, `name` becomes the location's title and `address` is not shown. Workspace SMS parameters must be scalar values.
    *
    */
   readonly type: string;
   /**
-   * Whether the send must supply this variable. Omitting a required value returns `422` on email, SMS, and WhatsApp sends. Always false when `system` is true, because you do not supply that slot's value.
+   * Whether the send must supply this variable. Omitting a required value returns `422` on every channel. On Apple Messages, a later time slot's start that is used nowhere else is optional: a send that omits it drops that slot. Always false when `system` is true, because you do not supply that slot's value.
    *
    */
   readonly required: boolean;
@@ -14997,6 +14997,10 @@ export type AmbLocation = {
    */
   longitude?: number;
   /**
+   * Apple Messages template content only: exactly one placeholder, such as `{{ store }}`, set instead of `latitude` and `longitude`. When the template is sent, a `location` variable fills it with its `latitude` and `longitude`, and its `name`, when it has one, replaces `title`. A direct send that includes it returns `422`. Never present on an inbound event.
+   */
+  coordinates?: string;
+  /**
    * Location radius in meters. Apple ignores it without coordinates.
    */
   radius?: number;
@@ -15008,7 +15012,7 @@ export type AmbTimeSlot = {
    */
   identifier: string;
   /**
-   * When this slot begins, as an ISO 8601 date-time with a UTC offset. Seconds and fractional seconds must be zero, for example `2026-09-02T14:30:00Z`; any other value returns `422` with error code `E01001`. The timestamp is converted to UTC for Apple while preserving the instant. In Apple Messages template content it may instead be exactly one placeholder, such as `{{ slot_1 }}`, filled with a `timestamp` variable when the template is sent.
+   * When this slot begins, as an ISO 8601 date-time with a UTC offset. Seconds and fractional seconds must be zero, for example `2026-09-02T14:30:00Z`; any other value returns `422` with error code `E01001`. The timestamp is converted to UTC for Apple while preserving the instant. In Apple Messages template content it may instead be exactly one placeholder, such as `{{ slot_1 }}`, filled with a `timestamp` variable when the template is sent. A slot after the first whose variable is used nowhere else is optional: a send that omits that variable drops the slot.
    */
   start_at: string;
   /**
@@ -15027,9 +15031,13 @@ export type AmbNativeEvent = {
    */
   location?: AmbLocation;
   /**
-   * Minutes from GMT at the event location. Omit to use the customer's time zone.
+   * Minutes from GMT at the event location. Omit it and `timezone` to use the customer's time zone.
    */
   timezone_offset?: number;
+  /**
+   * IANA time zone of the event location. Apple receives the zone's offset at the time slots, so a template keeps the right offset across a daylight-saving change. Every slot must have the same offset in the zone: slots on both sides of a clock change return `422`. Set it instead of `timezone_offset`. An unknown zone returns `422`. In Apple Messages template content it may instead be exactly one placeholder, such as `{{ timezone }}`, filled with a `timezone` variable when the template is sent. A direct send with a placeholder returns `422`.
+   */
+  timezone?: string;
   /**
    * Appointment times with RFC 3339 timestamps and duration in seconds.
    */
@@ -15772,7 +15780,7 @@ export type AmbTemplateSend = unknown & {
    */
   language?: LanguageTag;
   /**
-   * Values for the template's variables, keyed by variable name. Read the live version to see the accepted keys and formats. A missing key, an undeclared key, an invalid value, or a serialized object over 16 KiB returns `422`.
+   * Values for the template's variables, keyed by variable name. Read the live version to see the accepted keys and formats. A `location` variable takes an object with `latitude` and `longitude`, and optionally `name`, which becomes the location's title. `address` is accepted for parity with WhatsApp and is not shown on Apple Messages. Every other variable takes a string, number or boolean. A missing required key, an undeclared key, an invalid value, or a serialized object over 16 KiB returns `422`.
    *
    */
   parameters?: {
@@ -18537,6 +18545,11 @@ export type EmailInboxInsightsSeedTests = EmailInboxInsightsEnvelope & {
 };
 
 /**
+ * Region names exactly as returned by the seed-test configuration.
+ */
+export type EmailInboxInsightsSeedRegions = Array<string>;
+
+/**
  * How to configure a seed test. The choices available for a domain come from the seed-test configuration.
  *
  */
@@ -18559,7 +18572,7 @@ export type EmailInboxInsightsSeedTestCreate = {
   /**
    * The regions to place seeds in, as the seed-test configuration names them.
    */
-  regions: Array<string>;
+  regions: EmailInboxInsightsSeedRegions;
   /**
    * A name attached to this registration. It is not returned in seed-test history.
    */
@@ -27302,6 +27315,11 @@ export type WalletId = string;
 export type WalletTransactionId = string;
 
 /**
+ * URL-safe identifier for a billing product. Lowercase letters and digits, separated by underscores. Must start with a letter.
+ */
+export type BillingProductSlug = string;
+
+/**
  * The recurring interval one subscription charge covers.
  */
 export type BillingInterval = "day" | "month" | "year";
@@ -27319,11 +27337,6 @@ export type BillingPricingInterval = {
    */
   count: number;
 };
-
-/**
- * URL-safe identifier for a billing product. Lowercase letters and digits, separated by underscores. Must start with a letter.
- */
-export type BillingProductSlug = string;
 
 /**
  * How this product is priced.

@@ -10937,6 +10937,9 @@ export const getEmailInboxInsightsSeedTests = <
  * endpoint reports which seed pools, regions, and engagement behaviours this
  * domain's account can use.
  *
+ * A pool or profile the configuration does not report as available, or a region
+ * it does not list, returns 422 E01001 and spends no allowance.
+ *
  * Send an Idempotency-Key and reuse it with the unchanged request when retrying
  * a lost response. Before running the curl example, set `IDEMPOTENCY_KEY` to a
  * unique key for this registration and retain it for retries of the same intent.
@@ -11083,8 +11086,8 @@ export const getEmailInboxInsightsDomains = <
  * is safe to repeat.
  *
  * Switching on answers `412` when the measurement provider declines to measure the
- * domain. Nothing is saved, and repeating the request returns the same answer
- * until support has the domain added, so contact support with the domain name.
+ * domain. The monitoring preference is not saved. Contact support with the
+ * sending domain and request ID.
  *
  */
 export const updateEmailInboxInsightsDomain = <
@@ -11138,9 +11141,8 @@ export const updateEmailInboxInsightsDomain = <
  * or added to at any time.
  *
  * The call answers `412` when the measurement provider declines to measure the
- * chosen domain. Nothing is switched on, and repeating the request returns the
- * same answer until support has the domain added, so contact support with the
- * domain name.
+ * chosen domain. The monitoring preference is not saved. Contact support with
+ * the sending domain and request ID.
  *
  */
 export const upsertEmailInboxInsightsDomainMonitoring = <

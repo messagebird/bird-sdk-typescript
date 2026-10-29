@@ -1632,6 +1632,7 @@ export type {
   EmailInboxInsightsSeedListType,
   EmailInboxInsightsSeedListTypeOption,
   EmailInboxInsightsSeedRegionOption,
+  EmailInboxInsightsSeedRegions,
   EmailInboxInsightsSeedTestAuth,
   EmailInboxInsightsSeedTestConfiguration,
   EmailInboxInsightsSeedTestCreate,
