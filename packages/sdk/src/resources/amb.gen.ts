@@ -57,7 +57,7 @@ export class AmbResourceBase extends Resource {
    * const result = await bird.amb.send({
    *   from: "b52d6267-2b62-4f8a-8842-0533d0f1dc07",
    *   to: "opaque-customer",
-   *   content: { type: "text", body: "Your order is ready." },
+   *   text: { body: "Your order is ready." },
    * });
    * console.log(result);
    */

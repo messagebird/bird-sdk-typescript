@@ -2658,7 +2658,7 @@ export type WhatsAppInboundStatsPoint = {
 export type AmbBusinessId = string;
 
 /**
- * Derived message classification for filtering and statistics. Send requests use the native content.type families. Create Apple Pay and authentication requests through the conversation payment and authentication operations.
+ * Derived message classification for filtering and statistics. Send requests use the `text`, `rich_link` and `interactive` keys. Create Apple Pay and authentication requests through the conversation payment and authentication operations.
  *
  * - text: Text, optionally with a subject.
  * - attachment: One or more files, images, audio clips, or videos.
@@ -8707,6 +8707,41 @@ export type SmsStatsByOriginatorResponse = {
 };
 
 /**
+ * Aggregate delivery and latency stats for a single cost center over the requested period.
+ */
+export type SmsCostCenterStatsPoint = {
+  /**
+   * The cost center this row aggregates, as set on the message or taken from its messaging profile at send time.
+   */
+  cost_center: string;
+  delivery: SmsDeliveryStats;
+  latency: SmsLatencyStats;
+  /**
+   * Per-bucket lifecycle counts for this cost center, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.
+   */
+  trend?: Array<SmsStatsPoint>;
+};
+
+/**
+ * Per-cost-center breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByCostCenterResponse = {
+  /**
+   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  period: SmsStatsSummaryPeriod;
+  /**
+   * Cost center breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no messages with a cost center were sent in the period.
+   */
+  data: Array<SmsCostCenterStatsPoint>;
+  /**
+   * Total number of distinct cost centers with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   *
+   */
+  total: number;
+};
+
+/**
  * The number of messages that ended the requested period in a single lifecycle status. This transposes the lifecycle counts into one row per status, so it carries no rates or latency.
  */
 export type SmsStatusStatsPoint = {
@@ -14633,7 +14668,7 @@ export type AmbAttachmentId = string;
 export type AmbAttachmentOrigin = "received" | "sent" | "uploaded";
 
 /**
- * A file Apple holds for one business account. Send it again by passing `id` as `attachment_id` in `content.attachments`. Only the business account in `business_account_id` can send it; a send from another business account is refused with a `422` `AMBAttachmentBusinessMismatch`. `message_id` is absent for an uploaded attachment.
+ * A file Apple holds for one business account. Send it again by passing `id` as `attachment_id` in `text.attachments`. Only the business account in `business_account_id` can send it; a send from another business account is refused with a `422` `AMBAttachmentBusinessMismatch`. `message_id` is absent for an uploaded attachment.
  */
 export type AmbAttachment = {
   /**
@@ -14719,16 +14754,6 @@ export type AmbMessageStatus =
  */
 export type AmbMessageSource = "operator" | "automation" | "api";
 
-/**
- * Apple Messages for Business message family:
- *
- * - `text` means a text or attachment message.
- * - `rich_link` means a rich URL or video link preview.
- * - `interactive` means an interactive payload such as a list picker, time picker, quick reply, form, authentication request, or Apple Pay request.
- *
- */
-export type AmbMessageType = "text" | "rich_link" | "interactive";
-
 export type AmbNativeAttachment = (
   | {
       source_url: unknown;
@@ -14759,16 +14784,12 @@ export type AmbNativeAttachment = (
   readonly size?: number;
 };
 
-export type AmbNativeTextContent = (
+export type AmbText = (
   | unknown
   | {
       attachments: unknown;
     }
 ) & {
-  /**
-   * Always text.
-   */
-  type: AmbMessageType;
   /**
    * Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.
    */
@@ -14836,23 +14857,7 @@ export type AmbRichLinkConstruct = {
   store_region?: CountryCode;
 };
 
-export type AmbNativeRichLinkContent = unknown & {
-  /**
-   * Always rich_link.
-   */
-  type: AmbMessageType;
-  /**
-   * Automatic introductions for rich links are enabled regionally in stages. When enabled for a new send, a nonblank body is sent as a separate text before the link. All parts belong to one message, which becomes sent after Apple accepts all parts. Before activation, and for retries retaining legacy behavior, body is included in the rich link request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the rich link. Use one U+FFFC object replacement character per attachment to control placement.
-   */
-  body?: string;
-  /**
-   * Subject displayed above the message body.
-   */
-  subject?: string;
-  /**
-   * Ordered attachments. A send supplies each one by source_url or attachment_id.
-   */
-  attachments?: Array<AmbNativeAttachment>;
+export type AmbRichLink = unknown & {
   rich_link_data?: AmbNativeRichLinkData;
   rich_link_construct?: AmbRichLinkConstruct;
 };
@@ -14925,7 +14930,7 @@ export type AmbQuickReplyItem = {
 
 export type AmbNativeQuickReply = {
   /**
-   * Text used for the device notification and shown in the transcript after the customer chooses an item. Automatic introductions through the enclosing content.body depend on regional activation and the send retry mode; see content.body. For an introduction independent of activation, send a separate text message and omit content.body from the quick reply.
+   * Text used for the device notification and shown in the transcript after the customer chooses an item. To introduce the choices, send `text` alongside `interactive`; it arrives first as its own bubble.
    */
   summary_text: string;
   /**
@@ -15282,13 +15287,34 @@ export type AmbNativeDynamic = {
   data: AmbNativeFormData;
 };
 
-export type AmbAuthenticationId = string;
-
 /**
- * Authentication attempt created through the conversation authentication endpoint. Contains no authorization parameters or credentials.
+ * A custom iMessage app interaction. It also requires both `received_message` and `reply_message`.
  */
-export type AmbNativeAuthentication = {
-  readonly authentication_id: AmbAuthenticationId;
+export type AmbiMessageApp = {
+  /**
+   * App Store identifier of the iMessage app.
+   */
+  app_id: string;
+  /**
+   * Name of the iMessage app.
+   */
+  app_name: string;
+  /**
+   * Identifier of the iMessage extension, in Apple's `com.apple.messages.MSMessageExtensionBalloonPlugin:team-id:extension-id` format.
+   */
+  bid: string;
+  /**
+   * Opaque URL string that Messages passes to the iMessage app.
+   */
+  url: string;
+  /**
+   * Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.
+   */
+  app_icon_source_url: string;
+  /**
+   * Whether Messages renders the received and reply bubbles using Live Layout.
+   */
+  use_live_layout: boolean;
 };
 
 /**
@@ -15298,50 +15324,18 @@ export type AmbNativePayment = {
   readonly payment_id: AmbPaymentId;
 };
 
-export type AmbNativeInteractivePayload = unknown & {
-  /**
-   * Correlation identifier for this interaction. Bird generates one when omitted. Use a new value for each message. A reply is linked to its request only when no other sent message in the conversation uses the same identifier.
-   */
-  request_identifier?: string;
-  /**
-   * Images referenced by identifier.
-   */
-  images?: Array<AmbNativeImage>;
-  quick_reply?: AmbNativeQuickReply;
-  list_picker?: AmbNativeListPicker;
-  event?: AmbNativeEvent;
-  dynamic?: AmbNativeDynamic;
-  readonly authenticate?: AmbNativeAuthentication;
-  readonly payment?: AmbNativePayment;
+export type AmbAuthenticationId = string;
+
+/**
+ * Authentication attempt created through the conversation authentication endpoint. Contains no authorization parameters or credentials.
+ */
+export type AmbNativeAuthentication = {
+  readonly authentication_id: AmbAuthenticationId;
 };
 
-export type AmbNativeInteractiveData = unknown & {
+export type AmbInteractive = unknown & {
   /**
-   * App Store identifier of the iMessage app.
-   */
-  app_id?: string;
-  /**
-   * Name of the iMessage app.
-   */
-  app_name?: string;
-  /**
-   * Identifier of the iMessage extension, in Apple's `com.apple.messages.MSMessageExtensionBalloonPlugin:team-id:extension-id` format.
-   */
-  bid?: string;
-  /**
-   * Opaque URL string that Messages passes to the iMessage app.
-   */
-  url?: string;
-  /**
-   * Whether Messages renders the received and reply bubbles using Live Layout.
-   */
-  use_live_layout?: boolean;
-  /**
-   * Session UUID to preserve across interactions. Apple creates one when omitted.
-   */
-  session_identifier?: string;
-  /**
-   * Content Messages shows in the received message bubble.
+   * Content Messages shows in the received message bubble. For a list picker, time picker or form, this is the visible introduction.
    */
   received_message?: AmbMessageBubble;
   /**
@@ -15349,45 +15343,40 @@ export type AmbNativeInteractiveData = unknown & {
    */
   reply_message?: AmbMessageBubble;
   /**
-   * Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.
+   * Session UUID to preserve across interactions. Apple creates one when omitted.
    */
-  app_icon_source_url?: string;
-  data?: AmbNativeInteractivePayload;
+  session_identifier?: string;
+  /**
+   * Correlation identifier for this interaction. Bird generates one when omitted. Use a new value for each message. A reply is linked to its request only when no other sent message in the conversation uses the same identifier.
+   */
+  request_identifier?: string;
+  /**
+   * Images the interaction references by `image_identifier`, such as list picker thumbnails.
+   */
+  images?: Array<AmbNativeImage>;
+  quick_reply?: AmbNativeQuickReply;
+  list_picker?: AmbNativeListPicker;
+  event?: AmbNativeEvent;
+  dynamic?: AmbNativeDynamic;
+  imessage_app?: AmbiMessageApp;
+  readonly payment?: AmbNativePayment;
+  readonly authenticate?: AmbNativeAuthentication;
 };
 
-export type AmbNativeInteractiveContent = {
+export type AmbNativeInboundImage = {
   /**
-   * Always interactive.
+   * Identifier used by the received message.
    */
-  type: AmbMessageType;
+  identifier: string;
   /**
-   * Automatic introductions for inline quick replies are enabled regionally in stages. When enabled for a new send containing `interactive_data.data.quick_reply`, a nonblank body is sent as separate text before the choices. All parts belong to one message, which becomes sent after Apple accepts all parts. Before activation, and for retries retaining legacy behavior, body is included in the interactive request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the quick reply. Omit body to send choices only. For list pickers, time pickers and forms, use interactive_data.received_message for the visible introduction. Use one U+FFFC object replacement character per attachment to control placement.
+   * Accessibility description supplied by Apple.
    */
-  body?: string;
+  description?: string;
   /**
-   * Subject displayed above the message body.
+   * Relative Bird API URL for downloading the image with the same authentication and workspace as the message.
    */
-  subject?: string;
-  /**
-   * Ordered attachments. A send supplies each one by source_url or attachment_id.
-   */
-  attachments?: Array<AmbNativeAttachment>;
-  interactive_data: AmbNativeInteractiveData;
+  download_url: string;
 };
-
-/**
- * Apple message families with Bird field naming and media URLs. Authentication and Apple Pay requests are created through their dedicated conversation endpoints.
- */
-export type AmbMessageContent =
-  | ({
-      type: "text";
-    } & AmbNativeTextContent)
-  | ({
-      type: "rich_link";
-    } & AmbNativeRichLinkContent)
-  | ({
-      type: "interactive";
-    } & AmbNativeInteractiveContent);
 
 export type AmbNativeInboundQuickReply = {
   /**
@@ -15517,39 +15506,10 @@ export type AmbNativeInboundAuthentication = {
   status?: string;
 };
 
-export type AmbNativeInboundImage = {
-  /**
-   * Identifier used by the received message.
-   */
-  identifier: string;
-  /**
-   * Accessibility description supplied by Apple.
-   */
-  description?: string;
-  /**
-   * Relative Bird API URL for downloading the image with the same authentication and workspace as the message.
-   */
-  download_url: string;
-};
-
-export type AmbNativeInboundPayload = {
-  /**
-   * Correlation identifier reported by Apple.
-   */
-  request_identifier?: string;
-  quick_reply?: AmbNativeInboundQuickReply;
-  list_picker?: AmbNativeInboundListPicker;
-  event?: AmbNativeInboundEvent;
-  dynamic?: AmbNativeInboundDynamic;
-  payment?: AmbNativeInboundPayment;
-  authenticate?: AmbNativeInboundAuthentication;
-  /**
-   * Images returned by Apple, with authenticated download URLs.
-   */
-  images?: Array<AmbNativeInboundImage>;
-};
-
-export type AmbNativeInboundInteractiveData = {
+/**
+ * The custom iMessage app a customer replied from.
+ */
+export type AmbInboundIMessageApp = {
   /**
    * Custom app identifier.
    */
@@ -15571,48 +15531,37 @@ export type AmbNativeInboundInteractiveData = {
    */
   use_live_layout?: boolean;
   /**
-   * Apple interaction session identifier.
-   */
-  session_identifier?: string;
-  reply_message?: AmbMessageBubble;
-  received_message?: AmbMessageBubble;
-  data?: AmbNativeInboundPayload;
-  /**
    * Relative Bird API URL for downloading the custom app icon with the same authentication and workspace as the message.
    */
   app_icon_url?: string;
 };
 
-export type AmbNativeInboundInteractiveContent = {
-  /**
-   * Always interactive.
-   */
-  type: AmbMessageType;
-  /**
-   * Message body supplied by Apple.
-   */
-  body?: string;
-  /**
-   * Message subject supplied by Apple.
-   */
-  subject?: string;
-  /**
-   * Ordered attachments supplied by Apple.
-   */
-  attachments?: Array<AmbNativeAttachment>;
-  interactive_data: AmbNativeInboundInteractiveData;
-};
-
 /**
- * Received text, attachments, and interactive replies, preserving Apple message structure.
+ * What the customer answered on an interactive message: their choice, time slot, form answers, payment result, sign-in result or custom app reply, under the same key as the request. Inbound only; a message that offers something to tap reads as `interactive` instead.
  */
-export type AmbInboundContent =
-  | ({
-      type: "text";
-    } & AmbNativeTextContent)
-  | ({
-      type: "interactive";
-    } & AmbNativeInboundInteractiveContent);
+export type AmbInteractiveReply = {
+  received_message?: AmbMessageBubble;
+  reply_message?: AmbMessageBubble;
+  /**
+   * Apple interaction session identifier.
+   */
+  session_identifier?: string;
+  /**
+   * Correlation identifier reported by Apple.
+   */
+  request_identifier?: string;
+  /**
+   * Images returned by Apple, with authenticated download URLs.
+   */
+  images?: Array<AmbNativeInboundImage>;
+  quick_reply?: AmbNativeInboundQuickReply;
+  list_picker?: AmbNativeInboundListPicker;
+  event?: AmbNativeInboundEvent;
+  dynamic?: AmbNativeInboundDynamic;
+  payment?: AmbNativeInboundPayment;
+  authenticate?: AmbNativeInboundAuthentication;
+  imessage_app?: AmbInboundIMessageApp;
+};
 
 /**
  * Failure detail for a message or invitation that could not be sent or was rejected.
@@ -15671,9 +15620,21 @@ export type AmbMessage = {
    */
   readonly source?: AmbMessageSource;
   /**
-   * Native message content. Outgoing interactions contain requests; incoming interactions contain replies.
+   * The message's text and files. Next to `rich_link`, `interactive` or `interactive_reply`, it is the text that came with them.
    */
-  readonly content: AmbMessageContent | AmbInboundContent;
+  readonly text?: AmbText;
+  /**
+   * The link preview an outbound message carried.
+   */
+  readonly rich_link?: AmbRichLink;
+  /**
+   * What an outbound message offered the customer to tap.
+   */
+  readonly interactive?: AmbInteractive;
+  /**
+   * What the customer answered, on an inbound message replying to an interactive message.
+   */
+  readonly interactive_reply?: AmbInteractiveReply;
   /**
    * Original message matched through Apple’s request identifier within the same workspace, business, and conversation. Omitted when no verified match exists, including when more than one sent message in the conversation uses the reply's request identifier.
    */
@@ -15788,7 +15749,11 @@ export type AmbTemplateSend = unknown & {
   };
 };
 
-export type AmbMessageSendRequest = unknown & {
+/**
+ * A message to send. Supply `text`, `rich_link` or `interactive` (the last two optionally with `text` sent first as its own bubble), or `template` (a stored template, whose category is derived).
+ *
+ */
+export type AmbMessageSendRequest = {
   /**
    * Apple business identifier of the brand sending the message. Read it from the business’s apple_business_id. The customer must have opened the conversation with this business.
    */
@@ -15802,11 +15767,19 @@ export type AmbMessageSendRequest = unknown & {
    */
   source?: AmbMessageSource;
   /**
-   * Message content in Apple’s native text, rich_link, or interactive family. Required unless `template` is supplied (the two are mutually exclusive).
+   * A text message. Alongside `rich_link` or `interactive`, it is sent first as its own text bubble, in the same message.
    */
-  content?: AmbMessageContent;
+  text?: AmbText;
   /**
-   * Send using a stored template instead of native content. The category is derived from the template, so `category` is rejected alongside it.
+   * A link with a preview card.
+   */
+  rich_link?: AmbRichLink;
+  /**
+   * Something for the customer to tap, such as quick replies, a list picker, a time picker, a form or a custom iMessage app.
+   */
+  interactive?: AmbInteractive;
+  /**
+   * Send using a stored template instead of `text`, `rich_link` or `interactive`. The category is derived from the template, so `category` is rejected alongside it.
    *
    */
   template?: AmbTemplateSend;
@@ -16645,9 +16618,17 @@ export type AmbTemplateVersionList = {
  */
 export type AmbTemplateVersionLanguage = {
   /**
-   * Stored template content, including its `{{ variable }}` placeholders.
+   * Stored text and files. Includes its `{{ variable }}` placeholders.
    */
-  readonly content: AmbMessageContent;
+  readonly text?: AmbText;
+  /**
+   * Stored link preview. Includes its `{{ variable }}` placeholders.
+   */
+  readonly rich_link?: AmbRichLink;
+  /**
+   * Stored interaction. Includes its `{{ variable }}` placeholders.
+   */
+  readonly interactive?: AmbInteractive;
   /**
    * This language's revision counter.
    */
@@ -16742,9 +16723,17 @@ export type AmbTemplateLanguage = {
    */
   readonly language: LanguageTag;
   /**
-   * Stored template content, including its `{{ variable }}` placeholders.
+   * Stored text and files. Includes its `{{ variable }}` placeholders.
    */
-  readonly content: AmbMessageContent;
+  readonly text?: AmbText;
+  /**
+   * Stored link preview. Includes its `{{ variable }}` placeholders.
+   */
+  readonly rich_link?: AmbRichLink;
+  /**
+   * Stored interaction. Includes its `{{ variable }}` placeholders.
+   */
+  readonly interactive?: AmbInteractive;
   /**
    * This language's revision counter, used for concurrent-edit checks on draft writes.
    */
@@ -32129,6 +32118,37 @@ export type SmsStatsByOriginatorResponseWritable = {
 };
 
 /**
+ * Aggregate delivery and latency stats for a single cost center over the requested period.
+ */
+export type SmsCostCenterStatsPointWritable = {
+  /**
+   * The cost center this row aggregates, as set on the message or taken from its messaging profile at send time.
+   */
+  cost_center: string;
+  delivery: unknown;
+  latency: SmsLatencyStatsWritable;
+  /**
+   * Per-bucket lifecycle counts for this cost center, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.
+   */
+  trend?: Array<unknown>;
+};
+
+/**
+ * Per-cost-center breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByCostCenterResponseWritable = {
+  /**
+   * Cost center breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no messages with a cost center were sent in the period.
+   */
+  data: Array<SmsCostCenterStatsPointWritable>;
+  /**
+   * Total number of distinct cost centers with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   *
+   */
+  total: number;
+};
+
+/**
  * Lifecycle-status breakdown for the requested period, ordered by message count descending. Statuses with no activity are omitted.
  */
 export type SmsStatsByStatusResponseWritable = {
@@ -32985,7 +33005,7 @@ export type AmbRoutingRuleListWritable = {
 };
 
 /**
- * A file Apple holds for one business account. Send it again by passing `id` as `attachment_id` in `content.attachments`. Only the business account in `business_account_id` can send it; a send from another business account is refused with a `422` `AMBAttachmentBusinessMismatch`. `message_id` is absent for an uploaded attachment.
+ * A file Apple holds for one business account. Send it again by passing `id` as `attachment_id` in `text.attachments`. Only the business account in `business_account_id` can send it; a send from another business account is refused with a `422` `AMBAttachmentBusinessMismatch`. `message_id` is absent for an uploaded attachment.
  */
 export type AmbAttachmentWritable = {
   /**
@@ -33049,16 +33069,12 @@ export type AmbNativeAttachmentWritable = (
   mime_type?: string;
 };
 
-export type AmbNativeTextContentWritable = (
+export type AmbTextWritable = (
   | unknown
   | {
       attachments: unknown;
     }
 ) & {
-  /**
-   * Always text.
-   */
-  type: AmbMessageType;
   /**
    * Text displayed in the message. Use one U+FFFC object replacement character per attachment to control placement.
    */
@@ -33073,69 +33089,9 @@ export type AmbNativeTextContentWritable = (
   attachments?: Array<AmbNativeAttachmentWritable>;
 };
 
-export type AmbNativeRichLinkContentWritable = unknown & {
+export type AmbInteractiveWritable = unknown & {
   /**
-   * Always rich_link.
-   */
-  type: AmbMessageType;
-  /**
-   * Automatic introductions for rich links are enabled regionally in stages. When enabled for a new send, a nonblank body is sent as a separate text before the link. All parts belong to one message, which becomes sent after Apple accepts all parts. Before activation, and for retries retaining legacy behavior, body is included in the rich link request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the rich link. Use one U+FFFC object replacement character per attachment to control placement.
-   */
-  body?: string;
-  /**
-   * Subject displayed above the message body.
-   */
-  subject?: string;
-  /**
-   * Ordered attachments. A send supplies each one by source_url or attachment_id.
-   */
-  attachments?: Array<AmbNativeAttachmentWritable>;
-  rich_link_data?: AmbNativeRichLinkData;
-  rich_link_construct?: AmbRichLinkConstruct;
-};
-
-export type AmbNativeInteractivePayloadWritable = unknown & {
-  /**
-   * Correlation identifier for this interaction. Bird generates one when omitted. Use a new value for each message. A reply is linked to its request only when no other sent message in the conversation uses the same identifier.
-   */
-  request_identifier?: string;
-  /**
-   * Images referenced by identifier.
-   */
-  images?: Array<AmbNativeImage>;
-  quick_reply?: AmbNativeQuickReply;
-  list_picker?: AmbNativeListPicker;
-  event?: AmbNativeEvent;
-  dynamic?: AmbNativeDynamic;
-};
-
-export type AmbNativeInteractiveDataWritable = unknown & {
-  /**
-   * App Store identifier of the iMessage app.
-   */
-  app_id?: string;
-  /**
-   * Name of the iMessage app.
-   */
-  app_name?: string;
-  /**
-   * Identifier of the iMessage extension, in Apple's `com.apple.messages.MSMessageExtensionBalloonPlugin:team-id:extension-id` format.
-   */
-  bid?: string;
-  /**
-   * Opaque URL string that Messages passes to the iMessage app.
-   */
-  url?: string;
-  /**
-   * Whether Messages renders the received and reply bubbles using Live Layout.
-   */
-  use_live_layout?: boolean;
-  /**
-   * Session UUID to preserve across interactions. Apple creates one when omitted.
-   */
-  session_identifier?: string;
-  /**
-   * Content Messages shows in the received message bubble.
+   * Content Messages shows in the received message bubble. For a list picker, time picker or form, this is the visible introduction.
    */
   received_message?: AmbMessageBubble;
   /**
@@ -33143,76 +33099,23 @@ export type AmbNativeInteractiveDataWritable = unknown & {
    */
   reply_message?: AmbMessageBubble;
   /**
-   * Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.
+   * Session UUID to preserve across interactions. Apple creates one when omitted.
    */
-  app_icon_source_url?: string;
-  data?: AmbNativeInteractivePayloadWritable;
+  session_identifier?: string;
+  /**
+   * Correlation identifier for this interaction. Bird generates one when omitted. Use a new value for each message. A reply is linked to its request only when no other sent message in the conversation uses the same identifier.
+   */
+  request_identifier?: string;
+  /**
+   * Images the interaction references by `image_identifier`, such as list picker thumbnails.
+   */
+  images?: Array<AmbNativeImage>;
+  quick_reply?: AmbNativeQuickReply;
+  list_picker?: AmbNativeListPicker;
+  event?: AmbNativeEvent;
+  dynamic?: AmbNativeDynamic;
+  imessage_app?: AmbiMessageApp;
 };
-
-export type AmbNativeInteractiveContentWritable = {
-  /**
-   * Always interactive.
-   */
-  type: AmbMessageType;
-  /**
-   * Automatic introductions for inline quick replies are enabled regionally in stages. When enabled for a new send containing `interactive_data.data.quick_reply`, a nonblank body is sent as separate text before the choices. All parts belong to one message, which becomes sent after Apple accepts all parts. Before activation, and for retries retaining legacy behavior, body is included in the interactive request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the quick reply. Omit body to send choices only. For list pickers, time pickers and forms, use interactive_data.received_message for the visible introduction. Use one U+FFFC object replacement character per attachment to control placement.
-   */
-  body?: string;
-  /**
-   * Subject displayed above the message body.
-   */
-  subject?: string;
-  /**
-   * Ordered attachments. A send supplies each one by source_url or attachment_id.
-   */
-  attachments?: Array<AmbNativeAttachmentWritable>;
-  interactive_data: AmbNativeInteractiveDataWritable;
-};
-
-/**
- * Apple message families with Bird field naming and media URLs. Authentication and Apple Pay requests are created through their dedicated conversation endpoints.
- */
-export type AmbMessageContentWritable =
-  | ({
-      type: "text";
-    } & AmbNativeTextContentWritable)
-  | ({
-      type: "rich_link";
-    } & AmbNativeRichLinkContentWritable)
-  | ({
-      type: "interactive";
-    } & AmbNativeInteractiveContentWritable);
-
-export type AmbNativeInboundInteractiveContentWritable = {
-  /**
-   * Always interactive.
-   */
-  type: AmbMessageType;
-  /**
-   * Message body supplied by Apple.
-   */
-  body?: string;
-  /**
-   * Message subject supplied by Apple.
-   */
-  subject?: string;
-  /**
-   * Ordered attachments supplied by Apple.
-   */
-  attachments?: Array<AmbNativeAttachmentWritable>;
-  interactive_data: AmbNativeInboundInteractiveData;
-};
-
-/**
- * Received text, attachments, and interactive replies, preserving Apple message structure.
- */
-export type AmbInboundContentWritable =
-  | ({
-      type: "text";
-    } & AmbNativeTextContentWritable)
-  | ({
-      type: "interactive";
-    } & AmbNativeInboundInteractiveContentWritable);
 
 /**
  * Failure detail for a message or invitation that could not be sent or was rejected.
@@ -33240,7 +33143,11 @@ export type AmbMessageListWritable = {
   data: Array<AmbMessageWritable>;
 } & ListEnvelope;
 
-export type AmbMessageSendRequestWritable = unknown & {
+/**
+ * A message to send. Supply `text`, `rich_link` or `interactive` (the last two optionally with `text` sent first as its own bubble), or `template` (a stored template, whose category is derived).
+ *
+ */
+export type AmbMessageSendRequestWritable = {
   /**
    * Apple business identifier of the brand sending the message. Read it from the business’s apple_business_id. The customer must have opened the conversation with this business.
    */
@@ -33254,11 +33161,19 @@ export type AmbMessageSendRequestWritable = unknown & {
    */
   source?: AmbMessageSource;
   /**
-   * Message content in Apple’s native text, rich_link, or interactive family. Required unless `template` is supplied (the two are mutually exclusive).
+   * A text message. Alongside `rich_link` or `interactive`, it is sent first as its own text bubble, in the same message.
    */
-  content?: AmbMessageContentWritable;
+  text?: AmbTextWritable;
   /**
-   * Send using a stored template instead of native content. The category is derived from the template, so `category` is rejected alongside it.
+   * A link with a preview card.
+   */
+  rich_link?: AmbRichLink;
+  /**
+   * Something for the customer to tap, such as quick replies, a list picker, a time picker, a form or a custom iMessage app.
+   */
+  interactive?: AmbInteractiveWritable;
+  /**
+   * Send using a stored template instead of `text`, `rich_link` or `interactive`. The category is derived from the template, so `category` is rejected alongside it.
    *
    */
   template?: AmbTemplateSend;
@@ -46083,6 +45998,11 @@ export type GetSmsStatsSummaryData = {
      */
     carrier?: string;
     /**
+     * Restrict the statistics to messages sent with this cost center. The match is exact. Mutually exclusive with the other dimension filters; only one may be set per request.
+     *
+     */
+    cost_center?: string;
+    /**
      * Set to `previous_period` to also include the same statistics for the immediately preceding window of equal length, plus the change between the two, so you can show "+X% vs last period" without a second request.
      *
      */
@@ -46188,6 +46108,11 @@ export type GetSmsStatsDailyData = {
      *
      */
     carrier?: string;
+    /**
+     * Restrict the statistics to messages sent with this cost center. The match is exact. Mutually exclusive with the other dimension filters; only one may be set per request.
+     *
+     */
+    cost_center?: string;
   };
   url: "/v1/sms/stats/daily";
 };
@@ -46289,6 +46214,11 @@ export type GetSmsStatsHourlyData = {
      *
      */
     carrier?: string;
+    /**
+     * Restrict the statistics to messages sent with this cost center. The match is exact. Mutually exclusive with the other dimension filters; only one may be set per request.
+     *
+     */
+    cost_center?: string;
   };
   url: "/v1/sms/stats/hourly";
 };
@@ -46936,6 +46866,105 @@ export type GetSmsStatsByTagResponses = {
 
 export type GetSmsStatsByTagResponse =
   GetSmsStatsByTagResponses[keyof GetSmsStatsByTagResponses];
+
+export type GetSmsStatsByCostCenterData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to keep the window within the 720-hour trend cap.
+     */
+    from?: string;
+    /**
+     * End date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to today in that timezone when omitted. Window may not exceed 365 days.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Metric to rank rows by, applied descending. Any lifecycle count or derived rate in the response may be used; rows whose rate is undefined (zero denominator) sort last. Defaults to `accepted`.
+     *
+     */
+    sort?: SmsStatsSortMetric;
+    /**
+     * Maximum number of cost center rows to return, ranked by the `sort` field descending.
+     */
+    limit?: number;
+    /**
+     * When true, each row also carries a `trend` array: a short per-bucket lifecycle-count series for that row over the window. Returned only when `limit` is 50 or fewer and the window is at most 90 days (trend_grain=daily) or 720 hours (trend_grain=hourly); a larger request returns 422.
+     *
+     */
+    include_trend?: boolean;
+    /**
+     * Bucket grain for the `trend` series. Has no effect unless `include_trend=true`.
+     */
+    trend_grain?: StatsTrendGrain;
+  };
+  url: "/v1/sms/stats/cost-centers";
+};
+
+export type GetSmsStatsByCostCenterErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetSmsStatsByCostCenterError =
+  GetSmsStatsByCostCenterErrors[keyof GetSmsStatsByCostCenterErrors];
+
+export type GetSmsStatsByCostCenterResponses = {
+  /**
+   * Per-cost-center breakdown for the requested period.
+   */
+  200: SmsStatsByCostCenterResponse;
+};
+
+export type GetSmsStatsByCostCenterResponse =
+  GetSmsStatsByCostCenterResponses[keyof GetSmsStatsByCostCenterResponses];
 
 export type GetSmsStatsByStatusData = {
   body?: never;

@@ -697,6 +697,9 @@ import type {
   GetSmsStatsByCategoryData,
   GetSmsStatsByCategoryErrors,
   GetSmsStatsByCategoryResponses,
+  GetSmsStatsByCostCenterData,
+  GetSmsStatsByCostCenterErrors,
+  GetSmsStatsByCostCenterResponses,
   GetSmsStatsByCountryData,
   GetSmsStatsByCountryErrors,
   GetSmsStatsByCountryResponses,
@@ -5256,6 +5259,40 @@ export const getSmsStatsByTag = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/sms/stats/tags",
+    ...options,
+  });
+
+/**
+ * Get outbound SMS statistics by cost center
+ *
+ * Returns aggregate delivery and latency stats grouped by the `cost_center` messages were sent with, for the requested period. Messages sent without a cost center are not counted, so rows do not sum to the period total. Rows are ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, hard maximum 200).
+ *
+ * Rows use send-time attribution. A delivery confirmed during the period for a message accepted earlier counts against the earlier period. A recent period therefore under-reports `delivered` while delivery reports are still arriving, and its counts grow as reports arrive.
+ *
+ * The maximum window is 365 days; requesting a longer range returns 422.
+ *
+ */
+export const getSmsStatsByCostCenter = <ThrowOnError extends boolean = false>(
+  options?: Options<GetSmsStatsByCostCenterData, ThrowOnError>,
+): RequestResult<
+  GetSmsStatsByCostCenterResponses,
+  GetSmsStatsByCostCenterErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetSmsStatsByCostCenterResponses,
+    GetSmsStatsByCostCenterErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/sms/stats/cost-centers",
     ...options,
   });
 

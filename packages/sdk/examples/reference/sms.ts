@@ -109,6 +109,15 @@ export async function smsStatsByTag() {
   }
 }
 
+export async function smsStatsByCostCenter() {
+  const stats = await bird.sms.stats.byCostCenter({ from: "2026-05-01", to: "2026-05-31" });
+  for (const row of stats.data) {
+    // Messages sent without a cost center are not counted, so rows do not sum to
+    // the period total.
+    console.log(row.cost_center, row.delivery);
+  }
+}
+
 export async function smsStatsInboundSummary() {
   const summary = await bird.sms.stats.inbound.summary({ from: "2026-05-01", to: "2026-05-31" });
   console.log(summary.received);

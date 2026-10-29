@@ -48,5 +48,5 @@ export async function ambTemplatesVersionsLanguagesGet() {
     "amv_01ky4x8e4genzb7way45txfkm1",
     "en",
   );
-  console.log(language.language, language.content);
+  console.log(language.language, language.text);
 }

@@ -4984,7 +4984,7 @@ export const AMBContentKindSchema = {
     "interactive",
   ],
   description:
-    "Derived message classification for filtering and statistics. Send requests use the native content.type families. Create Apple Pay and authentication requests through the conversation payment and authentication operations.\n\n- text: Text, optionally with a subject.\n- attachment: One or more files, images, audio clips, or videos.\n- rich_link: A link with a preview card.\n- quick_reply: Two to five reply choices.\n- list_picker: A grouped menu of choices.\n- time_picker: Appointment time slots; a reply may contain only a selected label.\n- form: A multi-page form.\n- imessage_app: A custom iMessage app interaction on a compatible device.\n- interactive: An opaque interactive reference whose subtype is unknown.\n- apple_pay: An Apple Pay request created through the conversation payment operations.\n- authenticate: An identity verification request created through the conversation authentication operations.",
+    "Derived message classification for filtering and statistics. Send requests use the `text`, `rich_link` and `interactive` keys. Create Apple Pay and authentication requests through the conversation payment and authentication operations.\n\n- text: Text, optionally with a subject.\n- attachment: One or more files, images, audio clips, or videos.\n- rich_link: A link with a preview card.\n- quick_reply: Two to five reply choices.\n- list_picker: A grouped menu of choices.\n- time_picker: Appointment time slots; a reply may contain only a selected label.\n- form: A multi-page form.\n- imessage_app: A custom iMessage app interaction on a compatible device.\n- interactive: An opaque interactive reference whose subtype is unknown.\n- apple_pay: An Apple Pay request created through the conversation payment operations.\n- authenticate: An identity verification request created through the conversation authentication operations.",
 } as const;
 
 export const AMBStatsSummaryPeriodSchema = {
@@ -15657,6 +15657,78 @@ export const SMSStatsByOriginatorResponseSchema = {
       description:
         "Total number of distinct originators with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.\n",
       example: 42,
+    },
+  },
+} as const;
+
+export const SMSCostCenterStatsPointSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "Aggregate delivery and latency stats for a single cost center over the requested period.",
+  required: ["cost_center", "delivery", "latency"],
+  properties: {
+    cost_center: {
+      type: "string",
+      minLength: 1,
+      maxLength: 64,
+      description:
+        "The cost center this row aggregates, as set on the message or taken from its messaging profile at send time.",
+      example: "CC001234",
+    },
+    delivery: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSDeliveryStats",
+        },
+      ],
+    },
+    latency: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSLatencyStats",
+        },
+      ],
+    },
+    trend: {
+      type: "array",
+      description:
+        "Per-bucket lifecycle counts for this cost center, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.",
+      items: {
+        $ref: "#/components/schemas/SMSStatsPoint",
+      },
+    },
+  },
+} as const;
+
+export const SMSStatsByCostCenterResponseSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "Per-cost-center breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).",
+  required: ["period", "data", "total"],
+  properties: {
+    period: {
+      $ref: "#/components/schemas/SMSStatsSummaryPeriod",
+      description:
+        "The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.",
+    },
+    data: {
+      type: "array",
+      description:
+        "Cost center breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no messages with a cost center were sent in the period.",
+      items: {
+        $ref: "#/components/schemas/SMSCostCenterStatsPoint",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      description:
+        "Total number of distinct cost centers with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.\n",
+      example: 8,
     },
   },
 } as const;
@@ -26384,7 +26456,7 @@ export const AMBAttachmentSchema = {
   additionalProperties: false,
   readOnly: true,
   description:
-    "A file Apple holds for one business account. Send it again by passing `id` as `attachment_id` in `content.attachments`. Only the business account in `business_account_id` can send it; a send from another business account is refused with a `422` `AMBAttachmentBusinessMismatch`. `message_id` is absent for an uploaded attachment.",
+    "A file Apple holds for one business account. Send it again by passing `id` as `attachment_id` in `text.attachments`. Only the business account in `business_account_id` can send it; a send from another business account is refused with a `422` `AMBAttachmentBusinessMismatch`. `message_id` is absent for an uploaded attachment.",
   required: [
     "id",
     "business_account_id",
@@ -26479,14 +26551,6 @@ export const AMBMessageSourceSchema = {
     "Who sent an outbound message:\n\n- `operator`: A person, through a signed-in dashboard session.\n- `automation`: A workflow or bot acting on the workspace's behalf,\n  through a signed-in session.\n- `api`: A direct API call, authenticated with an API key.\n\nA credential can send only the sources it is permitted; naming one\noutside that set is refused with a `422` `AMBMessageSourceNotPermitted`.\n\nThis is not `from`, which a send carries alongside it. That names\nthe brand the message goes out as; this names who composed it.\n",
 } as const;
 
-export const AMBMessageTypeSchema = {
-  type: "string",
-  minLength: 1,
-  enum: ["text", "rich_link", "interactive"],
-  description:
-    "Apple Messages for Business message family:\n\n- `text` means a text or attachment message.\n- `rich_link` means a rich URL or video link preview.\n- `interactive` means an interactive payload such as a list picker, time picker, quick reply, form, authentication request, or Apple Pay request.\n",
-} as const;
-
 export const AMBNativeAttachmentSchema = {
   type: "object",
   additionalProperties: false,
@@ -26538,16 +26602,13 @@ export const AMBNativeAttachmentSchema = {
   ],
 } as const;
 
-export const AMBNativeTextContentSchema = {
+export const AMBTextSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["type"],
+  "x-sensitive": true,
+  description:
+    "A text message: a body, an optional subject, and files placed in the body. Next to `rich_link` or `interactive`, it is sent first as its own text bubble.",
   properties: {
-    type: {
-      const: "text",
-      description: "Always text.",
-      $ref: "#/components/schemas/AMBMessageType",
-    },
     body: {
       type: "string",
       description:
@@ -26581,6 +26642,9 @@ export const AMBNativeTextContentSchema = {
       },
     },
   ],
+  example: {
+    body: "Your order is ready.",
+  },
 } as const;
 
 export const AMBNativeRichLinkImageSchema = {
@@ -26685,35 +26749,13 @@ export const AMBRichLinkConstructSchema = {
     "Asks Apple to build the rich link preview when the message is sent. Use `POST /v1/amb/messages/construct-payload` beforehand only to check the URL and see the preview's title.",
 } as const;
 
-export const AMBNativeRichLinkContentSchema = {
+export const AMBRichLinkSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["type"],
+  "x-sensitive": true,
+  description:
+    "A link with a preview card. Supply your own preview in `rich_link_data`, or ask Apple to build it with `rich_link_construct`. To introduce the link, send `text` alongside it.",
   properties: {
-    type: {
-      const: "rich_link",
-      description: "Always rich_link.",
-      $ref: "#/components/schemas/AMBMessageType",
-    },
-    body: {
-      type: "string",
-      description:
-        "Automatic introductions for rich links are enabled regionally in stages. When enabled for a new send, a nonblank body is sent as a separate text before the link. All parts belong to one message, which becomes sent after Apple accepts all parts. Before activation, and for retries retaining legacy behavior, body is included in the rich link request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the rich link. Use one U+FFFC object replacement character per attachment to control placement.",
-      "x-sensitive": true,
-    },
-    subject: {
-      type: "string",
-      description: "Subject displayed above the message body.",
-      "x-sensitive": true,
-    },
-    attachments: {
-      type: "array",
-      items: {
-        $ref: "#/components/schemas/AMBNativeAttachment",
-      },
-      description:
-        "Ordered attachments. A send supplies each one by source_url or attachment_id.",
-    },
     rich_link_data: {
       $ref: "#/components/schemas/AMBNativeRichLinkData",
     },
@@ -26855,7 +26897,7 @@ export const AMBNativeQuickReplySchema = {
       minLength: 1,
       "x-sensitive": true,
       description:
-        "Text used for the device notification and shown in the transcript after the customer chooses an item. Automatic introductions through the enclosing content.body depend on regional activation and the send retry mode; see content.body. For an introduction independent of activation, send a separate text message and omit content.body from the quick reply.",
+        "Text used for the device notification and shown in the transcript after the customer chooses an item. To introduce the choices, send `text` alongside `interactive`; it arrives first as its own bubble.",
     },
     items: {
       type: "array",
@@ -27607,313 +27649,19 @@ export const AMBNativeDynamicSchema = {
   },
 } as const;
 
-export const AMBAuthenticationIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^amauth_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "amauth_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const AMBNativeAuthenticationSchema = {
-  type: "object",
-  additionalProperties: false,
-  readOnly: true,
-  description:
-    "Authentication attempt created through the conversation authentication endpoint. Contains no authorization parameters or credentials.",
-  required: ["authentication_id"],
-  properties: {
-    authentication_id: {
-      readOnly: true,
-      $ref: "#/components/schemas/AMBAuthenticationID",
-    },
-  },
-} as const;
-
-export const AMBNativePaymentSchema = {
-  type: "object",
-  additionalProperties: false,
-  readOnly: true,
-  description:
-    "Apple Pay request created through the conversation payment endpoint. Contains no payment token or provider credentials.",
-  required: ["payment_id"],
-  properties: {
-    payment_id: {
-      readOnly: true,
-      $ref: "#/components/schemas/AMBPaymentID",
-    },
-  },
-} as const;
-
-export const AMBNativeInteractivePayloadSchema = {
+export const AMBIMessageAppSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Exactly one built-in interaction. Protocol versions are managed by Bird.",
-  properties: {
-    request_identifier: {
-      type: "string",
-      pattern:
-        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
-      description:
-        "Correlation identifier for this interaction. Bird generates one when omitted. Use a new value for each message. A reply is linked to its request only when no other sent message in the conversation uses the same identifier.",
-    },
-    images: {
-      type: "array",
-      items: {
-        $ref: "#/components/schemas/AMBNativeImage",
-      },
-      description: "Images referenced by identifier.",
-    },
-    quick_reply: {
-      $ref: "#/components/schemas/AMBNativeQuickReply",
-    },
-    list_picker: {
-      $ref: "#/components/schemas/AMBNativeListPicker",
-    },
-    event: {
-      $ref: "#/components/schemas/AMBNativeEvent",
-    },
-    dynamic: {
-      $ref: "#/components/schemas/AMBNativeDynamic",
-    },
-    authenticate: {
-      $ref: "#/components/schemas/AMBNativeAuthentication",
-      readOnly: true,
-    },
-    payment: {
-      $ref: "#/components/schemas/AMBNativePayment",
-      readOnly: true,
-    },
-  },
-  oneOf: [
-    {
-      required: ["quick_reply"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              list_picker: {},
-            },
-            required: ["list_picker"],
-          },
-          {
-            properties: {
-              event: {},
-            },
-            required: ["event"],
-          },
-          {
-            properties: {
-              dynamic: {},
-            },
-            required: ["dynamic"],
-          },
-          {
-            properties: {
-              authenticate: {},
-            },
-            required: ["authenticate"],
-          },
-          {
-            properties: {
-              payment: {},
-            },
-            required: ["payment"],
-          },
-        ],
-      },
-    },
-    {
-      required: ["list_picker"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              quick_reply: {},
-            },
-            required: ["quick_reply"],
-          },
-          {
-            properties: {
-              event: {},
-            },
-            required: ["event"],
-          },
-          {
-            properties: {
-              dynamic: {},
-            },
-            required: ["dynamic"],
-          },
-          {
-            properties: {
-              authenticate: {},
-            },
-            required: ["authenticate"],
-          },
-          {
-            properties: {
-              payment: {},
-            },
-            required: ["payment"],
-          },
-        ],
-      },
-    },
-    {
-      required: ["event"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              quick_reply: {},
-            },
-            required: ["quick_reply"],
-          },
-          {
-            properties: {
-              list_picker: {},
-            },
-            required: ["list_picker"],
-          },
-          {
-            properties: {
-              dynamic: {},
-            },
-            required: ["dynamic"],
-          },
-          {
-            properties: {
-              authenticate: {},
-            },
-            required: ["authenticate"],
-          },
-          {
-            properties: {
-              payment: {},
-            },
-            required: ["payment"],
-          },
-        ],
-      },
-    },
-    {
-      required: ["dynamic"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              quick_reply: {},
-            },
-            required: ["quick_reply"],
-          },
-          {
-            properties: {
-              list_picker: {},
-            },
-            required: ["list_picker"],
-          },
-          {
-            properties: {
-              event: {},
-            },
-            required: ["event"],
-          },
-          {
-            properties: {
-              authenticate: {},
-            },
-            required: ["authenticate"],
-          },
-          {
-            properties: {
-              payment: {},
-            },
-            required: ["payment"],
-          },
-        ],
-      },
-    },
-    {
-      required: ["authenticate"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              quick_reply: {},
-            },
-            required: ["quick_reply"],
-          },
-          {
-            properties: {
-              list_picker: {},
-            },
-            required: ["list_picker"],
-          },
-          {
-            properties: {
-              event: {},
-            },
-            required: ["event"],
-          },
-          {
-            properties: {
-              dynamic: {},
-            },
-            required: ["dynamic"],
-          },
-          {
-            properties: {
-              payment: {},
-            },
-            required: ["payment"],
-          },
-        ],
-      },
-    },
-    {
-      required: ["payment"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              quick_reply: {},
-            },
-            required: ["quick_reply"],
-          },
-          {
-            properties: {
-              list_picker: {},
-            },
-            required: ["list_picker"],
-          },
-          {
-            properties: {
-              event: {},
-            },
-            required: ["event"],
-          },
-          {
-            properties: {
-              dynamic: {},
-            },
-            required: ["dynamic"],
-          },
-          {
-            properties: {
-              authenticate: {},
-            },
-            required: ["authenticate"],
-          },
-        ],
-      },
-    },
+    "A custom iMessage app interaction. It also requires both `received_message` and `reply_message`.",
+  required: [
+    "app_id",
+    "app_name",
+    "bid",
+    "url",
+    "app_icon_source_url",
+    "use_live_layout",
   ],
-} as const;
-
-export const AMBNativeInteractiveDataSchema = {
-  type: "object",
-  additionalProperties: false,
   properties: {
     app_id: {
       type: "string",
@@ -27939,10 +27687,388 @@ export const AMBNativeInteractiveDataSchema = {
         "Opaque URL string that Messages passes to the iMessage app.",
       example: "?order=1234&view=detail",
     },
+    app_icon_source_url: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.",
+      "x-sensitive": true,
+    },
     use_live_layout: {
       type: "boolean",
       description:
         "Whether Messages renders the received and reply bubbles using Live Layout.",
+    },
+  },
+} as const;
+
+export const AMBNativePaymentSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Apple Pay request created through the conversation payment endpoint. Contains no payment token or provider credentials.",
+  required: ["payment_id"],
+  properties: {
+    payment_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBPaymentID",
+    },
+  },
+} as const;
+
+export const AMBAuthenticationIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^amauth_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "amauth_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AMBNativeAuthenticationSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "Authentication attempt created through the conversation authentication endpoint. Contains no authorization parameters or credentials.",
+  required: ["authentication_id"],
+  properties: {
+    authentication_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/AMBAuthenticationID",
+    },
+  },
+} as const;
+
+export const AMBInteractiveSchema = {
+  type: "object",
+  additionalProperties: false,
+  "x-sensitive": true,
+  description:
+    "Something for the customer to tap: exactly one of `quick_reply`, `list_picker`, `event` (a time picker), `dynamic` (a form) or `imessage_app`. To introduce it with text or files, send `text` alongside it; that text arrives as its own bubble first. Apple Pay and identity verification requests are created through their conversation endpoints and read back here as `payment` and `authenticate`.",
+  oneOf: [
+    {
+      required: ["quick_reply"],
+      not: {
+        anyOf: [
+          {
+            required: ["list_picker"],
+            properties: {
+              list_picker: {},
+            },
+          },
+          {
+            required: ["event"],
+            properties: {
+              event: {},
+            },
+          },
+          {
+            required: ["dynamic"],
+            properties: {
+              dynamic: {},
+            },
+          },
+          {
+            required: ["imessage_app"],
+            properties: {
+              imessage_app: {},
+            },
+          },
+          {
+            required: ["payment"],
+            properties: {
+              payment: {},
+            },
+          },
+          {
+            required: ["authenticate"],
+            properties: {
+              authenticate: {},
+            },
+          },
+        ],
+      },
+    },
+    {
+      required: ["list_picker"],
+      not: {
+        anyOf: [
+          {
+            required: ["quick_reply"],
+            properties: {
+              quick_reply: {},
+            },
+          },
+          {
+            required: ["event"],
+            properties: {
+              event: {},
+            },
+          },
+          {
+            required: ["dynamic"],
+            properties: {
+              dynamic: {},
+            },
+          },
+          {
+            required: ["imessage_app"],
+            properties: {
+              imessage_app: {},
+            },
+          },
+          {
+            required: ["payment"],
+            properties: {
+              payment: {},
+            },
+          },
+          {
+            required: ["authenticate"],
+            properties: {
+              authenticate: {},
+            },
+          },
+        ],
+      },
+    },
+    {
+      required: ["event"],
+      not: {
+        anyOf: [
+          {
+            required: ["quick_reply"],
+            properties: {
+              quick_reply: {},
+            },
+          },
+          {
+            required: ["list_picker"],
+            properties: {
+              list_picker: {},
+            },
+          },
+          {
+            required: ["dynamic"],
+            properties: {
+              dynamic: {},
+            },
+          },
+          {
+            required: ["imessage_app"],
+            properties: {
+              imessage_app: {},
+            },
+          },
+          {
+            required: ["payment"],
+            properties: {
+              payment: {},
+            },
+          },
+          {
+            required: ["authenticate"],
+            properties: {
+              authenticate: {},
+            },
+          },
+        ],
+      },
+    },
+    {
+      required: ["dynamic"],
+      not: {
+        anyOf: [
+          {
+            required: ["quick_reply"],
+            properties: {
+              quick_reply: {},
+            },
+          },
+          {
+            required: ["list_picker"],
+            properties: {
+              list_picker: {},
+            },
+          },
+          {
+            required: ["event"],
+            properties: {
+              event: {},
+            },
+          },
+          {
+            required: ["imessage_app"],
+            properties: {
+              imessage_app: {},
+            },
+          },
+          {
+            required: ["payment"],
+            properties: {
+              payment: {},
+            },
+          },
+          {
+            required: ["authenticate"],
+            properties: {
+              authenticate: {},
+            },
+          },
+        ],
+      },
+    },
+    {
+      required: ["imessage_app", "received_message", "reply_message"],
+      not: {
+        anyOf: [
+          {
+            required: ["quick_reply"],
+            properties: {
+              quick_reply: {},
+            },
+          },
+          {
+            required: ["list_picker"],
+            properties: {
+              list_picker: {},
+            },
+          },
+          {
+            required: ["event"],
+            properties: {
+              event: {},
+            },
+          },
+          {
+            required: ["dynamic"],
+            properties: {
+              dynamic: {},
+            },
+          },
+          {
+            required: ["payment"],
+            properties: {
+              payment: {},
+            },
+          },
+          {
+            required: ["authenticate"],
+            properties: {
+              authenticate: {},
+            },
+          },
+          {
+            required: ["images"],
+            properties: {
+              images: {},
+            },
+          },
+          {
+            required: ["request_identifier"],
+            properties: {
+              request_identifier: {},
+            },
+          },
+        ],
+      },
+    },
+    {
+      required: ["payment"],
+      not: {
+        anyOf: [
+          {
+            required: ["quick_reply"],
+            properties: {
+              quick_reply: {},
+            },
+          },
+          {
+            required: ["list_picker"],
+            properties: {
+              list_picker: {},
+            },
+          },
+          {
+            required: ["event"],
+            properties: {
+              event: {},
+            },
+          },
+          {
+            required: ["dynamic"],
+            properties: {
+              dynamic: {},
+            },
+          },
+          {
+            required: ["imessage_app"],
+            properties: {
+              imessage_app: {},
+            },
+          },
+          {
+            required: ["authenticate"],
+            properties: {
+              authenticate: {},
+            },
+          },
+        ],
+      },
+    },
+    {
+      required: ["authenticate"],
+      not: {
+        anyOf: [
+          {
+            required: ["quick_reply"],
+            properties: {
+              quick_reply: {},
+            },
+          },
+          {
+            required: ["list_picker"],
+            properties: {
+              list_picker: {},
+            },
+          },
+          {
+            required: ["event"],
+            properties: {
+              event: {},
+            },
+          },
+          {
+            required: ["dynamic"],
+            properties: {
+              dynamic: {},
+            },
+          },
+          {
+            required: ["imessage_app"],
+            properties: {
+              imessage_app: {},
+            },
+          },
+          {
+            required: ["payment"],
+            properties: {
+              payment: {},
+            },
+          },
+        ],
+      },
+    },
+  ],
+  properties: {
+    received_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
+      description:
+        "Content Messages shows in the received message bubble. For a list picker, time picker or form, this is the visible introduction.",
+    },
+    reply_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
+      description: "Content Messages shows in the reply message bubble.",
     },
     session_identifier: {
       type: "string",
@@ -27951,147 +28077,86 @@ export const AMBNativeInteractiveDataSchema = {
       description:
         "Session UUID to preserve across interactions. Apple creates one when omitted.",
     },
-    received_message: {
-      $ref: "#/components/schemas/AMBMessageBubble",
-      description: "Content Messages shows in the received message bubble.",
-    },
-    reply_message: {
-      $ref: "#/components/schemas/AMBMessageBubble",
-      description: "Content Messages shows in the reply message bubble.",
-    },
-    app_icon_source_url: {
+    request_identifier: {
       type: "string",
-      minLength: 1,
+      pattern:
+        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
       description:
-        "Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.",
-      "x-sensitive": true,
+        "Correlation identifier for this interaction. Bird generates one when omitted. Use a new value for each message. A reply is linked to its request only when no other sent message in the conversation uses the same identifier.",
     },
-    data: {
-      $ref: "#/components/schemas/AMBNativeInteractivePayload",
-    },
-  },
-  description:
-    "A built-in interaction or custom iMessage app. Custom apps require the app metadata and both message bubbles.",
-  oneOf: [
-    {
-      required: ["data"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              app_id: {},
-            },
-            required: ["app_id"],
-          },
-          {
-            properties: {
-              app_name: {},
-            },
-            required: ["app_name"],
-          },
-          {
-            properties: {
-              bid: {},
-            },
-            required: ["bid"],
-          },
-          {
-            properties: {
-              url: {},
-            },
-            required: ["url"],
-          },
-          {
-            properties: {
-              app_icon_source_url: {},
-            },
-            required: ["app_icon_source_url"],
-          },
-          {
-            properties: {
-              use_live_layout: {},
-            },
-            required: ["use_live_layout"],
-          },
-        ],
-      },
-    },
-    {
-      required: [
-        "app_id",
-        "app_name",
-        "bid",
-        "url",
-        "app_icon_source_url",
-        "use_live_layout",
-        "received_message",
-        "reply_message",
-      ],
-      not: {
-        properties: {
-          data: {},
-        },
-        required: ["data"],
-      },
-    },
-  ],
-} as const;
-
-export const AMBNativeInteractiveContentSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["type", "interactive_data"],
-  properties: {
-    type: {
-      const: "interactive",
-      description: "Always interactive.",
-      $ref: "#/components/schemas/AMBMessageType",
-    },
-    body: {
-      type: "string",
-      description:
-        "Automatic introductions for inline quick replies are enabled regionally in stages. When enabled for a new send containing `interactive_data.data.quick_reply`, a nonblank body is sent as separate text before the choices. All parts belong to one message, which becomes sent after Apple accepts all parts. Before activation, and for retries retaining legacy behavior, body is included in the interactive request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the quick reply. Omit body to send choices only. For list pickers, time pickers and forms, use interactive_data.received_message for the visible introduction. Use one U+FFFC object replacement character per attachment to control placement.",
-      "x-sensitive": true,
-    },
-    subject: {
-      type: "string",
-      description: "Subject displayed above the message body.",
-      "x-sensitive": true,
-    },
-    attachments: {
+    images: {
       type: "array",
       items: {
-        $ref: "#/components/schemas/AMBNativeAttachment",
+        $ref: "#/components/schemas/AMBNativeImage",
       },
       description:
-        "Ordered attachments. A send supplies each one by source_url or attachment_id.",
+        "Images the interaction references by `image_identifier`, such as list picker thumbnails.",
     },
-    interactive_data: {
-      $ref: "#/components/schemas/AMBNativeInteractiveData",
+    quick_reply: {
+      $ref: "#/components/schemas/AMBNativeQuickReply",
+    },
+    list_picker: {
+      $ref: "#/components/schemas/AMBNativeListPicker",
+    },
+    event: {
+      $ref: "#/components/schemas/AMBNativeEvent",
+    },
+    dynamic: {
+      $ref: "#/components/schemas/AMBNativeDynamic",
+    },
+    imessage_app: {
+      $ref: "#/components/schemas/AMBIMessageApp",
+    },
+    payment: {
+      $ref: "#/components/schemas/AMBNativePayment",
+      readOnly: true,
+    },
+    authenticate: {
+      $ref: "#/components/schemas/AMBNativeAuthentication",
+      readOnly: true,
+    },
+  },
+  example: {
+    received_message: {
+      title: "Pick a delivery slot",
+    },
+    list_picker: {
+      sections: [
+        {
+          title: "Tomorrow",
+          items: [
+            {
+              identifier: "am",
+              title: "Morning",
+            },
+          ],
+        },
+      ],
     },
   },
 } as const;
 
-export const AMBMessageContentSchema = {
-  description:
-    "Apple message families with Bird field naming and media URLs. Authentication and Apple Pay requests are created through their dedicated conversation endpoints.",
-  oneOf: [
-    {
-      $ref: "#/components/schemas/AMBNativeTextContent",
+export const AMBNativeInboundImageSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["identifier", "download_url"],
+  properties: {
+    identifier: {
+      type: "string",
+      description: "Identifier used by the received message.",
+      minLength: 1,
     },
-    {
-      $ref: "#/components/schemas/AMBNativeRichLinkContent",
+    description: {
+      type: "string",
+      description: "Accessibility description supplied by Apple.",
+      "x-sensitive": true,
     },
-    {
-      $ref: "#/components/schemas/AMBNativeInteractiveContent",
-    },
-  ],
-  discriminator: {
-    propertyName: "type",
-    mapping: {
-      text: "#/components/schemas/AMBNativeTextContent",
-      rich_link: "#/components/schemas/AMBNativeRichLinkContent",
-      interactive: "#/components/schemas/AMBNativeInteractiveContent",
+    download_url: {
+      type: "string",
+      description:
+        "Relative Bird API URL for downloading the image with the same authentication and workspace as the message.",
+      format: "uri-reference",
+      minLength: 1,
     },
   },
 } as const;
@@ -28331,71 +28396,10 @@ export const AMBNativeInboundAuthenticationSchema = {
   },
 } as const;
 
-export const AMBNativeInboundImageSchema = {
+export const AMBInboundIMessageAppSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["identifier", "download_url"],
-  properties: {
-    identifier: {
-      type: "string",
-      description: "Identifier used by the received message.",
-      minLength: 1,
-    },
-    description: {
-      type: "string",
-      description: "Accessibility description supplied by Apple.",
-      "x-sensitive": true,
-    },
-    download_url: {
-      type: "string",
-      description:
-        "Relative Bird API URL for downloading the image with the same authentication and workspace as the message.",
-      format: "uri-reference",
-      minLength: 1,
-    },
-  },
-} as const;
-
-export const AMBNativeInboundPayloadSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    request_identifier: {
-      type: "string",
-      description: "Correlation identifier reported by Apple.",
-    },
-    quick_reply: {
-      $ref: "#/components/schemas/AMBNativeInboundQuickReply",
-    },
-    list_picker: {
-      $ref: "#/components/schemas/AMBNativeInboundListPicker",
-    },
-    event: {
-      $ref: "#/components/schemas/AMBNativeInboundEvent",
-    },
-    dynamic: {
-      $ref: "#/components/schemas/AMBNativeInboundDynamic",
-    },
-    payment: {
-      $ref: "#/components/schemas/AMBNativeInboundPayment",
-    },
-    authenticate: {
-      $ref: "#/components/schemas/AMBNativeInboundAuthentication",
-    },
-    images: {
-      type: "array",
-      items: {
-        $ref: "#/components/schemas/AMBNativeInboundImage",
-      },
-      description:
-        "Images returned by Apple, with authenticated download URLs.",
-    },
-  },
-} as const;
-
-export const AMBNativeInboundInteractiveDataSchema = {
-  type: "object",
-  additionalProperties: false,
+  description: "The custom iMessage app a customer replied from.",
   properties: {
     app_id: {
       type: "string",
@@ -28418,19 +28422,6 @@ export const AMBNativeInboundInteractiveDataSchema = {
       type: "boolean",
       description: "Whether the app uses live layout.",
     },
-    session_identifier: {
-      type: "string",
-      description: "Apple interaction session identifier.",
-    },
-    reply_message: {
-      $ref: "#/components/schemas/AMBMessageBubble",
-    },
-    received_message: {
-      $ref: "#/components/schemas/AMBMessageBubble",
-    },
-    data: {
-      $ref: "#/components/schemas/AMBNativeInboundPayload",
-    },
     app_icon_url: {
       type: "string",
       description:
@@ -28440,55 +28431,62 @@ export const AMBNativeInboundInteractiveDataSchema = {
   },
 } as const;
 
-export const AMBNativeInboundInteractiveContentSchema = {
+export const AMBInteractiveReplySchema = {
   type: "object",
   additionalProperties: false,
-  required: ["type", "interactive_data"],
+  "x-sensitive": true,
+  description:
+    "What the customer answered on an interactive message: their choice, time slot, form answers, payment result, sign-in result or custom app reply, under the same key as the request. Inbound only; a message that offers something to tap reads as `interactive` instead.",
   properties: {
-    type: {
-      const: "interactive",
-      description: "Always interactive.",
-      $ref: "#/components/schemas/AMBMessageType",
+    received_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
     },
-    body: {
+    reply_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
+    },
+    session_identifier: {
       type: "string",
-      description: "Message body supplied by Apple.",
-      "x-sensitive": true,
+      description: "Apple interaction session identifier.",
     },
-    subject: {
+    request_identifier: {
       type: "string",
-      description: "Message subject supplied by Apple.",
-      "x-sensitive": true,
+      description: "Correlation identifier reported by Apple.",
     },
-    attachments: {
+    images: {
       type: "array",
       items: {
-        $ref: "#/components/schemas/AMBNativeAttachment",
+        $ref: "#/components/schemas/AMBNativeInboundImage",
       },
-      description: "Ordered attachments supplied by Apple.",
+      description:
+        "Images returned by Apple, with authenticated download URLs.",
     },
-    interactive_data: {
-      $ref: "#/components/schemas/AMBNativeInboundInteractiveData",
+    quick_reply: {
+      $ref: "#/components/schemas/AMBNativeInboundQuickReply",
+    },
+    list_picker: {
+      $ref: "#/components/schemas/AMBNativeInboundListPicker",
+    },
+    event: {
+      $ref: "#/components/schemas/AMBNativeInboundEvent",
+    },
+    dynamic: {
+      $ref: "#/components/schemas/AMBNativeInboundDynamic",
+    },
+    payment: {
+      $ref: "#/components/schemas/AMBNativeInboundPayment",
+    },
+    authenticate: {
+      $ref: "#/components/schemas/AMBNativeInboundAuthentication",
+    },
+    imessage_app: {
+      $ref: "#/components/schemas/AMBInboundIMessageApp",
     },
   },
-} as const;
-
-export const AMBInboundContentSchema = {
-  description:
-    "Received text, attachments, and interactive replies, preserving Apple message structure.",
-  oneOf: [
-    {
-      $ref: "#/components/schemas/AMBNativeTextContent",
-    },
-    {
-      $ref: "#/components/schemas/AMBNativeInboundInteractiveContent",
-    },
-  ],
-  discriminator: {
-    propertyName: "type",
-    mapping: {
-      text: "#/components/schemas/AMBNativeTextContent",
-      interactive: "#/components/schemas/AMBNativeInboundInteractiveContent",
+  example: {
+    request_identifier: "6f1c2a4e-8b7d-4c3a-9e1f-2d5b7a9c0e3f",
+    quick_reply: {
+      selected_identifier: "yes",
+      selected_index: 0,
     },
   },
 } as const;
@@ -28558,7 +28556,6 @@ export const AMBMessageSchema = {
     "direction",
     "status",
     "kind",
-    "content",
     "created_at",
     "cost",
     "requested_language",
@@ -28618,19 +28615,43 @@ export const AMBMessageSchema = {
       description:
         "Who sent this message. Absent on an inbound message, which has no source to report.",
     },
-    content: {
+    text: {
       readOnly: true,
-      description:
-        "Native message content. Outgoing interactions contain requests; incoming interactions contain replies.",
-      anyOf: [
+      allOf: [
         {
-          $ref: "#/components/schemas/AMBMessageContent",
-        },
-        {
-          $ref: "#/components/schemas/AMBInboundContent",
+          $ref: "#/components/schemas/AMBText",
         },
       ],
-      "x-sensitive": true,
+      description:
+        "The message's text and files. Next to `rich_link`, `interactive` or `interactive_reply`, it is the text that came with them.",
+    },
+    rich_link: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBRichLink",
+        },
+      ],
+      description: "The link preview an outbound message carried.",
+    },
+    interactive: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBInteractive",
+        },
+      ],
+      description: "What an outbound message offered the customer to tap.",
+    },
+    interactive_reply: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBInteractiveReply",
+        },
+      ],
+      description:
+        "What the customer answered, on an inbound message replying to an interactive message.",
     },
     in_reply_to_message_id: {
       readOnly: true,
@@ -28879,23 +28900,36 @@ export const AMBMessageSendRequestSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A message to send. Supply exactly one of `content` (native content) or `template` (a stored template, whose category is derived). Supplying both, or neither, is rejected.\n",
+    "A message to send. Supply `text`, `rich_link` or `interactive` (the last two optionally with `text` sent first as its own bubble), or `template` (a stored template, whose category is derived).\n",
   required: ["from", "to"],
-  anyOf: [
-    {
-      required: ["content"],
-    },
-    {
-      required: ["template"],
-    },
-  ],
   not: {
     anyOf: [
       {
-        required: ["content", "template"],
+        required: ["rich_link", "interactive"],
         properties: {
-          content: {},
+          rich_link: {},
+          interactive: {},
+        },
+      },
+      {
+        required: ["template", "text"],
+        properties: {
           template: {},
+          text: {},
+        },
+      },
+      {
+        required: ["template", "rich_link"],
+        properties: {
+          template: {},
+          rich_link: {},
+        },
+      },
+      {
+        required: ["template", "interactive"],
+        properties: {
+          template: {},
+          interactive: {},
         },
       },
       {
@@ -28927,11 +28961,31 @@ export const AMBMessageSendRequestSchema = {
       description:
         "Who this message is sent as. A signed-in session may send as `operator` or `automation`; an API key may send as `api` or `automation`. Omit it to take the default for your credential. Naming a source your credential cannot use is refused with a `422` `AMBMessageSourceNotPermitted`.",
     },
-    content: {
-      $ref: "#/components/schemas/AMBMessageContent",
+    text: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBText",
+        },
+      ],
       description:
-        "Message content in Apple’s native text, rich_link, or interactive family. Required unless `template` is supplied (the two are mutually exclusive).",
-      "x-sensitive": true,
+        "A text message. Alongside `rich_link` or `interactive`, it is sent first as its own text bubble, in the same message.",
+    },
+    rich_link: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBRichLink",
+        },
+      ],
+      description: "A link with a preview card.",
+    },
+    interactive: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBInteractive",
+        },
+      ],
+      description:
+        "Something for the customer to tap, such as quick replies, a list picker, a time picker, a form or a custom iMessage app.",
     },
     template: {
       allOf: [
@@ -28940,7 +28994,7 @@ export const AMBMessageSendRequestSchema = {
         },
       ],
       description:
-        "Send using a stored template instead of native content. The category is derived from the template, so `category` is rejected alongside it.\n",
+        "Send using a stored template instead of `text`, `rich_link` or `interactive`. The category is derived from the template, so `category` is rejected alongside it.\n",
     },
     category: {
       type: "string",
@@ -28990,8 +29044,7 @@ export const AMBMessageSendRequestSchema = {
   example: {
     from: "b52d6267-2b62-4f8a-8842-0533d0f1dc07",
     to: "opaque-customer-id",
-    content: {
-      type: "text",
+    text: {
       body: "Your order is ready.",
     },
   },
@@ -30578,13 +30631,37 @@ export const AMBTemplateVersionLanguageSchema = {
   type: "object",
   additionalProperties: false,
   description: "One language's content and revision metadata within a version.",
-  required: ["content", "revision", "content_hash", "updated_at"],
+  required: ["revision", "content_hash", "updated_at"],
   properties: {
-    content: {
-      $ref: "#/components/schemas/AMBMessageContent",
+    text: {
       readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBText",
+        },
+      ],
       description:
-        "Stored template content, including its `{{ variable }}` placeholders.",
+        "Stored text and files. Includes its `{{ variable }}` placeholders.",
+    },
+    rich_link: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBRichLink",
+        },
+      ],
+      description:
+        "Stored link preview. Includes its `{{ variable }}` placeholders.",
+    },
+    interactive: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBInteractive",
+        },
+      ],
+      description:
+        "Stored interaction. Includes its `{{ variable }}` placeholders.",
     },
     revision: {
       type: "integer",
@@ -30605,8 +30682,7 @@ export const AMBTemplateVersionLanguageSchema = {
     },
   },
   example: {
-    content: {
-      type: "text",
+    text: {
       body: "Your order {{ order_number }} is on its way.",
     },
     revision: 1,
@@ -30721,8 +30797,7 @@ export const AMBTemplateVersionSchema = {
     ],
     languages: {
       en: {
-        content: {
-          type: "text",
+        text: {
           body: "Your order {{ order_number }} is on its way.",
         },
         revision: 1,
@@ -30797,18 +30872,42 @@ export const AMBTemplateLanguageSchema = {
   additionalProperties: false,
   description:
     "One language's full Apple Messages template content and revision metadata.",
-  required: ["language", "content", "revision", "content_hash", "updated_at"],
+  required: ["language", "revision", "content_hash", "updated_at"],
   properties: {
     language: {
       $ref: "#/components/schemas/LanguageTag",
       readOnly: true,
       description: "The language in canonical BCP-47 form.",
     },
-    content: {
-      $ref: "#/components/schemas/AMBMessageContent",
+    text: {
       readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBText",
+        },
+      ],
       description:
-        "Stored template content, including its `{{ variable }}` placeholders.",
+        "Stored text and files. Includes its `{{ variable }}` placeholders.",
+    },
+    rich_link: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBRichLink",
+        },
+      ],
+      description:
+        "Stored link preview. Includes its `{{ variable }}` placeholders.",
+    },
+    interactive: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBInteractive",
+        },
+      ],
+      description:
+        "Stored interaction. Includes its `{{ variable }}` placeholders.",
     },
     revision: {
       type: "integer",
@@ -30831,8 +30930,7 @@ export const AMBTemplateLanguageSchema = {
   },
   example: {
     language: "en",
-    content: {
-      type: "text",
+    text: {
       body: "Your order {{ order_number }} is on its way.",
     },
     revision: 1,
@@ -43512,8 +43610,7 @@ export const EventAMBAcceptedSchema = {
           status: "accepted",
           kind: "text",
           source: "operator",
-          content: {
-            type: "text",
+          text: {
             body: "Your order has shipped.",
           },
           locale: "en_US",
@@ -43719,8 +43816,7 @@ export const EventAMBReceivedSchema = {
           direction: "inbound",
           status: "received",
           kind: "text",
-          content: {
-            type: "text",
+          text: {
             body: "Where is my order?",
           },
           locale: "en_US",
@@ -43770,8 +43866,7 @@ export const EventAMBRejectedSchema = {
           status: "rejected",
           kind: "text",
           source: "operator",
-          content: {
-            type: "text",
+          text: {
             body: "Your order has shipped.",
           },
           locale: "en_US",
@@ -43834,8 +43929,7 @@ export const EventAMBSendFailedSchema = {
           status: "send_failed",
           kind: "text",
           source: "operator",
-          content: {
-            type: "text",
+          text: {
             body: "Your order has shipped.",
           },
           locale: "en_US",
@@ -43897,8 +43991,7 @@ export const EventAMBSentSchema = {
           status: "sent",
           kind: "text",
           source: "operator",
-          content: {
-            type: "text",
+          text: {
             body: "Your order has shipped.",
           },
           locale: "en_US",
@@ -57870,6 +57963,64 @@ export const SMSStatsByOriginatorResponseWritableSchema = {
     "Per-originator breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).",
 } as const;
 
+export const SMSCostCenterStatsPointWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "Aggregate delivery and latency stats for a single cost center over the requested period.",
+  required: ["cost_center", "delivery", "latency"],
+  properties: {
+    cost_center: {
+      type: "string",
+      minLength: 1,
+      maxLength: 64,
+      description:
+        "The cost center this row aggregates, as set on the message or taken from its messaging profile at send time.",
+      example: "CC001234",
+    },
+    delivery: {},
+    latency: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSLatencyStatsWritable",
+        },
+      ],
+    },
+    trend: {
+      type: "array",
+      description:
+        "Per-bucket lifecycle counts for this cost center, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.",
+    },
+  },
+} as const;
+
+export const SMSStatsByCostCenterResponseWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "Per-cost-center breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).",
+  required: ["data", "total"],
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "Cost center breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no messages with a cost center were sent in the period.",
+      items: {
+        $ref: "#/components/schemas/SMSCostCenterStatsPointWritable",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      description:
+        "Total number of distinct cost centers with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.\n",
+      example: 8,
+    },
+  },
+} as const;
+
 export const SMSStatsByStatusResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -59401,7 +59552,7 @@ export const AMBAttachmentWritableSchema = {
   additionalProperties: false,
   readOnly: true,
   description:
-    "A file Apple holds for one business account. Send it again by passing `id` as `attachment_id` in `content.attachments`. Only the business account in `business_account_id` can send it; a send from another business account is refused with a `422` `AMBAttachmentBusinessMismatch`. `message_id` is absent for an uploaded attachment.",
+    "A file Apple holds for one business account. Send it again by passing `id` as `attachment_id` in `text.attachments`. Only the business account in `business_account_id` can send it; a send from another business account is refused with a `422` `AMBAttachmentBusinessMismatch`. `message_id` is absent for an uploaded attachment.",
   required: [
     "id",
     "business_account_id",
@@ -59507,16 +59658,13 @@ export const AMBNativeAttachmentWritableSchema = {
   ],
 } as const;
 
-export const AMBNativeTextContentWritableSchema = {
+export const AMBTextWritableSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["type"],
+  "x-sensitive": true,
+  description:
+    "A text message: a body, an optional subject, and files placed in the body. Next to `rich_link` or `interactive`, it is sent first as its own text bubble.",
   properties: {
-    type: {
-      const: "text",
-      description: "Always text.",
-      $ref: "#/components/schemas/AMBMessageType",
-    },
     body: {
       type: "string",
       description:
@@ -59550,72 +59698,349 @@ export const AMBNativeTextContentWritableSchema = {
       },
     },
   ],
+  example: {
+    body: "Your order is ready.",
+  },
 } as const;
 
-export const AMBNativeRichLinkContentWritableSchema = {
+export const AMBInteractiveWritableSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["type"],
-  properties: {
-    type: {
-      const: "rich_link",
-      description: "Always rich_link.",
-      $ref: "#/components/schemas/AMBMessageType",
-    },
-    body: {
-      type: "string",
-      description:
-        "Automatic introductions for rich links are enabled regionally in stages. When enabled for a new send, a nonblank body is sent as a separate text before the link. All parts belong to one message, which becomes sent after Apple accepts all parts. Before activation, and for retries retaining legacy behavior, body is included in the rich link request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the rich link. Use one U+FFFC object replacement character per attachment to control placement.",
-      "x-sensitive": true,
-    },
-    subject: {
-      type: "string",
-      description: "Subject displayed above the message body.",
-      "x-sensitive": true,
-    },
-    attachments: {
-      type: "array",
-      items: {
-        $ref: "#/components/schemas/AMBNativeAttachmentWritable",
-      },
-      description:
-        "Ordered attachments. A send supplies each one by source_url or attachment_id.",
-    },
-    rich_link_data: {
-      $ref: "#/components/schemas/AMBNativeRichLinkData",
-    },
-    rich_link_construct: {
-      $ref: "#/components/schemas/AMBRichLinkConstruct",
-    },
-  },
+  "x-sensitive": true,
+  description:
+    "Something for the customer to tap: exactly one of `quick_reply`, `list_picker`, `event` (a time picker), `dynamic` (a form) or `imessage_app`. To introduce it with text or files, send `text` alongside it; that text arrives as its own bubble first. Apple Pay and identity verification requests are created through their conversation endpoints and read back here as `payment` and `authenticate`.",
   oneOf: [
     {
-      required: ["rich_link_data"],
+      required: ["quick_reply"],
       not: {
-        properties: {
-          rich_link_construct: {},
-        },
-        required: ["rich_link_construct"],
+        anyOf: [
+          {
+            required: ["list_picker"],
+            properties: {
+              list_picker: {},
+            },
+          },
+          {
+            required: ["event"],
+            properties: {
+              event: {},
+            },
+          },
+          {
+            required: ["dynamic"],
+            properties: {
+              dynamic: {},
+            },
+          },
+          {
+            required: ["imessage_app"],
+            properties: {
+              imessage_app: {},
+            },
+          },
+          {
+            required: ["payment"],
+            properties: {
+              payment: {},
+            },
+          },
+          {
+            required: ["authenticate"],
+            properties: {
+              authenticate: {},
+            },
+          },
+        ],
       },
     },
     {
-      required: ["rich_link_construct"],
+      required: ["list_picker"],
       not: {
-        properties: {
-          rich_link_data: {},
-        },
-        required: ["rich_link_data"],
+        anyOf: [
+          {
+            required: ["quick_reply"],
+            properties: {
+              quick_reply: {},
+            },
+          },
+          {
+            required: ["event"],
+            properties: {
+              event: {},
+            },
+          },
+          {
+            required: ["dynamic"],
+            properties: {
+              dynamic: {},
+            },
+          },
+          {
+            required: ["imessage_app"],
+            properties: {
+              imessage_app: {},
+            },
+          },
+          {
+            required: ["payment"],
+            properties: {
+              payment: {},
+            },
+          },
+          {
+            required: ["authenticate"],
+            properties: {
+              authenticate: {},
+            },
+          },
+        ],
+      },
+    },
+    {
+      required: ["event"],
+      not: {
+        anyOf: [
+          {
+            required: ["quick_reply"],
+            properties: {
+              quick_reply: {},
+            },
+          },
+          {
+            required: ["list_picker"],
+            properties: {
+              list_picker: {},
+            },
+          },
+          {
+            required: ["dynamic"],
+            properties: {
+              dynamic: {},
+            },
+          },
+          {
+            required: ["imessage_app"],
+            properties: {
+              imessage_app: {},
+            },
+          },
+          {
+            required: ["payment"],
+            properties: {
+              payment: {},
+            },
+          },
+          {
+            required: ["authenticate"],
+            properties: {
+              authenticate: {},
+            },
+          },
+        ],
+      },
+    },
+    {
+      required: ["dynamic"],
+      not: {
+        anyOf: [
+          {
+            required: ["quick_reply"],
+            properties: {
+              quick_reply: {},
+            },
+          },
+          {
+            required: ["list_picker"],
+            properties: {
+              list_picker: {},
+            },
+          },
+          {
+            required: ["event"],
+            properties: {
+              event: {},
+            },
+          },
+          {
+            required: ["imessage_app"],
+            properties: {
+              imessage_app: {},
+            },
+          },
+          {
+            required: ["payment"],
+            properties: {
+              payment: {},
+            },
+          },
+          {
+            required: ["authenticate"],
+            properties: {
+              authenticate: {},
+            },
+          },
+        ],
+      },
+    },
+    {
+      required: ["imessage_app", "received_message", "reply_message"],
+      not: {
+        anyOf: [
+          {
+            required: ["quick_reply"],
+            properties: {
+              quick_reply: {},
+            },
+          },
+          {
+            required: ["list_picker"],
+            properties: {
+              list_picker: {},
+            },
+          },
+          {
+            required: ["event"],
+            properties: {
+              event: {},
+            },
+          },
+          {
+            required: ["dynamic"],
+            properties: {
+              dynamic: {},
+            },
+          },
+          {
+            required: ["payment"],
+            properties: {
+              payment: {},
+            },
+          },
+          {
+            required: ["authenticate"],
+            properties: {
+              authenticate: {},
+            },
+          },
+          {
+            required: ["images"],
+            properties: {
+              images: {},
+            },
+          },
+          {
+            required: ["request_identifier"],
+            properties: {
+              request_identifier: {},
+            },
+          },
+        ],
+      },
+    },
+    {
+      required: ["payment"],
+      not: {
+        anyOf: [
+          {
+            required: ["quick_reply"],
+            properties: {
+              quick_reply: {},
+            },
+          },
+          {
+            required: ["list_picker"],
+            properties: {
+              list_picker: {},
+            },
+          },
+          {
+            required: ["event"],
+            properties: {
+              event: {},
+            },
+          },
+          {
+            required: ["dynamic"],
+            properties: {
+              dynamic: {},
+            },
+          },
+          {
+            required: ["imessage_app"],
+            properties: {
+              imessage_app: {},
+            },
+          },
+          {
+            required: ["authenticate"],
+            properties: {
+              authenticate: {},
+            },
+          },
+        ],
+      },
+    },
+    {
+      required: ["authenticate"],
+      not: {
+        anyOf: [
+          {
+            required: ["quick_reply"],
+            properties: {
+              quick_reply: {},
+            },
+          },
+          {
+            required: ["list_picker"],
+            properties: {
+              list_picker: {},
+            },
+          },
+          {
+            required: ["event"],
+            properties: {
+              event: {},
+            },
+          },
+          {
+            required: ["dynamic"],
+            properties: {
+              dynamic: {},
+            },
+          },
+          {
+            required: ["imessage_app"],
+            properties: {
+              imessage_app: {},
+            },
+          },
+          {
+            required: ["payment"],
+            properties: {
+              payment: {},
+            },
+          },
+        ],
       },
     },
   ],
-} as const;
-
-export const AMBNativeInteractivePayloadWritableSchema = {
-  type: "object",
-  additionalProperties: false,
-  description:
-    "Exactly one built-in interaction. Protocol versions are managed by Bird.",
   properties: {
+    received_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
+      description:
+        "Content Messages shows in the received message bubble. For a list picker, time picker or form, this is the visible introduction.",
+    },
+    reply_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
+      description: "Content Messages shows in the reply message bubble.",
+    },
+    session_identifier: {
+      type: "string",
+      pattern:
+        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+      description:
+        "Session UUID to preserve across interactions. Apple creates one when omitted.",
+    },
     request_identifier: {
       type: "string",
       pattern:
@@ -59628,7 +60053,8 @@ export const AMBNativeInteractivePayloadWritableSchema = {
       items: {
         $ref: "#/components/schemas/AMBNativeImage",
       },
-      description: "Images referenced by identifier.",
+      description:
+        "Images the interaction references by `image_identifier`, such as list picker thumbnails.",
     },
     quick_reply: {
       $ref: "#/components/schemas/AMBNativeQuickReply",
@@ -59642,468 +60068,26 @@ export const AMBNativeInteractivePayloadWritableSchema = {
     dynamic: {
       $ref: "#/components/schemas/AMBNativeDynamic",
     },
+    imessage_app: {
+      $ref: "#/components/schemas/AMBIMessageApp",
+    },
   },
-  oneOf: [
-    {
-      required: ["quick_reply"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              list_picker: {},
-            },
-            required: ["list_picker"],
-          },
-          {
-            properties: {
-              event: {},
-            },
-            required: ["event"],
-          },
-          {
-            properties: {
-              dynamic: {},
-            },
-            required: ["dynamic"],
-          },
-          {
-            properties: {
-              authenticate: {},
-            },
-            required: ["authenticate"],
-          },
-          {
-            properties: {
-              payment: {},
-            },
-            required: ["payment"],
-          },
-        ],
-      },
-    },
-    {
-      required: ["list_picker"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              quick_reply: {},
-            },
-            required: ["quick_reply"],
-          },
-          {
-            properties: {
-              event: {},
-            },
-            required: ["event"],
-          },
-          {
-            properties: {
-              dynamic: {},
-            },
-            required: ["dynamic"],
-          },
-          {
-            properties: {
-              authenticate: {},
-            },
-            required: ["authenticate"],
-          },
-          {
-            properties: {
-              payment: {},
-            },
-            required: ["payment"],
-          },
-        ],
-      },
-    },
-    {
-      required: ["event"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              quick_reply: {},
-            },
-            required: ["quick_reply"],
-          },
-          {
-            properties: {
-              list_picker: {},
-            },
-            required: ["list_picker"],
-          },
-          {
-            properties: {
-              dynamic: {},
-            },
-            required: ["dynamic"],
-          },
-          {
-            properties: {
-              authenticate: {},
-            },
-            required: ["authenticate"],
-          },
-          {
-            properties: {
-              payment: {},
-            },
-            required: ["payment"],
-          },
-        ],
-      },
-    },
-    {
-      required: ["dynamic"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              quick_reply: {},
-            },
-            required: ["quick_reply"],
-          },
-          {
-            properties: {
-              list_picker: {},
-            },
-            required: ["list_picker"],
-          },
-          {
-            properties: {
-              event: {},
-            },
-            required: ["event"],
-          },
-          {
-            properties: {
-              authenticate: {},
-            },
-            required: ["authenticate"],
-          },
-          {
-            properties: {
-              payment: {},
-            },
-            required: ["payment"],
-          },
-        ],
-      },
-    },
-    {
-      required: ["authenticate"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              quick_reply: {},
-            },
-            required: ["quick_reply"],
-          },
-          {
-            properties: {
-              list_picker: {},
-            },
-            required: ["list_picker"],
-          },
-          {
-            properties: {
-              event: {},
-            },
-            required: ["event"],
-          },
-          {
-            properties: {
-              dynamic: {},
-            },
-            required: ["dynamic"],
-          },
-          {
-            properties: {
-              payment: {},
-            },
-            required: ["payment"],
-          },
-        ],
-      },
-    },
-    {
-      required: ["payment"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              quick_reply: {},
-            },
-            required: ["quick_reply"],
-          },
-          {
-            properties: {
-              list_picker: {},
-            },
-            required: ["list_picker"],
-          },
-          {
-            properties: {
-              event: {},
-            },
-            required: ["event"],
-          },
-          {
-            properties: {
-              dynamic: {},
-            },
-            required: ["dynamic"],
-          },
-          {
-            properties: {
-              authenticate: {},
-            },
-            required: ["authenticate"],
-          },
-        ],
-      },
-    },
-  ],
-} as const;
-
-export const AMBNativeInteractiveDataWritableSchema = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    app_id: {
-      type: "string",
-      minLength: 1,
-      description: "App Store identifier of the iMessage app.",
-    },
-    app_name: {
-      type: "string",
-      minLength: 1,
-      description: "Name of the iMessage app.",
-    },
-    bid: {
-      type: "string",
-      minLength: 1,
-      description:
-        "Identifier of the iMessage extension, in Apple's `com.apple.messages.MSMessageExtensionBalloonPlugin:team-id:extension-id` format.",
-    },
-    url: {
-      "x-sensitive": true,
-      type: "string",
-      minLength: 1,
-      description:
-        "Opaque URL string that Messages passes to the iMessage app.",
-      example: "?order=1234&view=detail",
-    },
-    use_live_layout: {
-      type: "boolean",
-      description:
-        "Whether Messages renders the received and reply bubbles using Live Layout.",
-    },
-    session_identifier: {
-      type: "string",
-      pattern:
-        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
-      description:
-        "Session UUID to preserve across interactions. Apple creates one when omitted.",
-    },
+  example: {
     received_message: {
-      $ref: "#/components/schemas/AMBMessageBubble",
-      description: "Content Messages shows in the received message bubble.",
+      title: "Pick a delivery slot",
     },
-    reply_message: {
-      $ref: "#/components/schemas/AMBMessageBubble",
-      description: "Content Messages shows in the reply message bubble.",
-    },
-    app_icon_source_url: {
-      type: "string",
-      minLength: 1,
-      description:
-        "Publicly accessible HTTPS URL of the app's PNG icon. The icon must be smaller than 15 kB. We fetch and include it in the request to Apple. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.",
-      "x-sensitive": true,
-    },
-    data: {
-      $ref: "#/components/schemas/AMBNativeInteractivePayloadWritable",
-    },
-  },
-  description:
-    "A built-in interaction or custom iMessage app. Custom apps require the app metadata and both message bubbles.",
-  oneOf: [
-    {
-      required: ["data"],
-      not: {
-        anyOf: [
-          {
-            properties: {
-              app_id: {},
+    list_picker: {
+      sections: [
+        {
+          title: "Tomorrow",
+          items: [
+            {
+              identifier: "am",
+              title: "Morning",
             },
-            required: ["app_id"],
-          },
-          {
-            properties: {
-              app_name: {},
-            },
-            required: ["app_name"],
-          },
-          {
-            properties: {
-              bid: {},
-            },
-            required: ["bid"],
-          },
-          {
-            properties: {
-              url: {},
-            },
-            required: ["url"],
-          },
-          {
-            properties: {
-              app_icon_source_url: {},
-            },
-            required: ["app_icon_source_url"],
-          },
-          {
-            properties: {
-              use_live_layout: {},
-            },
-            required: ["use_live_layout"],
-          },
-        ],
-      },
-    },
-    {
-      required: [
-        "app_id",
-        "app_name",
-        "bid",
-        "url",
-        "app_icon_source_url",
-        "use_live_layout",
-        "received_message",
-        "reply_message",
-      ],
-      not: {
-        properties: {
-          data: {},
+          ],
         },
-        required: ["data"],
-      },
-    },
-  ],
-} as const;
-
-export const AMBNativeInteractiveContentWritableSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["type", "interactive_data"],
-  properties: {
-    type: {
-      const: "interactive",
-      description: "Always interactive.",
-      $ref: "#/components/schemas/AMBMessageType",
-    },
-    body: {
-      type: "string",
-      description:
-        "Automatic introductions for inline quick replies are enabled regionally in stages. When enabled for a new send containing `interactive_data.data.quick_reply`, a nonblank body is sent as separate text before the choices. All parts belong to one message, which becomes sent after Apple accepts all parts. Before activation, and for retries retaining legacy behavior, body is included in the interactive request and is not guaranteed to appear on the device. To ensure an introduction without relying on activation, send a separate text message and omit body from the quick reply. Omit body to send choices only. For list pickers, time pickers and forms, use interactive_data.received_message for the visible introduction. Use one U+FFFC object replacement character per attachment to control placement.",
-      "x-sensitive": true,
-    },
-    subject: {
-      type: "string",
-      description: "Subject displayed above the message body.",
-      "x-sensitive": true,
-    },
-    attachments: {
-      type: "array",
-      items: {
-        $ref: "#/components/schemas/AMBNativeAttachmentWritable",
-      },
-      description:
-        "Ordered attachments. A send supplies each one by source_url or attachment_id.",
-    },
-    interactive_data: {
-      $ref: "#/components/schemas/AMBNativeInteractiveDataWritable",
-    },
-  },
-} as const;
-
-export const AMBMessageContentWritableSchema = {
-  description:
-    "Apple message families with Bird field naming and media URLs. Authentication and Apple Pay requests are created through their dedicated conversation endpoints.",
-  oneOf: [
-    {
-      $ref: "#/components/schemas/AMBNativeTextContentWritable",
-    },
-    {
-      $ref: "#/components/schemas/AMBNativeRichLinkContentWritable",
-    },
-    {
-      $ref: "#/components/schemas/AMBNativeInteractiveContentWritable",
-    },
-  ],
-  discriminator: {
-    propertyName: "type",
-    mapping: {
-      text: "#/components/schemas/AMBNativeTextContentWritable",
-      rich_link: "#/components/schemas/AMBNativeRichLinkContentWritable",
-      interactive: "#/components/schemas/AMBNativeInteractiveContentWritable",
-    },
-  },
-} as const;
-
-export const AMBNativeInboundInteractiveContentWritableSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["type", "interactive_data"],
-  properties: {
-    type: {
-      const: "interactive",
-      description: "Always interactive.",
-      $ref: "#/components/schemas/AMBMessageType",
-    },
-    body: {
-      type: "string",
-      description: "Message body supplied by Apple.",
-      "x-sensitive": true,
-    },
-    subject: {
-      type: "string",
-      description: "Message subject supplied by Apple.",
-      "x-sensitive": true,
-    },
-    attachments: {
-      type: "array",
-      items: {
-        $ref: "#/components/schemas/AMBNativeAttachmentWritable",
-      },
-      description: "Ordered attachments supplied by Apple.",
-    },
-    interactive_data: {
-      $ref: "#/components/schemas/AMBNativeInboundInteractiveData",
-    },
-  },
-} as const;
-
-export const AMBInboundContentWritableSchema = {
-  description:
-    "Received text, attachments, and interactive replies, preserving Apple message structure.",
-  oneOf: [
-    {
-      $ref: "#/components/schemas/AMBNativeTextContentWritable",
-    },
-    {
-      $ref: "#/components/schemas/AMBNativeInboundInteractiveContentWritable",
-    },
-  ],
-  discriminator: {
-    propertyName: "type",
-    mapping: {
-      text: "#/components/schemas/AMBNativeTextContentWritable",
-      interactive:
-        "#/components/schemas/AMBNativeInboundInteractiveContentWritable",
+      ],
     },
   },
 } as const;
@@ -60170,23 +60154,36 @@ export const AMBMessageSendRequestWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A message to send. Supply exactly one of `content` (native content) or `template` (a stored template, whose category is derived). Supplying both, or neither, is rejected.\n",
+    "A message to send. Supply `text`, `rich_link` or `interactive` (the last two optionally with `text` sent first as its own bubble), or `template` (a stored template, whose category is derived).\n",
   required: ["from", "to"],
-  anyOf: [
-    {
-      required: ["content"],
-    },
-    {
-      required: ["template"],
-    },
-  ],
   not: {
     anyOf: [
       {
-        required: ["content", "template"],
+        required: ["rich_link", "interactive"],
         properties: {
-          content: {},
+          rich_link: {},
+          interactive: {},
+        },
+      },
+      {
+        required: ["template", "text"],
+        properties: {
           template: {},
+          text: {},
+        },
+      },
+      {
+        required: ["template", "rich_link"],
+        properties: {
+          template: {},
+          rich_link: {},
+        },
+      },
+      {
+        required: ["template", "interactive"],
+        properties: {
+          template: {},
+          interactive: {},
         },
       },
       {
@@ -60218,11 +60215,31 @@ export const AMBMessageSendRequestWritableSchema = {
       description:
         "Who this message is sent as. A signed-in session may send as `operator` or `automation`; an API key may send as `api` or `automation`. Omit it to take the default for your credential. Naming a source your credential cannot use is refused with a `422` `AMBMessageSourceNotPermitted`.",
     },
-    content: {
-      $ref: "#/components/schemas/AMBMessageContentWritable",
+    text: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBTextWritable",
+        },
+      ],
       description:
-        "Message content in Apple’s native text, rich_link, or interactive family. Required unless `template` is supplied (the two are mutually exclusive).",
-      "x-sensitive": true,
+        "A text message. Alongside `rich_link` or `interactive`, it is sent first as its own text bubble, in the same message.",
+    },
+    rich_link: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBRichLink",
+        },
+      ],
+      description: "A link with a preview card.",
+    },
+    interactive: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBInteractiveWritable",
+        },
+      ],
+      description:
+        "Something for the customer to tap, such as quick replies, a list picker, a time picker, a form or a custom iMessage app.",
     },
     template: {
       allOf: [
@@ -60231,7 +60248,7 @@ export const AMBMessageSendRequestWritableSchema = {
         },
       ],
       description:
-        "Send using a stored template instead of native content. The category is derived from the template, so `category` is rejected alongside it.\n",
+        "Send using a stored template instead of `text`, `rich_link` or `interactive`. The category is derived from the template, so `category` is rejected alongside it.\n",
     },
     category: {
       type: "string",
@@ -60281,8 +60298,7 @@ export const AMBMessageSendRequestWritableSchema = {
   example: {
     from: "b52d6267-2b62-4f8a-8842-0533d0f1dc07",
     to: "opaque-customer-id",
-    content: {
-      type: "text",
+    text: {
       body: "Your order is ready.",
     },
   },
@@ -60726,8 +60742,7 @@ export const AMBTemplateVersionLanguageWritableSchema = {
   additionalProperties: false,
   description: "One language's content and revision metadata within a version.",
   example: {
-    content: {
-      type: "text",
+    text: {
       body: "Your order {{ order_number }} is on its way.",
     },
     revision: 1,
@@ -60758,8 +60773,7 @@ export const AMBTemplateVersionWritableSchema = {
     ],
     languages: {
       en: {
-        content: {
-          type: "text",
+        text: {
           body: "Your order {{ order_number }} is on its way.",
         },
         revision: 1,
@@ -60794,8 +60808,7 @@ export const AMBTemplateLanguageWritableSchema = {
     "One language's full Apple Messages template content and revision metadata.",
   example: {
     language: "en",
-    content: {
-      type: "text",
+    text: {
       body: "Your order {{ order_number }} is on its way.",
     },
     revision: 1,
@@ -63410,8 +63423,7 @@ export const EventAMBAcceptedWritableSchema = {
           status: "accepted",
           kind: "text",
           source: "operator",
-          content: {
-            type: "text",
+          text: {
             body: "Your order has shipped.",
           },
           locale: "en_US",
@@ -63459,8 +63471,7 @@ export const EventAMBReceivedWritableSchema = {
           direction: "inbound",
           status: "received",
           kind: "text",
-          content: {
-            type: "text",
+          text: {
             body: "Where is my order?",
           },
           locale: "en_US",
@@ -63502,8 +63513,7 @@ export const EventAMBRejectedWritableSchema = {
           status: "rejected",
           kind: "text",
           source: "operator",
-          content: {
-            type: "text",
+          text: {
             body: "Your order has shipped.",
           },
           locale: "en_US",
@@ -63558,8 +63568,7 @@ export const EventAMBSendFailedWritableSchema = {
           status: "send_failed",
           kind: "text",
           source: "operator",
-          content: {
-            type: "text",
+          text: {
             body: "Your order has shipped.",
           },
           locale: "en_US",
@@ -63613,8 +63622,7 @@ export const EventAMBSentWritableSchema = {
           status: "sent",
           kind: "text",
           source: "operator",
-          content: {
-            type: "text",
+          text: {
             body: "Your order has shipped.",
           },
           locale: "en_US",

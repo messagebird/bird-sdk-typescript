@@ -20,7 +20,7 @@ if (
 const message = await bird.amb.send({
   from: business.apple_business_id,
   to: conversation.recipient.opaque_user_id,
-  content: { type: "text", body: "Your order is ready." },
+  text: { body: "Your order is ready." },
 });
 console.log(message.id);
 console.log(await bird.amb.listEvents(message.id));
