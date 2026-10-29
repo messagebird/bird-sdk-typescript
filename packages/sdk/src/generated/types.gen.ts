@@ -267,6 +267,35 @@ export type NextAction = {
  * - `workspace`: the limit set for this workspace.
  *
  */
+export type RateLimitScope = "organization" | "workspace";
+
+/**
+ * The rate-limit policy that refused the request. Present only on `rate_limit_error` responses from a rate-limit policy. A workspace-targeted request is checked against its organization's limit and any limit set for its workspace; the organization limit is reported when both are exhausted.
+ *
+ */
+export type RateLimitErrorContext = {
+  /**
+   * Stable key of the rate-limit policy that refused the request.
+   */
+  policy_key: string;
+  scope: RateLimitScope;
+  /**
+   * The rolling window length in seconds.
+   */
+  window_seconds: number;
+  /**
+   * Maximum policy units per rolling window under the limit that refused the request.
+   */
+  limit: number;
+};
+
+/**
+ * Which limit refused the request.
+ *
+ * - `organization`: the limit shared by every workspace in the organization.
+ * - `workspace`: the limit set for this workspace.
+ *
+ */
 export type QuotaScope = "organization" | "workspace";
 
 /**
@@ -345,6 +374,7 @@ export type ErrorBody = {
    *
    */
   next?: Array<NextAction>;
+  rate_limit?: RateLimitErrorContext;
   quota?: QuotaErrorContext;
 };
 
@@ -552,6 +582,136 @@ export type Workspace = {
    */
   readonly logo_url?: string | null;
 } & Timestamps;
+
+/**
+ * Whether the workspace limit applies.
+ *
+ * - `active`: the limit is enforced alongside the organization limit.
+ * - `expired`: the limit passed its expiry and no longer applies. It stays visible until it is replaced or removed.
+ *
+ */
+export type WorkspaceRateLimitCapStatus = "active" | "expired";
+
+/**
+ * A workspace's own limit for a policy. It is not reserved capacity; the organization limit still applies.
+ */
+export type WorkspaceRateLimitCap = {
+  /**
+   * Maximum policy units this workspace can use per rolling window. It can exceed the organization limit.
+   */
+  value: number;
+  status: WorkspaceRateLimitCapStatus;
+  /**
+   * When the workspace limit stops applying. `null` means it has no expiry.
+   */
+  expires_at: string | null;
+  /**
+   * When the workspace limit was last set.
+   */
+  updated_at: string;
+};
+
+/**
+ * Whether workspace usage has been measured for long enough to set a new workspace limit.
+ *
+ * - `unavailable`: workspace limits cannot be set in this region yet.
+ * - `warming`: workspace usage is being measured; a limit can be set from `ready_at`.
+ * - `ready`: a workspace limit can be set.
+ *
+ * Existing workspace limits are enforced in every state and can be removed while the workspace can be managed.
+ *
+ */
+export type WorkspaceRateLimitAttributionStatus =
+  "unavailable" | "warming" | "ready";
+
+/**
+ * When workspace usage has been measured for long enough to set a new workspace limit for this policy. Readiness covers timing only; a new limit also needs an organization with several workspaces, and with one workspace only an existing unexpired limit can be changed.
+ */
+export type WorkspaceRateLimitAttribution = {
+  status: WorkspaceRateLimitAttributionStatus;
+  /**
+   * When workspace usage has been measured for long enough, from which a workspace limit can be set if the organization's other conditions allow it. `null` while workspace limits are unavailable in this region.
+   */
+  ready_at: string | null;
+};
+
+/**
+ * Whether current usage could be read.
+ *
+ * - `available`: the remaining counts reflect usage at `observed_at`.
+ * - `unavailable`: usage could not be read. Remaining counts are unknown, not zero.
+ *
+ */
+export type WorkspaceRateLimitUsageStatus = "available" | "unavailable";
+
+/**
+ * Remaining capacity in the current rolling window. Taking the observation consumes no capacity, but the request that reads it counts against its own policy, `api_list`, like any other read. It is measured against the limits that requests were checked against when it was read, which can briefly differ from the configured top-level `organization_limit` and `workspace_limit` after a limit changes.
+ */
+export type WorkspaceRateLimitUsage = {
+  status: WorkspaceRateLimitUsageStatus;
+  /**
+   * When usage was read.
+   */
+  observed_at: string;
+  /**
+   * The organization limit requests were checked against when usage was read. `null` when usage is unavailable.
+   */
+  organization_limit: number | null;
+  /**
+   * Units the whole organization can still use in this window, shared by all its workspaces. `null` when usage is unavailable.
+   */
+  organization_remaining: number | null;
+  /**
+   * The workspace's own limit requests were checked against when usage was read. `null` when no workspace limit applied or usage is unavailable.
+   */
+  workspace_limit: number | null;
+  /**
+   * Units this workspace can still use under its own limit. `null` when no workspace limit applied, usage is unavailable, or workspace usage is not yet measured for long enough.
+   */
+  workspace_remaining: number | null;
+  /**
+   * Seconds until the current window ends. `null` when usage is unavailable.
+   */
+  resets_in_seconds: number | null;
+};
+
+/**
+ * A rate-limit policy as it applies to one workspace.
+ */
+export type WorkspaceRateLimit = {
+  /**
+   * Stable key of the rate-limit policy.
+   */
+  key: string;
+  name: string;
+  description: string;
+  /**
+   * What the policy counts, such as `request` or `message`.
+   */
+  unit: string;
+  /**
+   * The rolling window length in seconds.
+   */
+  window_seconds: number;
+  /**
+   * Maximum policy units per rolling window for the whole organization, shared by all its workspaces.
+   */
+  organization_limit: number;
+  /**
+   * The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.
+   */
+  workspace_limit: WorkspaceRateLimitCap | null;
+  /**
+   * The lower of the organization limit and any active workspace limit. Requests can still be refused below it when other workspaces use the shared organization limit.
+   */
+  limit: number;
+  attribution: WorkspaceRateLimitAttribution;
+  usage: WorkspaceRateLimitUsage;
+};
+
+export type WorkspaceRateLimitList = {
+  data: Array<WorkspaceRateLimit>;
+};
 
 /**
  * What the quota limits.
@@ -9924,41 +10084,38 @@ export type WhatsAppLocationSend = {
    */
   longitude: number;
   /**
-   * Name of the place, shown above the address.
+   * Place name, shown above the address.
    */
   name?: string;
   /**
-   * Street address of the place. Shown only when `name` is also set.
+   * Street address; shown only with `name`.
    */
   address?: string;
 };
 
 export type WhatsAppMessageTemplateComponentParameter = {
   /**
-   * The kind of value this parameter carries, which decides which of the fields below to send.
+   * Value kind; determines which field to supply.
    */
   type: WhatsAppTemplateParameterType;
   /**
-   * The value substituted into the placeholder, as a plain string. Send it on a `text` parameter.
+   * Placeholder value for a `text` parameter.
    */
   text?: string;
   /**
-   * Public `https` URL of the file a media header shows, fetched by WhatsApp at send time. Send it on an `image`, `video`, `gif` or `document` parameter.
-   *
+   * Public HTTPS media-header URL, fetched at send time. For `image`, `video`, `gif`, or `document` parameters.
    */
   url?: string;
   /**
-   * Name the recipient sees on the document, including the extension. Without it, the document arrives untitled. Send it only on a `document` parameter; Bird rejects it on any other kind.
-   *
+   * Document name with extension; rejected on other parameter types.
    */
   filename?: string;
   /**
-   * The point on the map a location header opens. Send it on a `location` parameter.
+   * Map point for a `location` header parameter.
    */
   location?: WhatsAppLocationSend;
   /**
-   * The placeholder this value fills, for a template with named parameters (for example `first_name`); name every parameter then. Omit it for a positional template, which takes values in `{{n}}` order.
-   *
+   * Placeholder name, such as `first_name`; required on every named parameter. Omit for positional templates and supply values in `{{n}}` order.
    */
   name?: string;
 };
@@ -9983,8 +10140,7 @@ export type WhatsAppMessageTemplateCardComponent = {
 };
 
 /**
- * The values that fill one card of a carousel. Cards fill in the order the template was approved with, so send one entry per card and keep them in that order.
- *
+ * Placeholder values for one carousel card. Supply one entry per approved card, in approval order.
  */
 export type WhatsAppMessageTemplateCard = {
   /**
@@ -10005,13 +10161,11 @@ export type WhatsAppMessageTemplateComponent = {
    */
   type: string;
   /**
-   * The values for this part's placeholders, in `{{n}}` order unless the template names them. Send it on every part except `carousel`, which uses `cards`. Send no `button` part for a button that takes no value.
-   *
+   * Placeholder values in `{{n}}` order, or named. Required except for `carousel`, which uses `cards`. Omit button parts without variables.
    */
   parameters?: Array<WhatsAppMessageTemplateComponentParameter>;
   /**
-   * Values for each carousel card, one entry per card the template was approved with. Send it only on a `carousel` part.
-   *
+   * For `carousel` only: one entry per approved card, in approval order.
    */
   cards?: Array<WhatsAppMessageTemplateCard>;
 };
@@ -10833,22 +10987,19 @@ export type WhatsAppTemplateSend = unknown & {
    */
   id?: WhatsAppTemplateId;
   /**
-   * The template to send, by its slug handle (for example `bird_otp`).
+   * Template slug, such as `bird_otp`.
    */
   slug?: TemplateSlug;
   /**
-   * Which of the template's languages to send, as a BCP-47 tag (for example `en-US`; Meta's `en_US` is accepted too). Omit it for the template's default language, unless the template sets `language_source_required`. A language the template lacks is handled by its `on_missing_language` setting. The message is priced at the language it resolves to, which the accepted message echoes.
-   *
+   * BCP-47 tag (`en-US`; `en_US` also accepted). Defaults to the template's default language unless `language_source_required` is set. Missing variants follow `on_missing_language`. The resolved language determines pricing and is echoed in the accepted message.
    */
   language?: LanguageTag;
   /**
-   * Scales the language's maximum price for this message only. The effective bid is the language's `optimization_spec.bid_amount`, times its country multiplier, times this value. At least 0.01 and at most 100; 1 when omitted. Only a language with an `optimization_spec`, on a template still in the `marketing` category, accepts it.
-   *
+   * Multiplies `optimization_spec.bid_amount` × country multiplier for this message. Range 0.01–100; default 1. Requires `optimization_spec` on a marketing template language.
    */
   bid_multiplier?: number;
   /**
-   * Values for the template's placeholders. Build it from the template language's `components`: each block's `example_parameters`, with real values, becomes that part's `parameters`. A template's `buttons` block becomes one `button` part per button that has `example_parameters`, in order; a `carousel` becomes one `cards` entry per card, built the same way. A `location` header always needs a part with a `location` parameter. Leave out other blocks without any.
-   *
+   * Copy each language component's `example_parameters` into that part's `parameters`, replacing examples with real values. Map `buttons` to one `button` part per button with examples, in order; map `carousel` to `cards`, built likewise. A location header requires a `location` parameter. Omit other blocks without examples.
    */
   components?: Array<WhatsAppMessageTemplateComponent>;
 };
@@ -10859,13 +11010,11 @@ export type WhatsAppTemplateSend = unknown & {
  */
 export type WhatsAppTextSend = {
   /**
-   * The message text. The WhatsApp client turns any URL it contains into a clickable link.
-   *
+   * Message text; URLs become clickable links.
    */
   body: string;
   /**
-   * Whether the WhatsApp client previews the first link in `body`. Not returned when the message is read back.
-   *
+   * Preview the first link in `body`. Omitted on reads.
    */
   preview_url?: boolean;
 };
@@ -10876,8 +11025,7 @@ export type WhatsAppTextSend = {
  */
 export type WhatsAppImageSend = {
   /**
-   * Public `https` URL of the image. WhatsApp fetches it at send time, so it must still be reachable then. JPEG or PNG, up to 5 MB.
-   *
+   * Public HTTPS URL fetched at send time. JPEG/PNG, up to 5 MB.
    */
   url: string;
   /**
@@ -10892,8 +11040,7 @@ export type WhatsAppImageSend = {
  */
 export type WhatsAppVideoSend = {
   /**
-   * Public `https` URL of the video. WhatsApp fetches it at send time, so it must still be reachable then. MP4 with H.264 video and AAC audio, up to 16 MB.
-   *
+   * Public HTTPS URL fetched at send time. MP4 with H.264 video and AAC audio, up to 16 MB.
    */
   url: string;
   /**
@@ -10908,13 +11055,11 @@ export type WhatsAppVideoSend = {
  */
 export type WhatsAppAudioSend = {
   /**
-   * Public `https` URL of the audio file. WhatsApp fetches it at send time, so it must still be reachable then. AAC, AMR, MP3, M4A or OGG (OPUS codec, mono), up to 16 MB.
-   *
+   * Public HTTPS URL fetched at send time. AAC, AMR, MP3, M4A, or OGG (OPUS, mono), up to 16 MB.
    */
   url: string;
   /**
-   * Whether to send this as a voice note rather than an audio file. A voice note needs an `.ogg` file encoded with the OPUS codec.
-   *
+   * Send as a voice note; requires an `.ogg` file with the OPUS codec.
    */
   voice?: boolean;
 };
@@ -10925,8 +11070,7 @@ export type WhatsAppAudioSend = {
  */
 export type WhatsAppStickerSend = {
   /**
-   * Public `https` URL of the sticker. WhatsApp fetches it at send time, so it must still be reachable then. WebP only, up to 100 KB static or 500 KB animated.
-   *
+   * Public HTTPS URL fetched at send time. WebP, up to 100 KB static or 500 KB animated.
    */
   url: string;
 };
@@ -10937,8 +11081,7 @@ export type WhatsAppStickerSend = {
  */
 export type WhatsAppDocumentSend = {
   /**
-   * Public `https` URL of the document. WhatsApp fetches it at send time, so it must still be reachable then. Up to 100 MB; PDF, Word, Excel, PowerPoint and plain text render reliably in the WhatsApp client.
-   *
+   * Public HTTPS URL fetched at send time, up to 100 MB. PDF, Word, Excel, PowerPoint, and plain text render reliably.
    */
   url: string;
   /**
@@ -10946,8 +11089,7 @@ export type WhatsAppDocumentSend = {
    */
   caption?: string;
   /**
-   * Name the recipient sees, including the extension. WhatsApp derives one from the URL when you omit it.
-   *
+   * Recipient-visible filename with extension.
    */
   filename?: string;
 };
@@ -10995,16 +11137,15 @@ export type WhatsAppInteractiveHeaderSend = (
     }
 ) & {
   /**
-   * Which kind of header this is, and which field carries it.
+   * Header kind; determines which field to supply.
    */
   type: WhatsAppInteractiveHeaderTypeWrite;
   /**
-   * A single line of text above the body. Send it on a `text` header.
+   * Single line above the body, for `text` headers.
    */
   text?: string;
   /**
-   * Public `https` URL of the file to show on an `image`, `video` or `document` header, fetched by WhatsApp at send time. The free-form `image`, `video` and `document` limits apply.
-   *
+   * Public HTTPS URL fetched at send time for `image`, `video`, or `document` headers. The corresponding free-form media limits apply.
    */
   url?: string;
 };
@@ -11023,25 +11164,21 @@ export type WhatsAppInteractiveHeaderSend = (
 export type WhatsAppInteractiveButtonTypeWrite = "quick_reply" | "cta_url";
 
 /**
- * One tappable reply button. Tapping it sends `slug` back as an inbound message, which reads as an `interactive_reply`.
- *
+ * Reply button; tapping returns `slug` in an inbound `interactive_reply`.
  */
 export type WhatsAppInteractiveQuickReplyButtonSend = {
   /**
-   * Your own handle for this button, echoed back on the reply. You choose the value and it is never shown to the recipient, so it can carry whatever your application needs to route the answer. Any characters, up to 256.
-   *
+   * Hidden reply identifier, echoed on tap. Any characters, up to 256.
    */
   slug: string;
   /**
-   * The button's label. It must differ from every other button's label in the same message, because the recipient's reply is identified to them by the label they tapped.
-   *
+   * Button label, unique within its message or carousel card.
    */
   text: string;
 };
 
 /**
- * A button that opens a link in the recipient's browser, so a long or opaque address never has to appear in the message body.
- *
+ * Button that opens a link in the recipient's browser.
  */
 export type WhatsAppInteractiveCtaUrlSend = {
   /**
@@ -11049,8 +11186,7 @@ export type WhatsAppInteractiveCtaUrlSend = {
    */
   text: string;
   /**
-   * The address the button opens. It is fixed for every recipient, so per recipient tracking belongs in the address you supply, for example as a query parameter you generate per send.
-   *
+   * Destination URL. Include per-recipient tracking in the supplied URL.
    */
   url: string;
 };
@@ -11066,43 +11202,39 @@ export type WhatsAppInteractiveButtonSend = (
     }
 ) & {
   /**
-   * Which kind of button this is, and which field carries it.
+   * Button kind; determines which field to supply.
    */
   type: WhatsAppInteractiveButtonTypeWrite;
   /**
-   * The button's label and the handle it sends back. Send this on a `quick_reply` button.
+   * Label and reply identifier for `quick_reply`.
    */
   quick_reply?: WhatsAppInteractiveQuickReplyButtonSend;
   /**
-   * The button's label and the address it opens. Send this on a `cta_url` button.
+   * Label and destination for `cta_url`.
    */
   cta_url?: WhatsAppInteractiveCtaUrlSend;
 };
 
 /**
- * One option in a list's menu. Choosing it sends `slug` back as an inbound message, which reads as an `interactive_reply`.
- *
+ * Menu option; selection returns `slug` in an inbound `interactive_reply`.
  */
 export type WhatsAppInteractiveListRowSend = {
   /**
-   * Your own handle for this option, echoed back on the reply. You choose the value and it is never shown to the recipient. Any characters, up to 200.
-   *
+   * Hidden reply identifier, echoed on selection. Any characters, up to 200.
    */
   slug: string;
   /**
-   * The option's label, shown as the row's title in the menu. It must differ from every other row's label and from every button's label in the same message, not merely within its own group; a repeat returns a `422` `WhatsAppInteractiveDuplicateLabel`.
-   *
+   * Row label, unique across every section's rows; duplicates return `422` `WhatsAppInteractiveDuplicateLabel`.
    */
   text: string;
   /**
-   * A second line under the label, for detail that will not fit in it.
+   * Detail shown below the label.
    */
   description?: string;
 };
 
 /**
- * One group of options in a list's menu. A menu with a single group still carries a title, which WhatsApp shows above its rows.
- *
+ * Menu section. A title is required even for a single section.
  */
 export type WhatsAppInteractiveListSectionSend = {
   /**
@@ -11110,15 +11242,13 @@ export type WhatsAppInteractiveListSectionSend = {
    */
   title: string;
   /**
-   * The options in this group. A message carries at most 10 rows across all its groups combined, so this per-group maximum is not additive: more than 10 in total returns a `422` `WhatsAppInteractiveLimitExceeded`. Row labels must be unique across the whole message too, not just within a group.
-   *
+   * At most 10 rows across the message (`422` `WhatsAppInteractiveLimitExceeded` otherwise). Labels must be unique across sections.
    */
   rows: Array<WhatsAppInteractiveListRowSend>;
 };
 
 /**
- * A menu of options behind a single button. The recipient taps the button, WhatsApp opens the menu, and choosing one option sends it back as a reply.
- *
+ * Button-opened menu; selecting an option sends a reply.
  */
 export type WhatsAppInteractiveListSend = {
   /**
@@ -11126,8 +11256,7 @@ export type WhatsAppInteractiveListSend = {
    */
   button_text: string;
   /**
-   * The groups of options in the menu, in the order shown. At most 10 rows across all groups combined, each carrying a label unique across the whole message.
-   *
+   * Sections in display order. At most 10 rows total, with labels unique across the message.
    */
   sections: Array<WhatsAppInteractiveListSectionSend>;
 };
@@ -11141,13 +11270,11 @@ export type WhatsAppInteractiveCardHeaderSend = (
     }
 ) & {
   /**
-   * Which kind of media this is. A card accepts `image` or `video` only.
-   *
+   * Card media kind: `image` or `video`.
    */
   type: WhatsAppInteractiveHeaderTypeWrite;
   /**
-   * Public `https` URL of the file to show at the top of the card. An image must be JPEG or PNG, up to 5 MB; a video, MP4 with H.264 video and AAC audio, up to 16 MB. WhatsApp fetches it at send time, on the same terms as a message header's `url`.
-   *
+   * Public HTTPS URL fetched at send time. Image: JPEG/PNG, up to 5 MB. Video: MP4 (H.264/AAC), up to 16 MB.
    */
   url: string;
 };
@@ -11165,13 +11292,11 @@ export type WhatsAppInteractiveCardSend = (
    */
   header: WhatsAppInteractiveCardHeaderSend;
   /**
-   * The card's own text, below its media, with at most two line breaks. Optional: a card can carry media and buttons alone.
-   *
+   * Optional text below the media, with at most two line breaks.
    */
   body_text?: string;
   /**
-   * The buttons under the card, in the order given. Either one `cta_url` button or up to three `quick_reply` buttons: the two kinds cannot be mixed on one card. Every card in the carousel must carry the same kinds in the same number, and a carousel whose cards disagree returns a `422` `WhatsAppInteractiveCardsButtonsMismatch`.
-   *
+   * One `cta_url` or up to three `quick_reply` buttons, in display order. Cards must match button kinds and count, or return `422` `WhatsAppInteractiveCardsButtonsMismatch`.
    */
   buttons: Array<WhatsAppInteractiveButtonSend>;
 };
@@ -11233,47 +11358,41 @@ export type WhatsAppInteractiveSend = (
     }
 ) & {
   /**
-   * Which kind of interactive message this is, and which field carries it.
+   * Message kind; determines which content field to supply.
    */
   type: WhatsAppInteractiveTypeWrite;
   /**
-   * Optional content above the body: text on a `list`; text, image, video or document on `button` and `cta_url`. A `carousel` and the two request kinds take none.
-   *
+   * For `list`: text only. For `button` and `cta_url`: text, image, video, or document. Unsupported for carousel and request kinds.
    */
   header?: WhatsAppInteractiveHeaderSend;
   /**
-   * The message's main text, required on every kind. Up to 1024 characters, except on a `list`.
-   *
+   * Required main text. Maximum 1024 characters, or 4096 for `list`.
    */
   body_text: string;
   /**
-   * Optional small print below the body and above the buttons. A `carousel` and both request kinds take no footer.
-   *
+   * Small print below the body. Unsupported for carousel and request kinds.
    */
   footer_text?: string;
   /**
-   * The `quick_reply` buttons of a `button` message, in order. Labels must be unique within the message.
-   *
+   * Ordered `quick_reply` buttons for `button` messages. Labels must be unique within the message.
    */
   buttons?: Array<WhatsAppInteractiveButtonSend>;
   /**
-   * The menu to show. Send this on a `list` message.
+   * Menu for a `list` message.
    */
   list?: WhatsAppInteractiveListSend;
   /**
-   * The link button to show. Send this on a `cta_url` message.
+   * Link button for a `cta_url` message.
    */
   cta_url?: WhatsAppInteractiveCtaUrlSend;
   /**
-   * The cards of a `carousel` message, 2 to 10, left to right. A carousel takes no header or footer of its own.
-   *
+   * 2–10 carousel cards, in display order. No message-level header or footer.
    */
   cards?: Array<WhatsAppInteractiveCardSend>;
 };
 
 /**
- * The contact's name. `formatted_name` is what the card shows, and WhatsApp additionally requires at least one of the parts below it, so a card carrying only a formatted name is rejected.
- *
+ * Requires `formatted_name` plus at least one other name part.
  */
 export type WhatsAppContactNameSend = {
   /**
@@ -11301,13 +11420,11 @@ export type WhatsAppContactOrgSend = {
  */
 export type WhatsAppContactPhoneSend = {
   /**
-   * The number to show. Send it in E.164 to get a card the recipient can message from; any other form still renders, with an invite button.
-   *
+   * E.164 enables a chat button; other formats show an invite button.
    */
   phone_number: string;
   /**
-   * A label for the number, shown beside it. Free text: WhatsApp defines no vocabulary, and the label is sent exactly as written.
-   *
+   * Free-text label shown beside the number, sent verbatim.
    */
   type?: string;
 };
@@ -11318,8 +11435,7 @@ export type WhatsAppContactPhoneSend = {
 export type WhatsAppContactEmailSend = {
   email: string;
   /**
-   * A label for the address, shown beside it. Free text, sent exactly as written.
-   *
+   * Free-text label shown beside the address, sent verbatim.
    */
   type?: string;
 };
@@ -11329,13 +11445,11 @@ export type WhatsAppContactEmailSend = {
  */
 export type WhatsAppContactUrlSend = {
   /**
-   * The address to show. Not validated as a URL, because a card commonly carries a bare domain.
-   *
+   * Website address; bare domains accepted without URL validation.
    */
   url: string;
   /**
-   * A label for the website, shown beside it. Free text, sent exactly as written.
-   *
+   * Free-text label shown beside the website, sent verbatim.
    */
   type?: string;
 };
@@ -11354,17 +11468,13 @@ export type WhatsAppContactAddressSend = {
    */
   country_code?: string;
   /**
-   * A label for the address, shown beside it. Free text, sent exactly as written.
-   *
+   * Free-text label shown beside the address, sent verbatim.
    */
   type?: string;
 };
 
 /**
- * A contact card to send. WhatsApp shows the name on the card and the rest in a profile view the recipient opens from it.
- *
- * A card carrying a phone number renders buttons that message or save the contact; a card without one can only be added to an address book.
- *
+ * Contact card with a name and profile details. With a phone number, recipients can message or save it; without one, they can save it.
  */
 export type WhatsAppContactCardSend = {
   name: WhatsAppContactNameSend;
@@ -11373,13 +11483,11 @@ export type WhatsAppContactCardSend = {
    */
   org?: WhatsAppContactOrgSend;
   /**
-   * The contact's birthday, as `YYYY-MM-DD`. WhatsApp rejects any other shape, and a date no calendar holds is rejected too.
-   *
+   * Valid calendar date in `YYYY-MM-DD` format.
    */
   birthday?: string;
   /**
-   * The numbers on the card. A number in E.164 renders a button that opens a WhatsApp chat with it; one that is not renders an invite instead.
-   *
+   * E.164 numbers get a WhatsApp chat button; other formats get an invite button.
    */
   phone_numbers?: Array<WhatsAppContactPhoneSend>;
   emails?: Array<WhatsAppContactEmailSend>;
@@ -11393,78 +11501,69 @@ export type WhatsAppContactCardSend = {
  */
 export type WhatsAppMessageSendRequest = {
   /**
-   * The recipient: a phone number in E.164 format (for example `+14155550100`), a business-scoped user ID (for example `US.13491208655302741918`) for a WhatsApp user whose number you do not have, or a WhatsApp group ID (for example `wag_01krdgeqcxet5s7t44vh8rt9mg`). One-time-passcode templates need a phone number. Bird tracks the customer service window per identity and business number, so reply to the identity a contact's message came from, from the number it reached.
-   *
+   * Recipient E.164 number, business-scoped user ID (BSUID, such as `US.13491208655302741918`), or group ID (such as `wag_01krdgeqcxet5s7t44vh8rt9mg`). OTP templates require a phone number. For replies, use the inbound sender identity and receiving business number.
    */
   to: string;
   /**
-   * The business phone number to send from, in E.164 format: a connected number this workspace owns, on the same WhatsApp Business Account as an authored template. Omit it for a Bird-managed template or a group send, which use their own number; every other send requires it.
-   *
+   * Connected E.164 number owned by this workspace; for authored templates, use the same WhatsApp Business Account. Omit for Bird-managed templates and groups; required otherwise.
    */
   from?: string;
   /**
-   * The template to send, the only content deliverable outside the customer service window. A group takes only templates your workspace authored, outside the authentication category.
-   *
+   * Required outside the customer service window. Groups accept workspace-authored, non-authentication templates only.
    */
   template?: WhatsAppTemplateSend;
   /**
-   * Free-form text. Deliverable only inside an open customer service window.
+   * Free-form text; requires an open customer service window.
    */
   text?: WhatsAppTextSend;
   /**
-   * A free-form image. Deliverable only inside an open customer service window.
+   * Free-form image; requires an open customer service window.
    */
   image?: WhatsAppImageSend;
   /**
-   * A free-form video. Deliverable only inside an open customer service window.
+   * Free-form video; requires an open customer service window.
    */
   video?: WhatsAppVideoSend;
   /**
-   * Free-form audio. Deliverable only inside an open customer service window.
+   * Free-form audio; requires an open customer service window.
    */
   audio?: WhatsAppAudioSend;
   /**
-   * A free-form sticker. Deliverable only inside an open customer service window.
+   * Free-form sticker; requires an open customer service window.
    */
   sticker?: WhatsAppStickerSend;
   /**
-   * A free-form document. Deliverable only inside an open customer service window.
+   * Free-form document; requires an open customer service window.
    */
   document?: WhatsAppDocumentSend;
   /**
-   * A free-form location. Deliverable only inside an open customer service window.
+   * Free-form location; requires an open customer service window.
    */
   location?: WhatsAppLocationSend;
   /**
-   * Free-form interactive content: reply buttons, a list menu, a link button, media cards, or a request for the recipient's location or contact details. Deliverable only inside an open customer service window, and never to a group.
-   *
+   * Reply buttons, a list, a link button, media cards, or a location/contact request. Requires an open customer service window; unsupported for groups.
    */
   interactive?: WhatsAppInteractiveSend;
   /**
-   * Up to five contact cards, each `name` carrying `formatted_name` plus at least one other part. Deliverable only inside an open customer service window.
-   *
+   * Up to five cards. Each name needs `formatted_name` and another name part. Requires an open customer service window.
    */
   contact_cards?: Array<WhatsAppContactCardSend>;
   /**
-   * An earlier message to quote above this one: one from the same conversation, between this `to` and `from`, in the last 15 days.
-   *
+   * Message to quote, from this conversation (`to` and `from`) within the last 15 days.
    */
   in_reply_to_message_id?: WhatsAppMessageId;
   /**
-   * Structured `{name, value}` labels for filtering. Tags become first-class query dimensions: filter the list endpoint by tag name. Maximum 20 tags per send. Use tags for low-cardinality dimensions (`category`, `experiment_variant`). For arbitrary structured context you do not need as a filter dimension, use `metadata` instead.
-   *
+   * Up to 20 `{name, value}` labels, filterable by name. Use for low-cardinality dimensions such as category; put other context in `metadata`.
    */
   tags?: Array<Tag>;
   /**
-   * Arbitrary JSON object stored on the message and returned on API reads. Maximum 2 KB serialized. Use metadata for per-send context like internal IDs and foreign keys. For low-cardinality filterable labels, use `tags` instead.
-   *
+   * Per-message JSON context, such as internal IDs, returned on reads. Maximum 2 KB serialized. Use `tags` for filterable labels.
    */
   metadata?: {
     [key: string]: unknown;
   };
   /**
-   * An identifier you want to find this message by, such as an order or ticket number, matched exactly by the message list's `reference` filter. Set it only when you need to search on it, and put any other data in `metadata`. Stored on the message, returned on reads and echoed in webhook payloads. Several messages can share one.
-   *
+   * Identifier matched exactly by the message list's `reference` filter; returned on reads and webhooks. May be shared by multiple messages. Put non-searchable context in `metadata`.
    */
   reference?: MessageReference;
 };
@@ -22754,7 +22853,7 @@ export type Mailbox = {
    */
   readonly address: string;
   /**
-   * An address we generate on our receiving domain when the mailbox is created on a domain not set up for receiving with us. Forward mail for `address` here from your current email provider, and it lands in this mailbox. Replies still go out from `address`. Immutable. It stops receiving while the mailbox is deleted, works again with the same value after a restore, and keeps working if you later enable receiving on the domain. `null` on mailboxes created on the shared domain or on a domain already enabled for receiving.
+   * An address we generate on our receiving domain, either when the mailbox is created on a domain not set up for receiving with us or later, when you set up forwarding for the mailbox. Forward mail for `address` here from your current email provider, and it lands in this mailbox. Replies still go out from `address`. Immutable once set. It stops receiving while the mailbox is deleted, works again with the same value after a restore, and keeps working if you later enable or disable receiving on the domain. `null` until set up; always `null` on the shared domain, which receives directly.
    */
   readonly forwarding_address: string | null;
   /**
@@ -22835,7 +22934,7 @@ export type Mailbox = {
    */
   readonly deleted_at?: string | null;
   /**
-   * What to do next with this mailbox. The response that creates it suggests subscribing to the mail it receives; other reads of one mailbox return an empty list, and lists omit it.
+   * What to do next with this mailbox. The response that creates it suggests subscribing to the mail it receives. Forwarding-address setup suggests configuring the email provider. Other reads of one mailbox return an empty list, and lists omit it.
    */
   readonly next?: Array<NextAction>;
 };
@@ -30609,6 +30708,63 @@ export type WorkspaceWritable = {
 };
 
 /**
+ * A workspace's own limit for a policy. It is not reserved capacity; the organization limit still applies.
+ */
+export type WorkspaceRateLimitCapWritable = {
+  /**
+   * Maximum policy units this workspace can use per rolling window. It can exceed the organization limit.
+   */
+  value: number;
+  status: WorkspaceRateLimitCapStatus;
+  /**
+   * When the workspace limit stops applying. `null` means it has no expiry.
+   */
+  expires_at: string | null;
+  /**
+   * When the workspace limit was last set.
+   */
+  updated_at: string;
+};
+
+/**
+ * A rate-limit policy as it applies to one workspace.
+ */
+export type WorkspaceRateLimitWritable = {
+  /**
+   * Stable key of the rate-limit policy.
+   */
+  key: string;
+  name: string;
+  description: string;
+  /**
+   * What the policy counts, such as `request` or `message`.
+   */
+  unit: string;
+  /**
+   * The rolling window length in seconds.
+   */
+  window_seconds: number;
+  /**
+   * Maximum policy units per rolling window for the whole organization, shared by all its workspaces.
+   */
+  organization_limit: number;
+  /**
+   * The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.
+   */
+  workspace_limit: WorkspaceRateLimitCapWritable | null;
+  /**
+   * The lower of the organization limit and any active workspace limit. Requests can still be refused below it when other workspaces use the shared organization limit.
+   */
+  limit: number;
+  attribution: WorkspaceRateLimitAttribution;
+  usage: WorkspaceRateLimitUsage;
+};
+
+export type WorkspaceRateLimitListWritable = {
+  data: Array<WorkspaceRateLimitWritable>;
+};
+
+/**
  * A workspace's own limit for a quota. It is a ceiling, not reserved capacity; the organization limit still applies.
  */
 export type WorkspaceQuotaCeilingWritable = {
@@ -36651,6 +36807,73 @@ export type GetCurrentWorkspaceResponses = {
 
 export type GetCurrentWorkspaceResponse =
   GetCurrentWorkspaceResponses[keyof GetCurrentWorkspaceResponses];
+
+export type ListWorkspaceRateLimitsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/workspace/rate-limits";
+};
+
+export type ListWorkspaceRateLimitsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request reached the wrong regional endpoint. The organization or API key belongs to a different region; reissue the request against the regional host named in the error message.
+   *
+   */
+  421: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWorkspaceRateLimitsError =
+  ListWorkspaceRateLimitsErrors[keyof ListWorkspaceRateLimitsErrors];
+
+export type ListWorkspaceRateLimitsResponses = {
+  /**
+   * The workspace's rate-limit policies.
+   */
+  200: WorkspaceRateLimitList;
+};
+
+export type ListWorkspaceRateLimitsResponse =
+  ListWorkspaceRateLimitsResponses[keyof ListWorkspaceRateLimitsResponses];
 
 export type ListWorkspaceQuotasData = {
   body?: never;

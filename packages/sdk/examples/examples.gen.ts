@@ -2921,3 +2921,13 @@ for (const quota of data) {
   console.log(quota.key, quota.limit, quota.organization_limit);
 }
 }
+
+export async function _ex_394() {
+// Workspace limits matter with several workspaces, or one that kept a limit after a deletion.
+const { data } = await bird.workspace.rateLimits.list();
+for (const policy of data) {
+  // Check usage.status first: workspace_remaining is also null when the
+  // workspace has no limit of its own or its usage is not measured yet.
+  console.log(policy.key, policy.limit, policy.usage.workspace_remaining);
+}
+}

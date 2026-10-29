@@ -28,6 +28,7 @@ export {
   BirdMissingApiKeyError,
   type ErrorDetail,
   type NextAction,
+  type RateLimitContext,
   type QuotaContext,
 } from "./errors.js";
 export { regionFromApiKey, baseUrlForRegion } from "./region.js";
@@ -387,6 +388,7 @@ export type {
   BroadcastSendParams,
 } from "./resources/broadcasts.js";
 export type { Workspace } from "./resources/workspace.gen.js";
+export type { WorkspaceRateLimitList } from "./resources/workspaceRateLimits.gen.js";
 export type { WorkspaceQuotaList } from "./resources/workspaceQuotas.gen.js";
 export type {
   PreferenceStatus,

@@ -251,7 +251,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
   readonly broadcasts: BroadcastsResource;
   readonly assets: AssetsResource;
 
-  /** Read the current workspace with `bird.workspace.get()` and its quotas with `bird.workspace.quotas.list()`. */
+  /** Read the current workspace with `bird.workspace.get()`, its rate limits with `bird.workspace.rateLimits.list()` and its quotas with `bird.workspace.quotas.list()`. */
   readonly workspace: WorkspaceResource;
   readonly organization: OrganizationResource;
 

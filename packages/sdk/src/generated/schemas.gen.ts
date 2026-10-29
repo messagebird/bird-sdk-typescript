@@ -355,6 +355,45 @@ export const NextActionSchema = {
   },
 } as const;
 
+export const RateLimitScopeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["organization", "workspace"],
+  description:
+    "Which limit refused the request.\n\n- `organization`: the limit shared by every workspace in the organization.\n- `workspace`: the limit set for this workspace.\n",
+} as const;
+
+export const RateLimitErrorContextSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The rate-limit policy that refused the request. Present only on `rate_limit_error` responses from a rate-limit policy. A workspace-targeted request is checked against its organization's limit and any limit set for its workspace; the organization limit is reported when both are exhausted.\n",
+  required: ["policy_key", "scope", "window_seconds", "limit"],
+  properties: {
+    policy_key: {
+      type: "string",
+      minLength: 1,
+      example: "email_send",
+      description:
+        "Stable key of the rate-limit policy that refused the request.",
+    },
+    scope: {
+      $ref: "#/components/schemas/RateLimitScope",
+    },
+    window_seconds: {
+      type: "integer",
+      minimum: 1,
+      description: "The rolling window length in seconds.",
+    },
+    limit: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "Maximum policy units per rolling window under the limit that refused the request.",
+    },
+  },
+} as const;
+
 export const QuotaScopeSchema = {
   type: "string",
   minLength: 1,
@@ -474,6 +513,9 @@ export const ErrorBodySchema = {
       items: {
         $ref: "#/components/schemas/NextAction",
       },
+    },
+    rate_limit: {
+      $ref: "#/components/schemas/RateLimitErrorContext",
     },
     quota: {
       $ref: "#/components/schemas/QuotaErrorContext",
@@ -895,6 +937,227 @@ export const WorkspaceSchema = {
       $ref: "#/components/schemas/Timestamps",
     },
   ],
+} as const;
+
+export const WorkspaceRateLimitCapStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["active", "expired"],
+  description:
+    "Whether the workspace limit applies.\n\n- `active`: the limit is enforced alongside the organization limit.\n- `expired`: the limit passed its expiry and no longer applies. It stays visible until it is replaced or removed.\n",
+} as const;
+
+export const WorkspaceRateLimitCapSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "A workspace's own limit for a policy. It is not reserved capacity; the organization limit still applies.",
+  required: ["value", "status", "expires_at", "updated_at"],
+  properties: {
+    value: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "Maximum policy units this workspace can use per rolling window. It can exceed the organization limit.",
+    },
+    status: {
+      $ref: "#/components/schemas/WorkspaceRateLimitCapStatus",
+    },
+    expires_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When the workspace limit stops applying. `null` means it has no expiry.",
+    },
+    updated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "When the workspace limit was last set.",
+    },
+  },
+} as const;
+
+export const WorkspaceRateLimitAttributionStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["unavailable", "warming", "ready"],
+  description:
+    "Whether workspace usage has been measured for long enough to set a new workspace limit.\n\n- `unavailable`: workspace limits cannot be set in this region yet.\n- `warming`: workspace usage is being measured; a limit can be set from `ready_at`.\n- `ready`: a workspace limit can be set.\n\nExisting workspace limits are enforced in every state and can be removed while the workspace can be managed.\n",
+} as const;
+
+export const WorkspaceRateLimitAttributionSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "When workspace usage has been measured for long enough to set a new workspace limit for this policy. Readiness covers timing only; a new limit also needs an organization with several workspaces, and with one workspace only an existing unexpired limit can be changed.",
+  required: ["status", "ready_at"],
+  properties: {
+    status: {
+      $ref: "#/components/schemas/WorkspaceRateLimitAttributionStatus",
+    },
+    ready_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When workspace usage has been measured for long enough, from which a workspace limit can be set if the organization's other conditions allow it. `null` while workspace limits are unavailable in this region.",
+    },
+  },
+} as const;
+
+export const WorkspaceRateLimitUsageStatusSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["available", "unavailable"],
+  description:
+    "Whether current usage could be read.\n\n- `available`: the remaining counts reflect usage at `observed_at`.\n- `unavailable`: usage could not be read. Remaining counts are unknown, not zero.\n",
+} as const;
+
+export const WorkspaceRateLimitUsageSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Remaining capacity in the current rolling window. Taking the observation consumes no capacity, but the request that reads it counts against its own policy, `api_list`, like any other read. It is measured against the limits that requests were checked against when it was read, which can briefly differ from the configured top-level `organization_limit` and `workspace_limit` after a limit changes.",
+  required: [
+    "status",
+    "observed_at",
+    "organization_limit",
+    "organization_remaining",
+    "workspace_limit",
+    "workspace_remaining",
+    "resets_in_seconds",
+  ],
+  properties: {
+    status: {
+      $ref: "#/components/schemas/WorkspaceRateLimitUsageStatus",
+    },
+    observed_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "When usage was read.",
+    },
+    organization_limit: {
+      type: ["integer", "null"],
+      minimum: 1,
+      description:
+        "The organization limit requests were checked against when usage was read. `null` when usage is unavailable.",
+    },
+    organization_remaining: {
+      type: ["integer", "null"],
+      minimum: 0,
+      description:
+        "Units the whole organization can still use in this window, shared by all its workspaces. `null` when usage is unavailable.",
+    },
+    workspace_limit: {
+      type: ["integer", "null"],
+      minimum: 1,
+      description:
+        "The workspace's own limit requests were checked against when usage was read. `null` when no workspace limit applied or usage is unavailable.",
+    },
+    workspace_remaining: {
+      type: ["integer", "null"],
+      minimum: 0,
+      description:
+        "Units this workspace can still use under its own limit. `null` when no workspace limit applied, usage is unavailable, or workspace usage is not yet measured for long enough.",
+    },
+    resets_in_seconds: {
+      type: ["integer", "null"],
+      minimum: 0,
+      description:
+        "Seconds until the current window ends. `null` when usage is unavailable.",
+    },
+  },
+} as const;
+
+export const WorkspaceRateLimitSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description: "A rate-limit policy as it applies to one workspace.",
+  required: [
+    "key",
+    "name",
+    "description",
+    "unit",
+    "window_seconds",
+    "organization_limit",
+    "workspace_limit",
+    "limit",
+    "attribution",
+    "usage",
+  ],
+  properties: {
+    key: {
+      type: "string",
+      minLength: 1,
+      example: "email_send",
+      description: "Stable key of the rate-limit policy.",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+    },
+    unit: {
+      type: "string",
+      minLength: 1,
+      description: "What the policy counts, such as `request` or `message`.",
+    },
+    window_seconds: {
+      type: "integer",
+      minimum: 1,
+      description: "The rolling window length in seconds.",
+    },
+    organization_limit: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "Maximum policy units per rolling window for the whole organization, shared by all its workspaces.",
+    },
+    workspace_limit: {
+      description:
+        "The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WorkspaceRateLimitCap",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    limit: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "The lower of the organization limit and any active workspace limit. Requests can still be refused below it when other workspaces use the shared organization limit.",
+    },
+    attribution: {
+      $ref: "#/components/schemas/WorkspaceRateLimitAttribution",
+    },
+    usage: {
+      $ref: "#/components/schemas/WorkspaceRateLimitUsage",
+    },
+  },
+} as const;
+
+export const WorkspaceRateLimitListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/WorkspaceRateLimit",
+      },
+    },
+  },
 } as const;
 
 export const WorkspaceQuotaKindSchema = {
@@ -17740,14 +18003,13 @@ export const WhatsAppLocationSendSchema = {
     name: {
       type: "string",
       maxLength: 1000,
-      description: "Name of the place, shown above the address.",
+      description: "Place name, shown above the address.",
       example: "Ferry Building",
     },
     address: {
       type: "string",
       maxLength: 1000,
-      description:
-        "Street address of the place. Shown only when `name` is also set.",
+      description: "Street address; shown only with `name`.",
       example: "1 Ferry Building, San Francisco, CA 94111",
     },
   },
@@ -17770,21 +18032,19 @@ export const WhatsAppMessageTemplateComponentParameterSchema = {
           $ref: "#/components/schemas/WhatsAppTemplateParameterType",
         },
       ],
-      description:
-        "The kind of value this parameter carries, which decides which of the fields below to send.",
+      description: "Value kind; determines which field to supply.",
     },
     text: {
       type: "string",
       minLength: 1,
-      description:
-        "The value substituted into the placeholder, as a plain string. Send it on a `text` parameter.",
+      description: "Placeholder value for a `text` parameter.",
     },
     url: {
       type: "string",
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the file a media header shows, fetched by WhatsApp at send time. Send it on an `image`, `video`, `gif` or `document` parameter.\n",
+        "Public HTTPS media-header URL, fetched at send time. For `image`, `video`, `gif`, or `document` parameters.",
       example: "https://cdn.example.com/receipts/a1b2c3.png",
     },
     filename: {
@@ -17792,7 +18052,7 @@ export const WhatsAppMessageTemplateComponentParameterSchema = {
       minLength: 1,
       maxLength: 100,
       description:
-        "Name the recipient sees on the document, including the extension. Without it, the document arrives untitled. Send it only on a `document` parameter; Bird rejects it on any other kind.\n",
+        "Document name with extension; rejected on other parameter types.",
       example: "invoice-a1b2c3.pdf",
     },
     location: {
@@ -17801,14 +18061,13 @@ export const WhatsAppMessageTemplateComponentParameterSchema = {
           $ref: "#/components/schemas/WhatsAppLocationSend",
         },
       ],
-      description:
-        "The point on the map a location header opens. Send it on a `location` parameter.",
+      description: "Map point for a `location` header parameter.",
     },
     name: {
       type: "string",
       minLength: 1,
       description:
-        "The placeholder this value fills, for a template with named parameters (for example `first_name`); name every parameter then. Omit it for a positional template, which takes values in `{{n}}` order.\n",
+        "Placeholder name, such as `first_name`; required on every named parameter. Omit for positional templates and supply values in `{{n}}` order.",
     },
   },
 } as const;
@@ -17843,7 +18102,7 @@ export const WhatsAppMessageTemplateCardSchema = {
   additionalProperties: false,
   required: ["components"],
   description:
-    "The values that fill one card of a carousel. Cards fill in the order the template was approved with, so send one entry per card and keep them in that order.\n",
+    "Placeholder values for one carousel card. Supply one entry per approved card, in approval order.",
   properties: {
     components: {
       type: "array",
@@ -17870,7 +18129,7 @@ export const WhatsAppMessageTemplateComponentSchema = {
     parameters: {
       type: "array",
       description:
-        "The values for this part's placeholders, in `{{n}}` order unless the template names them. Send it on every part except `carousel`, which uses `cards`. Send no `button` part for a button that takes no value.\n",
+        "Placeholder values in `{{n}}` order, or named. Required except for `carousel`, which uses `cards`. Omit button parts without variables.",
       items: {
         $ref: "#/components/schemas/WhatsAppMessageTemplateComponentParameter",
       },
@@ -17880,7 +18139,7 @@ export const WhatsAppMessageTemplateComponentSchema = {
       minItems: 2,
       maxItems: 10,
       description:
-        "Values for each carousel card, one entry per card the template was approved with. Send it only on a `carousel` part.\n",
+        "For `carousel` only: one entry per approved card, in approval order.",
       items: {
         $ref: "#/components/schemas/WhatsAppMessageTemplateCard",
       },
@@ -19197,7 +19456,7 @@ export const WhatsAppTemplateSendSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A send-by-template reference. Identify the template by its `id` or its `slug` (supply exactly one), optionally name a language, and fill its placeholders through `components`.\n",
+    "Supply exactly one of `id` or `slug`, optionally a language, and fill required placeholders through `components`.",
   oneOf: [
     {
       required: ["id"],
@@ -19217,8 +19476,7 @@ export const WhatsAppTemplateSendSchema = {
           $ref: "#/components/schemas/TemplateSlug",
         },
       ],
-      description:
-        "The template to send, by its slug handle (for example `bird_otp`).",
+      description: "Template slug, such as `bird_otp`.",
       example: "bird_otp",
     },
     language: {
@@ -19228,7 +19486,7 @@ export const WhatsAppTemplateSendSchema = {
         },
       ],
       description:
-        "Which of the template's languages to send, as a BCP-47 tag (for example `en-US`; Meta's `en_US` is accepted too). Omit it for the template's default language, unless the template sets `language_source_required`. A language the template lacks is handled by its `on_missing_language` setting. The message is priced at the language it resolves to, which the accepted message echoes.\n",
+        "BCP-47 tag (`en-US`; `en_US` also accepted). Defaults to the template's default language unless `language_source_required` is set. Missing variants follow `on_missing_language`. The resolved language determines pricing and is echoed in the accepted message.",
       example: "en-US",
     },
     bid_multiplier: {
@@ -19237,13 +19495,13 @@ export const WhatsAppTemplateSendSchema = {
       minimum: 0.01,
       maximum: 100,
       description:
-        "Scales the language's maximum price for this message only. The effective bid is the language's `optimization_spec.bid_amount`, times its country multiplier, times this value. At least 0.01 and at most 100; 1 when omitted. Only a language with an `optimization_spec`, on a template still in the `marketing` category, accepts it.\n",
+        "Multiplies `optimization_spec.bid_amount` × country multiplier for this message. Range 0.01–100; default 1. Requires `optimization_spec` on a marketing template language.",
       example: 0.8,
     },
     components: {
       type: "array",
       description:
-        "Values for the template's placeholders. Build it from the template language's `components`: each block's `example_parameters`, with real values, becomes that part's `parameters`. A template's `buttons` block becomes one `button` part per button that has `example_parameters`, in order; a `carousel` becomes one `cards` entry per card, built the same way. A `location` header always needs a part with a `location` parameter. Leave out other blocks without any.\n",
+        "Copy each language component's `example_parameters` into that part's `parameters`, replacing examples with real values. Map `buttons` to one `button` part per button with examples, in order; map `carousel` to `cards`, built likewise. A location header requires a `location` parameter. Omit other blocks without examples.",
       items: {
         $ref: "#/components/schemas/WhatsAppMessageTemplateComponent",
       },
@@ -19333,15 +19591,13 @@ export const WhatsAppTextSendSchema = {
       type: "string",
       minLength: 1,
       maxLength: 4096,
-      description:
-        "The message text. The WhatsApp client turns any URL it contains into a clickable link.\n",
+      description: "Message text; URLs become clickable links.",
       example: "Your driver is 2 minutes away.",
     },
     preview_url: {
       type: "boolean",
       default: false,
-      description:
-        "Whether the WhatsApp client previews the first link in `body`. Not returned when the message is read back.\n",
+      description: "Preview the first link in `body`. Omitted on reads.",
     },
   },
   example: {
@@ -19362,7 +19618,7 @@ export const WhatsAppImageSendSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the image. WhatsApp fetches it at send time, so it must still be reachable then. JPEG or PNG, up to 5 MB.\n",
+        "Public HTTPS URL fetched at send time. JPEG/PNG, up to 5 MB.",
       example: "https://cdn.example.com/receipts/a1b2c3.png",
     },
     caption: {
@@ -19390,7 +19646,7 @@ export const WhatsAppVideoSendSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the video. WhatsApp fetches it at send time, so it must still be reachable then. MP4 with H.264 video and AAC audio, up to 16 MB.\n",
+        "Public HTTPS URL fetched at send time. MP4 with H.264 video and AAC audio, up to 16 MB.",
       example: "https://cdn.example.com/unboxing.mp4",
     },
     caption: {
@@ -19418,14 +19674,14 @@ export const WhatsAppAudioSendSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the audio file. WhatsApp fetches it at send time, so it must still be reachable then. AAC, AMR, MP3, M4A or OGG (OPUS codec, mono), up to 16 MB.\n",
+        "Public HTTPS URL fetched at send time. AAC, AMR, MP3, M4A, or OGG (OPUS, mono), up to 16 MB.",
       example: "https://cdn.example.com/voice/9f2e4a.ogg",
     },
     voice: {
       type: "boolean",
       default: false,
       description:
-        "Whether to send this as a voice note rather than an audio file. A voice note needs an `.ogg` file encoded with the OPUS codec.\n",
+        "Send as a voice note; requires an `.ogg` file with the OPUS codec.",
     },
   },
   example: {
@@ -19446,7 +19702,7 @@ export const WhatsAppStickerSendSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the sticker. WhatsApp fetches it at send time, so it must still be reachable then. WebP only, up to 100 KB static or 500 KB animated.\n",
+        "Public HTTPS URL fetched at send time. WebP, up to 100 KB static or 500 KB animated.",
       example: "https://cdn.example.com/stickers/thumbs-up.webp",
     },
   },
@@ -19467,7 +19723,7 @@ export const WhatsAppDocumentSendSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the document. WhatsApp fetches it at send time, so it must still be reachable then. Up to 100 MB; PDF, Word, Excel, PowerPoint and plain text render reliably in the WhatsApp client.\n",
+        "Public HTTPS URL fetched at send time, up to 100 MB. PDF, Word, Excel, PowerPoint, and plain text render reliably.",
       example: "https://cdn.example.com/invoices/a1b2c3.pdf",
     },
     caption: {
@@ -19480,8 +19736,7 @@ export const WhatsAppDocumentSendSchema = {
       type: "string",
       minLength: 1,
       maxLength: 100,
-      description:
-        "Name the recipient sees, including the extension. WhatsApp derives one from the URL when you omit it.\n",
+      description: "Recipient-visible filename with extension.",
       example: "invoice-a1b2c3.pdf",
     },
   },
@@ -19536,7 +19791,7 @@ export const WhatsAppInteractiveHeaderSendSchema = {
   additionalProperties: false,
   required: ["type"],
   description:
-    "What to show above an interactive message's body: `text` for a line of copy, or `url` for an image, video or document. A `list` accepts a `text` header only.\n",
+    "Content above the body: `text` or a media `url`. Lists accept text headers only.",
   oneOf: [
     {
       properties: {
@@ -19568,14 +19823,13 @@ export const WhatsAppInteractiveHeaderSendSchema = {
           $ref: "#/components/schemas/WhatsAppInteractiveHeaderTypeWrite",
         },
       ],
-      description: "Which kind of header this is, and which field carries it.",
+      description: "Header kind; determines which field to supply.",
     },
     text: {
       type: "string",
       minLength: 1,
       maxLength: 60,
-      description:
-        "A single line of text above the body. Send it on a `text` header.",
+      description: "Single line above the body, for `text` headers.",
       example: "New workshop dates announced",
     },
     url: {
@@ -19583,7 +19837,7 @@ export const WhatsAppInteractiveHeaderSendSchema = {
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the file to show on an `image`, `video` or `document` header, fetched by WhatsApp at send time. The free-form `image`, `video` and `document` limits apply.\n",
+        "Public HTTPS URL fetched at send time for `image`, `video`, or `document` headers. The corresponding free-form media limits apply.",
       example: "https://cdn.example.com/banners/workshop.png",
     },
   },
@@ -19611,22 +19865,21 @@ export const WhatsAppInteractiveQuickReplyButtonSendSchema = {
   additionalProperties: false,
   required: ["slug", "text"],
   description:
-    "One tappable reply button. Tapping it sends `slug` back as an inbound message, which reads as an `interactive_reply`.\n",
+    "Reply button; tapping returns `slug` in an inbound `interactive_reply`.",
   properties: {
     slug: {
       type: "string",
       minLength: 1,
       maxLength: 256,
       description:
-        "Your own handle for this button, echoed back on the reply. You choose the value and it is never shown to the recipient, so it can carry whatever your application needs to route the answer. Any characters, up to 256.\n",
+        "Hidden reply identifier, echoed on tap. Any characters, up to 256.",
       example: "change-booking",
     },
     text: {
       type: "string",
       minLength: 1,
       maxLength: 20,
-      description:
-        "The button's label. It must differ from every other button's label in the same message, because the recipient's reply is identified to them by the label they tapped.\n",
+      description: "Button label, unique within its message or carousel card.",
       example: "Change",
     },
   },
@@ -19640,8 +19893,7 @@ export const WhatsAppInteractiveCtaUrlSendSchema = {
   type: "object",
   additionalProperties: false,
   required: ["text", "url"],
-  description:
-    "A button that opens a link in the recipient's browser, so a long or opaque address never has to appear in the message body.\n",
+  description: "Button that opens a link in the recipient's browser.",
   properties: {
     text: {
       type: "string",
@@ -19656,7 +19908,7 @@ export const WhatsAppInteractiveCtaUrlSendSchema = {
       minLength: 1,
       maxLength: 2000,
       description:
-        "The address the button opens. It is fixed for every recipient, so per recipient tracking belongs in the address you supply, for example as a query parameter you generate per send.\n",
+        "Destination URL. Include per-recipient tracking in the supplied URL.",
       example: "https://example.com/workshops?click_id=a1b2c3",
     },
   },
@@ -19671,7 +19923,7 @@ export const WhatsAppInteractiveButtonSendSchema = {
   additionalProperties: false,
   required: ["type"],
   description:
-    "One button on an interactive message or on a carousel card. `type` names the kind and the field that carries it, so a button kind WhatsApp adds later arrives as another `type` here rather than as a new shape somewhere else.\n",
+    "Interactive or carousel button. Set `type` and its matching field.",
   oneOf: [
     {
       properties: {
@@ -19703,7 +19955,7 @@ export const WhatsAppInteractiveButtonSendSchema = {
           $ref: "#/components/schemas/WhatsAppInteractiveButtonTypeWrite",
         },
       ],
-      description: "Which kind of button this is, and which field carries it.",
+      description: "Button kind; determines which field to supply.",
     },
     quick_reply: {
       allOf: [
@@ -19711,8 +19963,7 @@ export const WhatsAppInteractiveButtonSendSchema = {
           $ref: "#/components/schemas/WhatsAppInteractiveQuickReplyButtonSend",
         },
       ],
-      description:
-        "The button's label and the handle it sends back. Send this on a `quick_reply` button.",
+      description: "Label and reply identifier for `quick_reply`.",
     },
     cta_url: {
       allOf: [
@@ -19720,8 +19971,7 @@ export const WhatsAppInteractiveButtonSendSchema = {
           $ref: "#/components/schemas/WhatsAppInteractiveCtaUrlSend",
         },
       ],
-      description:
-        "The button's label and the address it opens. Send this on a `cta_url` button.",
+      description: "Label and destination for `cta_url`.",
     },
   },
   example: {
@@ -19738,14 +19988,14 @@ export const WhatsAppInteractiveListRowSendSchema = {
   additionalProperties: false,
   required: ["slug", "text"],
   description:
-    "One option in a list's menu. Choosing it sends `slug` back as an inbound message, which reads as an `interactive_reply`.\n",
+    "Menu option; selection returns `slug` in an inbound `interactive_reply`.",
   properties: {
     slug: {
       type: "string",
       minLength: 1,
       maxLength: 200,
       description:
-        "Your own handle for this option, echoed back on the reply. You choose the value and it is never shown to the recipient. Any characters, up to 200.\n",
+        "Hidden reply identifier, echoed on selection. Any characters, up to 200.",
       example: "priority_express",
     },
     text: {
@@ -19753,14 +20003,13 @@ export const WhatsAppInteractiveListRowSendSchema = {
       minLength: 1,
       maxLength: 24,
       description:
-        "The option's label, shown as the row's title in the menu. It must differ from every other row's label and from every button's label in the same message, not merely within its own group; a repeat returns a `422` `WhatsAppInteractiveDuplicateLabel`.\n",
+        "Row label, unique across every section's rows; duplicates return `422` `WhatsAppInteractiveDuplicateLabel`.",
       example: "Priority Mail Express",
     },
     description: {
       type: "string",
       maxLength: 72,
-      description:
-        "A second line under the label, for detail that will not fit in it.",
+      description: "Detail shown below the label.",
       example: "Next day to 2 days",
     },
   },
@@ -19775,8 +20024,7 @@ export const WhatsAppInteractiveListSectionSendSchema = {
   type: "object",
   additionalProperties: false,
   required: ["title", "rows"],
-  description:
-    "One group of options in a list's menu. A menu with a single group still carries a title, which WhatsApp shows above its rows.\n",
+  description: "Menu section. A title is required even for a single section.",
   properties: {
     title: {
       type: "string",
@@ -19790,7 +20038,7 @@ export const WhatsAppInteractiveListSectionSendSchema = {
       minItems: 1,
       maxItems: 10,
       description:
-        "The options in this group. A message carries at most 10 rows across all its groups combined, so this per-group maximum is not additive: more than 10 in total returns a `422` `WhatsAppInteractiveLimitExceeded`. Row labels must be unique across the whole message too, not just within a group.\n",
+        "At most 10 rows across the message (`422` `WhatsAppInteractiveLimitExceeded` otherwise). Labels must be unique across sections.",
       items: {
         $ref: "#/components/schemas/WhatsAppInteractiveListRowSend",
       },
@@ -19812,8 +20060,7 @@ export const WhatsAppInteractiveListSendSchema = {
   type: "object",
   additionalProperties: false,
   required: ["button_text", "sections"],
-  description:
-    "A menu of options behind a single button. The recipient taps the button, WhatsApp opens the menu, and choosing one option sends it back as a reply.\n",
+  description: "Button-opened menu; selecting an option sends a reply.",
   properties: {
     button_text: {
       type: "string",
@@ -19827,7 +20074,7 @@ export const WhatsAppInteractiveListSendSchema = {
       minItems: 1,
       maxItems: 10,
       description:
-        "The groups of options in the menu, in the order shown. At most 10 rows across all groups combined, each carrying a label unique across the whole message.\n",
+        "Sections in display order. At most 10 rows total, with labels unique across the message.",
       items: {
         $ref: "#/components/schemas/WhatsAppInteractiveListSectionSend",
       },
@@ -19864,8 +20111,7 @@ export const WhatsAppInteractiveCardHeaderSendSchema = {
   type: "object",
   additionalProperties: false,
   required: ["type", "url"],
-  description:
-    "The media at the top of a carousel card. Every card must carry one, and it must be an image or a video: a card takes no text or document header.\n",
+  description: "Required carousel-card media: image or video only.",
   oneOf: [
     {
       properties: {
@@ -19889,15 +20135,14 @@ export const WhatsAppInteractiveCardHeaderSendSchema = {
           $ref: "#/components/schemas/WhatsAppInteractiveHeaderTypeWrite",
         },
       ],
-      description:
-        "Which kind of media this is. A card accepts `image` or `video` only.\n",
+      description: "Card media kind: `image` or `video`.",
     },
     url: {
       type: "string",
       format: "uri",
       minLength: 1,
       description:
-        "Public `https` URL of the file to show at the top of the card. An image must be JPEG or PNG, up to 5 MB; a video, MP4 with H.264 video and AAC audio, up to 16 MB. WhatsApp fetches it at send time, on the same terms as a message header's `url`.\n",
+        "Public HTTPS URL fetched at send time. Image: JPEG/PNG, up to 5 MB. Video: MP4 (H.264/AAC), up to 16 MB.",
       example: "https://cdn.example.com/plants/blue-echeveria.jpeg",
     },
   },
@@ -19912,7 +20157,7 @@ export const WhatsAppInteractiveCardSendSchema = {
   additionalProperties: false,
   required: ["header", "buttons"],
   description:
-    "One card in a carousel: media at the top, optional text of its own, and the buttons under it. A card has no footer, and its position in `cards` is the position it appears in.\n",
+    "Carousel card: media, optional text, and buttons. No footer. Array order determines display order.",
   oneOf: [
     {
       properties: {
@@ -19957,7 +20202,7 @@ export const WhatsAppInteractiveCardSendSchema = {
       maxLength: 160,
       pattern: "^[^\\n]*(\\n[^\\n]*){0,2}$",
       description:
-        "The card's own text, below its media, with at most two line breaks. Optional: a card can carry media and buttons alone.\n",
+        "Optional text below the media, with at most two line breaks.",
       example:
         "*Blue Echeveria*\n\nA rosette-shaped succulent with powdery blue leaves.",
     },
@@ -19966,7 +20211,7 @@ export const WhatsAppInteractiveCardSendSchema = {
       minItems: 1,
       maxItems: 3,
       description:
-        "The buttons under the card, in the order given. Either one `cta_url` button or up to three `quick_reply` buttons: the two kinds cannot be mixed on one card. Every card in the carousel must carry the same kinds in the same number, and a carousel whose cards disagree returns a `422` `WhatsAppInteractiveCardsButtonsMismatch`.\n",
+        "One `cta_url` or up to three `quick_reply` buttons, in display order. Cards must match button kinds and count, or return `422` `WhatsAppInteractiveCardsButtonsMismatch`.",
       items: {
         $ref: "#/components/schemas/WhatsAppInteractiveButtonSend",
       },
@@ -19979,7 +20224,7 @@ export const WhatsAppInteractiveSendSchema = {
   additionalProperties: false,
   required: ["type", "body_text"],
   description:
-    "An interactive message: body text plus something for the recipient to tap. Name the kind in `type` and send that kind's field: `buttons`, `list`, `cta_url` or `cards`. `location_request_message` and `request_contact_info` carry only `body_text`.\n",
+    "Set `type` and its matching field: `buttons`, `list`, `cta_url`, or `cards`. `location_request_message` and `request_contact_info` take only `body_text`.",
   oneOf: [
     {
       properties: {
@@ -20149,8 +20394,7 @@ export const WhatsAppInteractiveSendSchema = {
           $ref: "#/components/schemas/WhatsAppInteractiveTypeWrite",
         },
       ],
-      description:
-        "Which kind of interactive message this is, and which field carries it.",
+      description: "Message kind; determines which content field to supply.",
     },
     header: {
       allOf: [
@@ -20159,14 +20403,14 @@ export const WhatsAppInteractiveSendSchema = {
         },
       ],
       description:
-        "Optional content above the body: text on a `list`; text, image, video or document on `button` and `cta_url`. A `carousel` and the two request kinds take none.\n",
+        "For `list`: text only. For `button` and `cta_url`: text, image, video, or document. Unsupported for carousel and request kinds.",
     },
     body_text: {
       type: "string",
       minLength: 1,
       maxLength: 4096,
       description:
-        "The message's main text, required on every kind. Up to 1024 characters, except on a `list`.\n",
+        "Required main text. Maximum 1024 characters, or 4096 for `list`.",
       example: "Your workshop is scheduled for 9am tomorrow.",
     },
     footer_text: {
@@ -20174,7 +20418,7 @@ export const WhatsAppInteractiveSendSchema = {
       minLength: 1,
       maxLength: 60,
       description:
-        "Optional small print below the body and above the buttons. A `carousel` and both request kinds take no footer.\n",
+        "Small print below the body. Unsupported for carousel and request kinds.",
       example: "Dates are subject to change.",
     },
     buttons: {
@@ -20182,7 +20426,7 @@ export const WhatsAppInteractiveSendSchema = {
       minItems: 1,
       maxItems: 3,
       description:
-        "The `quick_reply` buttons of a `button` message, in order. Labels must be unique within the message.\n",
+        "Ordered `quick_reply` buttons for `button` messages. Labels must be unique within the message.",
       items: {
         $ref: "#/components/schemas/WhatsAppInteractiveButtonSend",
       },
@@ -20193,7 +20437,7 @@ export const WhatsAppInteractiveSendSchema = {
           $ref: "#/components/schemas/WhatsAppInteractiveListSend",
         },
       ],
-      description: "The menu to show. Send this on a `list` message.",
+      description: "Menu for a `list` message.",
     },
     cta_url: {
       allOf: [
@@ -20201,14 +20445,14 @@ export const WhatsAppInteractiveSendSchema = {
           $ref: "#/components/schemas/WhatsAppInteractiveCtaUrlSend",
         },
       ],
-      description: "The link button to show. Send this on a `cta_url` message.",
+      description: "Link button for a `cta_url` message.",
     },
     cards: {
       type: "array",
       minItems: 2,
       maxItems: 10,
       description:
-        "The cards of a `carousel` message, 2 to 10, left to right. A carousel takes no header or footer of its own.\n",
+        "2–10 carousel cards, in display order. No message-level header or footer.",
       items: {
         $ref: "#/components/schemas/WhatsAppInteractiveCardSend",
       },
@@ -20339,8 +20583,7 @@ export const WhatsAppInteractiveSendSchema = {
 export const WhatsAppContactNameSendSchema = {
   type: "object",
   additionalProperties: false,
-  description:
-    "The contact's name. `formatted_name` is what the card shows, and WhatsApp additionally requires at least one of the parts below it, so a card carrying only a formatted name is rejected.\n",
+  description: "Requires `formatted_name` plus at least one other name part.",
   required: ["formatted_name"],
   properties: {
     formatted_name: {
@@ -20412,14 +20655,13 @@ export const WhatsAppContactPhoneSendSchema = {
       minLength: 1,
       maxLength: 32,
       description:
-        "The number to show. Send it in E.164 to get a card the recipient can message from; any other form still renders, with an invite button.\n",
+        "E.164 enables a chat button; other formats show an invite button.",
       example: "+16505551234",
     },
     type: {
       type: "string",
       maxLength: 64,
-      description:
-        "A label for the number, shown beside it. Free text: WhatsApp defines no vocabulary, and the label is sent exactly as written.\n",
+      description: "Free-text label shown beside the number, sent verbatim.",
       example: "Mobile",
     },
   },
@@ -20440,8 +20682,7 @@ export const WhatsAppContactEmailSendSchema = {
     type: {
       type: "string",
       maxLength: 64,
-      description:
-        "A label for the address, shown beside it. Free text, sent exactly as written.\n",
+      description: "Free-text label shown beside the address, sent verbatim.",
       example: "Work",
     },
   },
@@ -20458,14 +20699,13 @@ export const WhatsAppContactUrlSendSchema = {
       minLength: 1,
       maxLength: 2048,
       description:
-        "The address to show. Not validated as a URL, because a card commonly carries a bare domain.\n",
+        "Website address; bare domains accepted without URL validation.",
       example: "https://luckyshrub.example.com",
     },
     type: {
       type: "string",
       maxLength: 64,
-      description:
-        "A label for the website, shown beside it. Free text, sent exactly as written.\n",
+      description: "Free-text label shown beside the website, sent verbatim.",
       example: "Company",
     },
   },
@@ -20511,8 +20751,7 @@ export const WhatsAppContactAddressSendSchema = {
     type: {
       type: "string",
       maxLength: 64,
-      description:
-        "A label for the address, shown beside it. Free text, sent exactly as written.\n",
+      description: "Free-text label shown beside the address, sent verbatim.",
       example: "Office",
     },
   },
@@ -20522,7 +20761,7 @@ export const WhatsAppContactCardSendSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A contact card to send. WhatsApp shows the name on the card and the rest in a profile view the recipient opens from it.\n\nA card carrying a phone number renders buttons that message or save the contact; a card without one can only be added to an address book.\n",
+    "Contact card with a name and profile details. With a phone number, recipients can message or save it; without one, they can save it.",
   required: ["name"],
   properties: {
     name: {
@@ -20543,15 +20782,14 @@ export const WhatsAppContactCardSendSchema = {
     birthday: {
       type: "string",
       pattern: "^\\d{4}-\\d{2}-\\d{2}$",
-      description:
-        "The contact's birthday, as `YYYY-MM-DD`. WhatsApp rejects any other shape, and a date no calendar holds is rejected too.\n",
+      description: "Valid calendar date in `YYYY-MM-DD` format.",
       example: "1999-01-23",
     },
     phone_numbers: {
       type: "array",
       maxItems: 10,
       description:
-        "The numbers on the card. A number in E.164 renders a button that opens a WhatsApp chat with it; one that is not renders an invite instead.\n",
+        "E.164 numbers get a WhatsApp chat button; other formats get an invite button.",
       items: {
         $ref: "#/components/schemas/WhatsAppContactPhoneSend",
       },
@@ -20604,14 +20842,14 @@ export const WhatsAppMessageSendRequestSchema = {
       type: "string",
       minLength: 1,
       description:
-        "The recipient: a phone number in E.164 format (for example `+14155550100`), a business-scoped user ID (for example `US.13491208655302741918`) for a WhatsApp user whose number you do not have, or a WhatsApp group ID (for example `wag_01krdgeqcxet5s7t44vh8rt9mg`). One-time-passcode templates need a phone number. Bird tracks the customer service window per identity and business number, so reply to the identity a contact's message came from, from the number it reached.\n",
+        "Recipient E.164 number, business-scoped user ID (BSUID, such as `US.13491208655302741918`), or group ID (such as `wag_01krdgeqcxet5s7t44vh8rt9mg`). OTP templates require a phone number. For replies, use the inbound sender identity and receiving business number.",
       example: "+14155550100",
     },
     from: {
       type: "string",
       minLength: 1,
       description:
-        "The business phone number to send from, in E.164 format: a connected number this workspace owns, on the same WhatsApp Business Account as an authored template. Omit it for a Bird-managed template or a group send, which use their own number; every other send requires it.\n",
+        "Connected E.164 number owned by this workspace; for authored templates, use the same WhatsApp Business Account. Omit for Bird-managed templates and groups; required otherwise.",
       example: "+13124495648",
     },
     template: {
@@ -20621,7 +20859,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "The template to send, the only content deliverable outside the customer service window. A group takes only templates your workspace authored, outside the authentication category.\n",
+        "Required outside the customer service window. Groups accept workspace-authored, non-authentication templates only.",
     },
     text: {
       allOf: [
@@ -20629,8 +20867,7 @@ export const WhatsAppMessageSendRequestSchema = {
           $ref: "#/components/schemas/WhatsAppTextSend",
         },
       ],
-      description:
-        "Free-form text. Deliverable only inside an open customer service window.",
+      description: "Free-form text; requires an open customer service window.",
     },
     image: {
       allOf: [
@@ -20638,8 +20875,7 @@ export const WhatsAppMessageSendRequestSchema = {
           $ref: "#/components/schemas/WhatsAppImageSend",
         },
       ],
-      description:
-        "A free-form image. Deliverable only inside an open customer service window.",
+      description: "Free-form image; requires an open customer service window.",
     },
     video: {
       allOf: [
@@ -20647,8 +20883,7 @@ export const WhatsAppMessageSendRequestSchema = {
           $ref: "#/components/schemas/WhatsAppVideoSend",
         },
       ],
-      description:
-        "A free-form video. Deliverable only inside an open customer service window.",
+      description: "Free-form video; requires an open customer service window.",
     },
     audio: {
       allOf: [
@@ -20656,8 +20891,7 @@ export const WhatsAppMessageSendRequestSchema = {
           $ref: "#/components/schemas/WhatsAppAudioSend",
         },
       ],
-      description:
-        "Free-form audio. Deliverable only inside an open customer service window.",
+      description: "Free-form audio; requires an open customer service window.",
     },
     sticker: {
       allOf: [
@@ -20666,7 +20900,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "A free-form sticker. Deliverable only inside an open customer service window.",
+        "Free-form sticker; requires an open customer service window.",
     },
     document: {
       allOf: [
@@ -20675,7 +20909,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "A free-form document. Deliverable only inside an open customer service window.",
+        "Free-form document; requires an open customer service window.",
     },
     location: {
       allOf: [
@@ -20684,7 +20918,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "A free-form location. Deliverable only inside an open customer service window.",
+        "Free-form location; requires an open customer service window.",
     },
     interactive: {
       allOf: [
@@ -20693,14 +20927,14 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "Free-form interactive content: reply buttons, a list menu, a link button, media cards, or a request for the recipient's location or contact details. Deliverable only inside an open customer service window, and never to a group.\n",
+        "Reply buttons, a list, a link button, media cards, or a location/contact request. Requires an open customer service window; unsupported for groups.",
     },
     contact_cards: {
       type: "array",
       minItems: 1,
       maxItems: 5,
       description:
-        "Up to five contact cards, each `name` carrying `formatted_name` plus at least one other part. Deliverable only inside an open customer service window.\n",
+        "Up to five cards. Each name needs `formatted_name` and another name part. Requires an open customer service window.",
       items: {
         $ref: "#/components/schemas/WhatsAppContactCardSend",
       },
@@ -20712,7 +20946,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "An earlier message to quote above this one: one from the same conversation, between this `to` and `from`, in the last 15 days.\n",
+        "Message to quote, from this conversation (`to` and `from`) within the last 15 days.",
       example: "wam_01kya19eknftrs2s6p82asmvnh",
     },
     tags: {
@@ -20722,13 +20956,13 @@ export const WhatsAppMessageSendRequestSchema = {
       },
       maxItems: 20,
       description:
-        "Structured `{name, value}` labels for filtering. Tags become first-class query dimensions: filter the list endpoint by tag name. Maximum 20 tags per send. Use tags for low-cardinality dimensions (`category`, `experiment_variant`). For arbitrary structured context you do not need as a filter dimension, use `metadata` instead.\n",
+        "Up to 20 `{name, value}` labels, filterable by name. Use for low-cardinality dimensions such as category; put other context in `metadata`.",
     },
     metadata: {
       type: "object",
       additionalProperties: true,
       description:
-        "Arbitrary JSON object stored on the message and returned on API reads. Maximum 2 KB serialized. Use metadata for per-send context like internal IDs and foreign keys. For low-cardinality filterable labels, use `tags` instead.\n",
+        "Per-message JSON context, such as internal IDs, returned on reads. Maximum 2 KB serialized. Use `tags` for filterable labels.",
     },
     reference: {
       allOf: [
@@ -20737,7 +20971,7 @@ export const WhatsAppMessageSendRequestSchema = {
         },
       ],
       description:
-        "An identifier you want to find this message by, such as an order or ticket number, matched exactly by the message list's `reference` filter. Set it only when you need to search on it, and put any other data in `metadata`. Stored on the message, returned on reads and echoed in webhook payloads. Several messages can share one.\n",
+        "Identifier matched exactly by the message list's `reference` filter; returned on reads and webhooks. May be shared by multiple messages. Put non-searchable context in `metadata`.",
     },
   },
   example: {
@@ -40930,7 +41164,7 @@ export const MailboxSchema = {
       format: "email",
       readOnly: true,
       description:
-        "An address we generate on our receiving domain when the mailbox is created on a domain not set up for receiving with us. Forward mail for `address` here from your current email provider, and it lands in this mailbox. Replies still go out from `address`. Immutable. It stops receiving while the mailbox is deleted, works again with the same value after a restore, and keeps working if you later enable receiving on the domain. `null` on mailboxes created on the shared domain or on a domain already enabled for receiving.",
+        "An address we generate on our receiving domain, either when the mailbox is created on a domain not set up for receiving with us or later, when you set up forwarding for the mailbox. Forward mail for `address` here from your current email provider, and it lands in this mailbox. Replies still go out from `address`. Immutable once set. It stops receiving while the mailbox is deleted, works again with the same value after a restore, and keeps working if you later enable or disable receiving on the domain. `null` until set up; always `null` on the shared domain, which receives directly.",
       example: "k7q2mzxw4h6p5ra3@eu1.inbound.bird.com",
     },
     display_name: {
@@ -41048,7 +41282,7 @@ export const MailboxSchema = {
       type: "array",
       readOnly: true,
       description:
-        "What to do next with this mailbox. The response that creates it suggests subscribing to the mail it receives; other reads of one mailbox return an empty list, and lists omit it.",
+        "What to do next with this mailbox. The response that creates it suggests subscribing to the mail it receives. Forwarding-address setup suggests configuring the email provider. Other reads of one mailbox return an empty list, and lists omit it.",
       items: {
         $ref: "#/components/schemas/NextAction",
       },
@@ -55522,6 +55756,127 @@ export const WorkspaceWritableSchema = {
       },
     },
   ],
+} as const;
+
+export const WorkspaceRateLimitCapWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "A workspace's own limit for a policy. It is not reserved capacity; the organization limit still applies.",
+  required: ["value", "status", "expires_at", "updated_at"],
+  properties: {
+    value: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "Maximum policy units this workspace can use per rolling window. It can exceed the organization limit.",
+    },
+    status: {
+      $ref: "#/components/schemas/WorkspaceRateLimitCapStatus",
+    },
+    expires_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When the workspace limit stops applying. `null` means it has no expiry.",
+    },
+    updated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "When the workspace limit was last set.",
+    },
+  },
+} as const;
+
+export const WorkspaceRateLimitWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description: "A rate-limit policy as it applies to one workspace.",
+  required: [
+    "key",
+    "name",
+    "description",
+    "unit",
+    "window_seconds",
+    "organization_limit",
+    "workspace_limit",
+    "limit",
+    "attribution",
+    "usage",
+  ],
+  properties: {
+    key: {
+      type: "string",
+      minLength: 1,
+      example: "email_send",
+      description: "Stable key of the rate-limit policy.",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+    },
+    unit: {
+      type: "string",
+      minLength: 1,
+      description: "What the policy counts, such as `request` or `message`.",
+    },
+    window_seconds: {
+      type: "integer",
+      minimum: 1,
+      description: "The rolling window length in seconds.",
+    },
+    organization_limit: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "Maximum policy units per rolling window for the whole organization, shared by all its workspaces.",
+    },
+    workspace_limit: {
+      description:
+        "The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WorkspaceRateLimitCapWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+    },
+    limit: {
+      type: "integer",
+      minimum: 1,
+      description:
+        "The lower of the organization limit and any active workspace limit. Requests can still be refused below it when other workspaces use the shared organization limit.",
+    },
+    attribution: {
+      $ref: "#/components/schemas/WorkspaceRateLimitAttribution",
+    },
+    usage: {
+      $ref: "#/components/schemas/WorkspaceRateLimitUsage",
+    },
+  },
+} as const;
+
+export const WorkspaceRateLimitListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/WorkspaceRateLimitWritable",
+      },
+    },
+  },
 } as const;
 
 export const WorkspaceQuotaCeilingWritableSchema = {

@@ -50,6 +50,18 @@ describe("mapResponseToError", () => {
     expect((err as BirdRateLimitError).retryAfter).toBe(60);
   });
 
+  it("carries the refusing policy limit from the body, never the message", () => {
+    const rateLimit = { policy_key: "email_send", scope: "workspace", window_seconds: 60, limit: 300 };
+    const err = mapResponseToError(
+      429,
+      { error: { type: "rate_limit_error", code: "E01003", message: "slow down", rate_limit: rateLimit } },
+      headers({ "Retry-After": "12" }),
+    );
+    expect(err).toBeInstanceOf(BirdRateLimitError);
+    expect(err.rateLimit).toEqual(rateLimit);
+    expect(mapResponseToError(429, { type: "rate_limit_error" }, headers()).rateLimit).toBeUndefined();
+  });
+
   it("falls back on status when the body carries no type (non-JSON error)", () => {
     const err = mapResponseToError(502, undefined, headers());
     expect(err).toBeInstanceOf(BirdInternalError); // 5xx → internal_error
@@ -123,6 +135,7 @@ describe("mapResponseToError", () => {
       doc_url: "docUrl",
       request_id: "requestId",
       vendor_code: "vendorCode",
+      rate_limit: "rateLimit",
     };
     for (const key of Object.keys(ErrorBodySchema.properties)) {
       expect(err, `ErrorBody wire field '${key}' is unmapped`).toHaveProperty(

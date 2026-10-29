@@ -109,6 +109,18 @@ export interface QuotaContext {
 }
 
 /** One verification requirement blocking the action, with the flow that resolves it. */
+/**
+ * The policy limit that refused a request. `scope` is `organization` for the
+ * limit shared by every workspace in the organization, or `workspace` for a
+ * limit set on the workspace itself.
+ */
+export interface RateLimitContext {
+  policy_key: string;
+  scope: string;
+  window_seconds: number;
+  limit: number;
+}
+
 /** Constructor fields shared by every API error, mapped from the wire body. */
 export interface BirdAPIErrorFields {
   statusCode: number;
@@ -131,6 +143,8 @@ export interface BirdAPIErrorFields {
   remediation?: string;
   /** Recovery steps for this error, in the order to take them. */
   next?: NextAction[];
+  /** The rate-limit policy limit that refused the request, on a `rate_limit_error` from a policy. */
+  rateLimit?: RateLimitContext;
   /** The quota limit that refused a resource change, when a quota refused the request. */
   quota?: QuotaContext;
   /** Verification requirements blocking this action, when it is blocked pending verification. */
@@ -148,6 +162,7 @@ export class BirdAPIError extends BirdError {
   readonly vendorCode?: string;
   readonly remediation?: string;
   readonly next?: NextAction[];
+  readonly rateLimit?: RateLimitContext;
   readonly quota?: QuotaContext;
 
   constructor(fields: BirdAPIErrorFields) {
@@ -163,6 +178,7 @@ export class BirdAPIError extends BirdError {
     this.vendorCode = fields.vendorCode;
     this.remediation = fields.remediation;
     this.next = fields.next;
+    this.rateLimit = fields.rateLimit;
     this.quota = fields.quota;
     Object.setPrototypeOf(this, new.target.prototype);
   }
@@ -315,6 +331,7 @@ interface WireErrorBody {
   details?: ErrorDetail[];
   remediation?: string;
   next?: NextAction[];
+  rate_limit?: RateLimitContext;
   quota?: QuotaContext;
 }
 
@@ -398,6 +415,7 @@ export function mapResponseToError(
     vendorCode: b.vendor_code,
     remediation: b.remediation,
     next: b.next ?? [], // normalize a null/absent wire `next` to [] so callers can always iterate
+    rateLimit: b.rate_limit,
     quota: b.quota,
   };
 

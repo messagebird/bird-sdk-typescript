@@ -76,6 +76,7 @@ export type _Domains = Pick<BirdClient["domains"], "list" | "get" | "create" | "
 export type _Suppressions = Pick<BirdClient["suppressions"], "list" | "get" | "add" | "remove">;
 export type _Webhooks = Pick<BirdClient["webhooks"], "list" | "get" | "create" | "test" | "delete" | "attempts" | "replay" | "rotateSecret" | "update" | "unwrap">;
 export type _Workspace = Pick<BirdClient["workspace"], "get">;
+export type _WorkspaceRateLimits = Pick<BirdClient["workspace"]["rateLimits"], "list">;
 export type _WorkspaceQuotas = Pick<BirdClient["workspace"]["quotas"], "list">;
 export type _Preferences = Pick<BirdClient["preferences"], "list" | "get" | "create" | "delete">;
 export type _Contacts = Pick<BirdClient["contacts"], "list" | "get" | "create" | "update" | "delete" | "batch">;

@@ -1122,6 +1122,9 @@ import type {
   ListWorkspaceQuotasData,
   ListWorkspaceQuotasErrors,
   ListWorkspaceQuotasResponses,
+  ListWorkspaceRateLimitsData,
+  ListWorkspaceRateLimitsErrors,
+  ListWorkspaceRateLimitsResponses,
   ListWorkspacesData,
   ListWorkspacesErrors,
   ListWorkspaceSmsSenderRequirementsData,
@@ -1379,6 +1382,48 @@ export const getCurrentWorkspace = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/workspace",
+    ...options,
+  });
+
+/**
+ * List workspace rate limits
+ *
+ * Only relevant to organizations with several workspaces, or one left with a single workspace that kept a workspace limit after a deletion, which still applies. When deleting workspaces leaves one, that workspace keeps its workspace limits and they still apply until they are removed or expire; otherwise an organization with one workspace only needs its organization rate limits.
+ *
+ * Returns every rate-limit policy as it applies to the current workspace: the organization limit shared by
+ * all workspaces, the workspace's own limit when one is set, and the remaining capacity observed in the
+ * current window.
+ *
+ * A workspace limit is not reserved capacity. A request is refused when either the organization
+ * limit or the workspace limit is reached. When usage cannot be read, `usage.status` is `unavailable` and
+ * the remaining counts are `null`. `usage.workspace_remaining` is also `null` when the workspace has no
+ * limit of its own or `attribution.status` is not `ready`, so check `usage.status` before treating `null`
+ * as a failed read.
+ *
+ * Rate limits are served from the organization's home region. A request sent to another region returns `421 Misdirected Request`; retry it on that region's host.
+ *
+ */
+export const listWorkspaceRateLimits = <ThrowOnError extends boolean = false>(
+  options?: Options<ListWorkspaceRateLimitsData, ThrowOnError>,
+): RequestResult<
+  ListWorkspaceRateLimitsResponses,
+  ListWorkspaceRateLimitsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListWorkspaceRateLimitsResponses,
+    ListWorkspaceRateLimitsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/workspace/rate-limits",
     ...options,
   });
 
