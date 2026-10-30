@@ -714,6 +714,26 @@ export type WorkspaceRateLimitList = {
 };
 
 /**
+ * What the quota's limit is measured in. `null` for a quota whose `type` is `boolean`, because its limit is a switch rather than an amount. `label` names what is counted.
+ *
+ * - `count`: a plain number: a count of things, such as domains or mailboxes, or a ratio such as a percentage or multiple.
+ * - `bytes`: stored data, in bytes.
+ * - `days`: a period, in days.
+ * - `microunits`: an amount of money in millionths of the billing currency's main unit.
+ *
+ */
+export type QuotaUnit = string | null;
+
+/**
+ * How to read the quota's limit.
+ *
+ * - `integer`: a count or amount, measured in `unit`.
+ * - `boolean`: a feature switch. A limit of `1` turns the feature on and `0` turns it off.
+ *
+ */
+export type QuotaType = "integer" | "boolean" | (string & {});
+
+/**
  * What the quota limits.
  *
  * - `counted`: an amount the workspace accumulates, such as mailboxes or stored bytes. Usage is reported.
@@ -835,10 +855,12 @@ export type WorkspaceQuota = {
   key: string;
   name: string;
   description: string;
+  unit: QuotaUnit;
   /**
-   * What the limit counts, such as `mailboxes`, `bytes` or `days`.
+   * What the product calls the thing the limit applies to, such as `domains` or `seed tests`, for display next to the limit.
    */
-  unit: string;
+  label: string;
+  type: QuotaType;
   kind: WorkspaceQuotaKind;
   enforcement: WorkspaceQuotaEnforcement;
   /**
@@ -26848,6 +26870,17 @@ export type EventWhatsAppSuppressionCreated = {
   data: EventWhatsAppSuppressionCreatedData;
 };
 
+/**
+ * What your endpoint did with the client certificate that we present for your workspace. Omitted when your workspace presents no client certificate, or when the test failed before your endpoint answered.
+ *
+ * - `presented`: your endpoint asked for the certificate and accepted it.
+ * - `not_requested`: your endpoint did not ask for a certificate.
+ * - `rejected`: your endpoint rejected the certificate. If your workspace allows deliveries without the certificate, we sent the test again without it, and the other fields show the result of that second request.
+ *
+ */
+export type WebhookTestClientCertificate =
+  "presented" | "not_requested" | "rejected";
+
 export type WebhookTestResponse = {
   /**
    * Whether your endpoint accepted the test event. `delivered` means it returned a `2xx` status; `failed` means it returned a non-`2xx` status or could not be reached (see `error` for the latter).
@@ -26876,6 +26909,7 @@ export type WebhookTestResponse = {
    * A short explanation of why the event could not be delivered. Present only when your endpoint could not be reached.
    */
   error?: string;
+  client_certificate?: WebhookTestClientCertificate;
 };
 
 export type WebhookReplayRequest = {
@@ -26963,6 +26997,175 @@ export type WebhookAttemptList = {
    * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
    */
   refresh_cursor: string | null;
+};
+
+/**
+ * Whether client certificates are off (`disabled`), checked while the previous behavior stays available (`evaluating`), or required (`enforced`).
+ */
+export type MtlsState = "disabled" | "evaluating" | "enforced";
+
+/**
+ * How a certificate chain is checked against the certificate revocation list (CRL) that each certificate names. With `full_chain`, the leaf certificate and each intermediate certificate below the trusted root are checked. A certificate that names no CRL is not checked.
+ */
+export type MtlscrlCheck = "disabled" | "full_chain";
+
+/**
+ * Public details of a webhook client certificate.
+ */
+export type WebhookClientCertificateDetails = {
+  /**
+   * The distinguished name of the certificate.
+   */
+  subject: string;
+  /**
+   * The distinguished name of the certificate authority that signed it.
+   */
+  issuer: string;
+  /**
+   * The serial number, in lowercase hexadecimal.
+   */
+  serial_number: string;
+  /**
+   * The SHA-256 fingerprint of the certificate, in lowercase hexadecimal.
+   */
+  fingerprint_sha256: string;
+  /**
+   * Start of the validity period.
+   */
+  not_before: string;
+  /**
+   * End of the validity period.
+   */
+  not_after: string;
+};
+
+/**
+ * A certificate signing request (CSR) for a new key pair that we generated. The private key stays with us. Get the CSR signed by your certificate authority, then upload the certificate.
+ *
+ */
+export type WebhookClientCertificateSigningRequest = {
+  /**
+   * The PEM-encoded PKCS #10 certificate signing request.
+   */
+  csr: string;
+  /**
+   * When we created the signing request.
+   */
+  created_at: string;
+};
+
+/**
+ * The client certificate that we present on webhook deliveries of your workspace. With `disabled`, we present no certificate. With `evaluating`, we present the certificate when the receiver asks for one. If the receiver does not ask, we deliver and report it. If the receiver rejects the certificate, we retry without it and report it. A failed check of the receiver's own certificate fails the attempt without a retry. With `enforced`, we present the certificate and fail the delivery attempt when the receiver does not ask for one or rejects it. `crl_check` applies to the server certificate chain of the receiver and is `disabled` by default. A failed CRL check fails the delivery attempt. When webhook mTLS is not enabled for this workspace, `state` and `crl_check` read `disabled` and deliveries obey them. Neither applies to `realtime.*` events, which Realtime delivers without the certificate, to connector endpoints, which call third-party APIs, or to MCP Events subscriptions, whose callback URL an OAuth authorization chooses.
+ *
+ */
+export type WebhookClientCertificate = {
+  state: MtlsState;
+  crl_check: MtlscrlCheck;
+  /**
+   * The certificate in use. `null` until you upload one.
+   */
+  certificate: WebhookClientCertificateDetails | null;
+  /**
+   * The signing request that waits for a signed certificate. `null` when none waits.
+   */
+  signing_request: WebhookClientCertificateSigningRequest | null;
+  /**
+   * When the certificate or its state last changed. `null` until the first change.
+   */
+  updated_at: string | null;
+};
+
+/**
+ * Changes to the webhook client certificate. Omit a field to keep its value. `evaluating` and `enforced` require an uploaded certificate.
+ *
+ */
+export type WebhookClientCertificateUpdate = {
+  state?: MtlsState;
+  crl_check?: MtlscrlCheck;
+};
+
+/**
+ * The signed certificate for the waiting signing request. The certificate must match the key of the signing request, have the `clientAuth` extended key usage and be in its validity period. Each intermediate certificate must be a CA certificate in its validity period that signed the certificate before it. It replaces the certificate in use.
+ *
+ */
+export type WebhookClientCertificateUpload = {
+  /**
+   * PEM-encoded certificates, the signed certificate first, then any intermediate certificates.
+   */
+  certificate_chain: string;
+};
+
+/**
+ * Client certificate (mTLS) settings for API requests to your workspace. The mTLS endpoint is `mtls.<region>.platform.bird.com`. With `disabled`, the mTLS endpoint rejects requests. With `evaluating`, both endpoints accept requests, and the mTLS endpoint rejects a request without a valid client certificate. With `enforced`, only the mTLS endpoint accepts requests. Dashboard and OAuth requests are accepted on the standard endpoint in every state. `crl_check` is `disabled` by default.
+ *
+ */
+export type WorkspaceMtlsSettings = {
+  state: MtlsState;
+  /**
+   * A subject alternative name that every client certificate must contain, as a DNS name or a URI. `null` when any subject alternative name is accepted.
+   */
+  expected_san: string | null;
+  crl_check: MtlscrlCheck;
+};
+
+/**
+ * Changes to the client certificate (mTLS) settings. Omit a field to keep its value. `evaluating` and `enforced` require at least one certificate authority.
+ *
+ */
+export type WorkspaceMtlsSettingsUpdate = {
+  state?: MtlsState;
+  /**
+   * A subject alternative name that every client certificate must contain, as a DNS name or a URI. `null` accepts any subject alternative name.
+   */
+  expected_san?: string | null;
+  crl_check?: MtlscrlCheck;
+};
+
+export type MtlsCertificateAuthorityId = string;
+
+/**
+ * A certificate authority that issues the client certificates of your workspace.
+ */
+export type MtlsCertificateAuthority = {
+  id: MtlsCertificateAuthorityId;
+  /**
+   * The distinguished name of the certificate authority.
+   */
+  subject: string;
+  /**
+   * The SHA-256 fingerprint of the certificate, in lowercase hexadecimal.
+   */
+  fingerprint_sha256: string;
+  /**
+   * Start of the validity period of the certificate authority.
+   */
+  not_before: string;
+  /**
+   * End of the validity period of the certificate authority.
+   */
+  not_after: string;
+  /**
+   * When you added the certificate authority.
+   */
+  created_at: string;
+};
+
+/**
+ * The certificate authorities of your workspace.
+ */
+export type MtlsCertificateAuthorityList = {
+  data: Array<MtlsCertificateAuthority>;
+};
+
+/**
+ * A certificate authority to add. The certificate must be an unexpired CA certificate that can sign certificates. A workspace has at most two certificate authorities.
+ *
+ */
+export type MtlsCertificateAuthorityCreate = {
+  /**
+   * One PEM-encoded X.509 certificate.
+   */
+  certificate: string;
 };
 
 /**
@@ -30841,10 +31044,12 @@ export type WorkspaceQuotaWritable = {
   key: string;
   name: string;
   description: string;
+  unit: QuotaUnit;
   /**
-   * What the limit counts, such as `mailboxes`, `bytes` or `days`.
+   * What the product calls the thing the limit applies to, such as `domains` or `seed tests`, for display next to the limit.
    */
-  unit: string;
+  label: string;
+  type: QuotaType;
   kind: WorkspaceQuotaKind;
   enforcement: WorkspaceQuotaEnforcement;
   /**
@@ -35744,6 +35949,7 @@ export type WebhookTestResponseWritable = {
    * A short explanation of why the event could not be delivered. Present only when your endpoint could not be reached.
    */
   error?: string;
+  client_certificate?: WebhookTestClientCertificate;
 };
 
 export type WebhookAttemptWritable = {
@@ -35806,6 +36012,61 @@ export type WebhookAttemptListWritable = {
    * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
    */
   refresh_cursor: string | null;
+};
+
+/**
+ * The client certificate that we present on webhook deliveries of your workspace. With `disabled`, we present no certificate. With `evaluating`, we present the certificate when the receiver asks for one. If the receiver does not ask, we deliver and report it. If the receiver rejects the certificate, we retry without it and report it. A failed check of the receiver's own certificate fails the attempt without a retry. With `enforced`, we present the certificate and fail the delivery attempt when the receiver does not ask for one or rejects it. `crl_check` applies to the server certificate chain of the receiver and is `disabled` by default. A failed CRL check fails the delivery attempt. When webhook mTLS is not enabled for this workspace, `state` and `crl_check` read `disabled` and deliveries obey them. Neither applies to `realtime.*` events, which Realtime delivers without the certificate, to connector endpoints, which call third-party APIs, or to MCP Events subscriptions, whose callback URL an OAuth authorization chooses.
+ *
+ */
+export type WebhookClientCertificateWritable = {
+  state: MtlsState;
+  crl_check: MtlscrlCheck;
+  /**
+   * The certificate in use. `null` until you upload one.
+   */
+  certificate: WebhookClientCertificateDetails | null;
+  /**
+   * The signing request that waits for a signed certificate. `null` when none waits.
+   */
+  signing_request: WebhookClientCertificateSigningRequest | null;
+  /**
+   * When the certificate or its state last changed. `null` until the first change.
+   */
+  updated_at: string | null;
+};
+
+/**
+ * A certificate authority that issues the client certificates of your workspace.
+ */
+export type MtlsCertificateAuthorityWritable = {
+  id: MtlsCertificateAuthorityId;
+  /**
+   * The distinguished name of the certificate authority.
+   */
+  subject: string;
+  /**
+   * The SHA-256 fingerprint of the certificate, in lowercase hexadecimal.
+   */
+  fingerprint_sha256: string;
+  /**
+   * Start of the validity period of the certificate authority.
+   */
+  not_before: string;
+  /**
+   * End of the validity period of the certificate authority.
+   */
+  not_after: string;
+  /**
+   * When you added the certificate authority.
+   */
+  created_at: string;
+};
+
+/**
+ * The certificate authorities of your workspace.
+ */
+export type MtlsCertificateAuthorityListWritable = {
+  data: Array<MtlsCertificateAuthorityWritable>;
 };
 
 export type VoicePartyBridgePstnEndpointWritable = {

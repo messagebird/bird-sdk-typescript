@@ -847,6 +847,34 @@ export const QuotaSource = {
 export type QuotaSourceValue = (typeof QuotaSource)[keyof typeof QuotaSource];
 
 /**
+ * Values of QuotaType known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const QuotaType = {
+  Boolean: "boolean",
+  Integer: "integer",
+} as const;
+
+/** A known QuotaType value. */
+export type QuotaTypeValue = (typeof QuotaType)[keyof typeof QuotaType];
+
+/**
+ * Values of QuotaUnit known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const QuotaUnit = {
+  Bytes: "bytes",
+  Count: "count",
+  Days: "days",
+  Microunits: "microunits",
+} as const;
+
+/** A known QuotaUnit value. */
+export type QuotaUnitValue = (typeof QuotaUnit)[keyof typeof QuotaUnit];
+
+/**
  * Values of SMSErrorCode known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
