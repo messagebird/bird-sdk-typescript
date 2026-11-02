@@ -819,6 +819,17 @@ export type {
   VoiceTrunksGatewaysUpdateParams,
 } from "./resources/voiceTrunksGateways.gen.js";
 export type {
+  VoiceRingGroup,
+  VoiceRingGroupList,
+  VoiceRingGroupsCreateParams,
+  VoiceRingGroupsUpdateParams,
+} from "./resources/voiceRingGroups.gen.js";
+export type {
+  VoiceRingGroupMember,
+  VoiceRingGroupMemberList,
+  VoiceRingGroupsMembersCreateParams,
+} from "./resources/voiceRingGroupsMembers.gen.js";
+export type {
   VoiceVerifiedNumbersCreateParams,
   VoiceVerifiedNumbersUpdateParams,
   VoiceVerifiedNumbersVerifyParams,

@@ -166,6 +166,12 @@ import type {
   CreateVoiceCallData,
   CreateVoiceCallErrors,
   CreateVoiceCallResponses,
+  CreateVoiceRingGroupData,
+  CreateVoiceRingGroupErrors,
+  CreateVoiceRingGroupMemberData,
+  CreateVoiceRingGroupMemberErrors,
+  CreateVoiceRingGroupMemberResponses,
+  CreateVoiceRingGroupResponses,
   CreateVoiceSessionCredentialData,
   CreateVoiceSessionCredentialErrors,
   CreateVoiceSessionCredentialResponses,
@@ -295,6 +301,12 @@ import type {
   DeleteSuppressionData,
   DeleteSuppressionErrors,
   DeleteSuppressionResponses,
+  DeleteVoiceRingGroupData,
+  DeleteVoiceRingGroupErrors,
+  DeleteVoiceRingGroupMemberData,
+  DeleteVoiceRingGroupMemberErrors,
+  DeleteVoiceRingGroupMemberResponses,
+  DeleteVoiceRingGroupResponses,
   DeleteVoiceTrunkData,
   DeleteVoiceTrunkErrors,
   DeleteVoiceTrunkGatewayData,
@@ -748,6 +760,9 @@ import type {
   GetVoiceNumberData,
   GetVoiceNumberErrors,
   GetVoiceNumberResponses,
+  GetVoiceRingGroupData,
+  GetVoiceRingGroupErrors,
+  GetVoiceRingGroupResponses,
   GetVoiceSettingsData,
   GetVoiceSettingsErrors,
   GetVoiceSettingsResponses,
@@ -1053,6 +1068,12 @@ import type {
   ListVoiceNumbersData,
   ListVoiceNumbersErrors,
   ListVoiceNumbersResponses,
+  ListVoiceRingGroupMembersData,
+  ListVoiceRingGroupMembersErrors,
+  ListVoiceRingGroupMembersResponses,
+  ListVoiceRingGroupsData,
+  ListVoiceRingGroupsErrors,
+  ListVoiceRingGroupsResponses,
   ListVoiceTrunkGatewaysData,
   ListVoiceTrunkGatewaysErrors,
   ListVoiceTrunkGatewaysResponses,
@@ -1284,6 +1305,9 @@ import type {
   UpdateVoiceNumberData,
   UpdateVoiceNumberErrors,
   UpdateVoiceNumberResponses,
+  UpdateVoiceRingGroupData,
+  UpdateVoiceRingGroupErrors,
+  UpdateVoiceRingGroupResponses,
   UpdateVoiceSettingsData,
   UpdateVoiceSettingsErrors,
   UpdateVoiceSettingsResponses,
@@ -7783,7 +7807,7 @@ export const getWhatsAppTemplateVersionLanguage = <
 /**
  * Upsert a language's content
  *
- * Writes one language of the template's draft, creating it when absent (`201`) and replacing it when present (`200`). A full replacement, so send the language's complete content every time. `optimization_spec` is the exception: omitting it keeps the current maximum price, and a language created without one uses Meta's standard rate. Only the draft is writable: submitted versions are immutable, and a language under active review at Meta refuses the write until that review finishes. Pass `revision` to make the write a compare-and-set against the copy you read. Tags are canonicalised, and the response echoes the canonical form: use it in later calls for this language.
+ * Writes one language of the template's draft, creating it when absent (`201`) and replacing it when present (`200`). A full replacement, so send the language's complete content every time. `optimization_spec` and `message_send_ttl_seconds` are the exceptions: omitting either keeps its current value, and a language created without them uses Meta's standard rate and Meta's default time-to-live. Only the draft is writable: submitted versions are immutable, and a language under active review at Meta refuses the write until that review finishes. Pass `revision` to make the write a compare-and-set against the copy you read. Tags are canonicalised, and the response echoes the canonical form: use it in later calls for this language.
  *
  */
 export const upsertWhatsAppTemplateLanguage = <
@@ -15316,7 +15340,11 @@ export const getVoiceNumber = <ThrowOnError extends boolean = false>(
  * calling enabled. "forward" needs a forward_to, which has to be one of your
  * verified caller IDs. That is checked when you set it, and again on every call
  * it forwards, so a caller ID you later remove stops forwarding rather than
- * carrying on.
+ * carrying on. "ring_group" needs a ring_group_id: one of your ring groups, or
+ * the default group of everyone online, from
+ * [List ring groups](/docs/api/reference/list-voice-ring-groups), otherwise the
+ * update returns 422. Routing to a ring group requires preview access to
+ * inbound browser calling; without it, the update returns 404.
  *
  * Sequence management remains in the dashboard. A `sequence` route needs
  * `sequence_id` and `entry_node_id` from an existing active publication in your
@@ -15407,7 +15435,9 @@ export const getVoiceSettings = <ThrowOnError extends boolean = false>(
  * The route is checked the same way as a number's: a trunk must be yours and
  * have inbound calling enabled, and a forward target must be one of your
  * verified caller IDs, otherwise the update returns 412. A trunk_id that is not
- * one of your trunks returns 404. Deleting the trunk, or
+ * one of your trunks returns 404. A ring_group_id that is not one of your ring
+ * groups or the default group returns 422. Routing to a ring group requires
+ * preview access to inbound browser calling; without it, the update returns 404. Deleting the trunk, or
  * turning off its inbound calling, sets the default back to "reject".
  *
  * `daily_spend_limit.workspace_limit` sets your workspace's own daily spend limit. It can be
@@ -15674,6 +15704,307 @@ export const verifyVoiceVerifiedNumber = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * List ring groups
+ *
+ * Returns the workspace's ring groups. The first is always the default
+ * group, which is not stored: it rings the users who are online in the
+ * browser phone. The others follow, oldest first.
+ *
+ * Ring groups require preview access to inbound browser calling. Without it,
+ * this returns `404 Not Found`.
+ *
+ */
+export const listVoiceRingGroups = <ThrowOnError extends boolean = false>(
+  options?: Options<ListVoiceRingGroupsData, ThrowOnError>,
+): RequestResult<
+  ListVoiceRingGroupsResponses,
+  ListVoiceRingGroupsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListVoiceRingGroupsResponses,
+    ListVoiceRingGroupsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/ring-groups",
+    ...options,
+  });
+
+/**
+ * Create a ring group
+ *
+ * Creates a ring group with no members. Add members with
+ * `POST /v1/voice/ring-groups/{ring_group_id}/members`.
+ *
+ * A workspace can have at most 50 ring groups besides its default group.
+ * Creating another returns `422`.
+ *
+ * Ring groups require preview access to inbound browser calling. Without it,
+ * this returns `404 Not Found`.
+ *
+ */
+export const createVoiceRingGroup = <ThrowOnError extends boolean = false>(
+  options: Options<CreateVoiceRingGroupData, ThrowOnError>,
+): RequestResult<
+  CreateVoiceRingGroupResponses,
+  CreateVoiceRingGroupErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateVoiceRingGroupResponses,
+    CreateVoiceRingGroupErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/ring-groups",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a ring group
+ *
+ * Deletes the ring group and its member list. Calls already ringing its
+ * members are not affected.
+ *
+ * Deleting a ring group that a number, the workspace default route or a
+ * published sequence still rings, or deleting the default group, returns
+ * `409 Conflict`.
+ *
+ * Ring groups require preview access to inbound browser calling. Without it,
+ * this returns `404 Not Found`.
+ *
+ */
+export const deleteVoiceRingGroup = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteVoiceRingGroupData, ThrowOnError>,
+): RequestResult<
+  DeleteVoiceRingGroupResponses,
+  DeleteVoiceRingGroupErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteVoiceRingGroupResponses,
+    DeleteVoiceRingGroupErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/ring-groups/{ring_group_id}",
+    ...options,
+  });
+
+/**
+ * Get a ring group
+ *
+ * Returns one ring group. The default group's ID is `vrg_` followed by the
+ * workspace ID's suffix.
+ *
+ * Ring groups require preview access to inbound browser calling. Without it,
+ * this returns `404 Not Found`.
+ *
+ */
+export const getVoiceRingGroup = <ThrowOnError extends boolean = false>(
+  options: Options<GetVoiceRingGroupData, ThrowOnError>,
+): RequestResult<
+  GetVoiceRingGroupResponses,
+  GetVoiceRingGroupErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetVoiceRingGroupResponses,
+    GetVoiceRingGroupErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/ring-groups/{ring_group_id}",
+    ...options,
+  });
+
+/**
+ * Update a ring group
+ *
+ * Renames the ring group. Renaming the default group returns
+ * `409 Conflict`.
+ *
+ * Ring groups require preview access to inbound browser calling. Without it,
+ * this returns `404 Not Found`.
+ *
+ */
+export const updateVoiceRingGroup = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateVoiceRingGroupData, ThrowOnError>,
+): RequestResult<
+  UpdateVoiceRingGroupResponses,
+  UpdateVoiceRingGroupErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateVoiceRingGroupResponses,
+    UpdateVoiceRingGroupErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/ring-groups/{ring_group_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List a ring group's members
+ *
+ * Returns the ring group's members, in the order they joined. The default
+ * group's members are the users who are online in the browser phone now.
+ *
+ * Ring groups require preview access to inbound browser calling. Without it,
+ * this returns `404 Not Found`.
+ *
+ */
+export const listVoiceRingGroupMembers = <ThrowOnError extends boolean = false>(
+  options: Options<ListVoiceRingGroupMembersData, ThrowOnError>,
+): RequestResult<
+  ListVoiceRingGroupMembersResponses,
+  ListVoiceRingGroupMembersErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListVoiceRingGroupMembersResponses,
+    ListVoiceRingGroupMembersErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/ring-groups/{ring_group_id}/members",
+    ...options,
+  });
+
+/**
+ * Add a member to a ring group
+ *
+ * Adds a workspace user to the ring group. The group rings the user only
+ * while they are online in the browser phone.
+ *
+ * A user without access to the workspace returns `422`, as does adding a
+ * member to a group that already has 200. Adding a user who is already a
+ * member, or adding to the default group, returns `409 Conflict`.
+ *
+ * Ring groups require preview access to inbound browser calling. Without it,
+ * this returns `404 Not Found`.
+ *
+ */
+export const createVoiceRingGroupMember = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateVoiceRingGroupMemberData, ThrowOnError>,
+): RequestResult<
+  CreateVoiceRingGroupMemberResponses,
+  CreateVoiceRingGroupMemberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateVoiceRingGroupMemberResponses,
+    CreateVoiceRingGroupMemberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/ring-groups/{ring_group_id}/members",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Remove a member from a ring group
+ *
+ * Removes the user from the ring group. A call already ringing the user is
+ * not affected. Removing a member of the default group returns
+ * `409 Conflict`.
+ *
+ * Ring groups require preview access to inbound browser calling. Without it,
+ * this returns `404 Not Found`.
+ *
+ */
+export const deleteVoiceRingGroupMember = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<DeleteVoiceRingGroupMemberData, ThrowOnError>,
+): RequestResult<
+  DeleteVoiceRingGroupMemberResponses,
+  DeleteVoiceRingGroupMemberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).delete<
+    DeleteVoiceRingGroupMemberResponses,
+    DeleteVoiceRingGroupMemberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/ring-groups/{ring_group_id}/members/{user_id}",
+    ...options,
   });
 
 /**

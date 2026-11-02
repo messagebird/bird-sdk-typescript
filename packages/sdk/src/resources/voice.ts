@@ -5,6 +5,7 @@ import { VoiceCallsResource } from "./voiceCalls.gen.js";
 import { VoiceLegsResource } from "./voiceLegs.gen.js";
 import { VoiceNumbersResource } from "./voiceNumbers.gen.js";
 import { VoiceSettingsResource } from "./voiceSettings.gen.js";
+import { VoiceRingGroupsResource } from "./voiceRingGroups.js";
 import { VoiceSessionCredentialsResource } from "./voiceSessionCredentials.gen.js";
 import { VoiceTrunksResource } from "./voiceTrunks.js";
 
@@ -17,6 +18,7 @@ export class VoiceResource extends Resource {
   readonly destinations: VoiceDestinationsResource;
   readonly sessionCredentials: VoiceSessionCredentialsResource;
   readonly calls: VoiceCallsResource;
+  readonly ringGroups: VoiceRingGroupsResource;
 
   constructor(
     core: ConstructorParameters<typeof Resource>[0],
@@ -31,5 +33,6 @@ export class VoiceResource extends Resource {
     this.destinations = new VoiceDestinationsResource(core, client);
     this.sessionCredentials = new VoiceSessionCredentialsResource(core, client);
     this.calls = new VoiceCallsResource(core, client);
+    this.ringGroups = new VoiceRingGroupsResource(core, client);
   }
 }

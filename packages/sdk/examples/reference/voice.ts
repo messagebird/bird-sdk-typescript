@@ -94,6 +94,48 @@ export async function voiceTrunksGatewaysDelete() {
   await bird.voice.trunks.gateways.delete("TRUNK_ID", "GATEWAY_ID");
 }
 
+export async function voiceRingGroupsList() {
+  const groups = await bird.voice.ringGroups.list();
+  for (const group of groups.data) {
+    console.log(group.id, group.name, group.online_member_count);
+  }
+}
+
+export async function voiceRingGroupsGet() {
+  const group = await bird.voice.ringGroups.get("RING_GROUP_ID");
+  console.log(group.id, group.name, group.online_member_count);
+}
+
+export async function voiceRingGroupsCreate() {
+  const group = await bird.voice.ringGroups.create({ name: "Support" });
+  console.log(group.id, group.name);
+}
+
+export async function voiceRingGroupsUpdate() {
+  const group = await bird.voice.ringGroups.update("RING_GROUP_ID", { name: "Tier 2 support" });
+  console.log(group.id, group.name);
+}
+
+export async function voiceRingGroupsDelete() {
+  await bird.voice.ringGroups.delete("RING_GROUP_ID");
+}
+
+export async function voiceRingGroupsMembersList() {
+  const members = await bird.voice.ringGroups.members.list("RING_GROUP_ID");
+  for (const member of members.data) {
+    console.log(member.user_id);
+  }
+}
+
+export async function voiceRingGroupsMembersCreate() {
+  const member = await bird.voice.ringGroups.members.create("RING_GROUP_ID", { user_id: "USER_ID" });
+  console.log(member.user_id);
+}
+
+export async function voiceRingGroupsMembersDelete() {
+  await bird.voice.ringGroups.members.delete("RING_GROUP_ID", "USER_ID");
+}
+
 export async function voiceNumbersList() {
   for await (const number of bird.voice.numbers.list()) {
     console.log(number.id, number.phone_number, number.country_code);

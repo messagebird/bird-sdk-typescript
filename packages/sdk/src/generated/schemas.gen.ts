@@ -22766,7 +22766,7 @@ export const WhatsAppTemplateLanguageStateSchema = {
         },
       ],
       description:
-        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec` or `message_send_ttl_seconds`; the language keeps sending on the maximum price and time-to-live WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -23402,6 +23402,14 @@ export const WhatsAppTemplateLanguageUpsertSchema = {
       description:
         "This language's maximum price. Omit it to keep the current one. A new language written without it uses Meta's standard rate. Send `null` to return to the standard rate. Changing only the price updates Meta without a new review. A send at a maximum price needs the business account's `marketing_messages_onboarding_status` to be `onboarded`. Otherwise it fails with WhatsApp error 131061.\n",
     },
+    message_send_ttl_seconds: {
+      type: ["integer", "null"],
+      minimum: 30,
+      maximum: 1209600,
+      description:
+        "How long WhatsApp keeps trying to deliver a message from this language, in seconds. WhatsApp drops a message it cannot deliver in that time. Omit it to keep the current value. Send `null` to use WhatsApp's default: 10 minutes for authentication, 30 days for utility and marketing. A new language written without it uses WhatsApp's default. The range depends on the language's `category`: 30 to 900 for authentication, 30 to 43200 for utility, and 43200 to 1209600 for marketing. A value outside 30 to 1209600 fails request validation; one inside it but outside the category's range fails with `WhatsAppTemplateTTLOutOfRange`. On a marketing template, the value applies while the business account's `marketing_messages_onboarding_status` is `onboarded`. Changing only this value updates WhatsApp without a new review.\n",
+      example: 600,
+    },
     components: {
       type: "array",
       maxItems: 10,
@@ -23754,7 +23762,7 @@ export const WhatsAppTemplateVersionLanguageSchema = {
         },
       ],
       description:
-        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec` or `message_send_ttl_seconds`; the language keeps sending on the maximum price and time-to-live WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -24168,6 +24176,12 @@ export const WhatsAppTemplateLanguageSchema = {
       description:
         "This language's maximum price, or `null` when Meta's standard rate applies.",
     },
+    message_send_ttl_seconds: {
+      type: ["integer", "null"],
+      description:
+        "How long WhatsApp keeps trying to deliver a message from this language, in seconds, or `null` when the language uses WhatsApp's default (10 minutes for authentication, 30 days otherwise).\n",
+      example: 600,
+    },
     language: {
       $ref: "#/components/schemas/LanguageTag",
       description: "The canonical tag this language is addressed by.",
@@ -24202,7 +24216,7 @@ export const WhatsAppTemplateLanguageSchema = {
     category: {
       $ref: "#/components/schemas/WhatsAppTemplateCategory",
       description:
-        "The category Meta is applying to this language, which is what messages from it are priced at.",
+        "The category Meta is applying to this language, which is what messages from it are priced at. On a draft, the category its next submission goes under.\n",
     },
     previous_category: {
       $ref: "#/components/schemas/WhatsAppTemplateCategory",
@@ -24234,7 +24248,7 @@ export const WhatsAppTemplateLanguageSchema = {
         },
       ],
       description:
-        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec` or `message_send_ttl_seconds`; the language keeps sending on the maximum price and time-to-live WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
     submitted_at: {
       type: ["string", "null"],
@@ -27092,7 +27106,7 @@ export const AMBMessageBubbleSchema = {
       type: "string",
       minLength: 1,
       description:
-        "Identifier of an image in interactive_data.data.images. Apple ignores it for custom iMessage apps.",
+        "Identifier of an image in `interactive.images`, or `interactive_reply.images` on a reply. Apple ignores it for custom iMessage apps.",
     },
     image_title: {
       type: "string",
@@ -27153,7 +27167,7 @@ export const AMBQuickReplyItemSchema = {
       type: "string",
       minLength: 1,
       description:
-        "Opaque choice identifier returned in interactive_data.data.quick_reply.selected_identifier.",
+        "Opaque choice identifier returned in `interactive_reply.quick_reply.selected_identifier`.",
     },
     title: {
       type: "string",
@@ -27197,7 +27211,7 @@ export const AMBListPickerItemSchema = {
       type: "string",
       minLength: 1,
       description:
-        "Opaque item identifier returned in interactive_data.data.list_picker.sections.",
+        "Opaque item identifier returned in `interactive_reply.list_picker.sections[].items[]`.",
     },
     title: {
       type: "string",
@@ -27212,7 +27226,7 @@ export const AMBListPickerItemSchema = {
       type: ["string", "null"],
       minLength: 1,
       description:
-        "Identifier of an image in interactive_data.data.images, shown next to this row. A key with no matching entry in `images` is refused with a `422` `AMBInteractiveImageInvalid`.",
+        "Identifier of an image in `interactive.images`, or `interactive_reply.images` on a reply, shown next to this row. A key with no matching entry in `images` is refused with a `422` `AMBInteractiveImageInvalid`.",
     },
     order: {
       type: "integer",
@@ -27331,7 +27345,7 @@ export const AMBTimeSlotSchema = {
       type: "string",
       minLength: 1,
       description:
-        "Opaque slot identifier. Apple may instead return only a localized label in interactive_data.reply_message.title.",
+        "Opaque slot identifier. Apple may instead return only a localized label in `interactive_reply.reply_message.title`.",
     },
     start_at: {
       type: "string",
@@ -27398,8 +27412,7 @@ export const AMBNativeEventSchema = {
     image_identifier: {
       type: "string",
       minLength: 1,
-      description:
-        "Identifier of the event image in interactive_data.data.images.",
+      description: "Identifier of the event image in `interactive.images`.",
     },
     title: {
       type: "string",
@@ -28541,7 +28554,7 @@ export const AMBNativeInboundEventSchema = {
       type: "string",
       minLength: 1,
       description:
-        "Identifier of the event image in interactive_data.data.images.",
+        "Identifier of the event image in `interactive_reply.images`.",
     },
     title: {
       type: "string",
@@ -49173,9 +49186,9 @@ export const VoiceLegRejectionReasonSchema = {
 export const VoiceLegInboundRouteTypeSchema = {
   type: "string",
   minLength: 1,
-  enum: ["reject", "trunk", "forward", "sequence"],
+  enum: ["reject", "trunk", "forward", "sequence", "ring_group"],
   description:
-    "Which answer handled this incoming leg.\n\n- `reject`: the call was refused.\n- `trunk`: the call was delivered to one of your SIP trunks.\n- `forward`: the call was forwarded to one of your verified caller IDs.\n- `sequence`: the call was handled by one of your sequences.\n",
+    "Which answer handled this incoming leg.\n\n- `reject`: the call was refused.\n- `trunk`: the call was delivered to one of your SIP trunks.\n- `forward`: the call was forwarded to one of your verified caller IDs.\n- `sequence`: the call was handled by one of your sequences.\n- `ring_group`: the call rang one of your ring groups.\n",
   example: "trunk",
 } as const;
 
@@ -49305,6 +49318,35 @@ export const VoiceLegInboundRouteSequenceSchema = {
   },
 } as const;
 
+export const VoiceRingGroupIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^vrg_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vrg_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoiceLegInboundRouteRingGroupSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "ring_group_id"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoiceLegInboundRouteType",
+      const: "ring_group",
+      description: "The leg rang one of your ring groups.",
+    },
+    ring_group_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceRingGroupID",
+        },
+      ],
+      description:
+        "The ring group the leg rang. Recorded as it was at the time, so it may name a group you have since deleted.\n",
+    },
+  },
+} as const;
+
 export const VoiceLegInboundRouteSchema = {
   description:
     "The routing choice recorded for an incoming leg. A recorded route does not\nguarantee that the leg connected. Check `status` for the outcome and\n`rejection_reason` for the cause when present.\n",
@@ -49321,6 +49363,9 @@ export const VoiceLegInboundRouteSchema = {
     {
       $ref: "#/components/schemas/VoiceLegInboundRouteSequence",
     },
+    {
+      $ref: "#/components/schemas/VoiceLegInboundRouteRingGroup",
+    },
   ],
   discriminator: {
     propertyName: "type",
@@ -49329,6 +49374,7 @@ export const VoiceLegInboundRouteSchema = {
       trunk: "#/components/schemas/VoiceLegInboundRouteTrunk",
       forward: "#/components/schemas/VoiceLegInboundRouteForward",
       sequence: "#/components/schemas/VoiceLegInboundRouteSequence",
+      ring_group: "#/components/schemas/VoiceLegInboundRouteRingGroup",
     },
   },
 } as const;
@@ -49396,7 +49442,7 @@ export const VoiceLegMediaPathSchema = {
         },
       ],
       description:
-        "How the audio between us and your side of the leg was encrypted: your SIP trunk's equipment, or the browser that placed the call. On a leg with neither, such as an incoming call a Sequence answered, it describes the carrier's side. Use it to confirm that a call on a trunk with `preferred` media encryption was actually encrypted: such a trunk delivers plain audio to a gateway not reached over TLS or behind an `exit_region`.\n\n- `none`: plain RTP.\n- `sdes`: SRTP with keys exchanged in the SDP over TLS signalling (SDES, RFC 4568). The audio between us and the carrier stays plain RTP.\n- `dtls`: DTLS-SRTP, which every call placed from a browser uses.\n\nAbsent when we did not record it: on a leg whose audio bypassed us, on an encrypted offer to a SIP trunk whose media encryption is `off`, on a leg placed without an SDP offer in its INVITE, on an incoming leg that was not answered, and on legs recorded before this field existed.\n",
+        "How the audio between Bird and your SIP trunk equipment or browser was encrypted. For a leg without either, such as an incoming call answered by a Sequence, this describes the carrier's side. Use this field to check whether a call on a trunk with `preferred` media encryption was encrypted. Audio can be plain when the gateway does not use TLS or when encryption is unavailable through an exit.\n\n- `none`: plain RTP.\n- `sdes`: SRTP with keys exchanged in the SDP over TLS signalling (SDES, RFC 4568). The audio between us and the carrier stays plain RTP.\n- `dtls`: DTLS-SRTP, used for calls placed from a browser.\n\nAbsent when we did not record it: on a leg whose audio bypassed us, on an encrypted offer to a SIP trunk whose media encryption is `off`, on a leg placed without an SDP offer in its INVITE, on an incoming leg that was not answered, and on legs recorded before this field existed.\n",
     },
   },
 } as const;
@@ -50832,7 +50878,7 @@ export const VoiceTrunkMediaEncryptionSchema = {
   minLength: 1,
   enum: ["off", "preferred", "required"],
   description:
-    "Whether audio between your equipment and Bird is encrypted with SRTP, keyed with SDES (`a=crypto`) over TLS signalling. Audio between Bird and the carrier network stays plain RTP.\n\n`preferred` encrypts when it can. A call your equipment places is encrypted when it offers `RTP/SAVP` or `RTP/SAVPF` with an `AES_CM_128_HMAC_SHA1_80` or `_32` key over TLS, and carried plain when it offers plain RTP. A call Bird delivers is encrypted to a gateway reached over TLS (`sips:` or `;transport=tls`) and plain to the rest. Deliveries through a gateway `exit_region`, and on a trunk with `media_bypass`, stay plain.\n\n`required` refuses a plain call with `488 Not Acceptable Here` and delivers encrypted to every gateway, so every gateway must use TLS.\n\nWith `preferred` or `required`, an SDES offer over plain SIP (UDP or TCP), an offer without a usable key, and DTLS-SRTP are refused with `488` and a `Warning` header naming why. `required` cannot be set alongside `media_bypass` or a gateway `exit_region`, since their audio does not pass through the relay that encrypts it. `off` encrypts nothing and relays an SRTP offer as it is. Calls from a web browser are always encrypted with DTLS-SRTP, whatever this says.\n",
+    "Controls SRTP encryption between your equipment and Bird. SRTP keys use SDES\n(`a=crypto`) over TLS signalling. Audio between Bird and the carrier uses\nplain RTP.\n\nWith `preferred`, a call you place is encrypted when your equipment offers\n`RTP/SAVP` or `RTP/SAVPF` with an `AES_CM_128_HMAC_SHA1_80` or `_32` key over\nTLS. A plain RTP offer stays plain. Calls delivered to a TLS gateway (`sips:`\nor `;transport=tls`) use encryption when available. Calls delivered through a\ngateway without TLS or with `media_bypass` use plain audio.\n\nWith `required`, a plain call is refused with `488 Not Acceptable Here`.\nDelivered calls require encrypted media, so your gateways must use TLS.\nYou cannot combine `required` with `media_bypass` because bypassed audio\ndoes not pass through the relay that encrypts it.\n\nWith `preferred` or `required`, an SDES offer over plain SIP (UDP or TCP), an\noffer without a usable key, and DTLS-SRTP are refused with `488` and a\n`Warning` header naming the reason.\n\nWith `off`, Bird does not encrypt audio and relays an SRTP offer unchanged.\nBrowser calls use DTLS-SRTP regardless of this setting.\n",
   example: "preferred",
 } as const;
 
@@ -51244,9 +51290,9 @@ export const VoiceNumberProviderTypeSchema = {
 export const VoiceCallRouteTypeSchema = {
   type: "string",
   minLength: 1,
-  enum: ["reject", "trunk", "forward", "sequence"],
+  enum: ["reject", "trunk", "forward", "sequence", "ring_group"],
   description:
-    "Which answer a number carries.\n\n- `reject`: refuses the call.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n- `sequence`: runs the configured sequence from its selected voice-call entry.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
+    "Which answer a number carries.\n\n- `reject`: refuses the call.\n- `trunk`: delivers the call to one of your SIP trunks.\n- `forward`: places a call to one of your verified caller IDs and connects the two.\n- `sequence`: runs the configured sequence from its selected voice-call entry.\n- `ring_group`: rings the group's online members. Requires preview access to configure.\n\nIt selects the answer's own shape, so a new way to answer a call arrives as a\nnew value alongside a new set of fields.\n",
   example: "reject",
 } as const;
 
@@ -51438,6 +51484,29 @@ export const VoiceCallRouteSequenceSchema = {
   },
 } as const;
 
+export const VoiceCallRouteRingGroupSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["type", "ring_group_id"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/VoiceCallRouteType",
+      const: "ring_group",
+      description:
+        "Rings the ring group's members who are online in the browser phone, and answers the call when one of them answers. Nobody answering refuses the call as busy or unavailable. Requires preview access.\n",
+    },
+    ring_group_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceRingGroupID",
+        },
+      ],
+      description:
+        "The ring group that rings. It must be one of this workspace's ring groups, or its default group of everyone online.\n",
+    },
+  },
+} as const;
+
 export const VoiceCallRouteSchema = {
   description:
     "What happens to a call arriving for this number, as it is configured now. Its `type` selects the shape, and each answer carries its own fields. Setting a route is a separate shape, and it does not offer every variant reported here.\n",
@@ -51454,6 +51523,9 @@ export const VoiceCallRouteSchema = {
     {
       $ref: "#/components/schemas/VoiceCallRouteSequence",
     },
+    {
+      $ref: "#/components/schemas/VoiceCallRouteRingGroup",
+    },
   ],
   discriminator: {
     propertyName: "type",
@@ -51462,6 +51534,7 @@ export const VoiceCallRouteSchema = {
       trunk: "#/components/schemas/VoiceCallRouteTrunk",
       forward: "#/components/schemas/VoiceCallRouteForward",
       sequence: "#/components/schemas/VoiceCallRouteSequence",
+      ring_group: "#/components/schemas/VoiceCallRouteRingGroup",
     },
   },
 } as const;
@@ -51631,6 +51704,9 @@ export const VoiceCallRouteWritableSchema = {
     {
       $ref: "#/components/schemas/VoiceCallRouteForward",
     },
+    {
+      $ref: "#/components/schemas/VoiceCallRouteRingGroup",
+    },
   ],
   discriminator: {
     propertyName: "type",
@@ -51638,6 +51714,7 @@ export const VoiceCallRouteWritableSchema = {
       reject: "#/components/schemas/VoiceCallRouteReject",
       trunk: "#/components/schemas/VoiceCallRouteTrunk",
       forward: "#/components/schemas/VoiceCallRouteForward",
+      ring_group: "#/components/schemas/VoiceCallRouteRingGroup",
     },
   },
 } as const;
@@ -52020,6 +52097,170 @@ export const VoiceVerifiedNumberVerifyRequestSchema = {
       description:
         "The 6-digit verification code read out by the verification call. Required until ownership is verified. Omit it when retrying activation of an already verified number.",
       example: "123456",
+    },
+  },
+} as const;
+
+export const VoiceRingGroupSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A set of workspace users that an inbound call rings in the browser phone. Every workspace also has a default group, which rings the workspace's online users and cannot be changed.\n",
+  required: [
+    "id",
+    "name",
+    "is_default",
+    "online_member_count",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/VoiceRingGroupID",
+      description:
+        "Unique identifier for this ring group. The default group's ID is `vrg_` followed by the workspace ID's suffix.\n",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description: "The ring group's name.",
+      example: "Support",
+    },
+    is_default: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this is the workspace's default group, which rings the users who are online in the browser phone.\n",
+      example: false,
+    },
+    online_member_count: {
+      type: "integer",
+      minimum: 0,
+      description:
+        "How many of the group's members are connected to the browser phone and accepting calls, read live. A member on a call counts, though a call to the group skips them until it ends. For the default group, the count includes every connected user who accepts calls.",
+      example: 3,
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the ring group was created. Null for the default group.",
+      example: "2026-10-01T12:00:00Z",
+    },
+    updated_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the ring group's name or members last changed. Null for the default group.",
+      example: "2026-10-01T12:00:00Z",
+    },
+  },
+} as const;
+
+export const VoiceRingGroupListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  description:
+    "The workspace's ring groups. Not paginated: a workspace holds at most 50 ring groups besides its default group.",
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/VoiceRingGroup",
+      },
+      description:
+        "The default group first, then the other ring groups, oldest first.",
+    },
+  },
+} as const;
+
+export const VoiceRingGroupCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description: "The ring group's name.",
+      example: "Support",
+    },
+  },
+} as const;
+
+export const VoiceRingGroupUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  description:
+    "A change to the ring group. An omitted field is left unchanged.",
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description: "The ring group's new name.",
+      example: "Tier 2 support",
+    },
+  },
+} as const;
+
+export const VoiceRingGroupMemberSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A user added to a ring group. A member who later leaves the workspace stays listed until removed, but the group never rings them.",
+  required: ["user_id", "created_at"],
+  properties: {
+    user_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/UserID",
+      description: "The member's user ID.",
+    },
+    created_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      readOnly: true,
+      description:
+        "When the user joined the ring group. Null for the default group, whose members are the users online now.",
+      example: "2026-10-01T12:00:00Z",
+    },
+  },
+} as const;
+
+export const VoiceRingGroupMemberListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  description:
+    "The ring group's members. Not paginated: a ring group holds at most 200 members, and the default group's members are the workspace's online users.",
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/VoiceRingGroupMember",
+      },
+      description:
+        "The members, in the order they joined; the default group's online users, by user ID.",
+    },
+  },
+} as const;
+
+export const VoiceRingGroupMemberCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["user_id"],
+  properties: {
+    user_id: {
+      $ref: "#/components/schemas/UserID",
+      description:
+        "The workspace user to add. `bird members list` and the `members_list` MCP tool list workspace members in pages, each with its `user.id`; follow `next_cursor` until the user appears. Both need the `members` scope at read level.",
     },
   },
 } as const;
@@ -59595,7 +59836,7 @@ export const WhatsAppTemplateLanguageStateWritableSchema = {
     },
     error: {
       description:
-        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec` or `message_send_ttl_seconds`; the language keeps sending on the maximum price and time-to-live WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -59745,7 +59986,7 @@ export const WhatsAppTemplateVersionLanguageWritableSchema = {
     },
     error: {
       description:
-        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec` or `message_send_ttl_seconds`; the language keeps sending on the maximum price and time-to-live WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -59867,6 +60108,12 @@ export const WhatsAppTemplateLanguageWritableSchema = {
       description:
         "This language's maximum price, or `null` when Meta's standard rate applies.",
     },
+    message_send_ttl_seconds: {
+      type: ["integer", "null"],
+      description:
+        "How long WhatsApp keeps trying to deliver a message from this language, in seconds, or `null` when the language uses WhatsApp's default (10 minutes for authentication, 30 days otherwise).\n",
+      example: 600,
+    },
     language: {
       $ref: "#/components/schemas/LanguageTag",
       description: "The canonical tag this language is addressed by.",
@@ -59884,7 +60131,7 @@ export const WhatsAppTemplateLanguageWritableSchema = {
     category: {
       $ref: "#/components/schemas/WhatsAppTemplateCategory",
       description:
-        "The category Meta is applying to this language, which is what messages from it are priced at.",
+        "The category Meta is applying to this language, which is what messages from it are priced at. On a draft, the category its next submission goes under.\n",
     },
     previous_category: {
       $ref: "#/components/schemas/WhatsAppTemplateCategory",
@@ -59906,7 +60153,7 @@ export const WhatsAppTemplateLanguageWritableSchema = {
     },
     error: {
       description:
-        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
+        "Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec` or `message_send_ttl_seconds`; the language keeps sending on the maximum price and time-to-live WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.\n",
     },
   },
   description:
@@ -65636,7 +65883,7 @@ export const VoiceLegMediaPathWritableSchema = {
         },
       ],
       description:
-        "How the audio between us and your side of the leg was encrypted: your SIP trunk's equipment, or the browser that placed the call. On a leg with neither, such as an incoming call a Sequence answered, it describes the carrier's side. Use it to confirm that a call on a trunk with `preferred` media encryption was actually encrypted: such a trunk delivers plain audio to a gateway not reached over TLS or behind an `exit_region`.\n\n- `none`: plain RTP.\n- `sdes`: SRTP with keys exchanged in the SDP over TLS signalling (SDES, RFC 4568). The audio between us and the carrier stays plain RTP.\n- `dtls`: DTLS-SRTP, which every call placed from a browser uses.\n\nAbsent when we did not record it: on a leg whose audio bypassed us, on an encrypted offer to a SIP trunk whose media encryption is `off`, on a leg placed without an SDP offer in its INVITE, on an incoming leg that was not answered, and on legs recorded before this field existed.\n",
+        "How the audio between Bird and your SIP trunk equipment or browser was encrypted. For a leg without either, such as an incoming call answered by a Sequence, this describes the carrier's side. Use this field to check whether a call on a trunk with `preferred` media encryption was encrypted. Audio can be plain when the gateway does not use TLS or when encryption is unavailable through an exit.\n\n- `none`: plain RTP.\n- `sdes`: SRTP with keys exchanged in the SDP over TLS signalling (SDES, RFC 4568). The audio between us and the carrier stays plain RTP.\n- `dtls`: DTLS-SRTP, used for calls placed from a browser.\n\nAbsent when we did not record it: on a leg whose audio bypassed us, on an encrypted offer to a SIP trunk whose media encryption is `off`, on a leg placed without an SDP offer in its INVITE, on an incoming leg that was not answered, and on legs recorded before this field existed.\n",
     },
   },
 } as const;
@@ -66571,6 +66818,63 @@ export const VoiceVerifiedNumberListWritableSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
+} as const;
+
+export const VoiceRingGroupWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A set of workspace users that an inbound call rings in the browser phone. Every workspace also has a default group, which rings the workspace's online users and cannot be changed.\n",
+  required: ["name", "online_member_count"],
+  properties: {
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description: "The ring group's name.",
+      example: "Support",
+    },
+    online_member_count: {
+      type: "integer",
+      minimum: 0,
+      description:
+        "How many of the group's members are connected to the browser phone and accepting calls, read live. A member on a call counts, though a call to the group skips them until it ends. For the default group, the count includes every connected user who accepts calls.",
+      example: 3,
+    },
+  },
+} as const;
+
+export const VoiceRingGroupListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  description:
+    "The workspace's ring groups. Not paginated: a workspace holds at most 50 ring groups besides its default group.",
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/VoiceRingGroupWritable",
+      },
+      description:
+        "The default group first, then the other ring groups, oldest first.",
+    },
+  },
+} as const;
+
+export const VoiceRingGroupMemberListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  description:
+    "The ring group's members. Not paginated: a ring group holds at most 200 members, and the default group's members are the workspace's online users.",
+  properties: {
+    data: {
+      type: "array",
+      description:
+        "The members, in the order they joined; the default group's online users, by user ID.",
+    },
+  },
 } as const;
 
 export const EsimServiceCapabilitiesWritableSchema = {

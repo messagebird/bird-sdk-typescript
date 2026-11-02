@@ -12627,7 +12627,7 @@ export type WhatsAppTemplateLanguageState = {
    */
   rejection?: WhatsAppTemplateRejection;
   /**
-   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec` or `message_send_ttl_seconds`; the language keeps sending on the maximum price and time-to-live WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: WhatsAppTemplateSubmissionError;
@@ -13026,6 +13026,11 @@ export type WhatsAppTemplateLanguageUpsert = {
    */
   optimization_spec?: WhatsAppTemplateOptimizationSpecWrite | null;
   /**
+   * How long WhatsApp keeps trying to deliver a message from this language, in seconds. WhatsApp drops a message it cannot deliver in that time. Omit it to keep the current value. Send `null` to use WhatsApp's default: 10 minutes for authentication, 30 days for utility and marketing. A new language written without it uses WhatsApp's default. The range depends on the language's `category`: 30 to 900 for authentication, 30 to 43200 for utility, and 43200 to 1209600 for marketing. A value outside 30 to 1209600 fails request validation; one inside it but outside the category's range fails with `WhatsAppTemplateTTLOutOfRange`. On a marketing template, the value applies while the business account's `marketing_messages_onboarding_status` is `onboarded`. Changing only this value updates WhatsApp without a new review.
+   *
+   */
+  message_send_ttl_seconds?: number | null;
+  /**
    * The template's content blocks for this language. Header, footer and buttons are optional. Every variable needs an example value, which is what Meta reviews against. May be omitted or empty on a draft; a body block is required before the language can be submitted.
    *
    */
@@ -13231,7 +13236,7 @@ export type WhatsAppTemplateVersionLanguage = {
    */
   rejection?: WhatsAppTemplateRejection;
   /**
-   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec` or `message_send_ttl_seconds`; the language keeps sending on the maximum price and time-to-live WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: WhatsAppTemplateSubmissionError;
@@ -13494,6 +13499,11 @@ export type WhatsAppTemplateLanguage = {
    */
   optimization_spec?: WhatsAppTemplateOptimizationSpec | null;
   /**
+   * How long WhatsApp keeps trying to deliver a message from this language, in seconds, or `null` when the language uses WhatsApp's default (10 minutes for authentication, 30 days otherwise).
+   *
+   */
+  message_send_ttl_seconds?: number | null;
+  /**
    * The canonical tag this language is addressed by.
    */
   language: LanguageTag;
@@ -13513,7 +13523,8 @@ export type WhatsAppTemplateLanguage = {
   readonly revision: WhatsAppTemplateRevision;
   readonly content_hash: WhatsAppTemplateContentHash;
   /**
-   * The category Meta is applying to this language, which is what messages from it are priced at.
+   * The category Meta is applying to this language, which is what messages from it are priced at. On a draft, the category its next submission goes under.
+   *
    */
   category?: WhatsAppTemplateCategory;
   /**
@@ -13536,7 +13547,7 @@ export type WhatsAppTemplateLanguage = {
    */
   rejection?: WhatsAppTemplateRejection;
   /**
-   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec` or `message_send_ttl_seconds`; the language keeps sending on the maximum price and time-to-live WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: WhatsAppTemplateSubmissionError;
@@ -15014,7 +15025,7 @@ export type AmbMessageBubble = {
    */
   style?: AmbMessageBubbleStyle;
   /**
-   * Identifier of an image in interactive_data.data.images. Apple ignores it for custom iMessage apps.
+   * Identifier of an image in `interactive.images`, or `interactive_reply.images` on a reply. Apple ignores it for custom iMessage apps.
    */
   image_identifier?: string;
   /**
@@ -15052,7 +15063,7 @@ export type AmbNativeImage = {
 
 export type AmbQuickReplyItem = {
   /**
-   * Opaque choice identifier returned in interactive_data.data.quick_reply.selected_identifier.
+   * Opaque choice identifier returned in `interactive_reply.quick_reply.selected_identifier`.
    */
   identifier: string;
   /**
@@ -15074,7 +15085,7 @@ export type AmbNativeQuickReply = {
 
 export type AmbListPickerItem = {
   /**
-   * Opaque item identifier returned in interactive_data.data.list_picker.sections.
+   * Opaque item identifier returned in `interactive_reply.list_picker.sections[].items[]`.
    */
   identifier: string;
   /**
@@ -15086,7 +15097,7 @@ export type AmbListPickerItem = {
    */
   subtitle?: string | null;
   /**
-   * Identifier of an image in interactive_data.data.images, shown next to this row. A key with no matching entry in `images` is refused with a `422` `AMBInteractiveImageInvalid`.
+   * Identifier of an image in `interactive.images`, or `interactive_reply.images` on a reply, shown next to this row. A key with no matching entry in `images` is refused with a `422` `AMBInteractiveImageInvalid`.
    */
   image_identifier?: string | null;
   /**
@@ -15146,7 +15157,7 @@ export type AmbLocation = {
 
 export type AmbTimeSlot = {
   /**
-   * Opaque slot identifier. Apple may instead return only a localized label in interactive_data.reply_message.title.
+   * Opaque slot identifier. Apple may instead return only a localized label in `interactive_reply.reply_message.title`.
    */
   identifier: string;
   /**
@@ -15181,7 +15192,7 @@ export type AmbNativeEvent = {
    */
   timeslots: Array<AmbTimeSlot>;
   /**
-   * Identifier of the event image in interactive_data.data.images.
+   * Identifier of the event image in `interactive.images`.
    */
   image_identifier?: string;
   /**
@@ -15570,7 +15581,7 @@ export type AmbNativeInboundEvent = {
    */
   timeslots?: Array<AmbTimeSlot>;
   /**
-   * Identifier of the event image in interactive_data.data.images.
+   * Identifier of the event image in `interactive_reply.images`.
    */
   image_identifier?: string;
   /**
@@ -27353,10 +27364,11 @@ export type VoiceLegRejectionReason =
  * - `trunk`: the call was delivered to one of your SIP trunks.
  * - `forward`: the call was forwarded to one of your verified caller IDs.
  * - `sequence`: the call was handled by one of your sequences.
+ * - `ring_group`: the call rang one of your ring groups.
  *
  */
 export type VoiceLegInboundRouteType =
-  "reject" | "trunk" | "forward" | "sequence";
+  "reject" | "trunk" | "forward" | "sequence" | "ring_group";
 
 export type VoiceLegInboundRouteReject = {
   /**
@@ -27419,6 +27431,20 @@ export type VoiceLegInboundRouteSequence = {
   entry_node_id: VoiceSequenceNodeId;
 };
 
+export type VoiceRingGroupId = string;
+
+export type VoiceLegInboundRouteRingGroup = {
+  /**
+   * The leg rang one of your ring groups.
+   */
+  type: VoiceLegInboundRouteType;
+  /**
+   * The ring group the leg rang. Recorded as it was at the time, so it may name a group you have since deleted.
+   *
+   */
+  ring_group_id: VoiceRingGroupId;
+};
+
 /**
  * The routing choice recorded for an incoming leg. A recorded route does not
  * guarantee that the leg connected. Check `status` for the outcome and
@@ -27437,7 +27463,10 @@ export type VoiceLegInboundRoute =
     } & VoiceLegInboundRouteForward)
   | ({
       type: "sequence";
-    } & VoiceLegInboundRouteSequence);
+    } & VoiceLegInboundRouteSequence)
+  | ({
+      type: "ring_group";
+    } & VoiceLegInboundRouteRingGroup);
 
 export type VoiceMediaQuality = {
   /**
@@ -27471,11 +27500,11 @@ export type VoiceLegMediaEncryption = "none" | "sdes" | "dtls" | (string & {});
 
 export type VoiceLegMediaPath = {
   /**
-   * How the audio between us and your side of the leg was encrypted: your SIP trunk's equipment, or the browser that placed the call. On a leg with neither, such as an incoming call a Sequence answered, it describes the carrier's side. Use it to confirm that a call on a trunk with `preferred` media encryption was actually encrypted: such a trunk delivers plain audio to a gateway not reached over TLS or behind an `exit_region`.
+   * How the audio between Bird and your SIP trunk equipment or browser was encrypted. For a leg without either, such as an incoming call answered by a Sequence, this describes the carrier's side. Use this field to check whether a call on a trunk with `preferred` media encryption was encrypted. Audio can be plain when the gateway does not use TLS or when encryption is unavailable through an exit.
    *
    * - `none`: plain RTP.
    * - `sdes`: SRTP with keys exchanged in the SDP over TLS signalling (SDES, RFC 4568). The audio between us and the carrier stays plain RTP.
-   * - `dtls`: DTLS-SRTP, which every call placed from a browser uses.
+   * - `dtls`: DTLS-SRTP, used for calls placed from a browser.
    *
    * Absent when we did not record it: on a leg whose audio bypassed us, on an encrypted offer to a SIP trunk whose media encryption is `off`, on a leg placed without an SDP offer in its INVITE, on an incoming leg that was not answered, and on legs recorded before this field existed.
    *
@@ -28210,13 +28239,27 @@ export type VoiceTrunkCore = {
 };
 
 /**
- * Whether audio between your equipment and Bird is encrypted with SRTP, keyed with SDES (`a=crypto`) over TLS signalling. Audio between Bird and the carrier network stays plain RTP.
+ * Controls SRTP encryption between your equipment and Bird. SRTP keys use SDES
+ * (`a=crypto`) over TLS signalling. Audio between Bird and the carrier uses
+ * plain RTP.
  *
- * `preferred` encrypts when it can. A call your equipment places is encrypted when it offers `RTP/SAVP` or `RTP/SAVPF` with an `AES_CM_128_HMAC_SHA1_80` or `_32` key over TLS, and carried plain when it offers plain RTP. A call Bird delivers is encrypted to a gateway reached over TLS (`sips:` or `;transport=tls`) and plain to the rest. Deliveries through a gateway `exit_region`, and on a trunk with `media_bypass`, stay plain.
+ * With `preferred`, a call you place is encrypted when your equipment offers
+ * `RTP/SAVP` or `RTP/SAVPF` with an `AES_CM_128_HMAC_SHA1_80` or `_32` key over
+ * TLS. A plain RTP offer stays plain. Calls delivered to a TLS gateway (`sips:`
+ * or `;transport=tls`) use encryption when available. Calls delivered through a
+ * gateway without TLS or with `media_bypass` use plain audio.
  *
- * `required` refuses a plain call with `488 Not Acceptable Here` and delivers encrypted to every gateway, so every gateway must use TLS.
+ * With `required`, a plain call is refused with `488 Not Acceptable Here`.
+ * Delivered calls require encrypted media, so your gateways must use TLS.
+ * You cannot combine `required` with `media_bypass` because bypassed audio
+ * does not pass through the relay that encrypts it.
  *
- * With `preferred` or `required`, an SDES offer over plain SIP (UDP or TCP), an offer without a usable key, and DTLS-SRTP are refused with `488` and a `Warning` header naming why. `required` cannot be set alongside `media_bypass` or a gateway `exit_region`, since their audio does not pass through the relay that encrypts it. `off` encrypts nothing and relays an SRTP offer as it is. Calls from a web browser are always encrypted with DTLS-SRTP, whatever this says.
+ * With `preferred` or `required`, an SDES offer over plain SIP (UDP or TCP), an
+ * offer without a usable key, and DTLS-SRTP are refused with `488` and a
+ * `Warning` header naming the reason.
+ *
+ * With `off`, Bird does not encrypt audio and relays an SRTP offer unchanged.
+ * Browser calls use DTLS-SRTP regardless of this setting.
  *
  */
 export type VoiceTrunkMediaEncryption = "off" | "preferred" | "required";
@@ -28513,12 +28556,14 @@ export type VoiceNumberProviderType = "allocation" | "verified_number";
  * - `trunk`: delivers the call to one of your SIP trunks.
  * - `forward`: places a call to one of your verified caller IDs and connects the two.
  * - `sequence`: runs the configured sequence from its selected voice-call entry.
+ * - `ring_group`: rings the group's online members. Requires preview access to configure.
  *
  * It selects the answer's own shape, so a new way to answer a call arrives as a
  * new value alongside a new set of fields.
  *
  */
-export type VoiceCallRouteType = "reject" | "trunk" | "forward" | "sequence";
+export type VoiceCallRouteType =
+  "reject" | "trunk" | "forward" | "sequence" | "ring_group";
 
 /**
  * Field used to sort the list.
@@ -28648,6 +28693,19 @@ export type VoiceCallRouteSequence = {
   entry_node_id: VoiceSequenceNodeId;
 };
 
+export type VoiceCallRouteRingGroup = {
+  /**
+   * Rings the ring group's members who are online in the browser phone, and answers the call when one of them answers. Nobody answering refuses the call as busy or unavailable. Requires preview access.
+   *
+   */
+  type: VoiceCallRouteType;
+  /**
+   * The ring group that rings. It must be one of this workspace's ring groups, or its default group of everyone online.
+   *
+   */
+  ring_group_id: VoiceRingGroupId;
+};
+
 /**
  * What happens to a call arriving for this number, as it is configured now. Its `type` selects the shape, and each answer carries its own fields. Setting a route is a separate shape, and it does not offer every variant reported here.
  *
@@ -28664,7 +28722,10 @@ export type VoiceCallRoute =
     } & VoiceCallRouteForward)
   | ({
       type: "sequence";
-    } & VoiceCallRouteSequence);
+    } & VoiceCallRouteSequence)
+  | ({
+      type: "ring_group";
+    } & VoiceCallRouteRingGroup);
 
 export type VoiceInboundConfigurationError = "unsupported_route_type";
 
@@ -28736,7 +28797,10 @@ export type VoiceCallRouteWritable =
     } & VoiceCallRouteTrunk)
   | ({
       type: "forward";
-    } & VoiceCallRouteForward);
+    } & VoiceCallRouteForward)
+  | ({
+      type: "ring_group";
+    } & VoiceCallRouteRingGroup);
 
 export type VoiceInboundConfigurationPut = {
   /**
@@ -28918,6 +28982,97 @@ export type VoiceVerifiedNumberVerifyRequest = {
    * The 6-digit verification code read out by the verification call. Required until ownership is verified. Omit it when retrying activation of an already verified number.
    */
   code?: string;
+};
+
+/**
+ * A set of workspace users that an inbound call rings in the browser phone. Every workspace also has a default group, which rings the workspace's online users and cannot be changed.
+ *
+ */
+export type VoiceRingGroup = {
+  /**
+   * Unique identifier for this ring group. The default group's ID is `vrg_` followed by the workspace ID's suffix.
+   *
+   */
+  readonly id: VoiceRingGroupId;
+  /**
+   * The ring group's name.
+   */
+  name: string;
+  /**
+   * Whether this is the workspace's default group, which rings the users who are online in the browser phone.
+   *
+   */
+  readonly is_default: boolean;
+  /**
+   * How many of the group's members are connected to the browser phone and accepting calls, read live. A member on a call counts, though a call to the group skips them until it ends. For the default group, the count includes every connected user who accepts calls.
+   */
+  online_member_count: number;
+  /**
+   * When the ring group was created. Null for the default group.
+   */
+  readonly created_at: string | null;
+  /**
+   * When the ring group's name or members last changed. Null for the default group.
+   */
+  readonly updated_at: string | null;
+};
+
+/**
+ * The workspace's ring groups. Not paginated: a workspace holds at most 50 ring groups besides its default group.
+ */
+export type VoiceRingGroupList = {
+  /**
+   * The default group first, then the other ring groups, oldest first.
+   */
+  data: Array<VoiceRingGroup>;
+};
+
+export type VoiceRingGroupCreate = {
+  /**
+   * The ring group's name.
+   */
+  name: string;
+};
+
+/**
+ * A change to the ring group. An omitted field is left unchanged.
+ */
+export type VoiceRingGroupUpdate = {
+  /**
+   * The ring group's new name.
+   */
+  name?: string;
+};
+
+/**
+ * A user added to a ring group. A member who later leaves the workspace stays listed until removed, but the group never rings them.
+ */
+export type VoiceRingGroupMember = {
+  /**
+   * The member's user ID.
+   */
+  readonly user_id: UserId;
+  /**
+   * When the user joined the ring group. Null for the default group, whose members are the users online now.
+   */
+  readonly created_at: string | null;
+};
+
+/**
+ * The ring group's members. Not paginated: a ring group holds at most 200 members, and the default group's members are the workspace's online users.
+ */
+export type VoiceRingGroupMemberList = {
+  /**
+   * The members, in the order they joined; the default group's online users, by user ID.
+   */
+  data: Array<VoiceRingGroupMember>;
+};
+
+export type VoiceRingGroupMemberCreate = {
+  /**
+   * The workspace user to add. `bird members list` and the `members_list` MCP tool list workspace members in pages, each with its `user.id`; follow `next_cursor` until the user appears. Both need the `members` scope at read level.
+   */
+  user_id: UserId;
 };
 
 export type EsimZoneId = string;
@@ -32976,7 +33131,7 @@ export type WhatsAppTemplateLanguageStateWritable = {
    */
   rejection?: WhatsAppTemplateRejectionWritable;
   /**
-   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec` or `message_send_ttl_seconds`; the language keeps sending on the maximum price and time-to-live WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: unknown;
@@ -33060,7 +33215,7 @@ export type WhatsAppTemplateVersionLanguageWritable = {
    */
   rejection?: WhatsAppTemplateRejectionWritable;
   /**
-   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec` or `message_send_ttl_seconds`; the language keeps sending on the maximum price and time-to-live WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: unknown;
@@ -33136,6 +33291,11 @@ export type WhatsAppTemplateLanguageWritable = {
    */
   optimization_spec?: WhatsAppTemplateOptimizationSpec | null;
   /**
+   * How long WhatsApp keeps trying to deliver a message from this language, in seconds, or `null` when the language uses WhatsApp's default (10 minutes for authentication, 30 days otherwise).
+   *
+   */
+  message_send_ttl_seconds?: number | null;
+  /**
    * The canonical tag this language is addressed by.
    */
   language: LanguageTag;
@@ -33149,7 +33309,8 @@ export type WhatsAppTemplateLanguageWritable = {
    */
   status?: WhatsAppTemplateLanguageStatus;
   /**
-   * The category Meta is applying to this language, which is what messages from it are priced at.
+   * The category Meta is applying to this language, which is what messages from it are priced at. On a draft, the category its next submission goes under.
+   *
    */
   category?: WhatsAppTemplateCategory;
   /**
@@ -33167,7 +33328,7 @@ export type WhatsAppTemplateLanguageWritable = {
    */
   rejection?: WhatsAppTemplateRejectionWritable;
   /**
-   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec`; the language keeps sending on the maximum price WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
+   * Why the submission did not complete. Present when `status` is `submit_failed`. Also present when WhatsApp refused a change to `optimization_spec` or `message_send_ttl_seconds`; the language keeps sending on the maximum price and time-to-live WhatsApp already held. Absent otherwise, including on a rejection, whose reason is in `rejection`.
    *
    */
   error?: unknown;
@@ -36116,11 +36277,11 @@ export type VoicePartyWritable = {
 
 export type VoiceLegMediaPathWritable = {
   /**
-   * How the audio between us and your side of the leg was encrypted: your SIP trunk's equipment, or the browser that placed the call. On a leg with neither, such as an incoming call a Sequence answered, it describes the carrier's side. Use it to confirm that a call on a trunk with `preferred` media encryption was actually encrypted: such a trunk delivers plain audio to a gateway not reached over TLS or behind an `exit_region`.
+   * How the audio between Bird and your SIP trunk equipment or browser was encrypted. For a leg without either, such as an incoming call answered by a Sequence, this describes the carrier's side. Use this field to check whether a call on a trunk with `preferred` media encryption was encrypted. Audio can be plain when the gateway does not use TLS or when encryption is unavailable through an exit.
    *
    * - `none`: plain RTP.
    * - `sdes`: SRTP with keys exchanged in the SDP over TLS signalling (SDES, RFC 4568). The audio between us and the carrier stays plain RTP.
-   * - `dtls`: DTLS-SRTP, which every call placed from a browser uses.
+   * - `dtls`: DTLS-SRTP, used for calls placed from a browser.
    *
    * Absent when we did not record it: on a leg whose audio bypassed us, on an encrypted offer to a SIP trunk whose media encryption is `off`, on a leg placed without an SDP offer in its INVITE, on an incoming leg that was not answered, and on legs recorded before this field existed.
    *
@@ -36567,6 +36728,41 @@ export type VoiceVerifiedNumberWritable = {
 export type VoiceVerifiedNumberListWritable = {
   data: Array<VoiceVerifiedNumberWritable>;
 } & ListEnvelope;
+
+/**
+ * A set of workspace users that an inbound call rings in the browser phone. Every workspace also has a default group, which rings the workspace's online users and cannot be changed.
+ *
+ */
+export type VoiceRingGroupWritable = {
+  /**
+   * The ring group's name.
+   */
+  name: string;
+  /**
+   * How many of the group's members are connected to the browser phone and accepting calls, read live. A member on a call counts, though a call to the group skips them until it ends. For the default group, the count includes every connected user who accepts calls.
+   */
+  online_member_count: number;
+};
+
+/**
+ * The workspace's ring groups. Not paginated: a workspace holds at most 50 ring groups besides its default group.
+ */
+export type VoiceRingGroupListWritable = {
+  /**
+   * The default group first, then the other ring groups, oldest first.
+   */
+  data: Array<VoiceRingGroupWritable>;
+};
+
+/**
+ * The ring group's members. Not paginated: a ring group holds at most 200 members, and the default group's members are the workspace's online users.
+ */
+export type VoiceRingGroupMemberListWritable = {
+  /**
+   * The members, in the order they joined; the default group's online users, by user ID.
+   */
+  data: Array<unknown>;
+};
 
 /**
  * Supported services for the eSIM. These values describe capabilities; package balances and current eSIM status determine whether service can be used now. Optional phone service can remain `unknown` until a number is assigned. Data packages do not establish call or SMS allowances.
@@ -72325,6 +72521,7 @@ export type ListVoiceNumbersData = {
      * - `trunk`: delivers calls to a SIP trunk.
      * - `forward`: connects calls to the configured forwarding number.
      * - `sequence`: runs the selected voice sequence entry.
+     * - `ring_group`: rings the group's online members.
      *
      * Numbers with an unsupported route are excluded when this filter is set.
      *
@@ -73286,6 +73483,701 @@ export type VerifyVoiceVerifiedNumberResponses = {
 
 export type VerifyVoiceVerifiedNumberResponse =
   VerifyVoiceVerifiedNumberResponses[keyof VerifyVoiceVerifiedNumberResponses];
+
+export type ListVoiceRingGroupsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/voice/ring-groups";
+};
+
+export type ListVoiceRingGroupsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListVoiceRingGroupsError =
+  ListVoiceRingGroupsErrors[keyof ListVoiceRingGroupsErrors];
+
+export type ListVoiceRingGroupsResponses = {
+  /**
+   * The workspace's ring groups.
+   */
+  200: VoiceRingGroupList;
+};
+
+export type ListVoiceRingGroupsResponse =
+  ListVoiceRingGroupsResponses[keyof ListVoiceRingGroupsResponses];
+
+export type CreateVoiceRingGroupData = {
+  body: VoiceRingGroupCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/voice/ring-groups";
+};
+
+export type CreateVoiceRingGroupErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateVoiceRingGroupError =
+  CreateVoiceRingGroupErrors[keyof CreateVoiceRingGroupErrors];
+
+export type CreateVoiceRingGroupResponses = {
+  /**
+   * Ring group created.
+   */
+  201: VoiceRingGroup;
+};
+
+export type CreateVoiceRingGroupResponse =
+  CreateVoiceRingGroupResponses[keyof CreateVoiceRingGroupResponses];
+
+export type DeleteVoiceRingGroupData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the ring group.
+     */
+    ring_group_id: VoiceRingGroupId;
+  };
+  query?: never;
+  url: "/v1/voice/ring-groups/{ring_group_id}";
+};
+
+export type DeleteVoiceRingGroupErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteVoiceRingGroupError =
+  DeleteVoiceRingGroupErrors[keyof DeleteVoiceRingGroupErrors];
+
+export type DeleteVoiceRingGroupResponses = {
+  /**
+   * Ring group deleted.
+   */
+  204: void;
+};
+
+export type DeleteVoiceRingGroupResponse =
+  DeleteVoiceRingGroupResponses[keyof DeleteVoiceRingGroupResponses];
+
+export type GetVoiceRingGroupData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the ring group.
+     */
+    ring_group_id: VoiceRingGroupId;
+  };
+  query?: never;
+  url: "/v1/voice/ring-groups/{ring_group_id}";
+};
+
+export type GetVoiceRingGroupErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetVoiceRingGroupError =
+  GetVoiceRingGroupErrors[keyof GetVoiceRingGroupErrors];
+
+export type GetVoiceRingGroupResponses = {
+  /**
+   * The ring group.
+   */
+  200: VoiceRingGroup;
+};
+
+export type GetVoiceRingGroupResponse =
+  GetVoiceRingGroupResponses[keyof GetVoiceRingGroupResponses];
+
+export type UpdateVoiceRingGroupData = {
+  body: VoiceRingGroupUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the ring group.
+     */
+    ring_group_id: VoiceRingGroupId;
+  };
+  query?: never;
+  url: "/v1/voice/ring-groups/{ring_group_id}";
+};
+
+export type UpdateVoiceRingGroupErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateVoiceRingGroupError =
+  UpdateVoiceRingGroupErrors[keyof UpdateVoiceRingGroupErrors];
+
+export type UpdateVoiceRingGroupResponses = {
+  /**
+   * The renamed ring group.
+   */
+  200: VoiceRingGroup;
+};
+
+export type UpdateVoiceRingGroupResponse =
+  UpdateVoiceRingGroupResponses[keyof UpdateVoiceRingGroupResponses];
+
+export type ListVoiceRingGroupMembersData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the ring group whose members to list or add to.
+     */
+    ring_group_id: VoiceRingGroupId;
+  };
+  query?: never;
+  url: "/v1/voice/ring-groups/{ring_group_id}/members";
+};
+
+export type ListVoiceRingGroupMembersErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListVoiceRingGroupMembersError =
+  ListVoiceRingGroupMembersErrors[keyof ListVoiceRingGroupMembersErrors];
+
+export type ListVoiceRingGroupMembersResponses = {
+  /**
+   * The ring group's members.
+   */
+  200: VoiceRingGroupMemberList;
+};
+
+export type ListVoiceRingGroupMembersResponse =
+  ListVoiceRingGroupMembersResponses[keyof ListVoiceRingGroupMembersResponses];
+
+export type CreateVoiceRingGroupMemberData = {
+  body: VoiceRingGroupMemberCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the ring group whose members to list or add to.
+     */
+    ring_group_id: VoiceRingGroupId;
+  };
+  query?: never;
+  url: "/v1/voice/ring-groups/{ring_group_id}/members";
+};
+
+export type CreateVoiceRingGroupMemberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateVoiceRingGroupMemberError =
+  CreateVoiceRingGroupMemberErrors[keyof CreateVoiceRingGroupMemberErrors];
+
+export type CreateVoiceRingGroupMemberResponses = {
+  /**
+   * Member added.
+   */
+  201: VoiceRingGroupMember;
+};
+
+export type CreateVoiceRingGroupMemberResponse =
+  CreateVoiceRingGroupMemberResponses[keyof CreateVoiceRingGroupMemberResponses];
+
+export type DeleteVoiceRingGroupMemberData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the ring group.
+     */
+    ring_group_id: VoiceRingGroupId;
+    /**
+     * ID of the member to remove.
+     */
+    user_id: UserId;
+  };
+  query?: never;
+  url: "/v1/voice/ring-groups/{ring_group_id}/members/{user_id}";
+};
+
+export type DeleteVoiceRingGroupMemberErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteVoiceRingGroupMemberError =
+  DeleteVoiceRingGroupMemberErrors[keyof DeleteVoiceRingGroupMemberErrors];
+
+export type DeleteVoiceRingGroupMemberResponses = {
+  /**
+   * Member removed.
+   */
+  204: void;
+};
+
+export type DeleteVoiceRingGroupMemberResponse =
+  DeleteVoiceRingGroupMemberResponses[keyof DeleteVoiceRingGroupMemberResponses];
 
 export type ListVoiceLegsData = {
   body?: never;
