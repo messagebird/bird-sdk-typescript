@@ -15343,8 +15343,7 @@ export const getVoiceNumber = <ThrowOnError extends boolean = false>(
  * carrying on. "ring_group" needs a ring_group_id: one of your ring groups, or
  * the default group of everyone online, from
  * [List ring groups](/docs/api/reference/list-voice-ring-groups), otherwise the
- * update returns 422. Routing to a ring group requires preview access to
- * inbound browser calling; without it, the update returns 404.
+ * update returns 422.
  *
  * Sequence management remains in the dashboard. A `sequence` route needs
  * `sequence_id` and `entry_node_id` from an existing active publication in your
@@ -15436,8 +15435,7 @@ export const getVoiceSettings = <ThrowOnError extends boolean = false>(
  * have inbound calling enabled, and a forward target must be one of your
  * verified caller IDs, otherwise the update returns 412. A trunk_id that is not
  * one of your trunks returns 404. A ring_group_id that is not one of your ring
- * groups or the default group returns 422. Routing to a ring group requires
- * preview access to inbound browser calling; without it, the update returns 404. Deleting the trunk, or
+ * groups or the default group returns 422. Deleting the trunk, or
  * turning off its inbound calling, sets the default back to "reject".
  *
  * `daily_spend_limit.workspace_limit` sets your workspace's own daily spend limit. It can be
@@ -15713,9 +15711,6 @@ export const verifyVoiceVerifiedNumber = <ThrowOnError extends boolean = false>(
  * group, which is not stored: it rings the users who are online in the
  * browser phone. The others follow, oldest first.
  *
- * Ring groups require preview access to inbound browser calling. Without it,
- * this returns `404 Not Found`.
- *
  */
 export const listVoiceRingGroups = <ThrowOnError extends boolean = false>(
   options?: Options<ListVoiceRingGroupsData, ThrowOnError>,
@@ -15749,9 +15744,6 @@ export const listVoiceRingGroups = <ThrowOnError extends boolean = false>(
  *
  * A workspace can have at most 50 ring groups besides its default group.
  * Creating another returns `422`.
- *
- * Ring groups require preview access to inbound browser calling. Without it,
- * this returns `404 Not Found`.
  *
  */
 export const createVoiceRingGroup = <ThrowOnError extends boolean = false>(
@@ -15792,9 +15784,6 @@ export const createVoiceRingGroup = <ThrowOnError extends boolean = false>(
  * published sequence still rings, or deleting the default group, returns
  * `409 Conflict`.
  *
- * Ring groups require preview access to inbound browser calling. Without it,
- * this returns `404 Not Found`.
- *
  */
 export const deleteVoiceRingGroup = <ThrowOnError extends boolean = false>(
   options: Options<DeleteVoiceRingGroupData, ThrowOnError>,
@@ -15826,9 +15815,6 @@ export const deleteVoiceRingGroup = <ThrowOnError extends boolean = false>(
  * Returns one ring group. The default group's ID is `vrg_` followed by the
  * workspace ID's suffix.
  *
- * Ring groups require preview access to inbound browser calling. Without it,
- * this returns `404 Not Found`.
- *
  */
 export const getVoiceRingGroup = <ThrowOnError extends boolean = false>(
   options: Options<GetVoiceRingGroupData, ThrowOnError>,
@@ -15859,9 +15845,6 @@ export const getVoiceRingGroup = <ThrowOnError extends boolean = false>(
  *
  * Renames the ring group. Renaming the default group returns
  * `409 Conflict`.
- *
- * Ring groups require preview access to inbound browser calling. Without it,
- * this returns `404 Not Found`.
  *
  */
 export const updateVoiceRingGroup = <ThrowOnError extends boolean = false>(
@@ -15898,9 +15881,6 @@ export const updateVoiceRingGroup = <ThrowOnError extends boolean = false>(
  * Returns the ring group's members, in the order they joined. The default
  * group's members are the users who are online in the browser phone now.
  *
- * Ring groups require preview access to inbound browser calling. Without it,
- * this returns `404 Not Found`.
- *
  */
 export const listVoiceRingGroupMembers = <ThrowOnError extends boolean = false>(
   options: Options<ListVoiceRingGroupMembersData, ThrowOnError>,
@@ -15935,9 +15915,6 @@ export const listVoiceRingGroupMembers = <ThrowOnError extends boolean = false>(
  * A user without access to the workspace returns `422`, as does adding a
  * member to a group that already has 200. Adding a user who is already a
  * member, or adding to the default group, returns `409 Conflict`.
- *
- * Ring groups require preview access to inbound browser calling. Without it,
- * this returns `404 Not Found`.
  *
  */
 export const createVoiceRingGroupMember = <
@@ -15976,9 +15953,6 @@ export const createVoiceRingGroupMember = <
  * Removes the user from the ring group. A call already ringing the user is
  * not affected. Removing a member of the default group returns
  * `409 Conflict`.
- *
- * Ring groups require preview access to inbound browser calling. Without it,
- * this returns `404 Not Found`.
  *
  */
 export const deleteVoiceRingGroupMember = <

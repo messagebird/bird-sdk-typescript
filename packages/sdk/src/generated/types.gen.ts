@@ -6387,7 +6387,7 @@ export type SmsInReplyToMessage = {
    */
   id: SmsMessageId;
   /**
-   * Text of the outbound message as Bird stored it. Authentication messages read `**REDACTED**`. Absent once that message is past the read window.
+   * Text of the outbound message as Bird stored it, with sensitive template values masked. Authentication messages without declared sensitive variables read `**REDACTED**`. Absent once that message is past the read window.
    *
    */
   text?: string;
@@ -6420,7 +6420,7 @@ export type SmsMessage = {
    */
   from: string;
   /**
-   * The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text, and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. When `category` is `authentication` (a message carrying a one-time code), this is `**REDACTED**`: the code still reaches the recipient, but the API does not retain it for later reads.
+   * The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text, and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. System template messages preserve the surrounding text and mask sensitive codes with one asterisk per digit. Authentication messages without declared sensitive variables return `**REDACTED**`. The recipient receives the real code; message history retains only its masked representation.
    *
    */
   text?: string;
@@ -28556,7 +28556,7 @@ export type VoiceNumberProviderType = "allocation" | "verified_number";
  * - `trunk`: delivers the call to one of your SIP trunks.
  * - `forward`: places a call to one of your verified caller IDs and connects the two.
  * - `sequence`: runs the configured sequence from its selected voice-call entry.
- * - `ring_group`: rings the group's online members. Requires preview access to configure.
+ * - `ring_group`: rings the group's online members.
  *
  * It selects the answer's own shape, so a new way to answer a call arrives as a
  * new value alongside a new set of fields.
@@ -28695,7 +28695,7 @@ export type VoiceCallRouteSequence = {
 
 export type VoiceCallRouteRingGroup = {
   /**
-   * Rings the ring group's members who are online in the browser phone, and answers the call when one of them answers. Nobody answering refuses the call as busy or unavailable. Requires preview access.
+   * Rings the ring group's members who are online in the browser phone, and answers the call when one of them answers. Nobody answering refuses the call as busy or unavailable.
    *
    */
   type: VoiceCallRouteType;
@@ -32359,7 +32359,7 @@ export type SmsInReplyToMessageWritable = {
    */
   id: SmsMessageId;
   /**
-   * Text of the outbound message as Bird stored it. Authentication messages read `**REDACTED**`. Absent once that message is past the read window.
+   * Text of the outbound message as Bird stored it, with sensitive template values masked. Authentication messages without declared sensitive variables read `**REDACTED**`. Absent once that message is past the read window.
    *
    */
   text?: string;
@@ -32382,7 +32382,7 @@ export type SmsMessageWritable = {
    */
   from: string;
   /**
-   * The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text, and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. When `category` is `authentication` (a message carrying a one-time code), this is `**REDACTED**`: the code still reaches the recipient, but the API does not retain it for later reads.
+   * The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text, and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. System template messages preserve the surrounding text and mask sensitive codes with one asterisk per digit. Authentication messages without declared sensitive variables return `**REDACTED**`. The recipient receives the real code; message history retains only its masked representation.
    *
    */
   text?: string;
