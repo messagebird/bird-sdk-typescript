@@ -10,11 +10,27 @@ import { BirdClient } from "@messagebird/sdk";
 
 const bird = new BirdClient({ apiKey: process.env.BIRD_API_KEY! });
 
+export async function emailContent() {
+  const content = await bird.email.content("em_01krdgeqcxet5s7t44vh8rt9mg", {
+    recipient_id: "er_01krdgeqcxet5s7t44vh8rt9mg",
+  });
+  console.log(content.html, content.text);
+}
+
+export async function emailRecipients() {
+  for await (const recipient of bird.email.recipients(
+    "em_01krdgeqcxet5s7t44vh8rt9mg",
+  )) {
+    console.log(recipient.id, recipient.subject);
+  }
+}
+
 export async function emailGet() {
   const msg = await bird.email.get("em_abc123");
   msg.status; // "accepted" | "processed" | "delivered" | "bounced" | …
   msg.delivered_count;
   msg.bounced_count;
+  console.log(msg.subject, msg.subject_recipient_id);
 }
 
 export async function emailCancel() {

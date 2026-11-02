@@ -3876,6 +3876,8 @@ export type EmailAddress = {
   name?: string;
 };
 
+export type RecipientId = string;
+
 /**
  * A language tag in BCP-47 form, for example `en` or `pt-BR`.
  */
@@ -3964,10 +3966,14 @@ export type EmailMessage = {
    */
   bcc?: Array<EmailAddress>;
   /**
-   * The subject line as delivered. For a send that used a template, the stored subject is the template's, so this reports it with the send's `parameters` substituted in, which is what the recipient saw.
+   * The resolved subject. For a template send with recipient snapshots, this is the subject accepted for the first To recipient in the original request. It remains available when body storage is disabled. Legacy messages use their message-wide subject and caller parameters. For sends with recipient snapshots, `subject_recipient_id` identifies the recipient represented by `subject` and is present for scheduled and canceled messages too.
    *
    */
   subject: string;
+  /**
+   * Recipient represented by subject. Present for template sends with recipient snapshots, including scheduled and canceled messages.
+   */
+  readonly subject_recipient_id?: RecipientId;
   category: EmailMessageCategory;
   /**
    * Reply-To addresses, if set on the send. Empty/null when no Reply-To was provided.
@@ -4144,12 +4150,23 @@ export type EmailTemplateSend = unknown & {
    *
    * Caller parameters have `system` set to false or absent in the template's
    * `variables` list. Supply each required caller parameter used by the
-   * resolved send language; omitting one returns `422`. A version's list
+   * resolved send language; omitting one or supplying null returns `422`. A version's list
    * covers all its languages, and values unused by the resolved language are
    * ignored.
    *
    * The `bird` namespace is reserved for values filled by Bird, so a send that
    * sets it is rejected. `parameters` is capped at 16 KB once serialized.
+   *
+   * Bird resolves the referenced
+   * `bird.contact` attributes from each original To recipient's matching contact
+   * in this workspace. Each To receives its own personalized email; Cc and Bcc receive
+   * a copy of each To's email and do not need matching contacts. A missing To
+   * contact rejects the send with `422` (`E04099`), including when Liquid uses
+   * a default or condition. Empty name fields on an existing contact render
+   * empty unless Liquid supplies a default; configured contact-property
+   * fallbacks still apply. Values are saved at acceptance and reused for
+   * delivery and content history. Individual, batch, and scheduled sends
+   * support this behavior.
    *
    */
   parameters?: {
@@ -4358,13 +4375,14 @@ export type EmailMessageBatchResponse = {
   data: Array<EmailMessageBatchItem>;
 };
 
-export type RecipientId = string;
-
 /**
  * Envelope position of a recipient on an outbound email event.
  */
 export type RecipientRole = "to" | "cc" | "bcc";
 
+/**
+ * One email delivery. For a contact-personalized template send, `copy_of_recipient_id` links a Cc or Bcc delivery to the To recipient whose saved values it carries. Each Cc and Bcc address receives one copy per To recipient. Its visible To header uses that To mailbox unless a different visible mailbox was specified for this copy. The link is absent for To recipients and sends without personalized copies.
+ */
 export type EmailRecipient = {
   /**
    * Recipient ID.
@@ -4387,6 +4405,14 @@ export type EmailRecipient = {
    */
   name?: string | null;
   /**
+   * Resolved subject accepted for this recipient, available independently of body storage. Legacy messages report their message-wide subject. Omitted if a retained recipient snapshot is unavailable.
+   */
+  readonly subject?: string;
+  /**
+   * For a Cc or Bcc recipient of a template send personalized with contact data, the To recipient whose personalized message this copy carries. Each Cc and Bcc recipient receives one copy per To recipient, with that To's values and its own delivery status. The visible To header uses that To mailbox unless a different visible mailbox was specified for this copy. Absent for To recipients and for sends not personalized per To recipient.
+   */
+  readonly copy_of_recipient_id?: RecipientId;
+  /**
    * Delivery status for this recipient:
    *
    * - `accepted`: The send has been taken and is being prepared for delivery.
@@ -4395,7 +4421,7 @@ export type EmailRecipient = {
    * - `delivered`: The recipient's mail server accepted the message.
    * - `bounced`: Delivery permanently failed (see `bounce_type` for hard vs soft).
    * - `complained`: The recipient reported the message as spam.
-   * - `rejected`: Delivery was never attempted (see `rejection_reason` for why).
+   * - `rejected`: Delivery was never attempted. Check `rejection_reason`, or the message status for a schedule canceled before delivery.
    *
    */
   readonly status:
@@ -4655,7 +4681,7 @@ export type EmailEventList = {
 } & ListEnvelope;
 
 /**
- * The body content of a sent email message, as delivered. A send that used a template stores the template's body, so these report it with the send's `parameters` substituted in.
+ * The body content of a sent email message, as delivered. A send that used a template reports its stored body with the accepted caller parameters and the selected recipient's saved contact values substituted in. A contextual send with multiple recipients requires the recipient_id query parameter.
  *
  */
 export type EmailMessageContent = {
@@ -7069,7 +7095,7 @@ export type TemplateVariable = {
    */
   readonly constraint: string;
   /**
-   * Whether this slot's value is redacted from stored message content. A placeholder replaces the sensitive value in message history; transport queues can still carry the text needed for delivery.
+   * Whether this slot requires redacted message history. Published email template sends that store recipient snapshots reject sensitive inputs before acceptance. Other channels retain their own sensitive-input delivery and retention rules.
    *
    */
   readonly sensitive?: boolean;
@@ -21558,10 +21584,11 @@ export type EmailTemplateCreate = {
    * - Comparing against `empty`/`blank` (use `.size == 0` instead).
    * - Blocks nested far deeper than real email markup needs.
    *
-   * A broadcast's template additionally cannot use a `{% for %}` loop,
-   * because a broadcast supplies one value per contact property, so there
-   * is nothing to iterate. Send with the messages API instead if the
-   * template needs one.
+   * Broadcast template parameters accept scalar values; arrays and objects are unsupported.
+   * Broadcasts support `{% for %}` over a local collection created with `split`.
+   * Broadcasts without caller-supplied parameters also support literal ranges and
+   * `{% tablerow %}`. When a broadcast uses caller parameters, ranges and
+   * `{% tablerow %}` are unsupported.
    *
    */
   source: EmailTemplateSourceWrite;
@@ -21574,10 +21601,17 @@ export type EmailTemplateCreate = {
    *
    * The example's `{{ first_name }}` is a parameter, filled from
    * `template.parameters` at send time. A `{{ bird.contact.<attribute> }}`
-   * placeholder reads a contact record instead. A send to an email address
-   * has no contact record, so it refuses such a template. A broadcast fills
-   * it from each recipient's contact, and a preview from the `contact` or
-   * `parameters` you supply.
+   * placeholder reads a contact attribute. Broadcasts resolve each audience
+   * contact during preparation; previews use the selected contact or sample
+   * values. Missing attributes use their configured fallbacks, while explicit
+   * empty strings remain empty.
+   *
+   * Public API sends, including batch and scheduled sends, look up each To
+   * address in this workspace when the selected language reads contact
+   * attributes. A missing contact returns `422` (`E04099`), even if Liquid
+   * supplies a default. Each To receives its own personalized email, with Cc
+   * and Bcc copied on each. Resolved values are saved at acceptance for
+   * delivery and later content reads.
    *
    */
   languages?: {
@@ -31870,7 +31904,7 @@ export type EmailMessageWritable = {
    */
   bcc?: Array<EmailAddress>;
   /**
-   * The subject line as delivered. For a send that used a template, the stored subject is the template's, so this reports it with the send's `parameters` substituted in, which is what the recipient saw.
+   * The resolved subject. For a template send with recipient snapshots, this is the subject accepted for the first To recipient in the original request. It remains available when body storage is disabled. Legacy messages use their message-wide subject and caller parameters. For sends with recipient snapshots, `subject_recipient_id` identifies the recipient represented by `subject` and is present for scheduled and canceled messages too.
    *
    */
   subject: string;
@@ -31924,6 +31958,9 @@ export type EmailMessageBatchResponseWritable = {
   data: Array<EmailMessageBatchItemWritable>;
 };
 
+/**
+ * One email delivery. For a contact-personalized template send, `copy_of_recipient_id` links a Cc or Bcc delivery to the To recipient whose saved values it carries. Each Cc and Bcc address receives one copy per To recipient. Its visible To header uses that To mailbox unless a different visible mailbox was specified for this copy. The link is absent for To recipients and sends without personalized copies.
+ */
 export type EmailRecipientWritable = {
   /**
    * ID of the message this recipient belongs to. For a message send, this is the message's own `em_`-prefixed ID. For a broadcast, it is the `em_`-prefixed ID of the copy addressed to this recipient. Read either one with [Get an email message](/docs/api/reference/get-email-message), which answers 404 for a broadcast copy the send has not recorded. No recipient status distinguishes a copy the send recorded from one it did not.
@@ -38561,6 +38598,11 @@ export type ListEmailMessagesErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type ListEmailMessagesError =
@@ -38826,6 +38868,11 @@ export type GetEmailMessageErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type GetEmailMessageError =
@@ -38940,6 +38987,176 @@ export type CancelEmailMessageResponses = {
 
 export type CancelEmailMessageResponse =
   CancelEmailMessageResponses[keyof CancelEmailMessageResponses];
+
+export type ListEmailMessageRecipientsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the message whose recipients to list. A broadcast records one message per recipient, and [List email messages](/docs/api/reference/list-email-messages) returns those copies alongside ordinary sends. For a single send, this is the message's own ID, from the send response's `id` field.
+     */
+    message_id: EmailId;
+  };
+  query?: {
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/email/messages/{message_id}/recipients";
+};
+
+export type ListEmailMessageRecipientsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ListEmailMessageRecipientsError =
+  ListEmailMessageRecipientsErrors[keyof ListEmailMessageRecipientsErrors];
+
+export type ListEmailMessageRecipientsResponses = {
+  /**
+   * Paginated list of recipients for this message.
+   */
+  200: EmailRecipientList;
+};
+
+export type ListEmailMessageRecipientsResponse =
+  ListEmailMessageRecipientsResponses[keyof ListEmailMessageRecipientsResponses];
+
+export type GetEmailMessageContentData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the message whose stored content to fetch. A broadcast records one message per recipient, and [List email messages](/docs/api/reference/list-email-messages) returns those copies alongside ordinary sends. For a single send, this is the message's own ID, from the send response's `id` field.
+     */
+    message_id: EmailId;
+  };
+  query?: {
+    /**
+     * Recipient whose accepted template values to render. Required for a message with multiple recipient snapshots; omission returns 422. A single recipient is selected automatically. An unknown recipient or one belonging to another message returns 404. Get the ID from the message's recipients listing.
+     */
+    recipient_id?: RecipientId;
+  };
+  url: "/v1/email/messages/{message_id}/content";
+};
+
+export type GetEmailMessageContentErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The resource existed but is no longer available.
+   */
+  410: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * The resource is not available yet. Retry shortly.
+   */
+  425: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetEmailMessageContentError =
+  GetEmailMessageContentErrors[keyof GetEmailMessageContentErrors];
+
+export type GetEmailMessageContentResponses = {
+  /**
+   * Stored message content.
+   */
+  200: EmailMessageContent;
+};
+
+export type GetEmailMessageContentResponse =
+  GetEmailMessageContentResponses[keyof GetEmailMessageContentResponses];
 
 export type ListEmailBroadcastsData = {
   body?: never;

@@ -12,16 +12,23 @@ import { BirdClient } from "@messagebird/sdk";
 const bird = new BirdClient({ apiKey: process.env.BIRD_API_KEY! });
 
 export async function contactPropertiesCreate() {
-  const prop = await bird.contactProperties.create({ key: "plan", type: "string" });
-  console.log(prop.id); // "cp_…"
+  const prop = await bird.contactProperties.create({
+    key: "plan",
+    type: "string",
+  });
+  console.log(prop.id); // "prp_…"
 }
 
 export async function contactPropertiesUpdate() {
-  await bird.contactProperties.update("cp_01krdgeqcxet5s7t44vh8rt9mg", { fallback_value: "free" });
+  await bird.contactProperties.update("prp_01krdgeqcxet5s7t44vh8rt9mg", {
+    fallback_value: "free",
+  });
 }
 
 export async function contactPropertiesGet() {
-  const prop = await bird.contactProperties.get("cp_01krdgeqcxet5s7t44vh8rt9mg");
+  const prop = await bird.contactProperties.get(
+    "prp_01krdgeqcxet5s7t44vh8rt9mg",
+  );
   console.log(prop.key, prop.type);
 }
 
@@ -33,10 +40,12 @@ export async function contactPropertiesList() {
 }
 
 export async function contactPropertiesArchive() {
-  const prop = await bird.contactProperties.archive("cp_01krdgeqcxet5s7t44vh8rt9mg");
+  const prop = await bird.contactProperties.archive(
+    "prp_01krdgeqcxet5s7t44vh8rt9mg",
+  );
   console.log(prop.key, prop.archived);
 }
 
 export async function contactPropertiesUnarchive() {
-  await bird.contactProperties.unarchive("cp_01krdgeqcxet5s7t44vh8rt9mg");
+  await bird.contactProperties.unarchive("prp_01krdgeqcxet5s7t44vh8rt9mg");
 }

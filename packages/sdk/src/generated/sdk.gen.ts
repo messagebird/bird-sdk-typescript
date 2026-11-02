@@ -544,6 +544,9 @@ import type {
   GetEmailInboxInsightsSpamTrapsData,
   GetEmailInboxInsightsSpamTrapsErrors,
   GetEmailInboxInsightsSpamTrapsResponses,
+  GetEmailMessageContentData,
+  GetEmailMessageContentErrors,
+  GetEmailMessageContentResponses,
   GetEmailMessageData,
   GetEmailMessageErrors,
   GetEmailMessageResponses,
@@ -957,6 +960,9 @@ import type {
   ListEmailBroadcastsData,
   ListEmailBroadcastsErrors,
   ListEmailBroadcastsResponses,
+  ListEmailMessageRecipientsData,
+  ListEmailMessageRecipientsErrors,
+  ListEmailMessageRecipientsResponses,
   ListEmailMessagesData,
   ListEmailMessagesErrors,
   ListEmailMessagesResponses,
@@ -1936,6 +1942,18 @@ export const listEmailMessages = <ThrowOnError extends boolean = false>(
  * instead. The `category` field controls suppression policy independently of content:
  * set it to `marketing` when sending marketing content.
  *
+ * For a published template, supply caller values in `template.parameters`.
+ * Contact IDs are not recipient addresses.
+ *
+ * When the selected template language reads contact attributes, Bird looks up
+ * each To address in this workspace and saves the referenced values at
+ * acceptance. Each To receives its own personalized email; Cc and Bcc receive
+ * a copy of each To's email and do not need matching contacts. A To address
+ * without a matching contact rejects the request with `422` (`E04099`), even
+ * if Liquid supplies a default. Existing contacts may have empty name fields.
+ * This also applies to scheduled sends. Templates without contact attributes
+ * keep the usual recipient behavior.
+ *
  * The `202` response means the message is safely accepted and awaiting delivery.
  * Fetch it by `id` or subscribe to webhook events to follow delivery. The
  * request never half-succeeds: an unverified sender domain or any field-level
@@ -1978,7 +1996,30 @@ export const createEmailMessage = <ThrowOnError extends boolean = false>(
 /**
  * Create a batch of email messages
  *
- * Accepts up to 100 independent email messages and queues them for delivery. All items are validated before any are queued: if one fails validation, the entire batch is rejected. Field-level validation failures and business-rule failures, such as sending from a domain that is not verified, both return `422`. An item can set `scheduled_at` to send it later, on the same terms as a single scheduled send, and one batch can mix scheduled and immediate messages. Cancel a scheduled item before it sends with [Cancel an email message](/docs/api/reference/cancel-email-message). Suppression is evaluated per recipient after acceptance, never as a synchronous error. The `202` response returns one entry per message in submission order, each with its own `id` you can use to fetch that message or match it against webhook events. Attachments are allowed per message. Each message must stay within the 20 MB estimated generated message-size cap, and the serialized JSON request body for the whole batch has a hard 20 MB cap.
+ * Accepts up to 100 independent email messages and queues them for delivery.
+ * All items are validated before any are queued: if one fails validation, the
+ * entire batch is rejected. Field-level validation failures and business-rule
+ * failures, such as sending from a domain that is not verified, both return
+ * `422`. An item can set `scheduled_at` to send it later, on the same terms as
+ * a single scheduled send, and one batch can mix scheduled and immediate
+ * messages. Cancel a scheduled item before it sends with
+ * [Cancel an email message](/docs/api/reference/cancel-email-message).
+ * Suppression is evaluated per recipient after acceptance, never as a
+ * synchronous error. The `202` response returns one entry per message in
+ * submission order, each with its own `id` you can use to fetch that message
+ * or match it against webhook events. Attachments are allowed per message.
+ * Each message must stay within the 20 MB estimated generated message-size
+ * cap, and the serialized JSON request body for the whole batch has a hard
+ * 20 MB cap.
+ * Supply caller values in `template.parameters` for each message.
+ *
+ * Template sends support contact attributes on the same terms as individual
+ * sends. Each To receives its own personalized email, and Cc and Bcc receive a
+ * copy for each To. Copies do not need matching contacts. If a To address has
+ * no matching contact when the template reads contact attributes, the entire
+ * batch is rejected with `422` (`E04099`) before any item is accepted. Liquid
+ * defaults do not waive that requirement. Values are saved at acceptance,
+ * including for scheduled items.
  *
  */
 export const createEmailMessageBatch = <ThrowOnError extends boolean = false>(
@@ -2066,6 +2107,80 @@ export const cancelEmailMessage = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/email/messages/{message_id}/cancel",
+    ...options,
+  });
+
+/**
+ * List recipients of a message
+ *
+ * Returns the message's per-recipient delivery state as a cursor page: each entry is
+ * one `to`/`cc`/`bcc` recipient with its role, current `status`, rejection or bounce
+ * detail when delivery failed, and open/click counts. Use it to see which specific
+ * addresses failed when the aggregate message `status` is mixed (for example
+ * `partial_failure`).
+ *
+ * This works for every email message, including one a broadcast sent. A broadcast
+ * records one message per recipient, so such a message has exactly one recipient
+ * here: the address its copy went to.
+ *
+ * Template messages with recipient snapshots include each recipient's accepted
+ * subject, even when body storage is disabled or the message is still scheduled.
+ * Pass the recipient's `id` as `recipient_id` when reading that message's content.
+ *
+ */
+export const listEmailMessageRecipients = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListEmailMessageRecipientsData, ThrowOnError>,
+): RequestResult<
+  ListEmailMessageRecipientsResponses,
+  ListEmailMessageRecipientsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListEmailMessageRecipientsResponses,
+    ListEmailMessageRecipientsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/messages/{message_id}/recipients",
+    ...options,
+  });
+
+/**
+ * Get stored message content
+ *
+ * Returns the stored HTML and text bodies for a sent message. Content storage must be enabled for the message. Content is available for up to 30 days after sending. A broadcast message can return `404` even when workspace content storage is enabled. Verify email previews preserve the message with the verification code masked. A `404` indicates content is unavailable for this message. A scheduled send of a workspace template, rather than a built-in one, stores its content when it sends, so it answers `404` until then. A `425` indicates the content is still being stored and the request can be retried shortly. A `410` indicates the content was stored but has since expired.
+ *
+ */
+export const getEmailMessageContent = <ThrowOnError extends boolean = false>(
+  options: Options<GetEmailMessageContentData, ThrowOnError>,
+): RequestResult<
+  GetEmailMessageContentResponses,
+  GetEmailMessageContentErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetEmailMessageContentResponses,
+    GetEmailMessageContentErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/messages/{message_id}/content",
     ...options,
   });
 

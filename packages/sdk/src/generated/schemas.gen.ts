@@ -7040,6 +7040,13 @@ export const EmailAddressSchema = {
   },
 } as const;
 
+export const RecipientIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^er_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "er_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const LanguageTagSchema = {
   type: "string",
   minLength: 2,
@@ -7225,7 +7232,13 @@ export const EmailMessageSchema = {
       type: "string",
       minLength: 1,
       description:
-        "The subject line as delivered. For a send that used a template, the stored subject is the template's, so this reports it with the send's `parameters` substituted in, which is what the recipient saw.\n",
+        "The resolved subject. For a template send with recipient snapshots, this is the subject accepted for the first To recipient in the original request. It remains available when body storage is disabled. Legacy messages use their message-wide subject and caller parameters. For sends with recipient snapshots, `subject_recipient_id` identifies the recipient represented by `subject` and is present for scheduled and canceled messages too.\n",
+    },
+    subject_recipient_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/RecipientID",
+      description:
+        "Recipient represented by subject. Present for template sends with recipient snapshots, including scheduled and canceled messages.",
     },
     category: {
       $ref: "#/components/schemas/EmailMessageCategory",
@@ -7564,7 +7577,7 @@ export const EmailTemplateSendSchema = {
       type: "object",
       additionalProperties: true,
       description:
-        "Values for caller parameters, keyed by name. A parameter name is a single word.\n\nCaller parameters have `system` set to false or absent in the template's\n`variables` list. Supply each required caller parameter used by the\nresolved send language; omitting one returns `422`. A version's list\ncovers all its languages, and values unused by the resolved language are\nignored.\n\nThe `bird` namespace is reserved for values filled by Bird, so a send that\nsets it is rejected. `parameters` is capped at 16 KB once serialized.\n",
+        "Values for caller parameters, keyed by name. A parameter name is a single word.\n\nCaller parameters have `system` set to false or absent in the template's\n`variables` list. Supply each required caller parameter used by the\nresolved send language; omitting one or supplying null returns `422`. A version's list\ncovers all its languages, and values unused by the resolved language are\nignored.\n\nThe `bird` namespace is reserved for values filled by Bird, so a send that\nsets it is rejected. `parameters` is capped at 16 KB once serialized.\n\nBird resolves the referenced\n`bird.contact` attributes from each original To recipient's matching contact\nin this workspace. Each To receives its own personalized email; Cc and Bcc receive\na copy of each To's email and do not need matching contacts. A missing To\ncontact rejects the send with `422` (`E04099`), including when Liquid uses\na default or condition. Empty name fields on an existing contact render\nempty unless Liquid supplies a default; configured contact-property\nfallbacks still apply. Values are saved at acceptance and reused for\ndelivery and content history. Individual, batch, and scheduled sends\nsupport this behavior.\n",
       example: {
         animal: "otter",
       },
@@ -7948,13 +7961,6 @@ export const EmailMessageBatchResponseSchema = {
   },
 } as const;
 
-export const RecipientIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^er_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "er_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
 export const RecipientRoleSchema = {
   type: "string",
   minLength: 1,
@@ -7965,6 +7971,8 @@ export const RecipientRoleSchema = {
 
 export const EmailRecipientSchema = {
   type: "object",
+  description:
+    "One email delivery. For a contact-personalized template send, `copy_of_recipient_id` links a Cc or Bcc delivery to the To recipient whose saved values it carries. Each Cc and Bcc address receives one copy per To recipient. Its visible To header uses that To mailbox unless a different visible mailbox was specified for this copy. The link is absent for To recipients and sends without personalized copies.",
   additionalProperties: false,
   required: [
     "id",
@@ -8002,6 +8010,18 @@ export const EmailRecipientSchema = {
       description:
         "Display name provided for this recipient on the send, or null if none was given.",
     },
+    subject: {
+      type: "string",
+      readOnly: true,
+      description:
+        "Resolved subject accepted for this recipient, available independently of body storage. Legacy messages report their message-wide subject. Omitted if a retained recipient snapshot is unavailable.",
+    },
+    copy_of_recipient_id: {
+      readOnly: true,
+      $ref: "#/components/schemas/RecipientID",
+      description:
+        "For a Cc or Bcc recipient of a template send personalized with contact data, the To recipient whose personalized message this copy carries. Each Cc and Bcc recipient receives one copy per To recipient, with that To's values and its own delivery status. The visible To header uses that To mailbox unless a different visible mailbox was specified for this copy. Absent for To recipients and for sends not personalized per To recipient.",
+    },
     status: {
       type: "string",
       minLength: 1,
@@ -8025,7 +8045,7 @@ export const EmailRecipientSchema = {
         "EmailRecipientStatusRejected",
       ],
       description:
-        "Delivery status for this recipient:\n\n- `accepted`: The send has been taken and is being prepared for delivery.\n- `processed`: This recipient's message is on its way out.\n- `deferred`: The recipient's mailbox provider asked for a retry, and delivery attempts continue.\n- `delivered`: The recipient's mail server accepted the message.\n- `bounced`: Delivery permanently failed (see `bounce_type` for hard vs soft).\n- `complained`: The recipient reported the message as spam.\n- `rejected`: Delivery was never attempted (see `rejection_reason` for why).\n",
+        "Delivery status for this recipient:\n\n- `accepted`: The send has been taken and is being prepared for delivery.\n- `processed`: This recipient's message is on its way out.\n- `deferred`: The recipient's mailbox provider asked for a retry, and delivery attempts continue.\n- `delivered`: The recipient's mail server accepted the message.\n- `bounced`: Delivery permanently failed (see `bounce_type` for hard vs soft).\n- `complained`: The recipient reported the message as spam.\n- `rejected`: Delivery was never attempted. Check `rejection_reason`, or the message status for a schedule canceled before delivery.\n",
     },
     rejection_reason: {
       type: ["string", "null"],
@@ -8325,7 +8345,7 @@ export const EmailMessageContentSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "The body content of a sent email message, as delivered. A send that used a template stores the template's body, so these report it with the send's `parameters` substituted in.\n",
+    "The body content of a sent email message, as delivered. A send that used a template reports its stored body with the accepted caller parameters and the selected recipient's saved contact values substituted in. A contextual send with multiple recipients requires the recipient_id query parameter.\n",
   properties: {
     html: {
       type: "string",
@@ -12579,7 +12599,7 @@ export const TemplateVariableSchema = {
       readOnly: true,
       default: false,
       description:
-        "Whether this slot's value is redacted from stored message content. A placeholder replaces the sensitive value in message history; transport queues can still carry the text needed for delivery.\n",
+        "Whether this slot requires redacted message history. Published email template sends that store recipient snapshots reject sensitive inputs before acceptance. Other channels retain their own sensitive-input delivery and retention rules.\n",
     },
     system: {
       type: "boolean",
@@ -39087,7 +39107,7 @@ export const EmailTemplateCreateSchema = {
         },
       ],
       description:
-        "The authoring format the template is written in, fixed at creation.\n`html` is finished markup you provide, optionally personalized with\nLiquid. Liquid supports variables, filters, and control flow such\nas `{% if %}` conditionals and `{% for %}` loops. A few constructs are\nrejected when you submit, and the error names exactly what to change:\n\n- Partial includes (`{% include %}`, `{% render %}`).\n- The `increment`, `decrement`, and `ifchanged` tags.\n- The `money`, `format_date`, `format_time`, `json`, `inspect`, and `type` filters.\n- Comparing against `empty`/`blank` (use `.size == 0` instead).\n- Blocks nested far deeper than real email markup needs.\n\nA broadcast's template additionally cannot use a `{% for %}` loop,\nbecause a broadcast supplies one value per contact property, so there\nis nothing to iterate. Send with the messages API instead if the\ntemplate needs one.\n",
+        "The authoring format the template is written in, fixed at creation.\n`html` is finished markup you provide, optionally personalized with\nLiquid. Liquid supports variables, filters, and control flow such\nas `{% if %}` conditionals and `{% for %}` loops. A few constructs are\nrejected when you submit, and the error names exactly what to change:\n\n- Partial includes (`{% include %}`, `{% render %}`).\n- The `increment`, `decrement`, and `ifchanged` tags.\n- The `money`, `format_date`, `format_time`, `json`, `inspect`, and `type` filters.\n- Comparing against `empty`/`blank` (use `.size == 0` instead).\n- Blocks nested far deeper than real email markup needs.\n\nBroadcast template parameters accept scalar values; arrays and objects are unsupported.\nBroadcasts support `{% for %}` over a local collection created with `split`.\nBroadcasts without caller-supplied parameters also support literal ranges and\n`{% tablerow %}`. When a broadcast uses caller parameters, ranges and\n`{% tablerow %}` are unsupported.\n",
     },
     languages: {
       type: "object",
@@ -39099,7 +39119,7 @@ export const EmailTemplateCreateSchema = {
         $ref: "#/components/schemas/EmailTemplateLanguageContent",
       },
       description:
-        "The initial draft's content, keyed by language tag in BCP-47 form such as\n`en` or `pt-BR`. A template holds up to 25 languages, and a send picks one\nof them.\n\nOmit this to create an empty draft and add content later.\n\nThe example's `{{ first_name }}` is a parameter, filled from\n`template.parameters` at send time. A `{{ bird.contact.<attribute> }}`\nplaceholder reads a contact record instead. A send to an email address\nhas no contact record, so it refuses such a template. A broadcast fills\nit from each recipient's contact, and a preview from the `contact` or\n`parameters` you supply.\n",
+        "The initial draft's content, keyed by language tag in BCP-47 form such as\n`en` or `pt-BR`. A template holds up to 25 languages, and a send picks one\nof them.\n\nOmit this to create an empty draft and add content later.\n\nThe example's `{{ first_name }}` is a parameter, filled from\n`template.parameters` at send time. A `{{ bird.contact.<attribute> }}`\nplaceholder reads a contact attribute. Broadcasts resolve each audience\ncontact during preparation; previews use the selected contact or sample\nvalues. Missing attributes use their configured fallbacks, while explicit\nempty strings remain empty.\n\nPublic API sends, including batch and scheduled sends, look up each To\naddress in this workspace when the selected language reads contact\nattributes. A missing contact returns `422` (`E04099`), even if Liquid\nsupplies a default. Each To receives its own personalized email, with Cc\nand Bcc copied on each. Resolved values are saved at acceptance for\ndelivery and later content reads.\n",
       example: {
         en: {
           subject: "Welcome, {{ first_name }}",
@@ -57525,7 +57545,7 @@ export const EmailMessageWritableSchema = {
       type: "string",
       minLength: 1,
       description:
-        "The subject line as delivered. For a send that used a template, the stored subject is the template's, so this reports it with the send's `parameters` substituted in, which is what the recipient saw.\n",
+        "The resolved subject. For a template send with recipient snapshots, this is the subject accepted for the first To recipient in the original request. It remains available when body storage is disabled. Legacy messages use their message-wide subject and caller parameters. For sends with recipient snapshots, `subject_recipient_id` identifies the recipient represented by `subject` and is present for scheduled and canceled messages too.\n",
     },
     category: {
       $ref: "#/components/schemas/EmailMessageCategory",
@@ -57624,6 +57644,8 @@ export const EmailMessageBatchResponseWritableSchema = {
 
 export const EmailRecipientWritableSchema = {
   type: "object",
+  description:
+    "One email delivery. For a contact-personalized template send, `copy_of_recipient_id` links a Cc or Bcc delivery to the To recipient whose saved values it carries. Each Cc and Bcc address receives one copy per To recipient. Its visible To header uses that To mailbox unless a different visible mailbox was specified for this copy. The link is absent for To recipients and sends without personalized copies.",
   additionalProperties: false,
   required: ["parent_id", "role", "recipient"],
   properties: {

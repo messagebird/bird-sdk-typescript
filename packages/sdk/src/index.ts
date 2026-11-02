@@ -49,6 +49,11 @@ export type {
   EmailChannelDefaults,
 } from "./resources/email.js";
 export type {
+  EmailContentQuery,
+  EmailRecipientsQuery,
+  EmailMessageContent,
+} from "./resources/email.gen.js";
+export type {
   // response types
   EmailStatsSummary,
   EmailStatsQueryParams,

@@ -28,7 +28,9 @@ export class ContactPropertiesResource extends Resource {
    * Get a single contact property by ID: key, type, fallback value, and archived state.
    *
    * @example Fetch a contact property by id
-   * const prop = await bird.contactProperties.get("cp_01krdgeqcxet5s7t44vh8rt9mg");
+   * const prop = await bird.contactProperties.get(
+   *   "prp_01krdgeqcxet5s7t44vh8rt9mg",
+   * );
    * console.log(prop.key, prop.type);
    */
   get(propertyId: string, options?: RequestOptions): APIPromise<ContactProperty> {
@@ -40,8 +42,11 @@ export class ContactPropertiesResource extends Resource {
    * Define a custom contact property (key + value type) that becomes available in contact data and as a broadcast template variable. The key and type cannot change after creation; a workspace holds at most 200 properties, archived included.
    *
    * @example Define a custom property
-   * const prop = await bird.contactProperties.create({ key: "plan", type: "string" });
-   * console.log(prop.id); // "cp_…"
+   * const prop = await bird.contactProperties.create({
+   *   key: "plan",
+   *   type: "string",
+   * });
+   * console.log(prop.id); // "prp_…"
    */
   create(params: ContactPropertyCreateParams, options?: RequestOptions): APIPromise<ContactProperty> {
     return this.call<ContactProperty>("POST", options, ({ signal, headers }) =>
@@ -52,7 +57,9 @@ export class ContactPropertiesResource extends Resource {
    * Update a contact property's fallback value. Only the fallback value can change; the key and type are fixed at creation, so a different key or type needs a new property.
    *
    * @example Change a property's fallback value
-   * await bird.contactProperties.update("cp_01krdgeqcxet5s7t44vh8rt9mg", { fallback_value: "free" });
+   * await bird.contactProperties.update("prp_01krdgeqcxet5s7t44vh8rt9mg", {
+   *   fallback_value: "free",
+   * });
    */
   update(propertyId: string, params: ContactPropertyUpdateParams = {}, options?: RequestOptions): APIPromise<ContactProperty> {
     return this.call<ContactProperty>("PATCH", options, ({ signal, headers }) =>
@@ -63,7 +70,9 @@ export class ContactPropertiesResource extends Resource {
    * Archive a contact property to remove it, and restore it with `contact_properties.unarchive`. It disappears from pickers and cannot be used in new template versions. Published templates keep sending. Stored values remain available, and API writes and imports still accept values of the property's type. Returns a 409 conflict if the property is already archived. Also returns a 409 while a published automation, including a paused one, uses the property in a trigger or contact write, or while an active run writes it. Remove the property from those automations or archive them, and let active runs finish or cancel them before retrying. The key stays reserved and counts toward the 200-property limit.
    *
    * @example Remove a property with Archive and keep its values
-   * const prop = await bird.contactProperties.archive("cp_01krdgeqcxet5s7t44vh8rt9mg");
+   * const prop = await bird.contactProperties.archive(
+   *   "prp_01krdgeqcxet5s7t44vh8rt9mg",
+   * );
    * console.log(prop.key, prop.archived);
    */
   archive(propertyId: string, options?: RequestOptions): APIPromise<ContactProperty> {
@@ -75,7 +84,7 @@ export class ContactPropertiesResource extends Resource {
    * Restore an archived contact property with its stored values. It appears in property pickers again and can be used in new template versions. Unarchiving a property that is not archived returns a `409` conflict.
    *
    * @example Restore an archived property
-   * await bird.contactProperties.unarchive("cp_01krdgeqcxet5s7t44vh8rt9mg");
+   * await bird.contactProperties.unarchive("prp_01krdgeqcxet5s7t44vh8rt9mg");
    */
   unarchive(propertyId: string, options?: RequestOptions): APIPromise<ContactProperty> {
     return this.call<ContactProperty>("POST", options, ({ signal, headers }) =>
