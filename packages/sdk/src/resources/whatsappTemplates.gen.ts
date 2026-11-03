@@ -80,7 +80,7 @@ export class WhatsappTemplatesResourceBase extends Resource {
   }
 
   /**
-   * Deletes the template and every language it holds, here first and at WhatsApp afterwards. Sends by this slug stop working. Built-in templates cannot be deleted. To discard unsubmitted work while keeping the template, delete its draft with `whatsapp.templates.versions.delete` instead.
+   * Deletes the template and every language it holds, here first and at WhatsApp afterwards. Sends by this slug stop working. Built-in templates cannot be deleted. To discard unsubmitted work while keeping the template, delete its draft with `whatsapp.templates.versions.delete` instead. Fails with a conflict while another resource still uses the template; the error says what to clear first.
    *
    * @example Delete a template
    * await bird.whatsapp.templates.delete("order_update");

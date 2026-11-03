@@ -1461,6 +1461,7 @@ export type WhatsAppMetaHealthEntityTypeValue = (typeof WhatsAppMetaHealthEntity
  * these with a `default` branch rather than treating the set as closed.
  */
 export const WhatsAppNumberErrorCode = {
+  BillingClose: "billing_close",
   BusinessAccountLocked: "business_account_locked",
   BusinessVerificationRequired: "business_verification_required",
   CreditCurrencyMismatch: "credit_currency_mismatch",

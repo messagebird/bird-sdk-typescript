@@ -7654,7 +7654,7 @@ export const createWhatsAppTemplate = <ThrowOnError extends boolean = false>(
 /**
  * Delete a message template
  *
- * Deletes a template and every language it holds. Built-in templates cannot be deleted. A template your workspace authored is removed immediately, and its copy at WhatsApp is removed afterwards. WhatsApp refuses to delete a template while any of its languages is disabled, so the request fails until WhatsApp changes that language's status.
+ * Deletes a template and every language it holds. Built-in templates cannot be deleted. A template your workspace authored is removed immediately, and its copy at WhatsApp is removed afterwards. WhatsApp refuses to delete a template while any of its languages is disabled, so the request fails until WhatsApp changes that language's status. While other resources still use the template, the request fails with `409`; the error says what uses it and how to clear it.
  *
  */
 export const deleteWhatsAppTemplate = <ThrowOnError extends boolean = false>(

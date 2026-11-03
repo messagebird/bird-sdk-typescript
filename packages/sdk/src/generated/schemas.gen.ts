@@ -7578,7 +7578,7 @@ export const EmailTemplateSendSchema = {
       type: "object",
       additionalProperties: true,
       description:
-        "Values for caller parameters, keyed by name. A parameter name is a single word.\n\nCaller parameters have `system` set to false or absent in the template's\n`variables` list. Supply each required caller parameter used by the\nresolved send language; omitting one or supplying null returns `422`. A version's list\ncovers all its languages, and values unused by the resolved language are\nignored.\n\nThe `bird` namespace is reserved for values filled by Bird, so a send that\nsets it is rejected. `parameters` is capped at 16 KB once serialized.\n\nBird resolves the referenced\n`bird.contact` attributes from each original To recipient's matching contact\nin this workspace. Each To receives its own personalized email; Cc and Bcc receive\na copy of each To's email and do not need matching contacts. A missing To\ncontact rejects the send with `422` (`E04099`), including when Liquid uses\na default or condition. Empty name fields on an existing contact render\nempty unless Liquid supplies a default; configured contact-property\nfallbacks still apply. Values are saved at acceptance and reused for\ndelivery and content history. Individual, batch, and scheduled sends\nsupport this behavior.\n",
+        "Values for the template's caller parameters, keyed by single-word name. Caller parameters are those with `system` false or absent in the template's `variables`. Supply every required one the resolved language uses; omitting one or sending `null` returns `422`, and values the resolved language does not use are ignored. The `bird` namespace is reserved, so a send that sets it is rejected, and the object is capped at 16 KB serialized.\n\nReferenced `bird.contact` attributes come from each To recipient's contact in this workspace, so each To receives its own email, and Cc and Bcc receive a copy of each without needing a contact of their own. A To with no contact rejects the send with `422` (`E04099`), even when Liquid sets a default or condition. Empty name fields on an existing contact render empty unless Liquid supplies a default, and configured contact-property fallbacks still apply. Values are saved at acceptance and reused for delivery and content history, for individual, batch and scheduled sends alike.",
       example: {
         animal: "otter",
       },
@@ -7708,12 +7708,12 @@ export const EmailMessageSendRequestSchema = {
       },
       maxItems: 20,
       description:
-        "Structured `{name, value}` labels for **filtering and analytics**. Tags become first-class query dimensions:\n\n- Filter the list endpoint by tag name.\n- Slice analytics rollups by tag.\n- Surface in webhook payloads.\n\nCap: 20 tags per send. Use tags for low-cardinality dimensions (`category`, `experiment_variant`, `template_id`). For arbitrary structured context that you do not need as a filter dimension, use `metadata` instead.\n",
+        "Structured `{name, value}` labels, up to 20 per send. You can filter the list endpoint by tag name, slice analytics by tag, and read them in webhook payloads. Use them for low-cardinality dimensions such as `category`, `experiment_variant` or `template_id`, and `metadata` for context you do not filter by.",
     },
     metadata: {
       type: "object",
       description:
-        "Arbitrary JSON object returned on API reads and included in webhook payloads. You can query its paths in analytics, such as `metadata.order_id`, but it is not a dashboard filter. The serialized object is limited to 2 KB. Use metadata for per-send context such as order IDs, customer references, and structured event data. For low-cardinality filterable labels, use `tags` instead.\n",
+        "JSON object returned on reads and in webhook payloads, up to 2 KB serialized. Analytics can query its paths, such as `metadata.order_id`, but the dashboard cannot filter by it. Use it for per-send context such as order IDs and customer references, and `tags` for low-cardinality labels you filter by.",
       additionalProperties: true,
     },
     reference: {
@@ -7728,7 +7728,7 @@ export const EmailMessageSendRequestSchema = {
     parameters: {
       type: "object",
       description:
-        "Parameter values used to personalize inline content, shared across all recipients of this send. Tokens such as `{{ animal }}` are replaced with matching values; missing values render empty. Include this object, even as `{}`, to use Liquid, or omit it to leave tokens unchanged. Use single-word names other than `bird`. Cap: 16 KB serialized. For a stored template, use `template.parameters` instead. See [inline personalization](https://bird.com/docs/guides/email/sending-email#content) for validation and URL encoding examples.\n",
+        "Values for the Liquid tokens in inline content, shared by every recipient: `{{ animal }}` takes the `animal` value, and a missing value renders empty. Include the object, even as `{}`, to render Liquid, or omit it to leave tokens unchanged. Names are single words other than `bird`, and the object is capped at 16 KB serialized. A stored template takes `template.parameters` instead. [Inline personalization](https://bird.com/docs/guides/email/sending-email#content) covers validation and URL encoding.",
       additionalProperties: true,
     },
     template: {
@@ -7760,7 +7760,7 @@ export const EmailMessageSendRequestSchema = {
       $ref: "#/components/schemas/EmailMessageCategory",
       default: "marketing",
       description:
-        "Content classification, which controls suppression policy:\n\n- `marketing`: Blocks on all suppression reasons.\n- `transactional`: Allows delivery through complaint and unsubscribe suppressions, for receipts, password resets, and similar operational mail.\n\nWhen you send with `template` and omit this field, the message takes the template's own classification, so a template created as `transactional` sends as transactional. Set this field to classify a single send differently from its template. It always takes precedence. A send with no template and no category defaults to `marketing`.\n",
+        "Content classification, which sets the suppression policy:\n\n- `marketing`: blocked by every suppression reason. A send with no template and no category defaults to it.\n- `transactional`: delivered through complaint and unsubscribe suppressions, for receipts, password resets and similar operational mail.\n\nA `template` send that omits it takes the template's classification. Set it to classify one send differently from its template; it always takes precedence.",
     },
     attachments: {
       type: "array",
@@ -7769,13 +7769,13 @@ export const EmailMessageSendRequestSchema = {
       },
       maxItems: 20,
       description:
-        "Files to attach, up to 20 per message. A message can be at most 20 MB once it has been generated, and we refuse a send that would go over. That figure covers the HTML body, the text body and every attachment and inline image, all measured after base64 encoding, which adds roughly a third. So 15 MB of raw files already accounts for most of the budget, and the body competes for the same space. A batch send is held to the same 20 MB per message, and the whole request body is capped at 20 MB as well.\n",
+        "Files to attach, up to 20 per message. A generated message is capped at 20 MB, and a send over it is refused. The cap counts the HTML and text bodies and every attachment and inline image after base64 encoding, which adds about a third, so 15 MB of raw files uses most of it. Each batch item has the same cap, and the whole request body is capped at 20 MB too.",
     },
     scheduled_at: {
       type: "string",
       format: "date-time",
       description:
-        "Schedule the message to send at a future time instead of immediately. Must be at least 30 seconds and at most 30 days ahead. Outside that range the request is rejected with `422`. The message returns with status `accepted` and shows as `scheduled` on reads until it sends. Cancel it before then with the message cancel endpoint. Scheduled sends count against your plan's monthly scheduled-email allowance. Exceeding it is rejected with a `422`. For a stored template, the published version, language and parameter values are pinned when we accept the request, so a later publication does not change what sends. If the template is deleted before the message is due, the message is rejected with `generation_failure`. We also check sender eligibility and send-volume allowance when the message is due. Batch items take this field too, so one batch can mix scheduled and immediate messages.\n",
+        "Send at this future time instead of immediately, at least 30 seconds and at most 30 days ahead; outside that range returns `422`. The message returns `accepted` and reads as `scheduled` until it sends, and the message cancel endpoint cancels it before then. Scheduled sends count against your plan's monthly scheduled-email allowance, and a send over it returns `422`. A stored template's published version, language and parameter values are pinned at acceptance, so a later publication does not change what sends; deleting the template before the message is due rejects it with `generation_failure`. Sender eligibility and send-volume allowance are checked again when it is due. Batch items take this field too, so one batch can mix scheduled and immediate messages.",
     },
   },
   example: {
@@ -11607,20 +11607,20 @@ export const SMSSendOptionsSchema = {
       type: "boolean",
       default: false,
       description:
-        "Replace characters outside the GSM-7 alphabet with their closest GSM-7 equivalent before sending: typically curly quotes, dashes, ellipses, fullwidth forms, and non-breaking spaces.\n\nOne such character forces the whole body into `UCS2`, which more than halves the characters that fit in a segment, so replacing them often lowers the segment count and the cost.\n\nDisabled by default, because it alters the body you composed. The replacement is all-or-nothing: a body that still holds a character outside the alphabet afterwards, such as an emoji or a non-Latin script, is sent exactly as you supplied it. Read the message back to see what was applied: `text` is the body as sent.\n",
+        "Replace characters outside the GSM-7 alphabet, typically curly quotes, dashes, ellipses, fullwidth forms and non-breaking spaces, with their closest GSM-7 equivalent before sending. One such character forces the whole body into `UCS2`, which more than halves the characters per segment, so replacing them often lowers the segment count and the cost. Off by default, because it alters the body you composed. The replacement is all-or-nothing: a body that still holds a character outside the alphabet, such as an emoji or a non-Latin script, is sent exactly as supplied. The message's `text` on a read is the body as sent.",
     },
     ignore_suppression: {
       type: "boolean",
       default: false,
       description:
-        "Send this message even if the recipient is suppressed for the sender, including after replying STOP. Bird skips every suppression reason and records the flag on the message; communication preferences the recipient revoked still apply. Only `authentication` and `transactional` messages can use it; setting it to `true` on a `marketing` or `service` message returns `422`. Bird must enable it for your workspace first; until then, a message that uses it is refused with `422`. Omit it to use the setting of the messaging profile in `messaging_profile_id`.\n",
+        "Send even if the recipient is suppressed for the sender, including after replying STOP: Bird skips every suppression reason and records the flag on the message, while communication preferences the recipient revoked still apply. Only `authentication` and `transactional` messages take it; `true` on a `marketing` or `service` message returns `422`, as does any use before Bird enables it for your workspace. Omit it to use the setting of the profile in `messaging_profile_id`.",
     },
     callback_url: {
       type: ["string", "null"],
       format: "uri",
       maxLength: 2048,
       description:
-        "An HTTPS URL that receives this message's events instead of your webhook endpoints. It must be a public address: a private, loopback or link-local host returns `422`. Bird fixes the URL when it accepts the message, so later profile changes do not reroute it. Each event is a signed POST, retried on failure, and signed with your workspace callback signing secret, which `rotateWebhookCallbackSigningSecret` creates and returns once. While a URL applies, this message's events skip your plain webhook endpoints, and a failed callback never falls back to them. MCP Events subscriptions and connector endpoints still receive them. The `callback_events` of the messaging profile in `messaging_profile_id` choose which events go to the URL. Omit the field to use the callback URL of that profile; send `null` to send this message's events to your webhook subscriptions.\n",
+        "An HTTPS URL that receives this message's events instead of your webhook endpoints; a private, loopback or link-local host returns `422`. The URL is fixed when Bird accepts the message, so later profile changes do not reroute it. Each event is a POST, retried on failure and signed with your workspace callback signing secret, which `rotateWebhookCallbackSigningSecret` creates and returns once. While the URL applies, the message's events skip your plain webhook endpoints, with no fallback when the callback fails; MCP Events subscriptions and connector endpoints still receive them. The `callback_events` of the profile in `messaging_profile_id` choose which events go to the URL. Omit it to use that profile's callback URL, or send `null` to send the events to your webhook subscriptions.",
       example: "https://receipts.example.com/bird/sms",
     },
     track_clicks: {
@@ -11775,14 +11775,14 @@ export const SMSMessageSendRequestSchema = {
       type: "string",
       minLength: 1,
       description:
-        "Sender to send from. It must be a sender the workspace holds: a number it owns in E.164, such as `+15557654321`, a short code it holds, such as `24680`, or an alphanumeric sender ID it has claimed, such as `MyBrand`. A sender the workspace does not hold returns a `422` `SMSSenderNotConfigured`, and an alphanumeric sender must also be permitted, and where required registered, for the destination country. Required on a free-text send and when sending a workspace template, unless `messaging_profile_id` is set and the profile selects a sender for the destination country or has a default sender. Omitting it otherwise returns `422`. A built-in template selects its sender automatically and rejects `from`.\n",
+        "Sender the workspace holds: a number it owns in E.164, such as `+15557654321`, a short code, such as `24680`, or an alphanumeric sender ID it has claimed, such as `MyBrand`. Any other sender returns `422` `SMSSenderNotConfigured`, and an alphanumeric sender must also be permitted, and where required registered, for the destination country. Required on a free-text send and a workspace-template send, unless the profile in `messaging_profile_id` selects a sender for the destination country or has a default sender; omitting it otherwise returns `422`. A built-in template selects its sender itself and rejects `from`.",
       example: "+15557654321",
     },
     text: {
       type: "string",
       minLength: 1,
       description:
-        "Free-text message body. Required unless `template` is supplied (the two are mutually exclusive). At least 1 character, up to a 12-segment cap (roughly 1836 GSM-7 or 804 UCS-2 characters). Bird does not truncate; a body exceeding 12 segments is rejected with a 422. The cap applies to segments because GSM-7 and UCS-2 encodings differ in characters per segment.\n",
+        "Free-text message body, required unless `template` is set; the two are mutually exclusive. From 1 character up to 12 segments, roughly 1836 GSM-7 or 804 UCS-2 characters, since the two encodings fit different numbers of characters in a segment. Bird does not truncate: a longer body returns `422`.",
       example: "Your verification code is 123456.",
     },
     binary: {
@@ -11808,7 +11808,7 @@ export const SMSMessageSendRequestSchema = {
       minimum: 60,
       maximum: 172800,
       description:
-        "How long, in seconds (60-172800), the message may wait for delivery, counted from acceptance. Bird does not submit the message to the carrier after this deadline and passes the remaining time to the carrier where the route supports it. A message that misses the deadline before reaching the carrier ends `rejected` or `failed`, not `expired`; `expired` comes only from a carrier report. Omit it to use the validity period of the messaging profile in `messaging_profile_id`, or the carrier's own validity rules when the profile sets none.\n",
+        "How long, in seconds (60-172800), the message may wait for delivery after acceptance. Bird does not submit it to the carrier after that deadline, and passes the remaining time to the carrier where the route supports it. A message that misses the deadline before reaching the carrier ends `rejected` or `failed`; `expired` comes only from a carrier report. Omit it to use the validity period of the profile in `messaging_profile_id`, or the carrier's own rules when the profile sets none.",
     },
     reference: {
       allOf: [
@@ -11834,7 +11834,7 @@ export const SMSMessageSendRequestSchema = {
       },
       maxItems: 20,
       description:
-        "Structured `{name, value}` labels for filtering and analytics. Tags become first-class query dimensions: filter the list endpoint by tag name, slice analytics by tag, and surface in webhook payloads. Maximum 20 tags per send. Use tags for low-cardinality dimensions (`category`, `experiment_variant`). For arbitrary structured context you do not need as a filter dimension, use `metadata` instead.\n",
+        "Structured `{name, value}` labels, up to 20 per send. You can filter the list endpoint by tag name, slice analytics by tag, and read them in webhook payloads. Use them for low-cardinality dimensions such as `category` or `experiment_variant`, and `metadata` for context you do not filter by.",
     },
     metadata: {
       type: "object",
@@ -11862,7 +11862,7 @@ export const SMSMessageSendRequestSchema = {
     messaging_profile_id: {
       type: "string",
       description:
-        "The messaging profile that supplies this message's sender and defaults. When `from` is omitted, Bird sends from the profile's sender for the destination country, or its default sender. An omitted `category` on a free-text send takes the profile's default category, and `smart_encoding`, `cost_center` and `validity_period` take the profile's settings. So do `options.callback_url` and `options.ignore_suppression`, which apply to the message. Values you set on the message take precedence. A built-in template sends from Bird's system sender and ignores the profile's senders. A profile that does not exist in this workspace returns `422` `SMSMessagingProfileNotFound`; a `from` bound to a different profile returns `422` `SMSMessagingProfileSenderBound`.\n",
+        "The messaging profile that supplies this message's sender and defaults. Without `from`, Bird sends from the profile's sender for the destination country, or its default sender. An omitted `category` on a free-text send, `smart_encoding`, `cost_center`, `validity_period`, `options.callback_url` and `options.ignore_suppression` take the profile's settings, and values set on the message take precedence. A built-in template sends from Bird's system sender and ignores the profile's senders. A profile that does not exist in this workspace returns `422` `SMSMessagingProfileNotFound`, and a `from` bound to a different profile returns `422` `SMSMessagingProfileSenderBound`.",
     },
     scheduled_at: {
       type: "string",
@@ -23044,7 +23044,7 @@ export const WhatsAppTemplateLanguageStatusSchema = {
     "submit_failed",
   ],
   description:
-    "Language review and health status:\n\n- `approved`: Passed review and can be sent.\n- `pending`: Under review, or submitted while Bird confirms the result with WhatsApp.\n- `rejected`: Failed review.\n- `paused` or `disabled`: Sending is suspended.\n- `in_appeal`: A decision is being appealed.\n- `pending_deletion`: Scheduled for deletion by Meta.\n- `limit_exceeded`: Sending is blocked by a limit.\n- `archived`: Reclaimed after 12 months without use; recoverable for 28 days.\n- `deleted`: Permanently deleted.\n- `submit_failed`: A submission or a deletion did not complete and will not be retried. `error.description` says why, and `error.meta_error_code` is set only where WhatsApp itself refused.\n\nThis is an open enum. Accept unrecognized values.\n",
+    "Language review and health status:\n\n- `approved`: Passed review and can be sent.\n- `pending`: Not yet approved or rejected.\n- `rejected`: Failed review.\n- `paused` or `disabled`: Sending is suspended.\n- `in_appeal`: A decision is being appealed.\n- `pending_deletion`: Scheduled for deletion by Meta.\n- `limit_exceeded`: Sending is blocked by a limit.\n- `archived`: Reclaimed after 12 months without use; recoverable for 28 days.\n- `deleted`: Permanently deleted.\n- `submit_failed`: A submission or a deletion did not complete and will not be retried. `error.description` says why, and `error.meta_error_code` is set only where WhatsApp itself refused.\n\nThis is an open enum. Accept unrecognized values.\n",
 } as const;
 
 export const WhatsAppTemplateRejectionCategorySchema = {
@@ -24661,6 +24661,15 @@ export const WhatsAppTemplateLanguageSchema = {
         "When Meta approved this exact content. It is a permanent mark on the content rather than a status, so a later pause or archival does not clear it. Null for a built-in template's language, whose approval predates Bird holding a date for it.\n",
       example: "2026-07-21T08:15:00Z",
     },
+    whatsapp_manager_url: {
+      type: ["string", "null"],
+      format: "uri",
+      readOnly: true,
+      description:
+        "Opens this language in Meta's WhatsApp Manager, for people with access to the business portfolio. Null until WhatsApp holds the language, which can take a minute after submitting, and null again once WhatsApp has deleted it. Always null for a built-in template's language.\n",
+      example:
+        "https://business.facebook.com/latest/whatsapp_manager/template_details/?asset_id=102290129340398&id=1143800821515747",
+    },
     updated_at: {
       type: ["string", "null"],
       format: "date-time",
@@ -25342,12 +25351,13 @@ export const WhatsAppNumberErrorCodeSchema = {
     "business_account_locked",
     "business_verification_required",
     "credit_currency_mismatch",
+    "billing_close",
     "permission_denied",
     "invalid_request",
     "internal_error",
   ],
   description:
-    "Standardized number-connection failure:\n\n- `registration_pin_rejected`: WhatsApp refused the two-step verification PIN.\n- `registration_pin_rate_limited`: Too many PIN attempts occurred recently.\n- `registration_attempts_exhausted`: The number has no registration attempts left. WhatsApp's own lockout clears after 72 hours; the number's attempt budget does not, so contact support if repair keeps ending here.\n- `number_verification_required`: WhatsApp requires the number to be verified again.\n- `number_not_registered`: WhatsApp does not hold the number as registered.\n- `number_already_linked`: Another WhatsApp integration uses the number.\n- `number_already_in_use`: WhatsApp cannot accept the number.\n- `verification_code_not_received`: The verification text did not arrive.\n- `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.\n- `business_account_locked`: WhatsApp locked the business account.\n- `business_verification_required`: WhatsApp refused to register the number because the business portfolio is not verified, usually because an unverified portfolio may hold only a few registered numbers. Verify the business or free a registered number on the portfolio, then repair the number.\n- `credit_currency_mismatch`: WhatsApp bills the business account in a currency your organization is not billed in. In Meta Business Suite, remove the account's payment method and then set its currency to your organization's billing currency. If Meta doesn't allow the change, connect the number under a business account WhatsApp bills in that same currency or has set no currency on.\n- `permission_denied`: WhatsApp refused access to the account.\n- `invalid_request`: WhatsApp rejected the connection details.\n- `internal_error`: The service could not classify or resolve the failure.\n\nThis is an open enum. Accept unrecognized values.\n",
+    "Standardized number-connection failure:\n\n- `registration_pin_rejected`: WhatsApp refused the two-step verification PIN.\n- `registration_pin_rate_limited`: Too many PIN attempts occurred recently.\n- `registration_attempts_exhausted`: The number has no registration attempts left. WhatsApp's own lockout clears after 72 hours; the number's attempt budget does not, so contact support if repair keeps ending here.\n- `number_verification_required`: WhatsApp requires the number to be verified again.\n- `number_not_registered`: WhatsApp does not hold the number as registered.\n- `number_already_linked`: Another WhatsApp integration uses the number.\n- `number_already_in_use`: WhatsApp cannot accept the number.\n- `verification_code_not_received`: The verification text did not arrive.\n- `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.\n- `business_account_locked`: WhatsApp locked the business account.\n- `business_verification_required`: WhatsApp refused to register the number because the business portfolio is not verified, usually because an unverified portfolio may hold only a few registered numbers. Verify the business or free a registered number on the portfolio, then repair the number.\n- `credit_currency_mismatch`: WhatsApp bills the business account in a currency your organization is not billed in. In Meta Business Suite, remove the account's payment method and then set its currency to your organization's billing currency. If Meta doesn't allow the change, connect the number under a business account WhatsApp bills in that same currency or has set no currency on.\n- `billing_close`: WhatsApp refused to set up billing for the business account while its monthly billing close ran. The close usually ends within the first few days of the new month; nothing about the number or the account needs changing. Once those days have passed, repair the number.\n- `permission_denied`: WhatsApp refused access to the account.\n- `invalid_request`: WhatsApp rejected the connection details.\n- `internal_error`: The service could not classify or resolve the failure.\n\nThis is an open enum. Accept unrecognized values.\n",
   example: "registration_pin_rejected",
 } as const;
 
@@ -50331,7 +50341,7 @@ export const NumberOwnershipStatusSchema = {
     "unknown",
   ],
   description:
-    "Current ownership registration approval status. Operational activation is separate:\n`blocked_at` records the ownership block on number use, and `next` describes remaining work.\n\n- `needs_input` means ownership details or a submission correction are needed, including when Bird closed a submission but accepts corrected details.\n- `under_review` means your current answers are being reviewed. Until the submission is approved, you can still change any answer; a changed answer is reviewed again.\n- `approval_pending` means your paperwork is accepted but registration approval is still pending.\n- `approved` means ownership registration is approved. Number activation can still be pending while `blocked_at` is non-null.\n- `not_required` means no active ownership requirement applies, including after a requirement is withdrawn.\n- `rejected` means the submission was closed without accepting another one, or the verifier correction deadline passed. Corrections are no longer accepted for this submission. Contact support.\n- `unknown` means current approval status could not be determined. Read `blocked_at` for any recorded ownership block. Retry the read.\n",
+    "Current ownership registration approval status. Operational activation is separate:\n`blocked_at` records the ownership block on number use, and `next` describes remaining work.\n\n- `needs_input` means ownership details or a submission correction are needed, including when Bird closed a submission but accepts corrected details.\n- `under_review` means your current answers are being reviewed. Until the submission is approved, you can still change any answer; a changed answer is reviewed again.\n- `approval_pending` means your paperwork is accepted but registration approval is still pending.\n- `approved` means ownership registration is approved. Number activation can still be pending while `blocked_at` is non-null.\n- `not_required` means no active ownership requirement applies, including after a requirement is withdrawn.\n- `rejected` means the submission was closed without accepting another one, or the verifier correction deadline passed. Corrections are no longer accepted for this submission. Contact support.\n- `unknown` means current approval status could not be determined. Read `blocked_at` for any recorded ownership block; if `unavailable_at` is present, contact support, otherwise retry the read.\n",
 } as const;
 
 export const NumberOwnershipSchema = {
@@ -50365,6 +50375,18 @@ export const NumberOwnershipSchema = {
       format: "date-time",
       description:
         "When ownership requirements began blocking outbound SMS and inbound and outbound voice calls. Null when that block is clear. Accepted paperwork can still await activation with a block in place. A number bought before ownership requirements were introduced can have outstanding paperwork without a block.\n",
+    },
+    unavailable_at: {
+      type: "string",
+      format: "date-time",
+      description:
+        "When the number became unavailable. It cannot be activated; contact support. Absent while the number is available.",
+    },
+    registration_due_at: {
+      type: "string",
+      format: "date-time",
+      description:
+        "The deadline for completing the number's ownership details. A number with incomplete or inaccurate details can be removed sooner. Absent when no deadline is known or while `unavailable_at` is set.",
     },
     next: {
       type: "array",
@@ -66687,6 +66709,18 @@ export const NumberOwnershipWritableSchema = {
       format: "date-time",
       description:
         "When ownership requirements began blocking outbound SMS and inbound and outbound voice calls. Null when that block is clear. Accepted paperwork can still await activation with a block in place. A number bought before ownership requirements were introduced can have outstanding paperwork without a block.\n",
+    },
+    unavailable_at: {
+      type: "string",
+      format: "date-time",
+      description:
+        "When the number became unavailable. It cannot be activated; contact support. Absent while the number is available.",
+    },
+    registration_due_at: {
+      type: "string",
+      format: "date-time",
+      description:
+        "The deadline for completing the number's ownership details. A number with incomplete or inaccurate details can be removed sooner. Absent when no deadline is known or while `unavailable_at` is set.",
     },
     next: {
       type: "array",
