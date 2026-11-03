@@ -584,6 +584,7 @@ export {
   WhatsAppNumberQualityRating,
   WhatsAppNumberStatus,
   WhatsAppNumberThroughputLevel,
+  WhatsAppStatsMessageCategory,
   WhatsAppTemplateBidStrategy,
   WhatsAppTemplateCategory,
   WhatsAppTemplateLanguageStatus,
@@ -688,6 +689,7 @@ export type {
   WhatsAppNumberQualityRatingValue,
   WhatsAppNumberStatusValue,
   WhatsAppNumberThroughputLevelValue,
+  WhatsAppStatsMessageCategoryValue,
   WhatsAppTemplateBidStrategyValue,
   WhatsAppTemplateCategoryValue,
   WhatsAppTemplateLanguageStatusValue,
@@ -1054,3 +1056,17 @@ export type {
   OrganizationWorkspacesUpdateParams,
 } from "./resources/organizationWorkspaces.gen.js";
 export type { WorkspaceSortField } from "./generated/types.gen.js";
+
+export type {
+  AssetUploadSessionInstruction,
+  AssetUploadSessionPrepared,
+  AssetUploadSessionDetails,
+  AssetsUploadsCreateParams,
+} from "./resources/assetsUploads.gen.js";
+
+export type {
+  AssetUploadFile,
+  AssetUploadInstruction,
+  AssetUploadReceipt,
+  AssetUploadSessionState,
+} from "./generated/types.gen.js";

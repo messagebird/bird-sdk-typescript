@@ -60,3 +60,39 @@ export async function assets_folders_update() {
 export async function assets_folders_delete() {
   await bird.assets.folders.delete("asf_01krdgeqcxet5s7t44vh8rt9mg");
 }
+
+export async function assets_uploads_create() {
+  const { readFile } = await import("node:fs/promises");
+  const { createHash, randomUUID } = await import("node:crypto");
+  const data = await readFile("invoice.pdf");
+  const upload = await bird.assets.uploads.create({
+    client_reference: randomUUID(),
+    file: {
+      filename: "invoice.pdf",
+      content_type: "application/pdf",
+      size_bytes: data.length,
+      sha256: createHash("sha256").update(data).digest("hex"),
+    },
+  });
+  console.log(upload.id);
+}
+
+export async function assets_uploads_get() {
+  const upload = await bird.assets.uploads.get("aus_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(upload.state);
+}
+
+export async function assets_uploads_prepare() {
+  const upload = await bird.assets.uploads.prepare("aus_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(upload.state);
+}
+
+export async function assets_uploads_complete() {
+  const upload = await bird.assets.uploads.complete("aus_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(upload.state);
+}
+
+export async function assets_uploads_cancel() {
+  const upload = await bird.assets.uploads.cancel("aus_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(upload.state);
+}

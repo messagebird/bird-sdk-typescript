@@ -406,7 +406,7 @@ export const QuotaErrorContextSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "The quota limit that refused a resource change. A change in a workspace is checked against its organization's limit and its workspace's limit, whether set manually or derived from the organization's automatic allocation; the organization limit is reported when both refuse. When scope is workspace, follow the response remediation instead of the error code's organization-wide recovery guidance. An organization administrator can adjust the workspace limit or the automatic allocation; the shared organization limit still applies.\n",
+    "The quota limit that refused a resource change. A change in a workspace is checked against its organization's limit and its workspace's limit, whether set manually or derived from the organization's automatic allocation; the organization limit is reported when both refuse. When scope is workspace, follow the response remediation instead of the error code's organization-wide recovery guidance. An organization administrator can adjust the workspace limit or the automatic allocation; the shared organization limit still applies. Bird sets the mTLS limits, so for those, contact your Bird representative.\n",
   required: ["quota_key", "scope"],
   properties: {
     quota_key: {
@@ -4301,12 +4301,12 @@ export const SMSInboundStatsByOperatorResponseSchema = {
   },
 } as const;
 
-export const WhatsAppTemplateCategorySchema = {
+export const WhatsAppStatsMessageCategorySchema = {
   type: "string",
   minLength: 1,
-  "x-extensible-enum": ["authentication", "utility", "marketing"],
+  "x-extensible-enum": ["authentication", "utility", "marketing", "service"],
   description:
-    "Meta's content classification for a template.\n\n- `authentication`: delivers one-time passcodes.\n- `utility`: delivers transaction-triggered updates (receipts, order status).\n- `marketing`: carries promotional content.\n\nThe category determines the sender number and price. This is an open enum.\nAccept unrecognized values.\n",
+    "The category a message was sent under: its template's category when it was sent, or `service` for a free-form message. Meta can bill a message under a different pricing category.\n\n- `authentication`: a template that delivers one-time passcodes.\n- `utility`: a template that delivers transaction-triggered updates, such as receipts or order status.\n- `marketing`: a template that carries promotional content.\n- `service`: a free-form message, sent without a template inside the customer service window.\n",
 } as const;
 
 export const WhatsAppStatsSummaryPeriodSchema = {
@@ -4841,15 +4841,16 @@ export const WhatsAppTemplateCategoryStatsPointSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Lifecycle counts, derived rates, and engagement for a single WhatsApp template category over the requested period.",
+    "Lifecycle counts, derived rates, and engagement for a single WhatsApp message category over the requested period. A template send counts under its template's category; a free-form send counts under `service`.",
   required: ["category", "delivery", "engagement", "latency"],
   properties: {
     category: {
       readOnly: true,
-      description: "The template category this row aggregates.",
+      description:
+        "The category this row aggregates. `service` aggregates free-form messages.",
       allOf: [
         {
-          $ref: "#/components/schemas/WhatsAppTemplateCategory",
+          $ref: "#/components/schemas/WhatsAppStatsMessageCategory",
         },
       ],
     },
@@ -4884,7 +4885,7 @@ export const WhatsAppStatsByTemplateCategoryResponseSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-template-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-message-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
   required: ["period", "data", "total"],
   properties: {
     period: {
@@ -14667,45 +14668,47 @@ export const AttachmentUploadSchema = {
   },
 } as const;
 
-export const AssetSortFieldSchema = {
-  type: "string",
-  description: "Field used to order media-library records.",
-  enum: ["created_at"],
-  default: "created_at",
-} as const;
-
-export const AssetKindFilterSchema = {
-  type: "string",
-  minLength: 1,
+export const AssetUploadFileSchema = {
+  type: "object",
+  additionalProperties: false,
   description:
-    "The media category to select when listing assets.\n\n- `image`: covers PNG, JPEG, and GIF.\n- `video`: covers MP4, WebM, and QuickTime.\n- `audio`: covers MP3, M4A, Ogg, and WAV.\n- `document`: covers PDF.\n",
-  enum: ["image", "video", "audio", "document"],
-  example: "image",
-} as const;
-
-export const AssetContentTypeFilterSchema = {
-  type: "string",
-  description: "Stored media type to match.",
-  enum: [
-    "image/png",
-    "image/jpeg",
-    "image/gif",
-    "video/mp4",
-    "video/webm",
-    "video/quicktime",
-    "audio/mpeg",
-    "audio/mp4",
-    "audio/ogg",
-    "audio/wav",
-    "application/pdf",
-  ],
-} as const;
-
-export const AssetDeletedFilterSchema = {
-  type: "string",
-  description: "Whether to include assets removed from the library.",
-  enum: ["exclude", "include", "only"],
-  default: "exclude",
+    "Exact properties of the original file. Calculate size and SHA-256 from its bytes before creating a session. Images allow up to 5,242,880 bytes; other supported media allow up to 25,000,000 bytes.",
+  required: ["filename", "content_type", "size_bytes", "sha256"],
+  properties: {
+    filename: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      example: "invoice.pdf",
+      description: "Original filename, including its extension.",
+    },
+    content_type: {
+      type: "string",
+      minLength: 1,
+      example: "application/pdf",
+      description:
+        "Media type of the original file. Supported values are `image/png`, `image/jpeg`, `image/gif`, `video/mp4`, `video/webm`, `video/quicktime`, `audio/mpeg`, `audio/mp4`, `audio/ogg`, `audio/wav`, and `application/pdf`.\n\nSupply the exact value without parameters. Unsupported values return `E20001`. Completion checks this against the file's contents.\n",
+    },
+    size_bytes: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      maximum: 25000000,
+      example: 1024,
+      description: "Exact size of the original file in bytes.",
+    },
+    sha256: {
+      type: "string",
+      pattern: "^[0-9a-f]{64}$",
+      minLength: 64,
+      maxLength: 64,
+      "x-sensitive": true,
+      example:
+        "4e2090a479f7ce6b17ad31f991988f12571bcafbd4a441cc4063644fc1400ae0",
+      description:
+        "SHA-256 of the original bytes, encoded as lowercase hexadecimal.",
+    },
+  },
 } as const;
 
 export const AssetFolderIDSchema = {
@@ -14715,11 +14718,271 @@ export const AssetFolderIDSchema = {
   example: "asf_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const AssetUploadSessionCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Start one upload intent. Keep client_reference unchanged when retrying this request. Changing the file or metadata requires a new reference. Optional folder_id must identify an existing folder in this workspace.",
+  required: ["client_reference", "file"],
+  properties: {
+    client_reference: {
+      type: "string",
+      format: "uuid",
+      minLength: 36,
+      maxLength: 36,
+      example: "4ca4145c-782a-4d03-bc80-a27e3e431780",
+      description:
+        "Caller-generated UUID for this upload intent. Retries with identical input recover the same session while its receipt is retained.",
+    },
+    file: {
+      $ref: "#/components/schemas/AssetUploadFile",
+    },
+    name: {
+      type: "string",
+      maxLength: 255,
+      description:
+        "Display name. Omitted or blank names default to the sanitized filename.",
+    },
+    alt_text: {
+      type: "string",
+      maxLength: 1000,
+      description: "Default alternative text for the asset.",
+    },
+    folder_id: {
+      description:
+        "Destination folder in this workspace. Omit it to use the library root.",
+      $ref: "#/components/schemas/AssetFolderID",
+    },
+  },
+} as const;
+
+export const AssetUploadSessionIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^aus_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "aus_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AssetUploadSessionStateSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "Upload progress. Pending accepts a transfer; finalizing is checking and publishing it. Completed has a saved result. Rejected, cancelled and expired allow no new upload instruction or publication. An already issued upload URL can remain usable until its expiry.",
+  enum: [
+    "pending",
+    "finalizing",
+    "completed",
+    "rejected",
+    "cancelled",
+    "expired",
+  ],
+} as const;
+
 export const AssetIDSchema = {
   type: "string",
   minLength: 1,
   pattern: "^ast_[0-9a-hjkmnp-tv-z]{26}$",
   example: "ast_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AssetUploadReceiptSchema = {
+  readOnly: true,
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Saved publication result. Retrying completion returns this receipt even if the asset has since been removed or become unavailable.",
+  required: ["asset_id", "reused_existing", "completed_at"],
+  properties: {
+    asset_id: {
+      $ref: "#/components/schemas/AssetID",
+    },
+    reused_existing: {
+      type: "boolean",
+      description:
+        "Whether the upload reused an existing active asset with identical source bytes. Reused assets keep their original metadata and folder.",
+    },
+    completed_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When publication completed.",
+    },
+  },
+} as const;
+
+export const AssetUploadSessionErrorSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Stable error code from the most recent failed completion attempt. The operation's error response carries its message and recovery steps.",
+  required: ["code"],
+  properties: {
+    code: {
+      type: "string",
+      minLength: 1,
+      description: "Bird error code for the failed attempt.",
+    },
+  },
+} as const;
+
+export const AssetUploadSessionSchema = {
+  readOnly: true,
+  type: "object",
+  description:
+    "An upload session owned by the workspace and the OAuth connection or API key that created it. Its file and metadata are frozen. Sessions expire after one hour; receipts remain available for at least 24 hours after expiry while cleanup finishes.",
+  required: [
+    "id",
+    "state",
+    "expires_at",
+    "name",
+    "alt_text",
+    "folder_id",
+    "file",
+    "result",
+    "last_error",
+    "next",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/AssetUploadSessionID",
+    },
+    state: {
+      $ref: "#/components/schemas/AssetUploadSessionState",
+    },
+    expires_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description:
+        "Absolute session expiry. Completion must finish before this deadline; starting it or refreshing an upload instruction does not extend it.",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      description: "Frozen display name for a newly published asset.",
+    },
+    alt_text: {
+      type: ["string", "null"],
+      description: "Frozen alternative text, or null when omitted.",
+    },
+    folder_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AssetFolderID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description: "Frozen destination folder, or null for the library root.",
+    },
+    file: {
+      $ref: "#/components/schemas/AssetUploadFile",
+    },
+    result: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AssetUploadReceipt",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description: "Saved publication receipt, or null until completed.",
+    },
+    last_error: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AssetUploadSessionError",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Last completion error, or null when no failure is recorded.",
+    },
+    next: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+      description: "Available next steps for this session.",
+    },
+  },
+} as const;
+
+export const AssetUploadInstructionSchema = {
+  readOnly: true,
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Send the original file bytes to this URL with the exact headers and content length. Send no Bird credentials or cookies. Keep the URL private and call complete after the PUT succeeds.",
+  required: [
+    "method",
+    "url",
+    "required_headers",
+    "content_length",
+    "expires_at",
+  ],
+  properties: {
+    method: {
+      type: "string",
+      const: "PUT",
+      minLength: 3,
+      description: "HTTP method for transferring the file.",
+    },
+    url: {
+      type: "string",
+      format: "uri",
+      minLength: 1,
+      "x-sensitive": true,
+      description:
+        "Temporary HTTPS upload URL. It can be reused for the same fixed file until expiry.",
+    },
+    required_headers: {
+      type: "object",
+      additionalProperties: {
+        type: "string",
+      },
+      "x-sensitive": true,
+      description: "Headers the upload request must send exactly as provided.",
+    },
+    content_length: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description: "Required HTTP content length in bytes.",
+    },
+    expires_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description:
+        "Upload instruction expiry, bounded by the session and signing credentials.",
+    },
+  },
+} as const;
+
+export const AssetUploadSessionInstructionSchema = {
+  readOnly: true,
+  description:
+    "The session and an optional upload instruction. A create replay omits upload when the session is no longer pending or instruction issuance is cooling down. Read its state, result and next steps before proceeding.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/AssetUploadSession",
+    },
+    {
+      type: "object",
+      readOnly: true,
+      properties: {
+        upload: {
+          $ref: "#/components/schemas/AssetUploadInstruction",
+        },
+      },
+    },
+  ],
 } as const;
 
 export const AssetKindSchema = {
@@ -14856,6 +15119,110 @@ export const AssetSchema = {
     created_at: "2026-05-20T09:14:52Z",
     updated_at: "2026-05-20T09:14:52Z",
   },
+} as const;
+
+export const AssetUploadSessionDetailsSchema = {
+  readOnly: true,
+  description:
+    "The session and its available media-library asset. A removed or unavailable result never causes another publication.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/AssetUploadSession",
+    },
+    {
+      type: "object",
+      readOnly: true,
+      required: ["asset"],
+      properties: {
+        asset: {
+          oneOf: [
+            {
+              $ref: "#/components/schemas/Asset",
+            },
+            {
+              type: "null",
+            },
+          ],
+          description:
+            "Canonical asset when available, or null before completion or when unavailable.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const AssetUploadSessionPreparedSchema = {
+  readOnly: true,
+  description:
+    "A pending session with an upload instruction. A successful prepare returns the instruction; a session that cannot accept a transfer or a refresh during the cooldown returns an error.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/AssetUploadSession",
+    },
+    {
+      type: "object",
+      readOnly: true,
+      required: ["state", "upload"],
+      properties: {
+        state: {
+          type: "string",
+          minLength: 1,
+          const: "pending",
+          description: "The session is awaiting transfer and completion.",
+        },
+        upload: {
+          allOf: [
+            {
+              $ref: "#/components/schemas/AssetUploadInstruction",
+            },
+          ],
+        },
+      },
+    },
+  ],
+} as const;
+
+export const AssetSortFieldSchema = {
+  type: "string",
+  description: "Field used to order media-library records.",
+  enum: ["created_at"],
+  default: "created_at",
+} as const;
+
+export const AssetKindFilterSchema = {
+  type: "string",
+  minLength: 1,
+  description:
+    "The media category to select when listing assets.\n\n- `image`: covers PNG, JPEG, and GIF.\n- `video`: covers MP4, WebM, and QuickTime.\n- `audio`: covers MP3, M4A, Ogg, and WAV.\n- `document`: covers PDF.\n",
+  enum: ["image", "video", "audio", "document"],
+  example: "image",
+} as const;
+
+export const AssetContentTypeFilterSchema = {
+  type: "string",
+  description: "Stored media type to match.",
+  enum: [
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "video/mp4",
+    "video/webm",
+    "video/quicktime",
+    "audio/mpeg",
+    "audio/mp4",
+    "audio/ogg",
+    "audio/wav",
+    "application/pdf",
+  ],
+} as const;
+
+export const AssetDeletedFilterSchema = {
+  type: "string",
+  description: "Whether to include assets removed from the library.",
+  enum: ["exclude", "include", "only"],
+  default: "exclude",
 } as const;
 
 export const AssetListSchema = {
@@ -17669,6 +18036,14 @@ export const VerificationChannelEntrySchema = {
       $ref: "#/components/schemas/VerificationChannel",
     },
   },
+} as const;
+
+export const WhatsAppTemplateCategorySchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["authentication", "utility", "marketing"],
+  description:
+    "Meta's content classification for a template.\n\n- `authentication`: delivers one-time passcodes.\n- `utility`: delivers transaction-triggered updates (receipts, order status).\n- `marketing`: carries promotional content.\n\nThe category determines the sender number and price. This is an open enum.\nAccept unrecognized values.\n",
 } as const;
 
 export const VerificationSchema = {
@@ -50968,6 +51343,7 @@ export const VoiceTrunkMediaCreateSchema = {
           $ref: "#/components/schemas/VoiceTrunkMediaEncryption",
         },
       ],
+      default: "preferred",
       description:
         "Omit it for `preferred`, which encrypts whenever your equipment and gateways allow and otherwise carries calls as before.\n",
     },
@@ -57152,14 +57528,14 @@ export const WhatsAppTemplateCategoryStatsPointWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Lifecycle counts, derived rates, and engagement for a single WhatsApp template category over the requested period.",
+    "Lifecycle counts, derived rates, and engagement for a single WhatsApp message category over the requested period. A template send counts under its template's category; a free-form send counts under `service`.",
 } as const;
 
 export const WhatsAppStatsByTemplateCategoryResponseWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Per-template-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
+    "Per-message-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).",
 } as const;
 
 export const WhatsAppTagStatsPointWritableSchema = {
@@ -58806,6 +59182,130 @@ export const AttachmentListWritableSchema = {
   ],
 } as const;
 
+export const AssetUploadReceiptWritableSchema = {
+  readOnly: true,
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Saved publication result. Retrying completion returns this receipt even if the asset has since been removed or become unavailable.",
+  required: ["asset_id", "reused_existing", "completed_at"],
+  properties: {
+    asset_id: {
+      $ref: "#/components/schemas/AssetID",
+    },
+    reused_existing: {
+      type: "boolean",
+      description:
+        "Whether the upload reused an existing active asset with identical source bytes. Reused assets keep their original metadata and folder.",
+    },
+    completed_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When publication completed.",
+    },
+  },
+} as const;
+
+export const AssetUploadSessionWritableSchema = {
+  readOnly: true,
+  type: "object",
+  description:
+    "An upload session owned by the workspace and the OAuth connection or API key that created it. Its file and metadata are frozen. Sessions expire after one hour; receipts remain available for at least 24 hours after expiry while cleanup finishes.",
+  required: [
+    "id",
+    "state",
+    "expires_at",
+    "name",
+    "alt_text",
+    "folder_id",
+    "file",
+    "result",
+    "last_error",
+    "next",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/AssetUploadSessionID",
+    },
+    state: {
+      $ref: "#/components/schemas/AssetUploadSessionState",
+    },
+    expires_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description:
+        "Absolute session expiry. Completion must finish before this deadline; starting it or refreshing an upload instruction does not extend it.",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      description: "Frozen display name for a newly published asset.",
+    },
+    alt_text: {
+      type: ["string", "null"],
+      description: "Frozen alternative text, or null when omitted.",
+    },
+    folder_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AssetFolderID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description: "Frozen destination folder, or null for the library root.",
+    },
+    file: {
+      $ref: "#/components/schemas/AssetUploadFile",
+    },
+    result: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AssetUploadReceiptWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description: "Saved publication receipt, or null until completed.",
+    },
+    last_error: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AssetUploadSessionError",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Last completion error, or null when no failure is recorded.",
+    },
+    next: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+      description: "Available next steps for this session.",
+    },
+  },
+} as const;
+
+export const AssetUploadSessionInstructionWritableSchema = {
+  readOnly: true,
+  description:
+    "The session and an optional upload instruction. A create replay omits upload when the session is no longer pending or instruction issuance is cooling down. Read its state, result and next steps before proceeding.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/AssetUploadSessionWritable",
+    },
+  ],
+} as const;
+
 export const AssetWritableSchema = {
   description:
     "A file in the workspace's media library, hosted at a permanent public URL. Embed or link `url` in your content. Metadata changes and removing a library entry preserve the URL and bytes; an abuse or security takedown can make the file unavailable.",
@@ -58858,6 +59358,30 @@ export const AssetWritableSchema = {
     created_at: "2026-05-20T09:14:52Z",
     updated_at: "2026-05-20T09:14:52Z",
   },
+} as const;
+
+export const AssetUploadSessionDetailsWritableSchema = {
+  readOnly: true,
+  description:
+    "The session and its available media-library asset. A removed or unavailable result never causes another publication.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/AssetUploadSessionWritable",
+    },
+  ],
+} as const;
+
+export const AssetUploadSessionPreparedWritableSchema = {
+  readOnly: true,
+  description:
+    "A pending session with an upload instruction. A successful prepare returns the instruction; a session that cannot accept a transfer or a refresh during the cooldown returns an error.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      $ref: "#/components/schemas/AssetUploadSessionWritable",
+    },
+  ],
 } as const;
 
 export const AssetListWritableSchema = {

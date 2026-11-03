@@ -299,7 +299,7 @@ export type RateLimitErrorContext = {
 export type QuotaScope = "organization" | "workspace";
 
 /**
- * The quota limit that refused a resource change. A change in a workspace is checked against its organization's limit and its workspace's limit, whether set manually or derived from the organization's automatic allocation; the organization limit is reported when both refuse. When scope is workspace, follow the response remediation instead of the error code's organization-wide recovery guidance. An organization administrator can adjust the workspace limit or the automatic allocation; the shared organization limit still applies.
+ * The quota limit that refused a resource change. A change in a workspace is checked against its organization's limit and its workspace's limit, whether set manually or derived from the organization's automatic allocation; the organization limit is reported when both refuse. When scope is workspace, follow the response remediation instead of the error code's organization-wide recovery guidance. An organization administrator can adjust the workspace limit or the automatic allocation; the shared organization limit still applies. Bird sets the mTLS limits, so for those, contact your Bird representative.
  *
  */
 export type QuotaErrorContext = {
@@ -2375,18 +2375,16 @@ export type SmsInboundStatsByOperatorResponse = {
 };
 
 /**
- * Meta's content classification for a template.
+ * The category a message was sent under: its template's category when it was sent, or `service` for a free-form message. Meta can bill a message under a different pricing category.
  *
- * - `authentication`: delivers one-time passcodes.
- * - `utility`: delivers transaction-triggered updates (receipts, order status).
- * - `marketing`: carries promotional content.
- *
- * The category determines the sender number and price. This is an open enum.
- * Accept unrecognized values.
+ * - `authentication`: a template that delivers one-time passcodes.
+ * - `utility`: a template that delivers transaction-triggered updates, such as receipts or order status.
+ * - `marketing`: a template that carries promotional content.
+ * - `service`: a free-form message, sent without a template inside the customer service window.
  *
  */
-export type WhatsAppTemplateCategory =
-  "authentication" | "utility" | "marketing" | (string & {});
+export type WhatsAppStatsMessageCategory =
+  "authentication" | "utility" | "marketing" | "service" | (string & {});
 
 /**
  * The window the server actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants on the hour). The grain of `from` and `to` mirrors the grain of the request's bounds.
@@ -2627,20 +2625,20 @@ export type WhatsAppStatsPoint = {
 export type WhatsAppTemplateId = string;
 
 /**
- * Lifecycle counts, derived rates, and engagement for a single WhatsApp template category over the requested period.
+ * Lifecycle counts, derived rates, and engagement for a single WhatsApp message category over the requested period. A template send counts under its template's category; a free-form send counts under `service`.
  */
 export type WhatsAppTemplateCategoryStatsPoint = {
   /**
-   * The template category this row aggregates.
+   * The category this row aggregates. `service` aggregates free-form messages.
    */
-  readonly category: WhatsAppTemplateCategory;
+  readonly category: WhatsAppStatsMessageCategory;
   readonly delivery: WhatsAppDeliveryStats;
   readonly engagement: WhatsAppEngagementStats;
   readonly latency: WhatsAppLatencyStats;
 };
 
 /**
- * Per-template-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ * Per-message-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
  */
 export type WhatsAppStatsByTemplateCategoryResponse = {
   /**
@@ -8236,45 +8234,161 @@ export type AttachmentUpload = {
 };
 
 /**
- * Field used to order media-library records.
+ * Exact properties of the original file. Calculate size and SHA-256 from its bytes before creating a session. Images allow up to 5,242,880 bytes; other supported media allow up to 25,000,000 bytes.
  */
-export type AssetSortField = "created_at";
-
-/**
- * The media category to select when listing assets.
- *
- * - `image`: covers PNG, JPEG, and GIF.
- * - `video`: covers MP4, WebM, and QuickTime.
- * - `audio`: covers MP3, M4A, Ogg, and WAV.
- * - `document`: covers PDF.
- *
- */
-export type AssetKindFilter = "image" | "video" | "audio" | "document";
-
-/**
- * Stored media type to match.
- */
-export type AssetContentTypeFilter =
-  | "image/png"
-  | "image/jpeg"
-  | "image/gif"
-  | "video/mp4"
-  | "video/webm"
-  | "video/quicktime"
-  | "audio/mpeg"
-  | "audio/mp4"
-  | "audio/ogg"
-  | "audio/wav"
-  | "application/pdf";
-
-/**
- * Whether to include assets removed from the library.
- */
-export type AssetDeletedFilter = "exclude" | "include" | "only";
+export type AssetUploadFile = {
+  /**
+   * Original filename, including its extension.
+   */
+  filename: string;
+  /**
+   * Media type of the original file. Supported values are `image/png`, `image/jpeg`, `image/gif`, `video/mp4`, `video/webm`, `video/quicktime`, `audio/mpeg`, `audio/mp4`, `audio/ogg`, `audio/wav`, and `application/pdf`.
+   *
+   * Supply the exact value without parameters. Unsupported values return `E20001`. Completion checks this against the file's contents.
+   *
+   */
+  content_type: string;
+  /**
+   * Exact size of the original file in bytes.
+   */
+  size_bytes: number;
+  /**
+   * SHA-256 of the original bytes, encoded as lowercase hexadecimal.
+   */
+  sha256: string;
+};
 
 export type AssetFolderId = string;
 
+/**
+ * Start one upload intent. Keep client_reference unchanged when retrying this request. Changing the file or metadata requires a new reference. Optional folder_id must identify an existing folder in this workspace.
+ */
+export type AssetUploadSessionCreate = {
+  /**
+   * Caller-generated UUID for this upload intent. Retries with identical input recover the same session while its receipt is retained.
+   */
+  client_reference: string;
+  file: AssetUploadFile;
+  /**
+   * Display name. Omitted or blank names default to the sanitized filename.
+   */
+  name?: string;
+  /**
+   * Default alternative text for the asset.
+   */
+  alt_text?: string;
+  /**
+   * Destination folder in this workspace. Omit it to use the library root.
+   */
+  folder_id?: AssetFolderId;
+};
+
+export type AssetUploadSessionId = string;
+
+/**
+ * Upload progress. Pending accepts a transfer; finalizing is checking and publishing it. Completed has a saved result. Rejected, cancelled and expired allow no new upload instruction or publication. An already issued upload URL can remain usable until its expiry.
+ */
+export type AssetUploadSessionState =
+  "pending" | "finalizing" | "completed" | "rejected" | "cancelled" | "expired";
+
 export type AssetId = string;
+
+/**
+ * Saved publication result. Retrying completion returns this receipt even if the asset has since been removed or become unavailable.
+ */
+export type AssetUploadReceipt = {
+  asset_id: AssetId;
+  /**
+   * Whether the upload reused an existing active asset with identical source bytes. Reused assets keep their original metadata and folder.
+   */
+  reused_existing: boolean;
+  /**
+   * When publication completed.
+   */
+  completed_at: string;
+};
+
+/**
+ * Stable error code from the most recent failed completion attempt. The operation's error response carries its message and recovery steps.
+ */
+export type AssetUploadSessionError = {
+  /**
+   * Bird error code for the failed attempt.
+   */
+  code: string;
+};
+
+/**
+ * An upload session owned by the workspace and the OAuth connection or API key that created it. Its file and metadata are frozen. Sessions expire after one hour; receipts remain available for at least 24 hours after expiry while cleanup finishes.
+ */
+export type AssetUploadSession = {
+  id: AssetUploadSessionId;
+  state: AssetUploadSessionState;
+  /**
+   * Absolute session expiry. Completion must finish before this deadline; starting it or refreshing an upload instruction does not extend it.
+   */
+  expires_at: string;
+  /**
+   * Frozen display name for a newly published asset.
+   */
+  name: string;
+  /**
+   * Frozen alternative text, or null when omitted.
+   */
+  alt_text: string | null;
+  /**
+   * Frozen destination folder, or null for the library root.
+   */
+  folder_id: AssetFolderId | null;
+  file: AssetUploadFile;
+  /**
+   * Saved publication receipt, or null until completed.
+   */
+  result: AssetUploadReceipt | null;
+  /**
+   * Last completion error, or null when no failure is recorded.
+   */
+  last_error: AssetUploadSessionError | null;
+  /**
+   * Available next steps for this session.
+   */
+  next: Array<NextAction>;
+};
+
+/**
+ * Send the original file bytes to this URL with the exact headers and content length. Send no Bird credentials or cookies. Keep the URL private and call complete after the PUT succeeds.
+ */
+export type AssetUploadInstruction = {
+  /**
+   * HTTP method for transferring the file.
+   */
+  method: "PUT";
+  /**
+   * Temporary HTTPS upload URL. It can be reused for the same fixed file until expiry.
+   */
+  url: string;
+  /**
+   * Headers the upload request must send exactly as provided.
+   */
+  required_headers: {
+    [key: string]: string;
+  };
+  /**
+   * Required HTTP content length in bytes.
+   */
+  content_length: number;
+  /**
+   * Upload instruction expiry, bounded by the session and signing credentials.
+   */
+  expires_at: string;
+};
+
+/**
+ * The session and an optional upload instruction. A create replay omits upload when the session is no longer pending or instruction issuance is cooling down. Read its state, result and next steps before proceeding.
+ */
+export type AssetUploadSessionInstruction = AssetUploadSession & {
+  upload?: AssetUploadInstruction;
+};
 
 /**
  * The category a media-library asset's type falls into. Use it to group or filter a
@@ -8336,6 +8450,64 @@ export type Asset = Timestamps & {
    */
   readonly deleted_at: string | null;
 };
+
+/**
+ * The session and its available media-library asset. A removed or unavailable result never causes another publication.
+ */
+export type AssetUploadSessionDetails = AssetUploadSession & {
+  /**
+   * Canonical asset when available, or null before completion or when unavailable.
+   */
+  asset: Asset | null;
+};
+
+/**
+ * A pending session with an upload instruction. A successful prepare returns the instruction; a session that cannot accept a transfer or a refresh during the cooldown returns an error.
+ */
+export type AssetUploadSessionPrepared = AssetUploadSession & {
+  /**
+   * The session is awaiting transfer and completion.
+   */
+  state: "pending";
+  upload: AssetUploadInstruction;
+};
+
+/**
+ * Field used to order media-library records.
+ */
+export type AssetSortField = "created_at";
+
+/**
+ * The media category to select when listing assets.
+ *
+ * - `image`: covers PNG, JPEG, and GIF.
+ * - `video`: covers MP4, WebM, and QuickTime.
+ * - `audio`: covers MP3, M4A, Ogg, and WAV.
+ * - `document`: covers PDF.
+ *
+ */
+export type AssetKindFilter = "image" | "video" | "audio" | "document";
+
+/**
+ * Stored media type to match.
+ */
+export type AssetContentTypeFilter =
+  | "image/png"
+  | "image/jpeg"
+  | "image/gif"
+  | "video/mp4"
+  | "video/webm"
+  | "video/quicktime"
+  | "audio/mpeg"
+  | "audio/mp4"
+  | "audio/ogg"
+  | "audio/wav"
+  | "application/pdf";
+
+/**
+ * Whether to include assets removed from the library.
+ */
+export type AssetDeletedFilter = "exclude" | "include" | "only";
 
 export type AssetList = {
   data: Array<Asset>;
@@ -9931,6 +10103,20 @@ export type VerificationTo = {
 export type VerificationChannelEntry = {
   channel: VerificationChannel;
 };
+
+/**
+ * Meta's content classification for a template.
+ *
+ * - `authentication`: delivers one-time passcodes.
+ * - `utility`: delivers transaction-triggered updates (receipts, order status).
+ * - `marketing`: carries promotional content.
+ *
+ * The category determines the sender number and price. This is an open enum.
+ * Accept unrecognized values.
+ *
+ */
+export type WhatsAppTemplateCategory =
+  "authentication" | "utility" | "marketing" | (string & {});
 
 export type Verification = {
   readonly id: VerificationId;
@@ -31637,14 +31823,14 @@ export type WhatsAppStatsPointWritable = {
 };
 
 /**
- * Lifecycle counts, derived rates, and engagement for a single WhatsApp template category over the requested period.
+ * Lifecycle counts, derived rates, and engagement for a single WhatsApp message category over the requested period. A template send counts under its template's category; a free-form send counts under `service`.
  */
 export type WhatsAppTemplateCategoryStatsPointWritable = {
   [key: string]: never;
 };
 
 /**
- * Per-template-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
+ * Per-message-category breakdown for the requested period, ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200).
  */
 export type WhatsAppStatsByTemplateCategoryResponseWritable = {
   [key: string]: never;
@@ -32614,6 +32800,63 @@ export type AttachmentListWritable = {
 } & ListEnvelopeWithTotal;
 
 /**
+ * Saved publication result. Retrying completion returns this receipt even if the asset has since been removed or become unavailable.
+ */
+export type AssetUploadReceiptWritable = {
+  asset_id: AssetId;
+  /**
+   * Whether the upload reused an existing active asset with identical source bytes. Reused assets keep their original metadata and folder.
+   */
+  reused_existing: boolean;
+  /**
+   * When publication completed.
+   */
+  completed_at: string;
+};
+
+/**
+ * An upload session owned by the workspace and the OAuth connection or API key that created it. Its file and metadata are frozen. Sessions expire after one hour; receipts remain available for at least 24 hours after expiry while cleanup finishes.
+ */
+export type AssetUploadSessionWritable = {
+  id: AssetUploadSessionId;
+  state: AssetUploadSessionState;
+  /**
+   * Absolute session expiry. Completion must finish before this deadline; starting it or refreshing an upload instruction does not extend it.
+   */
+  expires_at: string;
+  /**
+   * Frozen display name for a newly published asset.
+   */
+  name: string;
+  /**
+   * Frozen alternative text, or null when omitted.
+   */
+  alt_text: string | null;
+  /**
+   * Frozen destination folder, or null for the library root.
+   */
+  folder_id: AssetFolderId | null;
+  file: AssetUploadFile;
+  /**
+   * Saved publication receipt, or null until completed.
+   */
+  result: AssetUploadReceiptWritable | null;
+  /**
+   * Last completion error, or null when no failure is recorded.
+   */
+  last_error: AssetUploadSessionError | null;
+  /**
+   * Available next steps for this session.
+   */
+  next: Array<NextAction>;
+};
+
+/**
+ * The session and an optional upload instruction. A create replay omits upload when the session is no longer pending or instruction issuance is cooling down. Read its state, result and next steps before proceeding.
+ */
+export type AssetUploadSessionInstructionWritable = AssetUploadSessionWritable;
+
+/**
  * A file in the workspace's media library, hosted at a permanent public URL. Embed or link `url` in your content. Metadata changes and removing a library entry preserve the URL and bytes; an abuse or security takedown can make the file unavailable.
  */
 export type AssetWritable = {
@@ -32630,6 +32873,16 @@ export type AssetWritable = {
    */
   folder_id: AssetFolderId | null;
 };
+
+/**
+ * The session and its available media-library asset. A removed or unavailable result never causes another publication.
+ */
+export type AssetUploadSessionDetailsWritable = AssetUploadSessionWritable;
+
+/**
+ * A pending session with an upload instruction. A successful prepare returns the instruction; a session that cannot accept a transfer or a refresh during the cooldown returns an error.
+ */
+export type AssetUploadSessionPreparedWritable = AssetUploadSessionWritable;
 
 export type AssetListWritable = {
   data: Array<AssetWritable>;
@@ -37194,6 +37447,11 @@ export type EmailBroadcastSearchFilter = string;
  *
  */
 export type BroadcastTestIdempotencyKey = string;
+
+/**
+ * ID of the media-library upload session.
+ */
+export type AssetUploadSessionId2 = AssetUploadSessionId;
 
 /**
  * Filter by workspace inbox status. Omit to include open and resolved conversations.
@@ -45519,6 +45777,501 @@ export type GetComplianceAttachmentResponses = {
 export type GetComplianceAttachmentResponse =
   GetComplianceAttachmentResponses[keyof GetComplianceAttachmentResponses];
 
+export type CreateAssetUploadSessionData = {
+  body: AssetUploadSessionCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/asset-upload-sessions";
+};
+
+export type CreateAssetUploadSessionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Request body or message size exceeds the allowed limit
+   */
+  413: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateAssetUploadSessionError =
+  CreateAssetUploadSessionErrors[keyof CreateAssetUploadSessionErrors];
+
+export type CreateAssetUploadSessionResponses = {
+  /**
+   * The upload session and its next steps.
+   */
+  200: AssetUploadSessionInstruction;
+};
+
+export type CreateAssetUploadSessionResponse =
+  CreateAssetUploadSessionResponses[keyof CreateAssetUploadSessionResponses];
+
+export type GetAssetUploadSessionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the media-library upload session.
+     */
+    upload_id: AssetUploadSessionId;
+  };
+  query?: never;
+  url: "/v1/asset-upload-sessions/{upload_id}";
+};
+
+export type GetAssetUploadSessionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAssetUploadSessionError =
+  GetAssetUploadSessionErrors[keyof GetAssetUploadSessionErrors];
+
+export type GetAssetUploadSessionResponses = {
+  /**
+   * The upload session and its next steps.
+   */
+  200: AssetUploadSessionDetails;
+};
+
+export type GetAssetUploadSessionResponse =
+  GetAssetUploadSessionResponses[keyof GetAssetUploadSessionResponses];
+
+export type CreateAssetUploadInstructionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the media-library upload session.
+     */
+    upload_id: AssetUploadSessionId;
+  };
+  query?: never;
+  url: "/v1/asset-upload-sessions/{upload_id}/prepare";
+};
+
+export type CreateAssetUploadInstructionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateAssetUploadInstructionError =
+  CreateAssetUploadInstructionErrors[keyof CreateAssetUploadInstructionErrors];
+
+export type CreateAssetUploadInstructionResponses = {
+  /**
+   * The pending session, its upload instruction, and its next steps.
+   */
+  200: AssetUploadSessionPrepared;
+};
+
+export type CreateAssetUploadInstructionResponse =
+  CreateAssetUploadInstructionResponses[keyof CreateAssetUploadInstructionResponses];
+
+export type PublishAssetUploadSessionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the media-library upload session.
+     */
+    upload_id: AssetUploadSessionId;
+  };
+  query?: never;
+  url: "/v1/asset-upload-sessions/{upload_id}/complete";
+};
+
+export type PublishAssetUploadSessionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * Request body or message size exceeds the allowed limit
+   */
+  413: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type PublishAssetUploadSessionError =
+  PublishAssetUploadSessionErrors[keyof PublishAssetUploadSessionErrors];
+
+export type PublishAssetUploadSessionResponses = {
+  /**
+   * The upload session and its next steps.
+   */
+  200: AssetUploadSessionDetails;
+};
+
+export type PublishAssetUploadSessionResponse =
+  PublishAssetUploadSessionResponses[keyof PublishAssetUploadSessionResponses];
+
+export type CancelAssetUploadSessionData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the media-library upload session.
+     */
+    upload_id: AssetUploadSessionId;
+  };
+  query?: never;
+  url: "/v1/asset-upload-sessions/{upload_id}/cancel";
+};
+
+export type CancelAssetUploadSessionErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CancelAssetUploadSessionError =
+  CancelAssetUploadSessionErrors[keyof CancelAssetUploadSessionErrors];
+
+export type CancelAssetUploadSessionResponses = {
+  /**
+   * The upload session and its next steps.
+   */
+  200: AssetUploadSessionDetails;
+};
+
+export type CancelAssetUploadSessionResponse =
+  CancelAssetUploadSessionResponses[keyof CancelAssetUploadSessionResponses];
+
 export type ListAssetsData = {
   body?: never;
   headers?: {
@@ -53553,10 +54306,10 @@ export type GetWhatsAppStatsSummaryData = {
      */
     template?: string;
     /**
-     * Restrict the statistics to a single template category. Mutually exclusive with the other dimension filters (`template`, `phone_number`, `tag`); only one may be set per request. Matches the `category` key on a row of the per-category breakdown.
+     * Restrict the statistics to a single message category; `service` selects free-form messages. Mutually exclusive with the other dimension filters (`template`, `phone_number`, `tag`); only one may be set per request. Matches the `category` key on a row of the per-category breakdown.
      *
      */
-    category?: WhatsAppTemplateCategory;
+    category?: WhatsAppStatsMessageCategory;
     /**
      * Restrict the statistics to a single business sender phone number, in E.164 form. Mutually exclusive with the other dimension filters (`template`, `category`, `tag`); only one may be set per request. Matches the `phone_number` key on a row of the per-phone-number breakdown.
      *
@@ -53659,10 +54412,10 @@ export type GetWhatsAppStatsDailyData = {
      */
     template?: string;
     /**
-     * Restrict the statistics to a single template category. Mutually exclusive with the other dimension filters (`template`, `phone_number`, `tag`); only one may be set per request. Matches the `category` key on a row of the per-category breakdown.
+     * Restrict the statistics to a single message category; `service` selects free-form messages. Mutually exclusive with the other dimension filters (`template`, `phone_number`, `tag`); only one may be set per request. Matches the `category` key on a row of the per-category breakdown.
      *
      */
-    category?: WhatsAppTemplateCategory;
+    category?: WhatsAppStatsMessageCategory;
     /**
      * Restrict the statistics to a single business sender phone number, in E.164 form. Mutually exclusive with the other dimension filters (`template`, `category`, `tag`); only one may be set per request. Matches the `phone_number` key on a row of the per-phone-number breakdown.
      *
@@ -53760,10 +54513,10 @@ export type GetWhatsAppStatsHourlyData = {
      */
     template?: string;
     /**
-     * Restrict the statistics to a single template category. Mutually exclusive with the other dimension filters (`template`, `phone_number`, `tag`); only one may be set per request. Matches the `category` key on a row of the per-category breakdown.
+     * Restrict the statistics to a single message category; `service` selects free-form messages. Mutually exclusive with the other dimension filters (`template`, `phone_number`, `tag`); only one may be set per request. Matches the `category` key on a row of the per-category breakdown.
      *
      */
-    category?: WhatsAppTemplateCategory;
+    category?: WhatsAppStatsMessageCategory;
     /**
      * Restrict the statistics to a single business sender phone number, in E.164 form. Mutually exclusive with the other dimension filters (`template`, `category`, `tag`); only one may be set per request. Matches the `phone_number` key on a row of the per-phone-number breakdown.
      *
@@ -54026,7 +54779,7 @@ export type GetWhatsAppStatsByTemplateCategoryData = {
      */
     timezone?: string;
     /**
-     * Maximum number of template-category rows to return, ranked by accepted volume descending.
+     * Maximum number of message-category rows to return, ranked by accepted volume descending.
      */
     limit?: number;
   };
@@ -54075,7 +54828,7 @@ export type GetWhatsAppStatsByTemplateCategoryError =
 
 export type GetWhatsAppStatsByTemplateCategoryResponses = {
   /**
-   * Per-template-category breakdown for the requested period.
+   * Per-message-category breakdown for the requested period.
    */
   200: WhatsAppStatsByTemplateCategoryResponse;
 };

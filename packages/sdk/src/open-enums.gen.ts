@@ -1549,6 +1549,21 @@ export const WhatsAppNumberThroughputLevel = {
 export type WhatsAppNumberThroughputLevelValue = (typeof WhatsAppNumberThroughputLevel)[keyof typeof WhatsAppNumberThroughputLevel];
 
 /**
+ * Values of WhatsAppStatsMessageCategory known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppStatsMessageCategory = {
+  Authentication: "authentication",
+  Marketing: "marketing",
+  Service: "service",
+  Utility: "utility",
+} as const;
+
+/** A known WhatsAppStatsMessageCategory value. */
+export type WhatsAppStatsMessageCategoryValue = (typeof WhatsAppStatsMessageCategory)[keyof typeof WhatsAppStatsMessageCategory];
+
+/**
  * Values of WhatsAppTemplateBidStrategy known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.

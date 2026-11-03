@@ -19,6 +19,9 @@ import type {
   AssignAudienceContactsData,
   AssignAudienceContactsErrors,
   AssignAudienceContactsResponses,
+  CancelAssetUploadSessionData,
+  CancelAssetUploadSessionErrors,
+  CancelAssetUploadSessionResponses,
   CancelEmailBroadcastData,
   CancelEmailBroadcastErrors,
   CancelEmailBroadcastResponses,
@@ -58,6 +61,12 @@ import type {
   CreateAssetFolderData,
   CreateAssetFolderErrors,
   CreateAssetFolderResponses,
+  CreateAssetUploadInstructionData,
+  CreateAssetUploadInstructionErrors,
+  CreateAssetUploadInstructionResponses,
+  CreateAssetUploadSessionData,
+  CreateAssetUploadSessionErrors,
+  CreateAssetUploadSessionResponses,
   CreateAudienceData,
   CreateAudienceErrors,
   CreateAudienceResponses,
@@ -448,6 +457,9 @@ import type {
   GetAssetFolderErrors,
   GetAssetFolderResponses,
   GetAssetResponses,
+  GetAssetUploadSessionData,
+  GetAssetUploadSessionErrors,
+  GetAssetUploadSessionResponses,
   GetAudienceData,
   GetAudienceErrors,
   GetAudienceMembershipData,
@@ -1167,6 +1179,9 @@ import type {
   PreviewEmailBroadcastData,
   PreviewEmailBroadcastErrors,
   PreviewEmailBroadcastResponses,
+  PublishAssetUploadSessionData,
+  PublishAssetUploadSessionErrors,
+  PublishAssetUploadSessionResponses,
   PublishRealtimeAppBatchData,
   PublishRealtimeAppBatchErrors,
   PublishRealtimeAppBatchResponses,
@@ -4591,6 +4606,127 @@ export const getComplianceAttachment = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/compliance/attachments/{attachment_id}",
+    ...options,
+  });
+
+/**
+ * Create a media-library upload session
+ *
+ * Creates or recovers a session. An upload instruction is omitted when the session is no longer pending or another instruction was issued within the last 30 seconds; follow the returned state and next steps. Repeating the same client reference with identical input recovers its original session. A changed request with that reference is refused. Upload instructions can be refreshed after 30 seconds. Creating a session does not publish the file. Completion publishes it at a permanent public URL.
+ *
+ * In each region, you can have up to 20 unexpired sessions per workspace, 100 per organization, and 500 MiB of reserved source bytes per organization. A new session reserves `file.size_bytes`; a request that would exceed a limit returns `429` with `E20021`. Replaying an existing session does not reserve capacity again.
+ *
+ * Sessions count toward the session limits until their one-hour expiry, including completed and cancelled sessions. Completing, cancelling, or expiring a session does not immediately release its reserved bytes: issued upload URLs must expire and cleanup must succeed. Retry new creates after capacity becomes available.
+ *
+ */
+export const createAssetUploadSession = <ThrowOnError extends boolean = false>(
+  options: Options<CreateAssetUploadSessionData, ThrowOnError>,
+): RequestResult<
+  CreateAssetUploadSessionResponses,
+  CreateAssetUploadSessionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateAssetUploadSessionResponses,
+    CreateAssetUploadSessionErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/v1/asset-upload-sessions",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Get a media-library upload session
+ *
+ * Returns the upload session and its saved publication receipt. Requires current asset write access and the connection that created the session. Status checks do not issue another upload capability.
+ */
+export const getAssetUploadSession = <ThrowOnError extends boolean = false>(
+  options: Options<GetAssetUploadSessionData, ThrowOnError>,
+): RequestResult<
+  GetAssetUploadSessionResponses,
+  GetAssetUploadSessionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAssetUploadSessionResponses,
+    GetAssetUploadSessionErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/v1/asset-upload-sessions/{upload_id}",
+    ...options,
+  });
+
+/**
+ * Refresh a media-library upload instruction
+ *
+ * Refreshes the temporary upload instruction for a pending session. File properties and the one-hour session deadline remain unchanged. No replacement file or metadata is accepted.
+ */
+export const createAssetUploadInstruction = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateAssetUploadInstructionData, ThrowOnError>,
+): RequestResult<
+  CreateAssetUploadInstructionResponses,
+  CreateAssetUploadInstructionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateAssetUploadInstructionResponses,
+    CreateAssetUploadInstructionErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/v1/asset-upload-sessions/{upload_id}/prepare",
+    ...options,
+  });
+
+/**
+ * Complete a media-library upload
+ *
+ * Verifies the uploaded file and publishes a media-library asset at a permanent public URL. Images use normal media-library processing; other supported files retain their bytes. Identical active files reuse the existing asset and metadata. Retries return the saved receipt and never recreate a removed result.
+ */
+export const publishAssetUploadSession = <ThrowOnError extends boolean = false>(
+  options: Options<PublishAssetUploadSessionData, ThrowOnError>,
+): RequestResult<
+  PublishAssetUploadSessionResponses,
+  PublishAssetUploadSessionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    PublishAssetUploadSessionResponses,
+    PublishAssetUploadSessionErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/v1/asset-upload-sessions/{upload_id}/complete",
+    ...options,
+  });
+
+/**
+ * Cancel a media-library upload
+ *
+ * Cancels an unfinished upload. The temporary file is reclaimed after issued upload instructions expire. A completed session remains completed and its published asset is unchanged.
+ */
+export const cancelAssetUploadSession = <ThrowOnError extends boolean = false>(
+  options: Options<CancelAssetUploadSessionData, ThrowOnError>,
+): RequestResult<
+  CancelAssetUploadSessionResponses,
+  CancelAssetUploadSessionErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CancelAssetUploadSessionResponses,
+    CancelAssetUploadSessionErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/v1/asset-upload-sessions/{upload_id}/cancel",
     ...options,
   });
 
@@ -8158,9 +8294,9 @@ export const getWhatsAppStatsByTemplate = <
   });
 
 /**
- * Get outbound WhatsApp statistics by template category
+ * Get outbound WhatsApp statistics by message category
  *
- * Returns lifecycle counts and delivery rates for WhatsApp messages grouped by template category for the requested period. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Rows use send-time attribution. A delivery confirmed during the period for a message accepted earlier counts against the earlier period. A recent period therefore under-reports `delivered` while delivery reports are still arriving, and its counts grow as reports arrive. The maximum window is 365 days; a longer range returns 422. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single template, category, phone number or tag, use the summary, daily or hourly statistics instead. Each row also carries the same three latency families as the summary: `processing`, `delivery` and `total`. `delivery` is measured from a best-effort handoff timestamp that a fast delivery callback can beat, so it can be absent for a row whose other two families are present.
+ * Returns lifecycle counts and delivery rates for WhatsApp messages grouped by message category for the requested period. A template send takes its template's category; a free-form send counts as `service`. Rows are ranked by accepted volume descending and capped at the requested `limit` (default 50, max 200). Rows use send-time attribution. A delivery confirmed during the period for a message accepted earlier counts against the earlier period. A recent period therefore under-reports `delivered` while delivery reports are still arriving, and its counts grow as reports arrive. The maximum window is 365 days; a longer range returns 422. A breakdown is already a single-dimension view and takes no dimension filter; to restrict statistics to a single template, category, phone number or tag, use the summary, daily or hourly statistics instead. Each row also carries the same three latency families as the summary: `processing`, `delivery` and `total`. `delivery` is measured from a best-effort handoff timestamp that a fast delivery callback can beat, so it can be absent for a row whose other two families are present.
  *
  */
 export const getWhatsAppStatsByTemplateCategory = <
