@@ -41585,6 +41585,7 @@ export const MailboxSchema = {
     "id",
     "address",
     "forwarding_address",
+    "name",
     "display_name",
     "default_reply_to",
     "receive_policy",
@@ -41623,12 +41624,19 @@ export const MailboxSchema = {
         "An address we generate on our receiving domain, either when the mailbox is created on a domain not set up for receiving with us or later, when you set up forwarding for the mailbox. Forward mail for `address` here from your current email provider, and it lands in this mailbox. Replies still go out from `address`. Immutable once set. It stops receiving while the mailbox is deleted, works again with the same value after a restore, and keeps working if you later enable or disable receiving on the domain. `null` until set up; always `null` on the shared domain, which receives directly.",
       example: "k7q2mzxw4h6p5ra3@eu1.inbound.bird.com",
     },
+    name: {
+      type: ["string", "null"],
+      maxLength: 255,
+      description:
+        "Sender name shown alongside the address in outgoing mail. `null` when unset.",
+      example: "Acme Concierge",
+    },
     display_name: {
       type: ["string", "null"],
       maxLength: 255,
       description:
-        "Display name used as the sender name on mail from this mailbox. `null` when unset.",
-      example: "Acme Concierge",
+        "Name shown to your team in the dashboard and tools. Defaults to `name` when no override is set. When `name` is unset, outgoing mail uses this value as the sender name.",
+      example: "Customer Support",
     },
     default_reply_to: {
       type: ["string", "null"],
@@ -41789,12 +41797,19 @@ export const MailboxCreateSchema = {
         "The domain the address lives under. Defaults to `inbox.ai`, our shared mailbox domain. Creating a mailbox claims the shared address for your organization on a first-come, first-served basis. The address remains reserved to your organization after the mailbox is deleted. You can instead use one of your own domains. On a domain enabled for receiving, mail arrives directly. On a domain this workspace has verified (its `status` is `verified`) that is not set up for receiving, the mailbox gets a `forwarding_address`: forward mail for the address there from your current email provider, with no MX change. If another workspace receives the domain's mail, creation fails with `E17009`.",
       example: "mail.acme.com",
     },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "Sender name shown alongside the address in outgoing mail. Must contain a non-whitespace character and cannot contain carriage returns or line feeds.",
+    },
     display_name: {
       type: "string",
       minLength: 1,
       maxLength: 255,
       description:
-        "Display name used as the sender name on mail from this mailbox.",
+        "Name shown to your team in the dashboard and tools. Defaults to `name` when omitted. When `name` is unset, outgoing mail uses this value as the sender name.",
       example: "Acme Concierge",
     },
     default_reply_to: {
@@ -41827,7 +41842,7 @@ export const MailboxCreateSchema = {
   },
   example: {
     local_part: "concierge",
-    display_name: "Acme Concierge",
+    name: "Acme Concierge",
     receive_policy: "open",
     retention_tier: "30d",
   },
@@ -41848,11 +41863,18 @@ export const MailboxUpdateSchema = {
   description:
     "Fields to update on a mailbox. Omitted fields are unchanged. Fields set to `null` are cleared. The address and domain are immutable.",
   properties: {
+    name: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 255,
+      description:
+        "Sender name shown alongside the address in outgoing mail. Must contain a non-whitespace character and cannot contain carriage returns or line feeds. `null` clears it.",
+    },
     display_name: {
       type: ["string", "null"],
       maxLength: 255,
       description:
-        "Display name used as the sender name on mail from this mailbox. `null` clears it.",
+        "Name shown to your team in the dashboard and tools. `null` clears the override and uses `name`. When `name` is unset, outgoing mail uses this value as the sender name.",
     },
     default_reply_to: {
       type: ["string", "null"],
@@ -41880,7 +41902,7 @@ export const MailboxUpdateSchema = {
     },
   },
   example: {
-    display_name: "Acme Concierge",
+    name: "Acme Concierge",
     retention_tier: "30d",
   },
 } as const;
@@ -42394,6 +42416,20 @@ export const InboundRouteUpdateSchema = {
   },
 } as const;
 
+export const EmailThreadFolderSchema = {
+  type: "string",
+  enum: ["inbox", "archive", "spam", "blocked", "sent", "trash"],
+  description:
+    "Primary conversation folder. The supported folders are inbox, archive, spam, blocked, sent, and trash. Blocked and sent are assigned automatically. The sent filter also includes sent conversations that received replies and still sit in the inbox; moving them with PATCH removes them from the sent filter.",
+} as const;
+
+export const EmailThreadReadStateSchema = {
+  type: "string",
+  enum: ["read", "unread"],
+  description:
+    "Whether retained received messages in the thread have been read. Includes retained trash, spam and blocked messages.",
+} as const;
+
 export const ThreadIDSchema = {
   type: "string",
   minLength: 1,
@@ -42431,6 +42467,7 @@ export const EmailThreadHighlightsSchema = {
 
 export const EmailThreadSchema = {
   type: "object",
+  readOnly: true,
   additionalProperties: false,
   description:
     "A conversation in a mailbox. It groups every message in both directions, the mail the mailbox received and the replies it sent, and it holds the conversation's read state, labels, and participant list. A message is retained until it is trashed or ages past the mailbox's retention tier. Only retained messages count toward the totals below.\n",
@@ -42446,23 +42483,22 @@ export const EmailThreadSchema = {
     "last_message_at",
     "last_direction",
     "labels",
+    "folder",
+    "read",
     "created_at",
     "updated_at",
   ],
   properties: {
     id: {
-      readOnly: true,
       $ref: "#/components/schemas/ThreadID",
       description: "Thread ID.",
     },
     mailbox_id: {
-      readOnly: true,
       $ref: "#/components/schemas/MailboxID",
       description: "Mailbox this conversation belongs to.",
     },
     channel: {
       type: "string",
-      readOnly: true,
       minLength: 1,
       description: "Channel this conversation lives on. Always `email`.",
       example: "email",
@@ -42481,14 +42517,12 @@ export const EmailThreadSchema = {
     },
     subject: {
       type: ["string", "null"],
-      readOnly: true,
       description:
         "Subject of the conversation, taken from its first message. Null when that message had no subject.",
       example: "Re: Your order",
     },
     participants: {
       type: "array",
-      readOnly: true,
       items: {
         type: "string",
         format: "email",
@@ -42498,14 +42532,12 @@ export const EmailThreadSchema = {
     },
     message_count: {
       type: "integer",
-      readOnly: true,
       minimum: 0,
       description:
         "Number of retained messages in this conversation, both directions.",
     },
     unread_count: {
       type: "integer",
-      readOnly: true,
       minimum: 0,
       description:
         "Number of retained received messages that are still unread. Spam and blocked mail is not counted.",
@@ -42514,7 +42546,6 @@ export const EmailThreadSchema = {
       type: "string",
       format: "date-time",
       minLength: 1,
-      readOnly: true,
       description:
         "When the most recent retained message in this conversation was received or sent.",
     },
@@ -42522,9 +42553,16 @@ export const EmailThreadSchema = {
       type: "string",
       enum: ["inbound", "outbound"],
       minLength: 1,
-      readOnly: true,
       description:
         "Direction of the most recent message: `inbound` for a received message, `outbound` for a sent one.",
+    },
+    folder: {
+      $ref: "#/components/schemas/EmailThreadFolder",
+    },
+    read: {
+      type: "boolean",
+      description:
+        "Whether every retained received message is read, including trash, spam and blocked messages. Outbound messages do not affect this state.",
     },
     labels: {
       type: "array",
@@ -42535,26 +42573,23 @@ export const EmailThreadSchema = {
       },
       maxItems: 20,
       description:
-        "Labels on this conversation. Exactly one system placement label is always present, set by the message that started the conversation:\n\n- `inbox`: The conversation is in the inbox.\n- `archive`: The conversation was filed away and is done for now.\n- `spam`: The conversation's opening message is filed in Spam.\n- `blocked`: The conversation's opening message was rejected by the mailbox's receive policy or rules.\n\nMove a conversation by updating its labels. Add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox`, or remove `spam`, `blocked`, or `archive`, to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list, and a conversation has at most 20 labels in total.\n",
-      example: ["inbox", "urgent"],
+        "Custom labels applied to this conversation. Folder and read state are separate fields.",
+      example: ["urgent"],
     },
     created_at: {
       type: "string",
       format: "date-time",
       minLength: 1,
-      readOnly: true,
       description: "When the thread was created.",
     },
     updated_at: {
       type: "string",
       format: "date-time",
       minLength: 1,
-      readOnly: true,
       description: "When the thread last changed.",
     },
     highlights: {
       $ref: "#/components/schemas/EmailThreadHighlights",
-      readOnly: true,
       description:
         "Matched search fragments, keyed by the field that matched. Returned only by thread search. Omitted when listing threads.\n",
     },
@@ -42562,14 +42597,12 @@ export const EmailThreadSchema = {
       type: "integer",
       format: "int64",
       minimum: 0,
-      readOnly: true,
       description:
         "Scheduled or dispatching sends targeting this conversation. Returned by conversation get and list, including zero when none remain. Omitted by search.",
     },
     next_scheduled_at: {
       type: "string",
       format: "date-time",
-      readOnly: true,
       description:
         "Earliest due time among scheduled or dispatching sends. Returned by conversation get and list only when scheduled_count is positive. Omitted by search and when no sends remain.",
     },
@@ -42596,11 +42629,19 @@ export const EmailThreadListSchema = {
   ],
 } as const;
 
-export const EmailLabelsUpdateSchema = {
+export const EmailThreadWritableFolderSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["inbox", "archive", "spam"],
+  description:
+    "Folder a caller can choose through PATCH. Use DELETE to move a thread to trash and [Restore a thread from trash](/docs/api/reference/restore-email-thread) (POST /v1/email/threads/{thread_id}/restore) to recover it.",
+} as const;
+
+export const EmailThreadLabelsUpdateSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. System labels express state changes. On a conversation, adding `spam` files it as spam. Adding `archive` files it away without deleting it. Adding `inbox`, or removing `spam`, `blocked`, or `archive`, returns it to the inbox. Removing `unread` marks all retained received messages as read in one call. On a message, adding or removing `unread` flips read state. Adding or removing `trash` moves it to or out of the trash. The API rejects changes that contradict this model. A request cannot add more than one placement label. It cannot add `blocked`, because blocking a sender is a receive-rule decision. Removing `inbox` requires adding a destination. A conversation cannot add `trash` or `unread`; removing `unread` is the mark-all-read shortcut, and `trash` uses the `DELETE` verb. A message cannot use placement labels; move its conversation instead. A sent message cannot use `unread`. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be used as custom labels, in any casing. A conversation or message has at most 20 labels, system labels included.\n",
+    "Custom labels to add or remove. System and reserved names are refused; use read and folder for thread state. The resulting custom-label set must contain at most 20 labels; larger sets return 422.",
   properties: {
     add: {
       type: "array",
@@ -42608,7 +42649,8 @@ export const EmailLabelsUpdateSchema = {
         type: "string",
         minLength: 1,
         maxLength: 64,
-        pattern: "^[^,\\s](?:[^,]*[^,\\s])?$",
+        pattern:
+          "^[^,\\s\\x00-\\x1F\\x7F-\\x9F](?:[^,\\x00-\\x1F\\x7F-\\x9F]*[^,\\s\\x00-\\x1F\\x7F-\\x9F])?$",
       },
       maxItems: 20,
       description: "Labels to apply.",
@@ -42620,7 +42662,8 @@ export const EmailLabelsUpdateSchema = {
         type: "string",
         minLength: 1,
         maxLength: 64,
-        pattern: "^[^,\\s](?:[^,]*[^,\\s])?$",
+        pattern:
+          "^[^,\\s\\x00-\\x1F\\x7F-\\x9F](?:[^,\\x00-\\x1F\\x7F-\\x9F]*[^,\\s\\x00-\\x1F\\x7F-\\x9F])?$",
       },
       maxItems: 20,
       description: "Labels to take off.",
@@ -42633,10 +42676,20 @@ export const EmailThreadUpdateRequestSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Changes to apply to a thread. Omitted fields are left unchanged.",
+    "Changes to apply to a thread. Omitted fields are left unchanged. Folder changes accept inbox, archive or spam and reject trashed threads with 422; first use [Restore a thread from trash](/docs/api/reference/restore-email-thread). Read and custom-label updates remain available in trash.",
   properties: {
+    read: {
+      type: "boolean",
+      description:
+        "Mark all retained received messages read or unread. Includes trash, spam and blocked messages; unread_count continues to exclude them.",
+    },
+    folder: {
+      $ref: "#/components/schemas/EmailThreadWritableFolder",
+      description:
+        "Move a non-trashed conversation to inbox, archive or spam. Use DELETE to trash it and POST restore to recover it. Blocked and sent folders are assigned automatically.",
+    },
     labels: {
-      $ref: "#/components/schemas/EmailLabelsUpdate",
+      $ref: "#/components/schemas/EmailThreadLabelsUpdate",
     },
     contact_id: {
       oneOf: [
@@ -42906,7 +42959,7 @@ export const EmailThreadMessageSchema = {
         $ref: "#/components/schemas/EmailThreadMessageRecipient",
       },
       description:
-        "Terminal per-recipient delivery outcomes of a sent message, filled in as each one becomes known and kept for the mailbox's full retention tier. Null for received messages and before any recipient reaches a terminal state. Per-recipient event detail lives on the sent-message log (`source`) for 30 days.\n",
+        "Terminal delivery outcomes for the visible To and Cc recipients of a sent message, filled in as each one becomes known and kept for the mailbox's full retention tier. Bcc recipients are omitted; aggregate status still includes every attempted recipient. Null for received messages and before any visible recipient reaches a terminal state. Per-recipient event detail lives on the sent-message log (`source`) for 30 days.\n",
     },
     authentication: {
       type: ["string", "null"],
@@ -43012,6 +43065,39 @@ export const EmailThreadMessageListSchema = {
   ],
 } as const;
 
+export const EmailLabelsUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. On a message, adding or removing `unread` flips read state. Adding or removing `trash` moves it to or out of the trash. Placement labels cannot be applied to a message; use `folder` on [Update a thread](/docs/api/reference/update-email-thread) (`PATCH /v1/email/threads/{thread_id}`) to move its conversation. A sent message cannot use unread. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be used as custom labels, in any casing. A conversation or message has at most 20 labels, system labels included.\n",
+  properties: {
+    add: {
+      type: "array",
+      items: {
+        type: "string",
+        minLength: 1,
+        maxLength: 64,
+        pattern: "^[^,\\s](?:[^,]*[^,\\s])?$",
+      },
+      maxItems: 20,
+      description: "Labels to apply.",
+      example: ["urgent"],
+    },
+    remove: {
+      type: "array",
+      items: {
+        type: "string",
+        minLength: 1,
+        maxLength: 64,
+        pattern: "^[^,\\s](?:[^,]*[^,\\s])?$",
+      },
+      maxItems: 20,
+      description: "Labels to take off.",
+      example: ["pending"],
+    },
+  },
+} as const;
+
 export const EmailThreadMessageUpdateRequestSchema = {
   type: "object",
   additionalProperties: false,
@@ -43071,11 +43157,19 @@ export const EmailThreadMessageAttachmentListSchema = {
   },
 } as const;
 
+export const EmailRecipientAddressSchema = {
+  type: "string",
+  format: "email",
+  minLength: 5,
+  description: "Email address without a display name.",
+  example: "jane@example.com",
+} as const;
+
 export const EmailThreadMessageReplyRequestSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A reply to a conversation message. Recipients are derived from the message being replied to: its Reply-To address when present, otherwise its From address. Set `reply_all` to also include the original To and Cc recipients (minus the mailbox's own address). The subject and threading headers are set automatically. At least one of `html` or `text` must be provided.\n",
+    "A reply to a conversation message. For a received message, recipients are derived from its Reply-To address when present, otherwise its From address. For a message the mailbox sent, recipients are derived from its original To line. Set `reply_all` to also include the original To and Cc recipients (minus the mailbox's own address). Add `cc` or `bcc` to copy further recipients. The subject and threading headers are set automatically. At least one of `html` or `text` must be provided.\n",
   not: {
     required: ["scheduled_at", "attachments"],
     properties: {
@@ -43103,6 +43197,24 @@ export const EmailThreadMessageReplyRequestSchema = {
       maxLength: 524288,
       description:
         "Plain-text body of the reply. At least one of html or text must be provided.",
+    },
+    cc: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailRecipientAddress",
+      },
+      maxItems: 50,
+      description:
+        "Additional Cc recipients, merged with recipients derived by `reply_all`. Addresses already on the derived To line are dropped (case-insensitive). The merged Cc set must contain at most 50 addresses; larger sets return 422.",
+    },
+    bcc: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailRecipientAddress",
+      },
+      maxItems: 50,
+      description:
+        "Blind-copy recipients. Addresses already on the derived To or merged Cc line are dropped (case-insensitive). Bcc addresses are omitted from conversation participants, visible recipient headers, and the 202 response. Bcc delivery outcomes are excluded from the message's `recipients` list.",
     },
     reply_all: {
       type: "boolean",
@@ -64068,6 +64180,7 @@ export const MailboxWritableSchema = {
   description:
     "A durable mailbox identity for an agent. A mailbox owns an email address, groups mail into threads, applies receive policy, and remembers message metadata, extracted text, and attachments for its retention tier. The body and raw MIME of each message remain available for 30 days.\n",
   required: [
+    "name",
     "display_name",
     "default_reply_to",
     "receive_policy",
@@ -64075,12 +64188,19 @@ export const MailboxWritableSchema = {
     "metadata",
   ],
   properties: {
+    name: {
+      type: ["string", "null"],
+      maxLength: 255,
+      description:
+        "Sender name shown alongside the address in outgoing mail. `null` when unset.",
+      example: "Acme Concierge",
+    },
     display_name: {
       type: ["string", "null"],
       maxLength: 255,
       description:
-        "Display name used as the sender name on mail from this mailbox. `null` when unset.",
-      example: "Acme Concierge",
+        "Name shown to your team in the dashboard and tools. Defaults to `name` when no override is set. When `name` is unset, outgoing mail uses this value as the sender name.",
+      example: "Customer Support",
     },
     default_reply_to: {
       type: ["string", "null"],
@@ -64263,11 +64383,42 @@ export const InboundRouteListWritableSchema = {
 
 export const EmailThreadWritableSchema = {
   type: "object",
+  readOnly: true,
   additionalProperties: false,
   description:
     "A conversation in a mailbox. It groups every message in both directions, the mail the mailbox received and the replies it sent, and it holds the conversation's read state, labels, and participant list. A message is retained until it is trashed or ages past the mailbox's retention tier. Only retained messages count toward the totals below.\n",
-  required: ["contact_id", "labels"],
+  required: [
+    "id",
+    "mailbox_id",
+    "channel",
+    "contact_id",
+    "subject",
+    "participants",
+    "message_count",
+    "unread_count",
+    "last_message_at",
+    "last_direction",
+    "labels",
+    "folder",
+    "read",
+    "created_at",
+    "updated_at",
+  ],
   properties: {
+    id: {
+      $ref: "#/components/schemas/ThreadID",
+      description: "Thread ID.",
+    },
+    mailbox_id: {
+      $ref: "#/components/schemas/MailboxID",
+      description: "Mailbox this conversation belongs to.",
+    },
+    channel: {
+      type: "string",
+      minLength: 1,
+      description: "Channel this conversation lives on. Always `email`.",
+      example: "email",
+    },
     contact_id: {
       oneOf: [
         {
@@ -64280,6 +64431,55 @@ export const EmailThreadWritableSchema = {
       description:
         "Contact linked to this conversation, or null when none is linked.",
     },
+    subject: {
+      type: ["string", "null"],
+      description:
+        "Subject of the conversation, taken from its first message. Null when that message had no subject.",
+      example: "Re: Your order",
+    },
+    participants: {
+      type: "array",
+      items: {
+        type: "string",
+        format: "email",
+      },
+      description:
+        "Addresses that appear on the retained messages in this conversation, including the mailbox's own address.",
+    },
+    message_count: {
+      type: "integer",
+      minimum: 0,
+      description:
+        "Number of retained messages in this conversation, both directions.",
+    },
+    unread_count: {
+      type: "integer",
+      minimum: 0,
+      description:
+        "Number of retained received messages that are still unread. Spam and blocked mail is not counted.",
+    },
+    last_message_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description:
+        "When the most recent retained message in this conversation was received or sent.",
+    },
+    last_direction: {
+      type: "string",
+      enum: ["inbound", "outbound"],
+      minLength: 1,
+      description:
+        "Direction of the most recent message: `inbound` for a received message, `outbound` for a sent one.",
+    },
+    folder: {
+      $ref: "#/components/schemas/EmailThreadFolder",
+    },
+    read: {
+      type: "boolean",
+      description:
+        "Whether every retained received message is read, including trash, spam and blocked messages. Outbound messages do not affect this state.",
+    },
     labels: {
       type: "array",
       items: {
@@ -64289,8 +64489,38 @@ export const EmailThreadWritableSchema = {
       },
       maxItems: 20,
       description:
-        "Labels on this conversation. Exactly one system placement label is always present, set by the message that started the conversation:\n\n- `inbox`: The conversation is in the inbox.\n- `archive`: The conversation was filed away and is done for now.\n- `spam`: The conversation's opening message is filed in Spam.\n- `blocked`: The conversation's opening message was rejected by the mailbox's receive policy or rules.\n\nMove a conversation by updating its labels. Add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox`, or remove `spam`, `blocked`, or `archive`, to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list, and a conversation has at most 20 labels in total.\n",
-      example: ["inbox", "urgent"],
+        "Custom labels applied to this conversation. Folder and read state are separate fields.",
+      example: ["urgent"],
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When the thread was created.",
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When the thread last changed.",
+    },
+    highlights: {
+      $ref: "#/components/schemas/EmailThreadHighlights",
+      description:
+        "Matched search fragments, keyed by the field that matched. Returned only by thread search. Omitted when listing threads.\n",
+    },
+    scheduled_count: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Scheduled or dispatching sends targeting this conversation. Returned by conversation get and list, including zero when none remain. Omitted by search.",
+    },
+    next_scheduled_at: {
+      type: "string",
+      format: "date-time",
+      description:
+        "Earliest due time among scheduled or dispatching sends. Returned by conversation get and list only when scheduled_count is positive. Omitted by search and when no sends remain.",
     },
   },
 } as const;

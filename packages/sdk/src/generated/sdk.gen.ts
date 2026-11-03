@@ -1203,6 +1203,9 @@ import type {
   RestoreAmbBusinessAccountData,
   RestoreAmbBusinessAccountErrors,
   RestoreAmbBusinessAccountResponses,
+  RestoreEmailThreadData,
+  RestoreEmailThreadErrors,
+  RestoreEmailThreadResponses,
   RestoreMailboxData,
   RestoreMailboxErrors,
   RestoreMailboxResponses,
@@ -13631,7 +13634,7 @@ export const submitEmailTemplateVersion = <
 /**
  * List mailboxes
  *
- * Returns a paginated list of the workspace's mailboxes, newest first. Search across addresses and display names with `q`, look a mailbox up by its exact address, or filter by lifecycle state or domain.
+ * Returns a paginated list of the workspace's mailboxes, newest first. Search across `address`, `name` and `display_name` with `q`, look a mailbox up by its exact address, or filter by lifecycle state or domain.
  *
  */
 export const listMailboxes = <ThrowOnError extends boolean = false>(
@@ -13997,11 +14000,10 @@ export const deleteMailboxReceiveRule = <ThrowOnError extends boolean = false>(
 /**
  * List threads
  *
- * Returns a paginated list of conversations across the workspace's mailboxes, most recently active first. `label` selects the view: the inbox (the default when omitted), `archive`, `spam`, `blocked`, or any custom label. You can also filter by mailbox, by linked contact, by participant address, or by a subject substring.
+ * Returns a paginated list of conversations across the workspace's mailboxes, most recently active first. `folder` selects inbox, archive, spam, blocked, sent, or trash. The default is inbox when neither folder nor custom labels are supplied. `labels` matches custom labels only; `read_state=read|unread` restricts read state. You can also filter by mailbox, by linked contact, by participant address, or by a subject substring.
  *
  * This listing filters; it does not search message content.
- * Conversations whose every message is trashed are excluded; restoring a message
- * returns the conversation to the list.
+ * Trashed conversations appear only with `folder=trash`. Expired trash never appears.
  *
  * `before` and `after` filter by time. To page through the results, pass the response cursors back as `starting_after` or `ending_before`.
  *
@@ -14089,7 +14091,7 @@ export const getEmailThread = <ThrowOnError extends boolean = false>(
 /**
  * Update a thread
  *
- * Applies label changes to a conversation, and links or unlinks a contact. Adding `spam` files the conversation, and its received messages, as spam. Adding `archive` files it away without deleting it. Adding `inbox`, or removing `spam`, `blocked`, or `archive`, returns it to the inbox, and its unread count recomputes to match. An archived conversation returns to the inbox by itself when a new message arrives that isn't spam or blocked; a junk reply or an outbound send leaves it archived. To block a sender going forward, add a receive rule instead. Any field you leave out stays unchanged.
+ * Sets the conversation's `read` state and `folder`, adds or removes custom `labels`, and links or unlinks a contact. Set `read` to true or false to mark all retained received messages read or unread. Set `folder` to inbox, archive or spam; blocked and sent are assigned automatically. Use DELETE to trash a conversation and POST restore to recover eligible retained messages. A trashed conversation must be restored before its folder can change. Labels accept custom names only. An archived conversation returns to the inbox when a new received message is neither spam nor blocked. To block a sender going forward, add a receive rule. Any field you leave out stays unchanged.
  *
  */
 export const updateEmailThread = <ThrowOnError extends boolean = false>(
@@ -14118,6 +14120,35 @@ export const updateEmailThread = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Restore a thread from trash
+ *
+ * Restores the conversation's unexpired trashed messages and updates its message and unread counts. Messages past their trash deadline or the mailbox retention period stay deleted. Folder, read state and custom labels are preserved. Repeating the operation leaves restored messages unchanged. Previously canceled scheduled sends are not resumed.
+ */
+export const restoreEmailThread = <ThrowOnError extends boolean = false>(
+  options: Options<RestoreEmailThreadData, ThrowOnError>,
+): RequestResult<
+  RestoreEmailThreadResponses,
+  RestoreEmailThreadErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RestoreEmailThreadResponses,
+    RestoreEmailThreadErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/threads/{thread_id}/restore",
+    ...options,
   });
 
 /**
@@ -14249,7 +14280,7 @@ export const listEmailThreadMessageAttachments = <
 /**
  * Reply to a thread message
  *
- * Sends a reply to a specific message in a conversation, from the mailbox's own address. Recipients are derived from the message being replied to: for a received message, its Reply-To address when present, otherwise its From address; for a message the mailbox sent, its original To recipients. Set `reply_all` to copy the original To and Cc recipients in as `Cc`, leaving out the mailbox's own address. The subject and the threading headers that keep the reply in this conversation are set automatically, and the reply is recorded in the conversation. To reply to a conversation as a whole, target its newest received message. Set `scheduled_at` to send later; the reply joins the conversation only at dispatch.
+ * Sends a reply to a specific message in a conversation, from the mailbox's own address. Recipients are derived from the message being replied to: for a received message, its Reply-To address when present, otherwise its From address; for a message the mailbox sent, its original To recipients. Set `reply_all` to copy the original To and Cc recipients in as `Cc`, leaving out the mailbox's own address. Add `cc` or `bcc` to copy further recipients. The subject and the threading headers that keep the reply in this conversation are set automatically, and the reply is recorded in the conversation. To reply to a conversation as a whole, target its newest received message. Set `scheduled_at` to send later; the reply joins the conversation only at dispatch.
  *
  */
 export const replyEmailThreadMessage = <ThrowOnError extends boolean = false>(

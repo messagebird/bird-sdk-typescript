@@ -49,7 +49,7 @@ export class EmailThreadsMessagesResource extends Resource {
   }
 
   /**
-   * Reply to a specific conversation message from the mailbox's own address. To reply to a conversation, target its newest received message. Recipients, subject, and threading headers are derived automatically.
+   * Reply to a specific conversation message from the mailbox's own address. To reply to a conversation, target its newest received message. Recipients, subject, and threading headers are derived automatically. Add cc or bcc to copy further recipients.
    *
    * @example Reply to a message
    * const reply = await bird.email.threads.messages.reply("thr_01abc", "rem_01xyz", {

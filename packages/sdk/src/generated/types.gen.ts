@@ -23127,7 +23127,11 @@ export type Mailbox = {
    */
   readonly forwarding_address: string | null;
   /**
-   * Display name used as the sender name on mail from this mailbox. `null` when unset.
+   * Sender name shown alongside the address in outgoing mail. `null` when unset.
+   */
+  name: string | null;
+  /**
+   * Name shown to your team in the dashboard and tools. Defaults to `name` when no override is set. When `name` is unset, outgoing mail uses this value as the sender name.
    */
   display_name: string | null;
   /**
@@ -23226,7 +23230,11 @@ export type MailboxCreate = {
    */
   domain?: string;
   /**
-   * Display name used as the sender name on mail from this mailbox.
+   * Sender name shown alongside the address in outgoing mail. Must contain a non-whitespace character and cannot contain carriage returns or line feeds.
+   */
+  name?: string;
+  /**
+   * Name shown to your team in the dashboard and tools. Defaults to `name` when omitted. When `name` is unset, outgoing mail uses this value as the sender name.
    */
   display_name?: string;
   /**
@@ -23267,7 +23275,11 @@ export type MailboxIdentifier = string;
  */
 export type MailboxUpdate = {
   /**
-   * Display name used as the sender name on mail from this mailbox. `null` clears it.
+   * Sender name shown alongside the address in outgoing mail. Must contain a non-whitespace character and cannot contain carriage returns or line feeds. `null` clears it.
+   */
+  name?: string | null;
+  /**
+   * Name shown to your team in the dashboard and tools. `null` clears the override and uses `name`. When `name` is unset, outgoing mail uses this value as the sender name.
    */
   display_name?: string | null;
   /**
@@ -23531,6 +23543,17 @@ export type InboundRouteUpdate = {
   enabled?: boolean;
 };
 
+/**
+ * Primary conversation folder. The supported folders are inbox, archive, spam, blocked, sent, and trash. Blocked and sent are assigned automatically. The sent filter also includes sent conversations that received replies and still sit in the inbox; moving them with PATCH removes them from the sent filter.
+ */
+export type EmailThreadFolder =
+  "inbox" | "archive" | "spam" | "blocked" | "sent" | "trash";
+
+/**
+ * Whether retained received messages in the thread have been read. Includes retained trash, spam and blocked messages.
+ */
+export type EmailThreadReadState = "read" | "unread";
+
 export type ThreadId = string;
 
 /**
@@ -23556,15 +23579,15 @@ export type EmailThread = {
   /**
    * Thread ID.
    */
-  readonly id: ThreadId;
+  id: ThreadId;
   /**
    * Mailbox this conversation belongs to.
    */
-  readonly mailbox_id: MailboxId;
+  mailbox_id: MailboxId;
   /**
    * Channel this conversation lives on. Always `email`.
    */
-  readonly channel: string;
+  channel: string;
   /**
    * Contact linked to this conversation, or null when none is linked.
    */
@@ -23572,60 +23595,57 @@ export type EmailThread = {
   /**
    * Subject of the conversation, taken from its first message. Null when that message had no subject.
    */
-  readonly subject: string | null;
+  subject: string | null;
   /**
    * Addresses that appear on the retained messages in this conversation, including the mailbox's own address.
    */
-  readonly participants: Array<string>;
+  participants: Array<string>;
   /**
    * Number of retained messages in this conversation, both directions.
    */
-  readonly message_count: number;
+  message_count: number;
   /**
    * Number of retained received messages that are still unread. Spam and blocked mail is not counted.
    */
-  readonly unread_count: number;
+  unread_count: number;
   /**
    * When the most recent retained message in this conversation was received or sent.
    */
-  readonly last_message_at: string;
+  last_message_at: string;
   /**
    * Direction of the most recent message: `inbound` for a received message, `outbound` for a sent one.
    */
-  readonly last_direction: "inbound" | "outbound";
+  last_direction: "inbound" | "outbound";
+  folder: EmailThreadFolder;
   /**
-   * Labels on this conversation. Exactly one system placement label is always present, set by the message that started the conversation:
-   *
-   * - `inbox`: The conversation is in the inbox.
-   * - `archive`: The conversation was filed away and is done for now.
-   * - `spam`: The conversation's opening message is filed in Spam.
-   * - `blocked`: The conversation's opening message was rejected by the mailbox's receive policy or rules.
-   *
-   * Move a conversation by updating its labels. Add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox`, or remove `spam`, `blocked`, or `archive`, to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list, and a conversation has at most 20 labels in total.
-   *
+   * Whether every retained received message is read, including trash, spam and blocked messages. Outbound messages do not affect this state.
+   */
+  read: boolean;
+  /**
+   * Custom labels applied to this conversation. Folder and read state are separate fields.
    */
   labels: Array<string>;
   /**
    * When the thread was created.
    */
-  readonly created_at: string;
+  created_at: string;
   /**
    * When the thread last changed.
    */
-  readonly updated_at: string;
+  updated_at: string;
   /**
    * Matched search fragments, keyed by the field that matched. Returned only by thread search. Omitted when listing threads.
    *
    */
-  readonly highlights?: EmailThreadHighlights;
+  highlights?: EmailThreadHighlights;
   /**
    * Scheduled or dispatching sends targeting this conversation. Returned by conversation get and list, including zero when none remain. Omitted by search.
    */
-  readonly scheduled_count?: number;
+  scheduled_count?: number;
   /**
    * Earliest due time among scheduled or dispatching sends. Returned by conversation get and list only when scheduled_count is positive. Omitted by search and when no sends remain.
    */
-  readonly next_scheduled_at?: string;
+  next_scheduled_at?: string;
 };
 
 export type EmailThreadList = {
@@ -23633,10 +23653,14 @@ export type EmailThreadList = {
 } & ListEnvelope;
 
 /**
- * Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. System labels express state changes. On a conversation, adding `spam` files it as spam. Adding `archive` files it away without deleting it. Adding `inbox`, or removing `spam`, `blocked`, or `archive`, returns it to the inbox. Removing `unread` marks all retained received messages as read in one call. On a message, adding or removing `unread` flips read state. Adding or removing `trash` moves it to or out of the trash. The API rejects changes that contradict this model. A request cannot add more than one placement label. It cannot add `blocked`, because blocking a sender is a receive-rule decision. Removing `inbox` requires adding a destination. A conversation cannot add `trash` or `unread`; removing `unread` is the mark-all-read shortcut, and `trash` uses the `DELETE` verb. A message cannot use placement labels; move its conversation instead. A sent message cannot use `unread`. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be used as custom labels, in any casing. A conversation or message has at most 20 labels, system labels included.
- *
+ * Folder a caller can choose through PATCH. Use DELETE to move a thread to trash and [Restore a thread from trash](/docs/api/reference/restore-email-thread) (POST /v1/email/threads/{thread_id}/restore) to recover it.
  */
-export type EmailLabelsUpdate = {
+export type EmailThreadWritableFolder = "inbox" | "archive" | "spam";
+
+/**
+ * Custom labels to add or remove. System and reserved names are refused; use read and folder for thread state. The resulting custom-label set must contain at most 20 labels; larger sets return 422.
+ */
+export type EmailThreadLabelsUpdate = {
   /**
    * Labels to apply.
    */
@@ -23648,10 +23672,18 @@ export type EmailLabelsUpdate = {
 };
 
 /**
- * Changes to apply to a thread. Omitted fields are left unchanged.
+ * Changes to apply to a thread. Omitted fields are left unchanged. Folder changes accept inbox, archive or spam and reject trashed threads with 422; first use [Restore a thread from trash](/docs/api/reference/restore-email-thread). Read and custom-label updates remain available in trash.
  */
 export type EmailThreadUpdateRequest = {
-  labels?: EmailLabelsUpdate;
+  /**
+   * Mark all retained received messages read or unread. Includes trash, spam and blocked messages; unread_count continues to exclude them.
+   */
+  read?: boolean;
+  /**
+   * Move a non-trashed conversation to inbox, archive or spam. Use DELETE to trash it and POST restore to recover it. Blocked and sent folders are assigned automatically.
+   */
+  folder?: EmailThreadWritableFolder;
+  labels?: EmailThreadLabelsUpdate;
   /**
    * Contact to link this conversation to, or null to unlink the current contact.
    */
@@ -23808,7 +23840,7 @@ export type EmailThreadMessage = {
    */
   readonly status: string | null;
   /**
-   * Terminal per-recipient delivery outcomes of a sent message, filled in as each one becomes known and kept for the mailbox's full retention tier. Null for received messages and before any recipient reaches a terminal state. Per-recipient event detail lives on the sent-message log (`source`) for 30 days.
+   * Terminal delivery outcomes for the visible To and Cc recipients of a sent message, filled in as each one becomes known and kept for the mailbox's full retention tier. Bcc recipients are omitted; aggregate status still includes every attempted recipient. Null for received messages and before any visible recipient reaches a terminal state. Per-recipient event detail lives on the sent-message log (`source`) for 30 days.
    *
    */
   readonly recipients: Array<EmailThreadMessageRecipient> | null;
@@ -23874,6 +23906,21 @@ export type EmailThreadMessageList = {
 } & ListEnvelope;
 
 /**
+ * Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. On a message, adding or removing `unread` flips read state. Adding or removing `trash` moves it to or out of the trash. Placement labels cannot be applied to a message; use `folder` on [Update a thread](/docs/api/reference/update-email-thread) (`PATCH /v1/email/threads/{thread_id}`) to move its conversation. A sent message cannot use unread. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be used as custom labels, in any casing. A conversation or message has at most 20 labels, system labels included.
+ *
+ */
+export type EmailLabelsUpdate = {
+  /**
+   * Labels to apply.
+   */
+  add?: Array<string>;
+  /**
+   * Labels to take off.
+   */
+  remove?: Array<string>;
+};
+
+/**
  * Changes to apply to a conversation message. Omitted fields are left unchanged.
  */
 export type EmailThreadMessageUpdateRequest = {
@@ -23907,7 +23954,12 @@ export type EmailThreadMessageAttachmentList = {
 };
 
 /**
- * A reply to a conversation message. Recipients are derived from the message being replied to: its Reply-To address when present, otherwise its From address. Set `reply_all` to also include the original To and Cc recipients (minus the mailbox's own address). The subject and threading headers are set automatically. At least one of `html` or `text` must be provided.
+ * Email address without a display name.
+ */
+export type EmailRecipientAddress = string;
+
+/**
+ * A reply to a conversation message. For a received message, recipients are derived from its Reply-To address when present, otherwise its From address. For a message the mailbox sent, recipients are derived from its original To line. Set `reply_all` to also include the original To and Cc recipients (minus the mailbox's own address). Add `cc` or `bcc` to copy further recipients. The subject and threading headers are set automatically. At least one of `html` or `text` must be provided.
  *
  */
 export type EmailThreadMessageReplyRequest = {
@@ -23923,6 +23975,14 @@ export type EmailThreadMessageReplyRequest = {
    * Plain-text body of the reply. At least one of html or text must be provided.
    */
   text?: string;
+  /**
+   * Additional Cc recipients, merged with recipients derived by `reply_all`. Addresses already on the derived To line are dropped (case-insensitive). The merged Cc set must contain at most 50 addresses; larger sets return 422.
+   */
+  cc?: Array<EmailRecipientAddress>;
+  /**
+   * Blind-copy recipients. Addresses already on the derived To or merged Cc line are dropped (case-insensitive). Bcc addresses are omitted from conversation participants, visible recipient headers, and the 202 response. Bcc delivery outcomes are excluded from the message's `recipients` list.
+   */
+  bcc?: Array<EmailRecipientAddress>;
   /**
    * Also send the reply to the original To and Cc recipients, minus the mailbox's own address.
    */
@@ -35390,7 +35450,11 @@ export type InboundAttachmentListWritable = {
  */
 export type MailboxWritable = {
   /**
-   * Display name used as the sender name on mail from this mailbox. `null` when unset.
+   * Sender name shown alongside the address in outgoing mail. `null` when unset.
+   */
+  name: string | null;
+  /**
+   * Name shown to your team in the dashboard and tools. Defaults to `name` when no override is set. When `name` is unset, outgoing mail uses this value as the sender name.
    */
   display_name: string | null;
   /**
@@ -35498,21 +35562,75 @@ export type InboundRouteListWritable = {
  */
 export type EmailThreadWritable = {
   /**
+   * Thread ID.
+   */
+  id: ThreadId;
+  /**
+   * Mailbox this conversation belongs to.
+   */
+  mailbox_id: MailboxId;
+  /**
+   * Channel this conversation lives on. Always `email`.
+   */
+  channel: string;
+  /**
    * Contact linked to this conversation, or null when none is linked.
    */
   contact_id: ContactId | null;
   /**
-   * Labels on this conversation. Exactly one system placement label is always present, set by the message that started the conversation:
-   *
-   * - `inbox`: The conversation is in the inbox.
-   * - `archive`: The conversation was filed away and is done for now.
-   * - `spam`: The conversation's opening message is filed in Spam.
-   * - `blocked`: The conversation's opening message was rejected by the mailbox's receive policy or rules.
-   *
-   * Move a conversation by updating its labels. Add `spam` to file it as spam, add `archive` to clean it out of the inbox, and add `inbox`, or remove `spam`, `blocked`, or `archive`, to bring it back. An archived conversation returns to the inbox by itself when a new message arrives. Custom labels share the same list, and a conversation has at most 20 labels in total.
-   *
+   * Subject of the conversation, taken from its first message. Null when that message had no subject.
+   */
+  subject: string | null;
+  /**
+   * Addresses that appear on the retained messages in this conversation, including the mailbox's own address.
+   */
+  participants: Array<string>;
+  /**
+   * Number of retained messages in this conversation, both directions.
+   */
+  message_count: number;
+  /**
+   * Number of retained received messages that are still unread. Spam and blocked mail is not counted.
+   */
+  unread_count: number;
+  /**
+   * When the most recent retained message in this conversation was received or sent.
+   */
+  last_message_at: string;
+  /**
+   * Direction of the most recent message: `inbound` for a received message, `outbound` for a sent one.
+   */
+  last_direction: "inbound" | "outbound";
+  folder: EmailThreadFolder;
+  /**
+   * Whether every retained received message is read, including trash, spam and blocked messages. Outbound messages do not affect this state.
+   */
+  read: boolean;
+  /**
+   * Custom labels applied to this conversation. Folder and read state are separate fields.
    */
   labels: Array<string>;
+  /**
+   * When the thread was created.
+   */
+  created_at: string;
+  /**
+   * When the thread last changed.
+   */
+  updated_at: string;
+  /**
+   * Matched search fragments, keyed by the field that matched. Returned only by thread search. Omitted when listing threads.
+   *
+   */
+  highlights?: EmailThreadHighlights;
+  /**
+   * Scheduled or dispatching sends targeting this conversation. Returned by conversation get and list, including zero when none remain. Omitted by search.
+   */
+  scheduled_count?: number;
+  /**
+   * Earliest due time among scheduled or dispatching sends. Returned by conversation get and list only when scheduled_count is positive. Omitted by search and when no sends remain.
+   */
+  next_scheduled_at?: string;
 };
 
 export type EmailThreadListWritable = {
@@ -68246,7 +68364,7 @@ export type ListMailboxesData = {
      */
     address?: string;
     /**
-     * Case-insensitive search matching the mailbox's address or display name (substring).
+     * Case-insensitive substring match on the mailbox's `address`, `name`, or `display_name`.
      */
     q?: string;
     /**
@@ -69390,15 +69508,17 @@ export type ListEmailThreadsData = {
      */
     contact_id?: ContactId;
     /**
-     * Filter to conversations that have this label. Repeat the parameter to ask for more than one: only conversations that have every label you list are returned.
-     *
-     * A placement label picks a folder: `inbox`, `archive`, `spam`, or `blocked`. A custom label matches a conversation in any folder. Leave this out and you get the inbox.
+     * Filter to a folder. Defaults to inbox when neither folder nor custom labels are supplied.
      */
-    label?: Array<string>;
+    folder?: EmailThreadFolder;
     /**
-     * When `true`, only conversations with unread messages are returned. This filters on the conversation's unread state, so you can combine it with `label`, for example to get unread conversations in the archive. The `unread` label itself lives on individual messages; this filter uses the conversation's aggregate unread state.
+     * Filter to read or unread conversations. Omit for either state.
      */
-    has_unread?: boolean;
+    read_state?: EmailThreadReadState;
+    /**
+     * Match every listed custom label. Repeat labels to supply more than one. System label names are refused.
+     */
+    labels?: Array<string>;
     /**
      * Conversations involving this address, matching the sender or any recipient. The match is case-insensitive and matches on any part of the address, so a fragment works as well as the whole address.
      */
@@ -69755,6 +69875,110 @@ export type UpdateEmailThreadResponses = {
 
 export type UpdateEmailThreadResponse =
   UpdateEmailThreadResponses[keyof UpdateEmailThreadResponses];
+
+export type RestoreEmailThreadData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Thread identifier. Starts with `thr_`.
+     */
+    thread_id: ThreadId;
+  };
+  query?: never;
+  url: "/v1/email/threads/{thread_id}/restore";
+};
+
+export type RestoreEmailThreadErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The resource existed but is no longer available.
+   */
+  410: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type RestoreEmailThreadError =
+  RestoreEmailThreadErrors[keyof RestoreEmailThreadErrors];
+
+export type RestoreEmailThreadResponses = {
+  /**
+   * Thread restored.
+   */
+  200: EmailThread;
+};
+
+export type RestoreEmailThreadResponse =
+  RestoreEmailThreadResponses[keyof RestoreEmailThreadResponses];
 
 export type ListEmailThreadMessagesData = {
   body?: never;

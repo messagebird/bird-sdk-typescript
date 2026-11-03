@@ -15,7 +15,7 @@ export type EmailMailboxesStatsQuery = NonNullable<GetMailboxStatsData["query"]>
 
 export class EmailMailboxesResourceBase extends Resource {
   /**
-   * List the workspace's mailboxes as a cursor page, newest first. Search addresses and display names with q, or filter by exact address, state, or domain.
+   * List the workspace's mailboxes as a cursor page, newest first. Search address, name and display_name with q, or filter by exact address, state, or domain.
    *
    * @example List mailboxes
    * for await (const mailbox of bird.email.mailboxes.list()) {
@@ -31,7 +31,7 @@ export class EmailMailboxesResourceBase extends Resource {
    * Create a mailbox: a durable agent identity that owns an email address, groups mail into conversations, and remembers conversations for its retention tier.
    *
    * @example Create a mailbox
-   * const mailbox = await bird.email.mailboxes.create({ display_name: "Support" });
+   * const mailbox = await bird.email.mailboxes.create({ name: "Support" });
    * console.log(mailbox.address); // "abc123@inbox.ai"
    */
   create(params: EmailMailboxesCreateParams = {}, options?: RequestOptions): APIPromise<Mailbox> {

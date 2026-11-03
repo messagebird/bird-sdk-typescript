@@ -190,7 +190,7 @@ export async function mailboxList() {
 }
 
 export async function mailboxCreate() {
-  const mailbox = await bird.email.mailboxes.create({ display_name: "Support" });
+  const mailbox = await bird.email.mailboxes.create({ name: "Support" });
   console.log(mailbox.address); // "abc123@inbox.ai"
 }
 
@@ -267,13 +267,18 @@ export async function mailboxThreadGet() {
 
 export async function mailboxThreadUpdate() {
   const thread = await bird.email.threads.update("thr_01abc", {
-    labels: { add: ["archive"] },
+    folder: "archive",
   });
   console.log(thread.id);
 }
 
 export async function mailboxThreadDelete() {
   await bird.email.threads.delete("thr_01abc", { permanent: true });
+}
+
+export async function mailboxThreadRestore() {
+  const thread = await bird.email.threads.restore("thr_01abc");
+  console.log(thread.id);
 }
 
 export async function mailboxThreadMessageReply() {
