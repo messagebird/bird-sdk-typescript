@@ -4489,6 +4489,7 @@ export type {
   WebhookRotateSecretResponse,
   WebhookSortField,
   WebhookTestClientCertificate,
+  WebhookTestKind,
   WebhookTestRequest,
   WebhookTestResponse,
   WebhookTestResponseWritable,

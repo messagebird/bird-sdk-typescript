@@ -43995,6 +43995,15 @@ export const WebhookEndpointSchema = {
             type: "webhook",
           },
         },
+        next: {
+          type: "array",
+          readOnly: true,
+          description:
+            "What to do next with this endpoint. The responses that create or update a connector endpoint suggest testing it, which checks its fields with the connected platform. Other responses that return one endpoint return an empty list, and lists omit it.",
+          items: {
+            $ref: "#/components/schemas/NextAction",
+          },
+        },
       },
     },
     {
@@ -44189,15 +44198,6 @@ export const WebhookEndpointCreatedSchema = {
             "Signing secret for this endpoint (`whsec_` prefix), used to verify every delivery signature. Present in this response only: store it immediately, it cannot be retrieved again. If you lose it, mint a new one with [Rotate webhook signing secret](/docs/api/reference/rotate-webhook-secret).\n",
           example: "whsec_base64encodedvalue",
         },
-        next: {
-          type: "array",
-          readOnly: true,
-          description:
-            "What to do next with this endpoint. Empty: deliveries start as the events happen, with nothing left to set up.",
-          items: {
-            $ref: "#/components/schemas/NextAction",
-          },
-        },
       },
     },
   ],
@@ -44363,6 +44363,14 @@ export const WebhookTestRequestSchema = {
   example: {
     event_type: "email.delivered",
   },
+} as const;
+
+export const WebhookTestKindSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["delivery", "probe"],
+  description:
+    "What the test did. `delivery` sent the test event to the endpoint. `probe` read the connected platform instead, which checks a connector endpoint's fields, sends no event and starts nothing; the status, HTTP details and latency are then the platform's answer to that read. Absent when the test stopped before sending anything, with `error` saying why.\n",
 } as const;
 
 export const AMBAcceptedEventTypeSchema = {
@@ -48940,12 +48948,15 @@ export const WebhookTestResponseSchema = {
   additionalProperties: false,
   required: ["status", "response_status_code", "response_duration_ms"],
   properties: {
+    kind: {
+      $ref: "#/components/schemas/WebhookTestKind",
+    },
     status: {
       type: "string",
       minLength: 1,
       enum: ["delivered", "failed"],
       description:
-        "Whether your endpoint accepted the test event. `delivered` means it returned a `2xx` status; `failed` means it returned a non-`2xx` status or could not be reached (see `error` for the latter).\n",
+        "Whether the test succeeded. For a `delivery`, `delivered` means your endpoint returned a `2xx` status to the test event. For a `probe`, `delivered` means the platform accepted the endpoint's fields, though no event was sent. `failed` means a non-`2xx` status or no answer at all (see `error` for the latter).\n",
     },
     response_status_code: {
       type: ["integer", "null"],
@@ -48962,7 +48973,8 @@ export const WebhookTestResponseSchema = {
     response_duration_ms: {
       type: "integer",
       minimum: 0,
-      description: "Round-trip delivery latency in milliseconds.",
+      description:
+        "Round-trip latency of the request the test sent, in milliseconds; `0` when it sent none.\n",
       example: 142,
     },
     event_payload: {
@@ -48974,8 +48986,15 @@ export const WebhookTestResponseSchema = {
       type: "string",
       minLength: 1,
       description:
-        "A short explanation of why the event could not be delivered. Present only when your endpoint could not be reached.",
+        "A short explanation of a failed test that got no HTTP answer: the endpoint or platform could not be reached, or the test stopped before sending anything, such as for a connector endpoint whose connection no longer exists (then `kind` is absent).\n",
       example: "connection refused",
+    },
+    field: {
+      type: "string",
+      minLength: 1,
+      description:
+        "For a connector endpoint, the request field that the platform's answer shows is wrong, such as `destination.connector.credentials.api_key`. Correct it with [Update a webhook endpoint](/docs/api/reference/update-webhook). Present only when `status` is `failed` and the connector maps that answer to a field.\n",
+      example: "destination.connector.credentials.api_key",
     },
     client_certificate: {
       $ref: "#/components/schemas/WebhookTestClientCertificate",
@@ -66334,12 +66353,15 @@ export const WebhookTestResponseWritableSchema = {
   additionalProperties: false,
   required: ["status", "response_status_code", "response_duration_ms"],
   properties: {
+    kind: {
+      $ref: "#/components/schemas/WebhookTestKind",
+    },
     status: {
       type: "string",
       minLength: 1,
       enum: ["delivered", "failed"],
       description:
-        "Whether your endpoint accepted the test event. `delivered` means it returned a `2xx` status; `failed` means it returned a non-`2xx` status or could not be reached (see `error` for the latter).\n",
+        "Whether the test succeeded. For a `delivery`, `delivered` means your endpoint returned a `2xx` status to the test event. For a `probe`, `delivered` means the platform accepted the endpoint's fields, though no event was sent. `failed` means a non-`2xx` status or no answer at all (see `error` for the latter).\n",
     },
     response_status_code: {
       type: ["integer", "null"],
@@ -66356,7 +66378,8 @@ export const WebhookTestResponseWritableSchema = {
     response_duration_ms: {
       type: "integer",
       minimum: 0,
-      description: "Round-trip delivery latency in milliseconds.",
+      description:
+        "Round-trip latency of the request the test sent, in milliseconds; `0` when it sent none.\n",
       example: 142,
     },
     event_payload: {
@@ -66368,8 +66391,15 @@ export const WebhookTestResponseWritableSchema = {
       type: "string",
       minLength: 1,
       description:
-        "A short explanation of why the event could not be delivered. Present only when your endpoint could not be reached.",
+        "A short explanation of a failed test that got no HTTP answer: the endpoint or platform could not be reached, or the test stopped before sending anything, such as for a connector endpoint whose connection no longer exists (then `kind` is absent).\n",
       example: "connection refused",
+    },
+    field: {
+      type: "string",
+      minLength: 1,
+      description:
+        "For a connector endpoint, the request field that the platform's answer shows is wrong, such as `destination.connector.credentials.api_key`. Correct it with [Update a webhook endpoint](/docs/api/reference/update-webhook). Present only when `status` is `failed` and the connector maps that answer to a field.\n",
+      example: "destination.connector.credentials.api_key",
     },
     client_certificate: {
       $ref: "#/components/schemas/WebhookTestClientCertificate",

@@ -24410,6 +24410,10 @@ export type WebhookEndpoint = {
    * How each delivery to the endpoint is built.
    */
   destination?: WebhookDestination;
+  /**
+   * What to do next with this endpoint. The responses that create or update a connector endpoint suggest testing it, which checks its fields with the connected platform. Other responses that return one endpoint return an empty list, and lists omit it.
+   */
+  readonly next?: Array<NextAction>;
 } & Timestamps;
 
 export type WebhookEndpointList = {
@@ -24493,10 +24497,6 @@ export type WebhookEndpointCreated = WebhookEndpoint & {
    *
    */
   secret: string;
-  /**
-   * What to do next with this endpoint. Empty: deliveries start as the events happen, with nothing left to set up.
-   */
-  readonly next?: Array<NextAction>;
 };
 
 /**
@@ -24585,6 +24585,12 @@ export type WebhookTestRequest = {
    */
   event_type?: string;
 };
+
+/**
+ * What the test did. `delivery` sent the test event to the endpoint. `probe` read the connected platform instead, which checks a connector endpoint's fields, sends no event and starts nothing; the status, HTTP details and latency are then the platform's answer to that read. Absent when the test stopped before sending anything, with `error` saying why.
+ *
+ */
+export type WebhookTestKind = "delivery" | "probe";
 
 /**
  * Always `amb.accepted` for this event.
@@ -27141,8 +27147,9 @@ export type WebhookTestClientCertificate =
   "presented" | "not_requested" | "rejected";
 
 export type WebhookTestResponse = {
+  kind?: WebhookTestKind;
   /**
-   * Whether your endpoint accepted the test event. `delivered` means it returned a `2xx` status; `failed` means it returned a non-`2xx` status or could not be reached (see `error` for the latter).
+   * Whether the test succeeded. For a `delivery`, `delivered` means your endpoint returned a `2xx` status to the test event. For a `probe`, `delivered` means the platform accepted the endpoint's fields, though no event was sent. `failed` means a non-`2xx` status or no answer at all (see `error` for the latter).
    *
    */
   status: "delivered" | "failed";
@@ -27156,7 +27163,8 @@ export type WebhookTestResponse = {
    */
   response_body?: string;
   /**
-   * Round-trip delivery latency in milliseconds.
+   * Round-trip latency of the request the test sent, in milliseconds; `0` when it sent none.
+   *
    */
   response_duration_ms: number;
   /**
@@ -27165,9 +27173,15 @@ export type WebhookTestResponse = {
    */
   event_payload?: WebhookEvent;
   /**
-   * A short explanation of why the event could not be delivered. Present only when your endpoint could not be reached.
+   * A short explanation of a failed test that got no HTTP answer: the endpoint or platform could not be reached, or the test stopped before sending anything, such as for a connector endpoint whose connection no longer exists (then `kind` is absent).
+   *
    */
   error?: string;
+  /**
+   * For a connector endpoint, the request field that the platform's answer shows is wrong, such as `destination.connector.credentials.api_key`. Correct it with [Update a webhook endpoint](/docs/api/reference/update-webhook). Present only when `status` is `failed` and the connector maps that answer to a field.
+   *
+   */
+  field?: string;
   client_certificate?: WebhookTestClientCertificate;
 };
 
@@ -36471,8 +36485,9 @@ export type EventWhatsAppRejectedWritable = {
 };
 
 export type WebhookTestResponseWritable = {
+  kind?: WebhookTestKind;
   /**
-   * Whether your endpoint accepted the test event. `delivered` means it returned a `2xx` status; `failed` means it returned a non-`2xx` status or could not be reached (see `error` for the latter).
+   * Whether the test succeeded. For a `delivery`, `delivered` means your endpoint returned a `2xx` status to the test event. For a `probe`, `delivered` means the platform accepted the endpoint's fields, though no event was sent. `failed` means a non-`2xx` status or no answer at all (see `error` for the latter).
    *
    */
   status: "delivered" | "failed";
@@ -36486,7 +36501,8 @@ export type WebhookTestResponseWritable = {
    */
   response_body?: string;
   /**
-   * Round-trip delivery latency in milliseconds.
+   * Round-trip latency of the request the test sent, in milliseconds; `0` when it sent none.
+   *
    */
   response_duration_ms: number;
   /**
@@ -36495,9 +36511,15 @@ export type WebhookTestResponseWritable = {
    */
   event_payload?: WebhookEventWritable;
   /**
-   * A short explanation of why the event could not be delivered. Present only when your endpoint could not be reached.
+   * A short explanation of a failed test that got no HTTP answer: the endpoint or platform could not be reached, or the test stopped before sending anything, such as for a connector endpoint whose connection no longer exists (then `kind` is absent).
+   *
    */
   error?: string;
+  /**
+   * For a connector endpoint, the request field that the platform's answer shows is wrong, such as `destination.connector.credentials.api_key`. Correct it with [Update a webhook endpoint](/docs/api/reference/update-webhook). Present only when `status` is `failed` and the connector maps that answer to a field.
+   *
+   */
+  field?: string;
   client_certificate?: WebhookTestClientCertificate;
 };
 

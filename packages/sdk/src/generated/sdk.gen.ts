@@ -14513,6 +14513,8 @@ export const listWebhooks = <ThrowOnError extends boolean = false>(
  *
  * A non-HTTPS or non-public `url`, an unknown event type, or exceeding the organization's endpoint limit returns `422`.
  *
+ * Creating a connector endpoint does not contact its platform. `next` suggests [testing the endpoint](/docs/api/reference/test-webhook), which checks its fields with the platform.
+ *
  */
 export const createWebhook = <ThrowOnError extends boolean = false>(
   options: Options<CreateWebhookData, ThrowOnError>,
@@ -14597,7 +14599,9 @@ export const getWebhook = <ThrowOnError extends boolean = false>(
  * whole subscription set, and `status` pauses or re-enables delivery.
  *
  * The `200` response is the updated endpoint. Invalid input (a non-HTTPS or non-public
- * `url`, an event type outside the catalog) returns a `422`.
+ * `url`, an event type outside the catalog) returns a `422`. Updating a connector endpoint
+ * does not contact its platform. `next` suggests [testing the endpoint](/docs/api/reference/test-webhook),
+ * which checks its fields with the platform.
  *
  */
 export const updateWebhook = <ThrowOnError extends boolean = false>(
@@ -14668,7 +14672,9 @@ export const rotateWebhookSecret = <ThrowOnError extends boolean = false>(
  *
  * The body is a minimal JSON object with the event `type` and `test: true`, signed like a real delivery. When the endpoint has a filter, `data` contains its configured equality values. It does not mirror that event's payload. Tests work on paused endpoints and do not appear in [List delivery attempts](/docs/api/reference/list-webhook-attempts).
  *
- * The operation returns `412` if the endpoint lacks a valid signing secret or, when `event_type` is omitted, has no subscribed event type to use.
+ * For a connector endpoint, the test checks the endpoint's fields with the connected platform. Where the platform can be read without starting anything, as with Claude Managed Agents, Bird reads it instead of sending an event and returns `kind: probe`. The status, body and latency are then the platform's answer, and `delivered` means it accepted the fields, not that an event was delivered. When the platform's answer identifies a wrong field, `field` names it.
+ *
+ * The operation returns `412` if, when `event_type` is omitted, the endpoint has no subscribed event type to use, or, for a test that sends an event, the endpoint lacks a valid signing secret; a `probe` needs no signing secret.
  *
  */
 export const testWebhook = <ThrowOnError extends boolean = false>(
