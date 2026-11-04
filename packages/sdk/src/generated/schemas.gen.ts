@@ -25357,7 +25357,7 @@ export const WhatsAppNumberErrorCodeSchema = {
     "internal_error",
   ],
   description:
-    "Standardized number-connection failure:\n\n- `registration_pin_rejected`: WhatsApp refused the two-step verification PIN.\n- `registration_pin_rate_limited`: Too many PIN attempts occurred recently.\n- `registration_attempts_exhausted`: The number has no registration attempts left. WhatsApp's own lockout clears after 72 hours; the number's attempt budget does not, so contact support if repair keeps ending here.\n- `number_verification_required`: WhatsApp requires the number to be verified again.\n- `number_not_registered`: WhatsApp does not hold the number as registered.\n- `number_already_linked`: Another WhatsApp integration uses the number.\n- `number_already_in_use`: WhatsApp cannot accept the number.\n- `verification_code_not_received`: The verification text did not arrive.\n- `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.\n- `business_account_locked`: WhatsApp locked the business account.\n- `business_verification_required`: WhatsApp refused to register the number because the business portfolio is not verified, usually because an unverified portfolio may hold only a few registered numbers. Verify the business or free a registered number on the portfolio, then repair the number.\n- `credit_currency_mismatch`: WhatsApp bills the business account in a currency your organization is not billed in. In Meta Business Suite, remove the account's payment method and then set its currency to your organization's billing currency. If Meta doesn't allow the change, connect the number under a business account WhatsApp bills in that same currency or has set no currency on.\n- `billing_close`: WhatsApp refused to set up billing for the business account while its monthly billing close ran. The close usually ends within the first few days of the new month; nothing about the number or the account needs changing. Once those days have passed, repair the number.\n- `permission_denied`: WhatsApp refused access to the account.\n- `invalid_request`: WhatsApp rejected the connection details.\n- `internal_error`: The service could not classify or resolve the failure.\n\nThis is an open enum. Accept unrecognized values.\n",
+    "Standardized number-connection failure:\n\n- `registration_pin_rejected`: WhatsApp refused the two-step verification PIN.\n- `registration_pin_rate_limited`: Too many PIN attempts occurred recently.\n- `registration_attempts_exhausted`: The number has no registration attempts left. WhatsApp's own lockout clears after 72 hours; the number's attempt budget does not, so contact support if repair keeps ending here.\n- `number_verification_required`: WhatsApp requires the number to be verified again.\n- `number_not_registered`: WhatsApp does not hold the number as registered.\n- `number_already_linked`: Another WhatsApp integration uses the number.\n- `number_already_in_use`: WhatsApp cannot accept the number.\n- `verification_code_not_received`: The verification text did not arrive.\n- `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.\n- `business_account_locked`: WhatsApp locked the business account.\n- `business_verification_required`: WhatsApp refused to register the number because the business portfolio is not verified, usually because an unverified portfolio may hold only a few registered numbers. Verify the business or free a registered number on the portfolio, then repair the number.\n- `credit_currency_mismatch`: WhatsApp bills the business account in a currency other than USD, EUR, or your organization's billing currency. In Meta Business Suite, remove the account's payment method and then set its currency to one of those. If Meta doesn't allow the change, connect the number under a business account WhatsApp bills in one of them or has set no currency on.\n- `billing_close`: WhatsApp refused to set up billing for the business account while its monthly billing close ran. The close usually ends within the first few days of the new month; nothing about the number or the account needs changing. Once those days have passed, repair the number.\n- `permission_denied`: WhatsApp refused access to the account.\n- `invalid_request`: WhatsApp rejected the connection details.\n- `internal_error`: The service could not classify or resolve the failure.\n\nThis is an open enum. Accept unrecognized values.\n",
   example: "registration_pin_rejected",
 } as const;
 
@@ -29963,7 +29963,7 @@ export const AMBConversationOriginSchema = {
   minLength: 1,
   enum: ["entry_point", "invitation"],
   description:
-    "How the conversation started. `entry_point` means the customer opened it from one of your configured Apple Messages for Business entry points. `invitation` means the customer accepted an invitation and sent a message. This is set once when the conversation is created and never changes.\n",
+    "How the conversation started. `entry_point` means the customer opened it from one of your configured Apple Messages for Business entry points. `invitation` means the customer accepted an invitation, which opened the conversation, or whose first message opened it when the acceptance could not (for example while the business was disconnected). This is set once when the conversation is created and never changes.\n",
 } as const;
 
 export const AMBConversationClosedReasonSchema = {
@@ -30032,7 +30032,7 @@ export const AMBConversationSchema = {
         },
       ],
       description:
-        "Most recent message, or null when its identity has not been recorded.",
+        "Most recent message, or null when no message identity has been recorded for the conversation, for example one opened by an invitation acceptance before its first message.",
     },
     id: {
       $ref: "#/components/schemas/AMBConversationID",
@@ -51000,6 +51000,7 @@ export const BillingResolvedPriceSchema = {
     "dimensions",
     "name",
     "pricing_model",
+    "included",
   ],
   properties: {
     is_priced: {
@@ -51068,6 +51069,12 @@ export const BillingResolvedPriceSchema = {
     },
     pricing_model: {
       $ref: "#/components/schemas/BillingPricingModel",
+    },
+    included: {
+      type: "boolean",
+      description:
+        "Whether your organization's next unit of this `unit_subscription` product, with the requested `dimensions`, is free because a plan includes it. It reflects the organization's current active entitlements, whatever `plan_id` is requested, so it does not describe a candidate plan. A unit with dimensions that no included pattern matches is not free. `unit_price` and `gross_price` stay the published price a unit pays beyond the included units. Always `false` for other pricing models.",
+      example: false,
     },
     billing_interval: {
       deprecated: true,
@@ -62145,7 +62152,7 @@ export const AMBConversationWritableSchema = {
         },
       ],
       description:
-        "Most recent message, or null when its identity has not been recorded.",
+        "Most recent message, or null when no message identity has been recorded for the conversation, for example one opened by an invitation acceptance before its first message.",
     },
     id: {
       $ref: "#/components/schemas/AMBConversationID",
@@ -67116,6 +67123,7 @@ export const BillingResolvedPriceWritableSchema = {
     "dimensions",
     "name",
     "pricing_model",
+    "included",
   ],
   properties: {
     is_priced: {
@@ -67178,6 +67186,12 @@ export const BillingResolvedPriceWritableSchema = {
     },
     pricing_model: {
       $ref: "#/components/schemas/BillingPricingModel",
+    },
+    included: {
+      type: "boolean",
+      description:
+        "Whether your organization's next unit of this `unit_subscription` product, with the requested `dimensions`, is free because a plan includes it. It reflects the organization's current active entitlements, whatever `plan_id` is requested, so it does not describe a candidate plan. A unit with dimensions that no included pattern matches is not free. `unit_price` and `gross_price` stay the published price a unit pays beyond the included units. Always `false` for other pricing models.",
+      example: false,
     },
     pricing_interval: {
       $ref: "#/components/schemas/BillingPricingInterval",

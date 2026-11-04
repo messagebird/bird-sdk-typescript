@@ -14104,7 +14104,7 @@ export type WhatsAppNumberSortField = "created_at";
  * - `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.
  * - `business_account_locked`: WhatsApp locked the business account.
  * - `business_verification_required`: WhatsApp refused to register the number because the business portfolio is not verified, usually because an unverified portfolio may hold only a few registered numbers. Verify the business or free a registered number on the portfolio, then repair the number.
- * - `credit_currency_mismatch`: WhatsApp bills the business account in a currency your organization is not billed in. In Meta Business Suite, remove the account's payment method and then set its currency to your organization's billing currency. If Meta doesn't allow the change, connect the number under a business account WhatsApp bills in that same currency or has set no currency on.
+ * - `credit_currency_mismatch`: WhatsApp bills the business account in a currency other than USD, EUR, or your organization's billing currency. In Meta Business Suite, remove the account's payment method and then set its currency to one of those. If Meta doesn't allow the change, connect the number under a business account WhatsApp bills in one of them or has set no currency on.
  * - `billing_close`: WhatsApp refused to set up billing for the business account while its monthly billing close ran. The close usually ends within the first few days of the new month; nothing about the number or the account needs changing. Once those days have passed, repair the number.
  * - `permission_denied`: WhatsApp refused access to the account.
  * - `invalid_request`: WhatsApp rejected the connection details.
@@ -16273,7 +16273,7 @@ export type AmbConversationLastMessage = {
 };
 
 /**
- * How the conversation started. `entry_point` means the customer opened it from one of your configured Apple Messages for Business entry points. `invitation` means the customer accepted an invitation and sent a message. This is set once when the conversation is created and never changes.
+ * How the conversation started. `entry_point` means the customer opened it from one of your configured Apple Messages for Business entry points. `invitation` means the customer accepted an invitation, which opened the conversation, or whose first message opened it when the acceptance could not (for example while the business was disconnected). This is set once when the conversation is created and never changes.
  *
  */
 export type AmbConversationOrigin = "entry_point" | "invitation";
@@ -16297,7 +16297,7 @@ export type AmbConversation = {
    */
   routing_change: AmbConversationRoutingChange | null;
   /**
-   * Most recent message, or null when its identity has not been recorded.
+   * Most recent message, or null when no message identity has been recorded for the conversation, for example one opened by an invitation acceptance before its first message.
    */
   last_message: AmbConversationLastMessage | null;
   /**
@@ -28315,6 +28315,10 @@ export type BillingResolvedPrice = {
   readonly external_description?: string | null;
   pricing_model: BillingPricingModel;
   /**
+   * Whether your organization's next unit of this `unit_subscription` product, with the requested `dimensions`, is free because a plan includes it. It reflects the organization's current active entitlements, whatever `plan_id` is requested, so it does not describe a candidate plan. A unit with dimensions that no included pattern matches is not free. `unit_price` and `gross_price` stay the published price a unit pays beyond the included units. Always `false` for other pricing models.
+   */
+  included: boolean;
+  /**
    * Compatibility alias for `pricing_interval.unit`. Only present when `pricing_model` is `unit_subscription`, or `plan` with configured recurring terms. Omitted for other pricing models and plans without configured terms.
    *
    * @deprecated
@@ -34146,7 +34150,7 @@ export type AmbConversationWritable = {
    */
   routing_change: AmbConversationRoutingChangeWritable | null;
   /**
-   * Most recent message, or null when its identity has not been recorded.
+   * Most recent message, or null when no message identity has been recorded for the conversation, for example one opened by an invitation acceptance before its first message.
    */
   last_message: AmbConversationLastMessageWritable | null;
   /**
@@ -36905,6 +36909,10 @@ export type BillingResolvedPriceWritable = {
    */
   name: string;
   pricing_model: BillingPricingModel;
+  /**
+   * Whether your organization's next unit of this `unit_subscription` product, with the requested `dimensions`, is free because a plan includes it. It reflects the organization's current active entitlements, whatever `plan_id` is requested, so it does not describe a candidate plan. A unit with dimensions that no included pattern matches is not free. `unit_price` and `gross_price` stay the published price a unit pays beyond the included units. Always `false` for other pricing models.
+   */
+  included: boolean;
   /**
    * Period covered by the resolved recurring rate. Present for `unit_subscription` products and plans with configured recurring terms. Omitted for other pricing models and plans without configured terms.
    */
@@ -72570,7 +72578,7 @@ export type GetBillingResolvedPriceData = {
      */
     product_slug?: string;
     /**
-     * Published self-serve plan to price under in place of your current plan. Returns `404` if the plan is not an active self-serve plan.
+     * Published self-serve plan to price under in place of your current plan. Returns `404` if the plan is not an active self-serve plan. The response's `included` flag still reflects your current entitlements, not this plan.
      */
     plan_id?: ProductId;
     /**

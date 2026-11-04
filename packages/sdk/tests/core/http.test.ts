@@ -6,6 +6,7 @@ import {
 } from "../../src/core/http.js";
 import {
   BirdConflictError,
+  BirdConnectionError,
   BirdRateLimitError,
   BirdServiceUnavailableError,
   BirdTimeoutError,
@@ -44,6 +45,18 @@ describe("BirdHTTPClient.request — retry matrix", () => {
     const { data } = await core.request(s.thunk, { method: "POST" });
     expect(s.calls()).toBe(2);
     expect(data).toEqual({ id: "em_1" });
+  });
+
+  it("retries a BirdConnectionError the transport throws", async () => {
+    let calls = 0;
+    const thunk = () => {
+      calls += 1;
+      if (calls === 1) throw new BirdConnectionError("storage unreachable");
+      return Promise.resolve(ok({ id: "media_1" }) as FetchOutcome<unknown>);
+    };
+    const { data } = await core.request(thunk, { method: "GET" });
+    expect(calls).toBe(2);
+    expect(data).toEqual({ id: "media_1" });
   });
 
   it("does NOT retry a 409 conflict", async () => {

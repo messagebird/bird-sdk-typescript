@@ -3,7 +3,12 @@ import {
   createConfig,
   type Client,
 } from "./generated/client/index.js";
-import { baseUrlForRegion, regionFromApiKey } from "./region.js";
+import { baseUrlForRegion, mtlsBaseUrlForRegion, regionFromApiKey } from "./region.js";
+import {
+  certificateFetch,
+  checkClientCertificate,
+  type ClientCertificateOptions,
+} from "./core/client-certificate.js";
 import {
   detectCallerInfo,
   normalizeModel,
@@ -83,6 +88,8 @@ export interface BirdClientOptions {
   maxRetries?: number;
   /** Custom fetch for testing, proxying, or edge-runtime adapters. Default global fetch. */
   fetch?: typeof fetch;
+  /** Node.js only, with the optional `undici` dependency. Selects the region's mTLS endpoint unless `baseUrl` is set. */
+  clientCertificate?: ClientCertificateOptions;
   /** Headers added to every request. SDK-internal headers win on conflict. */
   defaultHeaders?: Record<string, string>;
   /**
@@ -152,7 +159,7 @@ function resolveBaseUrl(options: BirdClientOptions): string | undefined {
         "bk_{region}_{token} or bm_{region}_{token} format. Pass an explicit `region` or `baseUrl`.",
     );
   }
-  return baseUrlForRegion(region);
+  return options.clientCertificate ? mtlsBaseUrlForRegion(region) : baseUrlForRegion(region);
 }
 
 // The raw escape hatch accepts caller-supplied paths. Require an absolute path
@@ -300,6 +307,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
       this.#missingAuth =
         "This client has no API key (webhook verification only); pass `apiKey` to call the API.";
     }
+    if (opts.clientCertificate) checkClientCertificate(opts.clientCertificate, opts.fetch);
     this.#baseUrl = resolveBaseUrl(opts);
     this.#headers = {
       ...withoutCallerHeaders(opts.defaultHeaders),
@@ -317,7 +325,9 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
       this.#headers["Bird-Caller-Source"] = caller.source;
       this.#headers["Bird-Caller-Execution"] = caller.execution;
     }
-    const rawFetch = opts.fetch ?? fetch;
+    const rawFetch = opts.clientCertificate
+      ? certificateFetch(opts.clientCertificate)
+      : (opts.fetch ?? fetch);
     const disabled =
       new Headers(opts.defaultHeaders).get("Bird-Enrichment") === "0";
     this.#fetch = Object.assign(

@@ -18,6 +18,7 @@ import {
   mapResponseToError,
   parseRetryAfter,
 } from "../errors.js";
+import { ClientCertificateError } from "./client-certificate.js";
 
 /** Transport metadata exposed to callers via `.withResponse()`. */
 export interface BirdResponse {
@@ -152,6 +153,7 @@ export class BirdHTTPClient {
       } catch (err) {
         // The fetch rejected: caller abort, per-attempt timeout, or network.
         throwIfAborted(options.signal); // caller abort wins, terminal
+        if (err instanceof ClientCertificateError) throw err;
         await retryOrThrow(() =>
           timeoutSignal.aborted
             ? new BirdTimeoutError(`Request timed out after ${timeout}ms`, timeout)

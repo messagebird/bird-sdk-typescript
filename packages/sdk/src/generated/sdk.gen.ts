@@ -14666,7 +14666,7 @@ export const rotateWebhookSecret = <ThrowOnError extends boolean = false>(
  *
  * Sends a signed synthetic event and returns whether your endpoint accepted it, its HTTP status, and the round-trip latency. An unreachable endpoint returns `status: failed` in the response body. The endpoint has 10 seconds to respond.
  *
- * The body is a minimal JSON object with the event `type`, signed like a real delivery. It does not mirror that event's payload. Tests work on paused endpoints and do not appear in [List delivery attempts](/docs/api/reference/list-webhook-attempts).
+ * The body is a minimal JSON object with the event `type` and `test: true`, signed like a real delivery. When the endpoint has a filter, `data` contains its configured equality values. It does not mirror that event's payload. Tests work on paused endpoints and do not appear in [List delivery attempts](/docs/api/reference/list-webhook-attempts).
  *
  * The operation returns `412` if the endpoint lacks a valid signing secret or, when `event_type` is omitted, has no subscribed event type to use.
  *

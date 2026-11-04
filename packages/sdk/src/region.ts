@@ -13,3 +13,7 @@ export function regionFromApiKey(apiKey: string): string | undefined {
 export function baseUrlForRegion(region: string): string {
   return `https://${region}.platform.bird.com`;
 }
+
+export function mtlsBaseUrlForRegion(region: string): string {
+  return `https://mtls.${region}.platform.bird.com`;
+}

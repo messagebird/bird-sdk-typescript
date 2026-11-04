@@ -488,6 +488,7 @@ export type {
   // channel authorization (authorizeChannel's return shape)
   ChannelAuthorization,
 } from "./resources/realtime.js";
+export type { ClientCertificateOptions } from "./core/client-certificate.js";
 export { WebhookEventType } from "./event-types.gen.js";
 export type { WebhookEventTypeValue } from "./event-types.gen.js";
 export {

@@ -6,7 +6,7 @@ The official TypeScript SDK for the [Bird](https://bird.com) API: email, SMS, Wh
 
 ## Requirements
 
-- **Node.js 20.3+** or a modern edge runtime (Cloudflare Workers, Vercel Edge, Deno). The SDK uses only web-standard APIs (`fetch`, `AbortSignal`, Web Crypto) and ships no Node built-ins.
+- **Node.js 20.3+** or a modern edge runtime (Cloudflare Workers, Vercel Edge, Deno). The SDK uses only web-standard APIs (`fetch`, `AbortSignal`, Web Crypto). Only the Node.js-only `clientCertificate` option loads Node built-ins and the optional `undici` dependency.
 - **ESM package.** `import` works everywhere. `require("@messagebird/sdk")` also works on Node 20.19+ (via `require(esm)`); on older runtimes, load it with `await import("@messagebird/sdk")`.
 
 ## Install
@@ -188,6 +188,8 @@ new BirdClient({
   defaultHeaders: { "X-My-Header": "…" },
 });
 ```
+
+On Node.js, `clientCertificate: { cert: "client.pem", key: "client.key" }` presents a client certificate on every request and, unless `baseUrl` is set, sends requests to the region's mTLS endpoint. It needs the optional `undici` dependency and cannot be combined with `fetch`.
 
 ## Apple Messages quickstart
 
