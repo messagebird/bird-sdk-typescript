@@ -39205,6 +39205,7 @@ export const EmailTemplateSummarySchema = {
     "live_version_number",
     "languages",
     "default_language",
+    "live_default_language",
     "available_languages",
     "description",
     "last_submitted_at",
@@ -39342,7 +39343,21 @@ export const EmailTemplateSummarySchema = {
       $ref: "#/components/schemas/LanguageTag",
       readOnly: true,
       description:
-        "The language the draft defaults to. Read this language's content when you have no particular preference for which one you want.\n",
+        "The language the draft defaults to. Read this language's content when you have no particular preference for which one you want. It becomes the live version's default when the draft is submitted; until then `live_default_language` can differ.\n",
+    },
+    live_default_language: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      example: "en",
+      description:
+        "The live version's default language. While the template's `language_source_required` is false, a send that names no language gets it, and a broadcast that selects no language gets the default of the published version it sends. A single send that names a language also gets it when the template's `on_missing_language` is `fallback` and the live version stocks no form of that language, even one only the draft has added: a request for `pt-BR` is served by the live version's `pt-BR`, then by its `pt` or another `pt` variant, and only then by this default. Null if the template has never been published. A built-in `system` template is always published and reports the same language as `default_language`.\n",
     },
     languages: {
       type: "object",
@@ -39557,6 +39572,7 @@ export const EmailTemplateSchema = {
     "revision",
     "languages",
     "default_language",
+    "live_default_language",
     "available_languages",
     "on_missing_language",
     "language_source_required",
@@ -39717,7 +39733,21 @@ export const EmailTemplateSchema = {
       $ref: "#/components/schemas/LanguageTag",
       readOnly: true,
       description:
-        "The language the draft defaults to. This is the language `languages` is\nkeyed against while you edit, and the language used by sends once you\nsubmit this draft.\n\nUntil then sends keep using the live version's default, so this can\ndiffer from what is being sent right now. `available_languages` describes\nthe live version for the same reason; read a version to see the default a\nsend currently uses.\n",
+        "The language the draft defaults to. This is the language `languages` is\nkeyed against while you edit, and it becomes the live version's default\nwhen you submit this draft.\n\nUntil then the live version keeps its own default, reported in\n`live_default_language`, so the two can differ. `available_languages`\ndescribes the live version for the same reason.\n",
+    },
+    live_default_language: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      example: "en",
+      description:
+        "The live version's default language. While `language_source_required` is false, a send that names no language gets it, and a broadcast that selects no language gets the default of the published version it sends. A single send that names a language also gets it when `on_missing_language` is `fallback` and the live version stocks no form of that language, even one only the draft has added: a request for `pt-BR` is served by the live version's `pt-BR`, then by its `pt` or another `pt` variant, and only then by this default. Null if the template has never been published. A built-in `system` template is always published and reports the same language as `default_language`.\n",
     },
     available_languages: {
       type: "array",

@@ -21639,10 +21639,15 @@ export type EmailTemplateSummary = {
    */
   readonly available_languages: Array<LanguageTag>;
   /**
-   * The language the draft defaults to. Read this language's content when you have no particular preference for which one you want.
+   * The language the draft defaults to. Read this language's content when you have no particular preference for which one you want. It becomes the live version's default when the draft is submitted; until then `live_default_language` can differ.
    *
    */
   readonly default_language: LanguageTag;
+  /**
+   * The live version's default language. While the template's `language_source_required` is false, a send that names no language gets it, and a broadcast that selects no language gets the default of the published version it sends. A single send that names a language also gets it when the template's `on_missing_language` is `fallback` and the live version stocks no form of that language, even one only the draft has added: a request for `pt-BR` is served by the live version's `pt-BR`, then by its `pt` or another `pt` variant, and only then by this default. Null if the template has never been published. A built-in `system` template is always published and reports the same language as `default_language`.
+   *
+   */
+  readonly live_default_language: LanguageTag | null;
   /**
    * Every language this template has, keyed by language tag, each with its state. Enough to show which templates need attention in a list without a request per row.
    *
@@ -21853,16 +21858,20 @@ export type EmailTemplate = {
   };
   /**
    * The language the draft defaults to. This is the language `languages` is
-   * keyed against while you edit, and the language used by sends once you
-   * submit this draft.
+   * keyed against while you edit, and it becomes the live version's default
+   * when you submit this draft.
    *
-   * Until then sends keep using the live version's default, so this can
-   * differ from what is being sent right now. `available_languages` describes
-   * the live version for the same reason; read a version to see the default a
-   * send currently uses.
+   * Until then the live version keeps its own default, reported in
+   * `live_default_language`, so the two can differ. `available_languages`
+   * describes the live version for the same reason.
    *
    */
   readonly default_language: LanguageTag;
+  /**
+   * The live version's default language. While `language_source_required` is false, a send that names no language gets it, and a broadcast that selects no language gets the default of the published version it sends. A single send that names a language also gets it when `on_missing_language` is `fallback` and the live version stocks no form of that language, even one only the draft has added: a request for `pt-BR` is served by the live version's `pt-BR`, then by its `pt` or another `pt` variant, and only then by this default. Null if the template has never been published. A built-in `system` template is always published and reports the same language as `default_language`.
+   *
+   */
+  readonly live_default_language: LanguageTag | null;
   /**
    * The languages this template currently supports for sending, as BCP-47 tags. Empty until the template is published, because sends serve published content. The set may shrink for reasons other than editing, so read it rather than assuming it matches what was published. A built-in `system` template has no publish step and always reports its one language.
    *
@@ -43004,7 +43013,7 @@ export type ListAudienceContactsData = {
   };
   query?: {
     /**
-     * Case-insensitive substring match against a contact's email address or the digits in its international phone number.
+     * Case-insensitive substring match against a contact's email address, first name, last name, or the digits in its international phone number.
      */
     q?: string;
     /**
