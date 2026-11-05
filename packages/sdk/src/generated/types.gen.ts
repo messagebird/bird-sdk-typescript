@@ -27639,7 +27639,8 @@ export type VoiceSessionCredential = {
 
 /**
  * Why we rejected the leg. Use `rejection_reason` to identify the cause;
- * `sip_response_code` alone cannot distinguish these reasons.
+ * `sip_response_code` alone cannot distinguish these reasons. Treat an
+ * unrecognized value as a reason added later.
  *
  * You can resolve these issues:
  *
@@ -27666,6 +27667,14 @@ export type VoiceSessionCredential = {
  * - `calls_per_second_exceeded`: You placed legs faster than your account
  *   allows. Reduce your dialing rate and retry.
  *
+ * - `emergency_number_inactive`: The trunk's emergency number does not have an
+ *   active emergency service. If the service is pending, wait for it to become
+ *   active. If it needs changes, finish the filing it is waiting on. If it was
+ *   rejected or canceled, the number needs a new emergency service, or the trunk
+ *   needs a different emergency number.
+ * - `emergency_cap_exceeded`: The trunk already carries 10 emergency calls.
+ *   The 11th is refused until one ends.
+ *
  * For all other reasons, contact support and provide the leg `id`:
  *
  * - `routing_not_configured`: This trunk has no dial plan, which can happen on
@@ -27675,6 +27684,8 @@ export type VoiceSessionCredential = {
  * - `destination_blocked`: The destination is blocked by our routing
  *   configuration.
  * - `call_not_permitted`: The leg could not be priced for your account.
+ * - `emergency_carrier_unavailable`: No carrier we use accepts emergency calls
+ *   from the trunk's emergency number.
  *
  */
 export type VoiceLegRejectionReason =
@@ -27689,7 +27700,11 @@ export type VoiceLegRejectionReason =
   | "concurrent_calls_exceeded"
   | "calls_per_second_exceeded"
   | "call_not_permitted"
-  | "number_ownership_not_verified";
+  | "number_ownership_not_verified"
+  | "emergency_number_inactive"
+  | "emergency_cap_exceeded"
+  | "emergency_carrier_unavailable"
+  | (string & {});
 
 /**
  * Which answer handled this incoming leg.
@@ -43497,12 +43512,12 @@ export type ListSmsMessagesData = {
      */
     direction?: MessageDirection;
     /**
-     * Keep only messages whose current `status` matches; repeat the parameter to match any of several. One of `scheduled`, `accepted`, `sent`, `delivered`, `undelivered`, `failed`, `rejected`, `canceled`, `expired`, or `received`. `scheduled` and `canceled` are accepted but match nothing until send-later scheduling ships.
+     * Keep only messages whose current `status` matches; repeat the parameter to match any of several. One of `scheduled`, `accepted`, `sent`, `delivered`, `undelivered`, `failed`, `rejected`, `canceled`, `expired`, or `received`. `scheduled` and `canceled` are accepted but match nothing until send-later scheduling ships. With a `status` or `error_code` filter a page can hold fewer messages than `limit`, or none; keep paging until `next_cursor` is null.
      *
      */
     status?: Array<string>;
     /**
-     * Keep only messages whose failure reason (`last_error.code`) matches; repeat the parameter to match any of several. One of `invalid_destination`, `unreachable`, `blocked_by_carrier`, `blocked_by_fraud_protection`, `blocked_by_recipient`, `landline_unreachable`, `content_rejected`, `sender_unregistered`, `recipient_opted_out`, `provider_unavailable`, `insufficient_balance`, or `unknown`.
+     * Keep only messages whose failure reason (`last_error.code`) matches; repeat the parameter to match any of several. One of `invalid_destination`, `unreachable`, `blocked_by_carrier`, `blocked_by_fraud_protection`, `blocked_by_recipient`, `landline_unreachable`, `content_rejected`, `sender_unregistered`, `recipient_opted_out`, `provider_unavailable`, `insufficient_balance`, or `unknown`. With a `status` or `error_code` filter a page can hold fewer messages than `limit`, or none; keep paging until `next_cursor` is null.
      *
      */
     error_code?: Array<string>;

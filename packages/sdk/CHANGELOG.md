@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.125.0
+
+- **Breaking:** `VoiceLeg["rejection_reason"]` accepts any string as well as its known values, so an exhaustive switch over `rejection_reason` needs a default branch. It gains `emergency_number_inactive`, `emergency_cap_exceeded` and `emergency_carrier_unavailable`.
+
 ## 0.124.0
 
 - **Breaking:** calls with an unset required nullable request field now fail locally before sending, without retries. Supply `null` or a value for `inbound_configuration.route`, `daily_spend_limit.workspace_limit`, `destinations[].daily_spend_limit.limit`, verified-number `name`, and call creation’s `sequence.definition.presentation.preview.execution_sample.call.orig` and `.dest` when their containing objects are present. Calls without an execution sample are unaffected. Explicit `null` is still sent unchanged.

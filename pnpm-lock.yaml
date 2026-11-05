@@ -18,8 +18,8 @@ importers:
   packages/realtime:
     devDependencies:
       tsdown:
-        specifier: 0.23.1
-        version: 0.23.1(publint@0.3.21)(tsx@4.21.0)(typescript@7.1.0-beta)(unrun@0.3.1)
+        specifier: 0.23.2
+        version: 0.23.2(publint@0.3.21)(tsx@4.21.0)(typescript@7.1.0-beta)(unrun@0.3.1)
       typescript:
         specifier: npm:typescript@7.1.0-beta
         version: 7.1.0-beta
@@ -49,8 +49,8 @@ importers:
         specifier: 0.0.0-next-20260930190945
         version: 0.0.0-next-20260930190945(magicast@0.5.3)
       tsdown:
-        specifier: 0.23.1
-        version: 0.23.1(publint@0.3.21)(tsx@4.21.0)(typescript@7.1.0-beta)(unrun@0.3.1)
+        specifier: 0.23.2
+        version: 0.23.2(publint@0.3.21)(tsx@4.21.0)(typescript@7.1.0-beta)(unrun@0.3.1)
       typescript:
         specifier: npm:typescript@7.1.0-beta
         version: 7.1.0-beta
@@ -3524,14 +3524,14 @@ packages:
   ts-toolbelt@6.15.5:
     resolution: {integrity: sha512-FZIXf1ksVyLcfr7M317jbB67XFJhOO1YqdTcuGaq9q5jLUoTikukZ+98TPjKiP2jC5CgmYdWWYs0s2nLSU0/1A==}
 
-  tsdown@0.23.1:
-    resolution: {integrity: sha512-MSC2WSOts3in95J334/VIS7KPfor3eCSvndJ6KdoVj9Aak9Kh1aNfz9ws5owhdukuTNSXRdfkPEzA/ihpDD6SA==}
+  tsdown@0.23.2:
+    resolution: {integrity: sha512-om1OoDykFlv07uM98WAX3ZNmu02FBmHqZYLW1hm+IMktb92r7VMNKgQ/G8dknECI1Q2huPrFJ+sggdYk8efsQg==}
     engines: {node: ^22.18.0 || ^24.11.0 || >=26.0.0}
     hasBin: true
     peerDependencies:
       '@arethetypeswrong/core': ^0.18.1
-      '@tsdown/css': 0.23.1
-      '@tsdown/exe': 0.23.1
+      '@tsdown/css': 0.23.2
+      '@tsdown/exe': 0.23.2
       '@vitejs/devtools': '*'
       publint: ^0.3.8
       tsx: '*'
@@ -7004,7 +7004,7 @@ snapshots:
 
   ts-toolbelt@6.15.5: {}
 
-  tsdown@0.23.1(publint@0.3.21)(tsx@4.21.0)(typescript@7.1.0-beta)(unrun@0.3.1):
+  tsdown@0.23.2(publint@0.3.21)(tsx@4.21.0)(typescript@7.1.0-beta)(unrun@0.3.1):
     dependencies:
       cac: 7.1.0
       defu: 6.1.7

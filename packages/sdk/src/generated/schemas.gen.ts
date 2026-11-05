@@ -49830,7 +49830,7 @@ export const VoiceSessionCredentialSchema = {
 export const VoiceLegRejectionReasonSchema = {
   type: "string",
   minLength: 1,
-  enum: [
+  "x-extensible-enum": [
     "source_not_allowed",
     "caller_id_not_verified",
     "routing_not_configured",
@@ -49843,23 +49843,12 @@ export const VoiceLegRejectionReasonSchema = {
     "calls_per_second_exceeded",
     "call_not_permitted",
     "number_ownership_not_verified",
-  ],
-  "x-enum-varnames": [
-    "VoiceCallRejectionReasonSourceNotAllowed",
-    "VoiceCallRejectionReasonCallerIDNotVerified",
-    "VoiceCallRejectionReasonRoutingNotConfigured",
-    "VoiceCallRejectionReasonNoRouteFound",
-    "VoiceCallRejectionReasonDestinationBlocked",
-    "VoiceCallRejectionReasonDestinationNotEnabled",
-    "VoiceCallRejectionReasonInsufficientBalance",
-    "VoiceCallRejectionReasonDailySpendExceeded",
-    "VoiceCallRejectionReasonConcurrentCallsExceeded",
-    "VoiceCallRejectionReasonCallsPerSecondExceeded",
-    "VoiceCallRejectionReasonCallNotPermitted",
-    "VoiceCallRejectionReasonNumberOwnershipNotVerified",
+    "emergency_number_inactive",
+    "emergency_cap_exceeded",
+    "emergency_carrier_unavailable",
   ],
   description:
-    "Why we rejected the leg. Use `rejection_reason` to identify the cause;\n`sip_response_code` alone cannot distinguish these reasons.\n\nYou can resolve these issues:\n\n- `source_not_allowed`: The leg came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it or use a verified caller ID.\n- `number_ownership_not_verified`: The ownership documents for this purchased\n  number have not yet been accepted under its country's requirements. We\n  block outgoing and incoming legs on the number until verification is\n  complete. Blocked incoming legs never reach your PBX, and their route type\n  is `reject` regardless of the number's configuration. Open the number\n  under **Numbers** and complete its ownership requirements, then retry\n  the leg.\n- `destination_not_enabled`: Calling to this destination country is disabled.\n  Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet balance was too low for the leg.\n  Top up or enable automatic top-ups.\n- `daily_spend_exceeded`: The leg would exceed your organization's daily\n  voice spend limit. Retry after the limit resets at the start of the next\n  UTC day.\n- `concurrent_calls_exceeded`: You already have as many legs in progress as\n  your account allows. Wait for one to end or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed legs faster than your account\n  allows. Reduce your dialing rate and retry.\n\nFor all other reasons, contact support and provide the leg `id`:\n\n- `routing_not_configured`: This trunk has no dial plan, which can happen on\n  a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The leg could not be priced for your account.\n",
+    "Why we rejected the leg. Use `rejection_reason` to identify the cause;\n`sip_response_code` alone cannot distinguish these reasons. Treat an\nunrecognized value as a reason added later.\n\nYou can resolve these issues:\n\n- `source_not_allowed`: The leg came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it or use a verified caller ID.\n- `number_ownership_not_verified`: The ownership documents for this purchased\n  number have not yet been accepted under its country's requirements. We\n  block outgoing and incoming legs on the number until verification is\n  complete. Blocked incoming legs never reach your PBX, and their route type\n  is `reject` regardless of the number's configuration. Open the number\n  under **Numbers** and complete its ownership requirements, then retry\n  the leg.\n- `destination_not_enabled`: Calling to this destination country is disabled.\n  Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet balance was too low for the leg.\n  Top up or enable automatic top-ups.\n- `daily_spend_exceeded`: The leg would exceed your organization's daily\n  voice spend limit. Retry after the limit resets at the start of the next\n  UTC day.\n- `concurrent_calls_exceeded`: You already have as many legs in progress as\n  your account allows. Wait for one to end or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed legs faster than your account\n  allows. Reduce your dialing rate and retry.\n\n- `emergency_number_inactive`: The trunk's emergency number does not have an\n  active emergency service. If the service is pending, wait for it to become\n  active. If it needs changes, finish the filing it is waiting on. If it was\n  rejected or canceled, the number needs a new emergency service, or the trunk\n  needs a different emergency number.\n- `emergency_cap_exceeded`: The trunk already carries 10 emergency calls.\n  The 11th is refused until one ends.\n\nFor all other reasons, contact support and provide the leg `id`:\n\n- `routing_not_configured`: This trunk has no dial plan, which can happen on\n  a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The leg could not be priced for your account.\n- `emergency_carrier_unavailable`: No carrier we use accepts emergency calls\n  from the trunk's emergency number.\n",
   example: "destination_not_enabled",
 } as const;
 

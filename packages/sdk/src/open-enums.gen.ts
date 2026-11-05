@@ -1135,6 +1135,32 @@ export const VoiceLegMediaEncryption = {
 export type VoiceLegMediaEncryptionValue = (typeof VoiceLegMediaEncryption)[keyof typeof VoiceLegMediaEncryption];
 
 /**
+ * Values of VoiceLegRejectionReason known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const VoiceLegRejectionReason = {
+  CallNotPermitted: "call_not_permitted",
+  CallerIdNotVerified: "caller_id_not_verified",
+  CallsPerSecondExceeded: "calls_per_second_exceeded",
+  ConcurrentCallsExceeded: "concurrent_calls_exceeded",
+  DailySpendExceeded: "daily_spend_exceeded",
+  DestinationBlocked: "destination_blocked",
+  DestinationNotEnabled: "destination_not_enabled",
+  EmergencyCapExceeded: "emergency_cap_exceeded",
+  EmergencyCarrierUnavailable: "emergency_carrier_unavailable",
+  EmergencyNumberInactive: "emergency_number_inactive",
+  InsufficientBalance: "insufficient_balance",
+  NoRouteFound: "no_route_found",
+  NumberOwnershipNotVerified: "number_ownership_not_verified",
+  RoutingNotConfigured: "routing_not_configured",
+  SourceNotAllowed: "source_not_allowed",
+} as const;
+
+/** A known VoiceLegRejectionReason value. */
+export type VoiceLegRejectionReasonValue = (typeof VoiceLegRejectionReason)[keyof typeof VoiceLegRejectionReason];
+
+/**
  * Values of VoicePartyEndpointType known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
