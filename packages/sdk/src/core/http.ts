@@ -19,6 +19,7 @@ import {
   parseRetryAfter,
 } from "../errors.js";
 import { ClientCertificateError } from "./client-certificate.js";
+import { RequestPresenceError } from "./requestPresence.js";
 
 /** Transport metadata exposed to callers via `.withResponse()`. */
 export interface BirdResponse {
@@ -103,7 +104,10 @@ export class BirdHTTPClient {
       const cred = this.defaults.credentials?.[scheme];
       if (!cred) throw new Error(`Unknown credential scheme "${scheme}"`);
       const value = override?.[scheme] ?? cred.value;
-      if (!value) throw new Error(`${cred.header} is required for this operation. ${cred.how}`);
+      if (!value)
+        throw new Error(
+          `${cred.header} is required for this operation. ${cred.how}`,
+        );
       out[cred.header] = value;
     }
     return out;
@@ -154,19 +158,26 @@ export class BirdHTTPClient {
         // The fetch rejected: caller abort, per-attempt timeout, or network.
         throwIfAborted(options.signal); // caller abort wins, terminal
         if (err instanceof ClientCertificateError) throw err;
+        if (err instanceof RequestPresenceError) throw err;
         await retryOrThrow(() =>
           timeoutSignal.aborted
-            ? new BirdTimeoutError(`Request timed out after ${timeout}ms`, timeout)
+            ? new BirdTimeoutError(
+                `Request timed out after ${timeout}ms`,
+                timeout,
+              )
             : new BirdConnectionError(errorMessage(err)),
         );
         continue;
       }
 
+      if (outcome.error instanceof RequestPresenceError) throw outcome.error;
       const res = outcome.response;
       if (!res) {
         // A resolved call with no response is a transport failure (the client
         // normally rejects instead) — treat it like a network error.
-        await retryOrThrow(() => new BirdConnectionError("No response received from the server"));
+        await retryOrThrow(
+          () => new BirdConnectionError("No response received from the server"),
+        );
         continue;
       }
       if (res.ok || res.status === options.successStatus) {
@@ -200,7 +211,9 @@ function backoffDelay(attempt: number): number {
 /** Honor Retry-After on a retryable response, else fall back to backoff. */
 function retryDelay(attempt: number, headers: Headers): number {
   const seconds = parseRetryAfter(headers);
-  return seconds === undefined ? backoffDelay(attempt) : Math.min(seconds * 1000, RETRY_AFTER_CAP_MS);
+  return seconds === undefined
+    ? backoffDelay(attempt)
+    : Math.min(seconds * 1000, RETRY_AFTER_CAP_MS);
 }
 
 function toBirdResponse(res: Response): BirdResponse {

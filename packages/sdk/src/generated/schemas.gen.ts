@@ -6709,6 +6709,9 @@ export const RealtimePublishSchema = {
     },
     data: {
       $ref: "#/components/schemas/RealtimeEventData",
+      type: ["object", "array", "string", "number", "boolean", "null"],
+      description:
+        "The event payload, up to 10 KB serialized; null delivers a JSON null payload.",
     },
     exclude_connection_id: {
       $ref: "#/components/schemas/RealtimeExcludeConnectionId",
@@ -6796,6 +6799,9 @@ export const RealtimeBatchEventSchema = {
     },
     data: {
       $ref: "#/components/schemas/RealtimeEventData",
+      type: ["object", "array", "string", "number", "boolean", "null"],
+      description:
+        "The event payload, up to 10 KB serialized; null delivers a JSON null payload.",
     },
     exclude_connection_id: {
       $ref: "#/components/schemas/RealtimeExcludeConnectionId",
@@ -6954,6 +6960,9 @@ export const RealtimeMemberPublishSchema = {
     },
     data: {
       $ref: "#/components/schemas/RealtimeEventData",
+      type: ["object", "array", "string", "number", "boolean", "null"],
+      description:
+        "The event payload, up to 10 KB serialized; null delivers a JSON null payload.",
     },
   },
 } as const;
@@ -8374,13 +8383,15 @@ export const EmailBroadcastStatusSchema = {
     "scheduled",
     "accepted",
     "sending",
+    "waiting_for_funds",
+    "paused",
     "sent",
     "canceling",
     "canceled",
     "failed",
   ],
   description:
-    "Where the broadcast itself has got to. This is separate from what happened to individual recipients, which the broadcast's own `sent_count`, `delivered_count`, `bounced_count` and `complained_count` tell you. Those four are fields on the broadcast, not on everything that carries this status, and reading the broadcast's recipients or its events gives the same outcomes one recipient at a time.\n\n- `draft`: Created, and not sent or scheduled yet.\n- `scheduled`: Due to send at `scheduled_at`. You can still edit it, and you can still change the time, right up until sending starts.\n- `accepted`: Taken for immediate sending. Nothing has gone out yet.\n- `sending`: On its way. Some recipients have been sent to and some have not.\n- `sent`: Every recipient has been sent to.\n- `canceling`: A cancellation is under way and the remaining sends are stopping.\n- `canceled`: The cancellation finished. Anything already on its way to a recipient when you canceled cannot be pulled back.\n- `failed`: The broadcast could not be sent. Reading the broadcast gives `failure_reason`, which says why. If it had already started sending, the recipients it reached keep their delivery status and carry on producing events.\n\nA draft is deleted rather than canceled, because it was never sent.\n",
+    "Where the broadcast itself has got to. This is separate from what happened to individual recipients, which the broadcast's own `sent_count`, `delivered_count`, `bounced_count` and `complained_count` tell you. Those four are fields on the broadcast, not on everything that carries this status, and reading the broadcast's recipients or its events gives the same outcomes one recipient at a time.\n\nThe `waiting_for_funds` and `paused` values are declared ahead of server support for funding recovery. The send-allowance response includes `can_start` when that support is available. If the field is absent, do not assume the broadcast can wait for funds or resume.\n\n- `draft`: Created, and not sent or scheduled yet.\n- `scheduled`: Due to send at `scheduled_at`. You can still edit it, and you can still change the time, right up until sending starts.\n- `accepted`: Taken for immediate sending. Nothing has gone out yet.\n- `sending`: On its way. Some recipients have been sent to and some have not.\n- `waiting_for_funds`: Sending stopped because your balance cannot pay for more email. You can add funds manually or let your existing automatic top-up restore the balance. Bird checks once a minute and continues sending to the remaining recipients when a funding check succeeds before `funding_hold.wait_until`. Otherwise the broadcast becomes `paused`, even if funds arrive after the last check.\n- `paused`: Sending stopped because your balance cannot pay for more email, and it does not continue by itself. `funding_hold.reason` says why. Add funds, then resume the broadcast, or cancel it.\n- `sent`: Every recipient has been sent to.\n- `canceling`: A cancellation is under way and the remaining sends are stopping.\n- `canceled`: The cancellation finished. Anything already on its way to a recipient when you canceled cannot be pulled back.\n- `failed`: The broadcast could not be sent. Reading the broadcast gives `failure_reason`, which says why. If it had already started sending, the recipients it reached keep their delivery status and carry on producing events.\n\nA draft is deleted rather than canceled, because it was never sent. Recipients already sent to before a broadcast waits or pauses keep their delivery status, and are not sent to again when it continues.\n",
 } as const;
 
 export const AudienceIDSchema = {
@@ -8470,6 +8481,45 @@ export const EmailBroadcastTemplateSchema = {
     },
     parameter_overrides: {
       $ref: "#/components/schemas/EmailBroadcastParameterOverrides",
+    },
+  },
+} as const;
+
+export const EmailBroadcastFundingHoldReasonSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["automatic_top_up", "funds_required", "wait_expired"],
+  description:
+    "Why sending stopped for funds.\n\n- `automatic_top_up`: Sending stopped while automatic top-up was active. Sending can continue automatically when a funding check succeeds before `wait_until`.\n- `funds_required`: Sending stopped because your balance cannot pay for more email. While `waiting_for_funds`, a manual or automatic top-up can restart sending before `wait_until`. If the broadcast is `paused`, add funds if needed, then resume it.\n- `wait_expired`: Status is `paused`. The automatic wait ended before sending continued. Add funds if needed, then resume the broadcast.\n",
+} as const;
+
+export const EmailBroadcastFundingHoldSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["reason"],
+  description:
+    "Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.\n\nFunding recovery is declared ahead of server support. The send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.\n\nThe automatic wait lasts at most 20 minutes from the first time sending stops for funds. Later stops and top-ups do not extend it. Resuming a paused broadcast starts a new wait for any later stop.\n",
+  properties: {
+    reason: {
+      example: "funds_required",
+      $ref: "#/components/schemas/EmailBroadcastFundingHoldReason",
+    },
+    wait_until: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      example: "2026-09-02T08:35:03Z",
+      description:
+        "When the automatic wait ends, or ended. Absent when the broadcast paused without waiting.",
+    },
+    paused_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      example: "2026-09-02T08:35:03Z",
+      description:
+        "When the broadcast paused. Present only while `status` is `paused`.",
     },
   },
 } as const;
@@ -8733,12 +8783,16 @@ export const EmailBroadcastSchema = {
       readOnly: true,
       example: "sent",
       description:
-        "Where the broadcast itself has got to, separate from what happened to individual recipients: for that, read `sent_count`, `delivered_count`, `bounced_count` and `complained_count` below. When it is `failed`, `failure_reason` says why.\n",
+        "Where the broadcast itself has got to, separate from what happened to individual recipients: for that, read `sent_count`, `delivered_count`, `bounced_count` and `complained_count` below. When it is `failed`, `failure_reason` says why. When it is `waiting_for_funds` or `paused`, `funding_hold` says why and what happens next.\n",
       allOf: [
         {
           $ref: "#/components/schemas/EmailBroadcastStatus",
         },
       ],
+    },
+    funding_hold: {
+      readOnly: true,
+      $ref: "#/components/schemas/EmailBroadcastFundingHold",
     },
     next: {
       type: "array",
@@ -8929,7 +8983,7 @@ export const EmailBroadcastSchema = {
       readOnly: true,
       example: "2026-09-02T08:00:03.771Z",
       description:
-        "When the broadcast started sending. Absent until then. Compare with `sent_at`, which is when the broadcast finished sending.",
+        "When the broadcast started sending. Absent until then. Older broadcasts waiting or paused for funds may lack that timestamp; they report their send authorization time, or creation time if that is also missing, so late-resume confirmation uses the same conservative time as the server. Compare with `sent_at`, which is when the broadcast finished sending.",
     },
     sent_at: {
       type: ["string", "null"],
@@ -8952,6 +9006,22 @@ export const EmailBroadcastSchema = {
       description:
         "Why the broadcast failed, when it could not prepare or render its template inputs. A failed broadcast cannot be updated or sent again. Correct the input or template that `pointer` and `problems` name, then create a new broadcast with the corrected inputs and send it. When `code` is `transport_missing` or `transport_invalid`, the broadcast's saved content cannot be used and changing an input does not fix it, so contact Bird support.\n\nAbsent when the broadcast did not fail this way. Returned on a single broadcast read and on the broadcast that creating, updating, sending or canceling one returns, and absent from the list.\n",
     },
+  },
+  example: {
+    id: "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    display_label: "Weekly news",
+    category: "marketing",
+    status: "sent",
+    recipient_count: 4820,
+    sent_count: 4820,
+    delivered_count: 4712,
+    track_opens: true,
+    track_clicks: true,
+    created_at: "2026-09-01T09:14:02.418Z",
+    started_at: "2026-09-02T08:00:03.771Z",
+    sent_at: "2026-09-02T08:11:47.902Z",
+    failure_reason: null,
+    failure_detail: null,
   },
 } as const;
 
@@ -9335,7 +9405,7 @@ export const EmailSendAllowanceLimitReasonSchema = {
     "custom_limit",
   ],
   description:
-    "What sets the monthly email limit and how to raise it.\n\n- `plan`: the organization's monthly email limit. This is the plan's included volume unless we have set a different limit for the organization. If the limit matches the included volume, a plan with more included volume raises it. Otherwise, contact Bird support.\n- `overage_off`: email overage is turned off, so sending stops at the included volume. Turn email overage back on to raise the monthly email limit.\n- `overdue_payment`: an overdue payment pauses email overage, so sending stops at the included volume. Pay the overdue invoice to raise the monthly email limit.\n- `unfunded`: the wallet cannot cover email overage, or its funding cannot be confirmed, so sending stops at the included volume. Top up the wallet if it lacks funds. Email overage resumes once sufficient funding is confirmed.\n- `overage_ceiling`: email overage is billed up to a configured multiple of the included volume. A plan with more included volume raises the email overage ceiling.\n- `custom_limit`: we have set a monthly email limit for the organization that differs from the plan's included volume. Contact Bird support to change it. These limits currently report as `plan`. This enum value is declared in advance so reporting them as `custom_limit` will not be a breaking change.\n",
+    "What sets the monthly email limit and how to raise it.\n\n- `plan`: the organization's monthly email limit. This is the plan's included volume unless we have set a different limit for the organization. If the limit matches the included volume, a plan with more included volume raises it. Otherwise, contact Bird support.\n- `overage_off`: email overage is turned off, so sending stops at the included volume. Turn email overage back on to raise the monthly email limit.\n- `overdue_payment`: an overdue payment pauses email overage, so sending stops at the included volume. Pay the overdue invoice to raise the monthly email limit.\n- `unfunded`: funding for email overage could not be confirmed, so sending stops at the included volume. Top up the wallet if it lacks funds. If it has sufficient funds, retry the allowance check. Email overage resumes once sufficient funding is confirmed.\n- `overage_ceiling`: email overage is billed up to a configured multiple of the included volume. A plan with more included volume raises the email overage ceiling.\n- `custom_limit`: we have set a monthly email limit for the organization that differs from the plan's included volume. Contact Bird support to change it. These limits currently report as `plan`. This enum value is declared in advance so reporting them as `custom_limit` will not be a breaking change.\n",
 } as const;
 
 export const EmailBroadcastCountAllowanceSchema = {
@@ -9373,12 +9443,34 @@ export const EmailBroadcastCountAllowanceSchema = {
   },
 } as const;
 
+export const EmailBroadcastInsufficientFundsBehaviorSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["wait_for_top_up", "pause"],
+  description:
+    "Declared ahead of server support for funding recovery. When returned in the send-allowance response, this describes what a broadcast does if your balance runs out while it is sending. Recipients already sent to are not affected either way.\n\n- `wait_for_top_up`: The broadcast waits up to 20 minutes for a manual or automatic top-up. It checks once a minute and continues by itself when funds cover the next batch of recipients, then pauses if the wait ends. Waiting does not change your automatic top-up settings or initiate a payment.\n- `pause`: The broadcast pauses until you add funds and resume it.\n",
+} as const;
+
 export const EmailBroadcastSendQuotaSchema = {
   type: "object",
   additionalProperties: false,
   required: ["recipients", "allowed", "limited_by"],
   description:
-    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit.\n",
+    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\nThe optional `can_start` and `on_insufficient_funds` fields are declared ahead of server support for funding recovery. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.\n",
+  example: {
+    recipients: 12000,
+    allowed: 5000,
+    limited_by: "monthly",
+    limit: 50000,
+    remaining: 7000,
+    resets_at: "2026-09-01T00:00:00Z",
+    limit_reason: "plan",
+    broadcasts: {
+      limit: 20,
+      remaining: 4,
+      resets_at: "2026-09-01T00:00:00Z",
+    },
+  },
   properties: {
     recipients: {
       type: "integer",
@@ -9396,7 +9488,7 @@ export const EmailBroadcastSendQuotaSchema = {
       readOnly: true,
       example: 5000,
       description:
-        "Number of recipients covered by the organization's email send allowance at `send_at`, or now if you omit it. Equals `recipients` when no email limit restricts the send. It is lower when the remaining allowance cannot cover the audience.\n\nPartially covered broadcasts send in whole batches. This count is rounded down to a batch boundary and can be lower than `remaining`. Read this value directly instead of calculating it from `limit` and `remaining`.\n\nA value of 0 means no recipients would receive the broadcast. This happens if the audience exceeds the full email limit, which rejects the send, or if the remaining allowance cannot cover a batch.\n",
+        "Number of recipients covered by the organization's email send allowance at `send_at`, or now if you omit it. Equals `recipients` when no email limit restricts the send. It is lower when the remaining allowance cannot cover the audience.\n\nPartially covered broadcasts send in whole batches. This count is rounded down to a batch boundary and can be lower than `remaining`. Read this value directly instead of calculating it from `limit` and `remaining`.\n\nA value of 0 means no recipients are currently covered. This happens if the audience exceeds the full email limit, which rejects the send, or if the remaining allowance cannot cover a batch. When `can_start` is present, use it to decide whether a balance-limited broadcast can start and wait for funds. If it is absent, a zero allowance does not provide a way to send.\n",
     },
     limited_by: {
       readOnly: true,
@@ -9438,6 +9530,18 @@ export const EmailBroadcastSendQuotaSchema = {
     broadcasts: {
       readOnly: true,
       $ref: "#/components/schemas/EmailBroadcastCountAllowance",
+    },
+    on_insufficient_funds: {
+      readOnly: true,
+      example: "wait_for_top_up",
+      $ref: "#/components/schemas/EmailBroadcastInsufficientFundsBehavior",
+    },
+    can_start: {
+      type: "boolean",
+      readOnly: true,
+      example: true,
+      description:
+        "When present, whether the organization's email limits let this broadcast start at `send_at`, or now if you omit it. A balance that cannot pay for the next batch does not make this `false`: once started, the broadcast waits or pauses until funds return, as `on_insufficient_funds` describes.\n\nIt is `false` when no recipient would be sent, including when the audience exceeds the full daily or monthly limit or none of that limit remains. A `true` value does not reserve allowance or promise that every recipient is sent. Other checks still apply when you send.\n",
     },
   },
 } as const;
@@ -10733,9 +10837,10 @@ export const ContactPropertyCreateRequestSchema = {
       $ref: "#/components/schemas/ContactPropertyType",
     },
     fallback_value: {
+      type: ["string", "number", "boolean", "null"],
       maxLength: 500,
       description:
-        "Default used when a contact has no value for this property and the template does not supply an inline fallback. A string, number, boolean, or RFC 3339 datetime matching the declared type (strings up to `500` characters), or `null` for no fallback; a value of another type returns a validation error.",
+        "Default used when a contact has no value for this property and the template does not supply an inline fallback. A string, number, boolean, or RFC 3339 datetime string matching the declared type (strings up to `500` characters); a value of another type returns a validation error. Omit or set to `null` for no fallback.",
     },
   },
   example: {
@@ -10750,9 +10855,10 @@ export const ContactPropertyUpdateRequestSchema = {
   additionalProperties: false,
   properties: {
     fallback_value: {
+      type: ["string", "number", "boolean", "null"],
       maxLength: 500,
       description:
-        "Default used when a contact has no value for this property and the template does not supply an inline fallback. A string, number, boolean, or RFC 3339 datetime matching the declared type (strings up to `500` characters); a value of another type returns a validation error. Set to `null` to remove the fallback.",
+        "Default used when a contact has no value for this property and the template does not supply an inline fallback. A string, number, boolean, or RFC 3339 datetime string matching the declared type (strings up to `500` characters); a value of another type returns a validation error. Set to `null` to remove the fallback; omit to leave it unchanged.",
     },
   },
   example: {
@@ -23784,6 +23890,14 @@ export const WhatsAppTemplateLanguageUpsertSchema = {
   type: "object",
   additionalProperties: false,
   description: "One language's content, as written to a draft.",
+  example: {
+    components: [
+      {
+        type: "body",
+        text: "Hello",
+      },
+    ],
+  },
   properties: {
     optimization_spec: {
       oneOf: [
@@ -51600,8 +51714,8 @@ export const VoiceTrunkMediaUpdateSchema = {
   type: "object",
   additionalProperties: false,
   minProperties: 1,
-  description:
-    "A change to how the trunk carries call audio. An omitted member is left unchanged.",
+  required: ["encryption"],
+  description: "A change to how the trunk encrypts call audio.",
   properties: {
     encryption: {
       $ref: "#/components/schemas/VoiceTrunkMediaEncryption",
@@ -52656,8 +52770,8 @@ export const VoiceVerifiedNumberUpdateSchema = {
   type: "object",
   additionalProperties: false,
   minProperties: 1,
-  description:
-    "A change to the verified number's label. Every field is optional; an omitted field is left unchanged.\n",
+  required: ["name"],
+  description: "A replacement for the verified number's label.\n",
   properties: {
     name: {
       type: ["string", "null"],
@@ -52784,8 +52898,8 @@ export const VoiceRingGroupUpdateSchema = {
   type: "object",
   additionalProperties: false,
   minProperties: 1,
-  description:
-    "A change to the ring group. An omitted field is left unchanged.",
+  required: ["name"],
+  description: "A change to the ring group's name.",
   properties: {
     name: {
       type: "string",
@@ -58454,6 +58568,37 @@ export const EmailBroadcastTemplateWritableSchema = {
   },
 } as const;
 
+export const EmailBroadcastFundingHoldWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["reason"],
+  description:
+    "Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.\n\nFunding recovery is declared ahead of server support. The send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.\n\nThe automatic wait lasts at most 20 minutes from the first time sending stops for funds. Later stops and top-ups do not extend it. Resuming a paused broadcast starts a new wait for any later stop.\n",
+  properties: {
+    reason: {
+      example: "funds_required",
+      $ref: "#/components/schemas/EmailBroadcastFundingHoldReason",
+    },
+    wait_until: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      example: "2026-09-02T08:35:03Z",
+      description:
+        "When the automatic wait ends, or ended. Absent when the broadcast paused without waiting.",
+    },
+    paused_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      example: "2026-09-02T08:35:03Z",
+      description:
+        "When the broadcast paused. Present only while `status` is `paused`.",
+    },
+  },
+} as const;
+
 export const EmailBroadcastWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -58536,6 +58681,22 @@ export const EmailBroadcastWritableSchema = {
       description: "Whether link clicks are tracked for this broadcast.",
     },
   },
+  example: {
+    id: "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    display_label: "Weekly news",
+    category: "marketing",
+    status: "sent",
+    recipient_count: 4820,
+    sent_count: 4820,
+    delivered_count: 4712,
+    track_opens: true,
+    track_clicks: true,
+    created_at: "2026-09-01T09:14:02.418Z",
+    started_at: "2026-09-02T08:00:03.771Z",
+    sent_at: "2026-09-02T08:11:47.902Z",
+    failure_reason: null,
+    failure_detail: null,
+  },
 } as const;
 
 export const EmailBroadcastListWritableSchema = {
@@ -58570,7 +58731,21 @@ export const EmailBroadcastSendQuotaWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit.\n",
+    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\nThe optional `can_start` and `on_insufficient_funds` fields are declared ahead of server support for funding recovery. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.\n",
+  example: {
+    recipients: 12000,
+    allowed: 5000,
+    limited_by: "monthly",
+    limit: 50000,
+    remaining: 7000,
+    resets_at: "2026-09-01T00:00:00Z",
+    limit_reason: "plan",
+    broadcasts: {
+      limit: 20,
+      remaining: 4,
+      resets_at: "2026-09-01T00:00:00Z",
+    },
+  },
 } as const;
 
 export const EmailBroadcastClickedLinkListWritableSchema = {

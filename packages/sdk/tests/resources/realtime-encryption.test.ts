@@ -63,7 +63,9 @@ function fakeFetch() {
   const bodies: unknown[] = [];
   const { fn, calls } = recordFetch(async (request) => {
     bodies.push(JSON.parse(await request.clone().text()));
-    return jsonResponse(200, { data: [] });
+    return request.url.includes("/members/")
+      ? new Response(null, { status: 204 })
+      : jsonResponse(200, { data: [] });
   });
   return { fn, calls, bodies };
 }
@@ -110,12 +112,73 @@ describe("realtime crypto vectors", () => {
       );
       const plain = open(b64(v.ciphertext), b64(v.nonce), key);
       if (v.result === "valid") {
-        expect(plain && new TextDecoder().decode(plain), v.id).toBe(v.plaintext);
+        expect(plain && new TextDecoder().decode(plain), v.id).toBe(
+          v.plaintext,
+        );
       } else {
         expect(plain, v.id).toBeNull();
       }
     }
   });
+});
+
+describe("Realtime payload presence with encryption configured", () => {
+  for (const method of ["publish", "publishBatch", "members.send"] as const) {
+    it.each(["unset", "null", "value"] as const)(
+      `${method} preserves %s`,
+      async (state) => {
+        const { fn, bodies } = fakeFetch();
+        const client = bird(fn, MASTER);
+        const data = state === "null" ? null : { items: [null, "value"] };
+        const payload = state === "unset" ? {} : { data };
+        if (method === "publishBatch") {
+          await client.realtime.publishBatch(APP, {
+            events: [
+              {
+                event: "changed",
+                channel: "private-encrypted-orders",
+                ...payload,
+              },
+            ],
+          });
+        } else if (method === "members.send") {
+          await client.realtime.members.send(APP, "member_1", {
+            event: "changed",
+            ...payload,
+          });
+        } else {
+          await client.realtime.publish(APP, {
+            event: "changed",
+            channels: ["private-encrypted-orders"],
+            ...payload,
+          });
+        }
+        const body = bodies[0] as {
+          data?: unknown;
+          events?: { data?: unknown }[];
+        };
+        const event = method === "publishBatch" ? body.events![0]! : body;
+        if (state === "unset") {
+          expect(event).not.toHaveProperty("data");
+        } else if (method === "members.send") {
+          expect(event.data).toEqual(data);
+        } else {
+          const envelope = event.data as { nonce: string; ciphertext: string };
+          const key = await deriveSharedSecret(
+            "private-encrypted-orders",
+            decodeMasterKey(MASTER),
+          );
+          const plain = open(
+            b64(envelope.ciphertext),
+            b64(envelope.nonce),
+            key,
+          );
+          expect(plain).not.toBeNull();
+          expect(JSON.parse(new TextDecoder().decode(plain!))).toEqual(data);
+        }
+      },
+    );
+  }
 });
 
 describe("bird.realtime.authorizeChannel", () => {
@@ -227,14 +290,21 @@ describe("bird.realtime.publish encryption", () => {
     await bird(fn, MASTER).realtime.publishBatch(APP, {
       events: [
         { event: "e1", channel: "orders", data: { plain: true } },
-        { event: "e2", channel: "private-encrypted-orders", data: { secret: 1 } },
+        {
+          event: "e2",
+          channel: "private-encrypted-orders",
+          data: { secret: 1 },
+        },
       ],
     });
     const body = bodies[0] as {
       events: { channel: string; data: unknown }[];
     };
     expect(body.events[0]!.data).toEqual({ plain: true });
-    const envelope = body.events[1]!.data as { nonce: string; ciphertext: string };
+    const envelope = body.events[1]!.data as {
+      nonce: string;
+      ciphertext: string;
+    };
     const key = await deriveSharedSecret(
       "private-encrypted-orders",
       decodeMasterKey(MASTER),

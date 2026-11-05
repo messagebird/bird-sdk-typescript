@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.124.0
+
+- **Breaking:** calls with an unset required nullable request field now fail locally before sending, without retries. Supply `null` or a value for `inbound_configuration.route`, `daily_spend_limit.workspace_limit`, `destinations[].daily_spend_limit.limit`, verified-number `name`, and call creation’s `sequence.definition.presentation.preview.execution_sample.call.orig` and `.dest` when their containing objects are present. Calls without an execution sample are unaffected. Explicit `null` is still sent unchanged.
+- Add broadcast `waiting_for_funds` and `paused` states, `funding_hold` details, and send-quota fields `can_start` and `on_insufficient_funds` ahead of server support. If `can_start` is absent from the send-quota response, use `allowed` for the current allowance and do not assume the broadcast can wait or resume.
+- Go also exports `EmailBroadcastFundingHold`, `EmailBroadcastFundingHoldReason`, and `EmailBroadcastInsufficientFundsBehavior`, with constants for their enum values.
+- **Breaking:** `voice.verifiedNumbers.update` now requires `name`: pass a label or null to clear it. `voice.ringGroups.update` requires `name`, and `voice.trunks.update` requires `media.encryption` when supplying `media`.
+- **Breaking:** Contact property `fallback_value` and Realtime `data` preserve explicit JSON null. Null clears a contact fallback or delivers a null event payload; omit the field to omit it.
+- **Breaking:** Encrypted Realtime publishes and batch events now omit data when the caller leaves it unset, instead of encrypting JSON null. Supply an explicit null payload to keep sending encrypted null: use `bird.Null[any]()` in Go, None in Python, `null` in Node, or `setData(null)` in PHP.
+- `bird contact-properties update` and the public SDK contact-property update methods now preserve the stored fallback when `fallback_value` is omitted. Send explicit JSON null to clear the fallback; an empty update no longer erases the stored value.
+
 ## 0.123.0
 
 - **Breaking:** email templates and email template list entries now include a required `live_default_language`, so code that builds an `EmailTemplate` or `EmailTemplateSummary` value itself, such as a test double, has to set it. It is the live version's default language, the one a single send falls back to when the template's language settings allow. It is null until the template is first published, and a built-in template reports its `default_language`.

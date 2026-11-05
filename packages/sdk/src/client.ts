@@ -9,6 +9,8 @@ import {
   checkClientCertificate,
   type ClientCertificateOptions,
 } from "./core/client-certificate.js";
+import { createRequestPresenceValidator } from "./core/requestPresence.js";
+import { requiredNullableRules } from "./core/requestPresence.gen.js";
 import {
   detectCallerInfo,
   normalizeModel,
@@ -394,6 +396,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
         baseUrl: this.#baseUrl,
         fetch: this.#fetch,
         headers: this.#headers,
+        requestValidator: createRequestPresenceValidator(requiredNullableRules),
       }),
     );
     this.core = new BirdHTTPClient({
@@ -465,8 +468,14 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
       this.#client,
     );
     this.smsSenders = new SmsSendersResource(this.core, this.#client);
-    this.smsSenderRequirements = new SmsSenderRequirementsResource(this.core, this.#client);
-    this.smsSenderRegistrations = new SmsSenderRegistrationsResource(this.core, this.#client);
+    this.smsSenderRequirements = new SmsSenderRequirementsResource(
+      this.core,
+      this.#client,
+    );
+    this.smsSenderRegistrations = new SmsSenderRegistrationsResource(
+      this.core,
+      this.#client,
+    );
     this.billingPrices = new BillingPricesResource(this.core, this.#client);
     this.billingWallets = new BillingWalletsResource(this.core, this.#client);
     this.complianceDocumentTemplates = new ComplianceDocumentTemplatesResource(

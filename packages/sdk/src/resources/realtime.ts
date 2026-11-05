@@ -146,6 +146,9 @@ export class RealtimeResource extends RealtimeResourceBase {
       );
     }
     const masterKey = decodeMasterKey(this.#options?.encryptionMasterKey);
+    if (params.data === undefined) {
+      return super.publish(realtimeAppId, params, options);
+    }
     return this.call<RealtimePublishResult>(
       "POST",
       options,
@@ -186,8 +189,11 @@ export class RealtimeResource extends RealtimeResourceBase {
       async ({ signal, headers }) => {
         const events = await Promise.all(
           params.events.map(async (e) =>
-            isEncryptedChannel(e.channel)
-              ? { ...e, data: await encryptForChannel(e.channel, e.data, masterKey) }
+            isEncryptedChannel(e.channel) && e.data !== undefined
+              ? {
+                  ...e,
+                  data: await encryptForChannel(e.channel, e.data, masterKey),
+                }
               : e,
           ),
         );

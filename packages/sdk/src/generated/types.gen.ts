@@ -3683,7 +3683,10 @@ export type RealtimePublish = {
    *
    */
   channels: Array<RealtimeChannelName>;
-  data?: RealtimeEventData;
+  /**
+   * The event payload, up to 10 KB serialized; null delivers a JSON null payload.
+   */
+  data?: RealtimeEventData | null;
   exclude_connection_id?: RealtimeExcludeConnectionId;
   /**
    * Per-channel attributes to return alongside the publish, reflecting each channel's state at publish time. `member_count` is available only for presence channels. `connection_count` requires the app's connection-counting flag. Requesting attributes counts as one additional message toward usage.
@@ -3726,7 +3729,10 @@ export type RealtimePublishResult = {
 export type RealtimeBatchEvent = {
   event: RealtimeEventName;
   channel: RealtimeChannelName;
-  data?: RealtimeEventData;
+  /**
+   * The event payload, up to 10 KB serialized; null delivers a JSON null payload.
+   */
+  data?: RealtimeEventData | null;
   exclude_connection_id?: RealtimeExcludeConnectionId;
   /**
    * Attributes of this event's channel to return alongside the publish (same semantics and validation errors as on the channel endpoints). Requesting attributes counts as one additional message toward usage.
@@ -3800,7 +3806,10 @@ export type RealtimeChannelMembers = {
  */
 export type RealtimeMemberPublish = {
   event: RealtimeEventName;
-  data?: RealtimeEventData;
+  /**
+   * The event payload, up to 10 KB serialized; null delivers a JSON null payload.
+   */
+  data?: RealtimeEventData | null;
 };
 
 export type RealtimeAppKeyList = {
@@ -4665,16 +4674,20 @@ export type EmailMessageContent = {
 /**
  * Where the broadcast itself has got to. This is separate from what happened to individual recipients, which the broadcast's own `sent_count`, `delivered_count`, `bounced_count` and `complained_count` tell you. Those four are fields on the broadcast, not on everything that carries this status, and reading the broadcast's recipients or its events gives the same outcomes one recipient at a time.
  *
+ * The `waiting_for_funds` and `paused` values are declared ahead of server support for funding recovery. The send-allowance response includes `can_start` when that support is available. If the field is absent, do not assume the broadcast can wait for funds or resume.
+ *
  * - `draft`: Created, and not sent or scheduled yet.
  * - `scheduled`: Due to send at `scheduled_at`. You can still edit it, and you can still change the time, right up until sending starts.
  * - `accepted`: Taken for immediate sending. Nothing has gone out yet.
  * - `sending`: On its way. Some recipients have been sent to and some have not.
+ * - `waiting_for_funds`: Sending stopped because your balance cannot pay for more email. You can add funds manually or let your existing automatic top-up restore the balance. Bird checks once a minute and continues sending to the remaining recipients when a funding check succeeds before `funding_hold.wait_until`. Otherwise the broadcast becomes `paused`, even if funds arrive after the last check.
+ * - `paused`: Sending stopped because your balance cannot pay for more email, and it does not continue by itself. `funding_hold.reason` says why. Add funds, then resume the broadcast, or cancel it.
  * - `sent`: Every recipient has been sent to.
  * - `canceling`: A cancellation is under way and the remaining sends are stopping.
  * - `canceled`: The cancellation finished. Anything already on its way to a recipient when you canceled cannot be pulled back.
  * - `failed`: The broadcast could not be sent. Reading the broadcast gives `failure_reason`, which says why. If it had already started sending, the recipients it reached keep their delivery status and carry on producing events.
  *
- * A draft is deleted rather than canceled, because it was never sent.
+ * A draft is deleted rather than canceled, because it was never sent. Recipients already sent to before a broadcast waits or pauses keep their delivery status, and are not sent to again when it continues.
  *
  */
 export type EmailBroadcastStatus =
@@ -4682,6 +4695,8 @@ export type EmailBroadcastStatus =
   | "scheduled"
   | "accepted"
   | "sending"
+  | "waiting_for_funds"
+  | "paused"
   | "sent"
   | "canceling"
   | "canceled"
@@ -4733,6 +4748,37 @@ export type EmailBroadcastTemplate = {
   readonly version_id?: EmailTemplateVersionId | null;
   parameters?: EmailBroadcastParameters;
   parameter_overrides?: EmailBroadcastParameterOverrides;
+};
+
+/**
+ * Why sending stopped for funds.
+ *
+ * - `automatic_top_up`: Sending stopped while automatic top-up was active. Sending can continue automatically when a funding check succeeds before `wait_until`.
+ * - `funds_required`: Sending stopped because your balance cannot pay for more email. While `waiting_for_funds`, a manual or automatic top-up can restart sending before `wait_until`. If the broadcast is `paused`, add funds if needed, then resume it.
+ * - `wait_expired`: Status is `paused`. The automatic wait ended before sending continued. Add funds if needed, then resume the broadcast.
+ *
+ */
+export type EmailBroadcastFundingHoldReason =
+  "automatic_top_up" | "funds_required" | "wait_expired";
+
+/**
+ * Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.
+ *
+ * Funding recovery is declared ahead of server support. The send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.
+ *
+ * The automatic wait lasts at most 20 minutes from the first time sending stops for funds. Later stops and top-ups do not extend it. Resuming a paused broadcast starts a new wait for any later stop.
+ *
+ */
+export type EmailBroadcastFundingHold = {
+  reason: EmailBroadcastFundingHoldReason;
+  /**
+   * When the automatic wait ends, or ended. Absent when the broadcast paused without waiting.
+   */
+  wait_until?: string;
+  /**
+   * When the broadcast paused. Present only while `status` is `paused`.
+   */
+  paused_at?: string;
 };
 
 /**
@@ -4926,10 +4972,11 @@ export type EmailBroadcast = {
     [key: string]: string;
   };
   /**
-   * Where the broadcast itself has got to, separate from what happened to individual recipients: for that, read `sent_count`, `delivered_count`, `bounced_count` and `complained_count` below. When it is `failed`, `failure_reason` says why.
+   * Where the broadcast itself has got to, separate from what happened to individual recipients: for that, read `sent_count`, `delivered_count`, `bounced_count` and `complained_count` below. When it is `failed`, `failure_reason` says why. When it is `waiting_for_funds` or `paused`, `funding_hold` says why and what happens next.
    *
    */
   readonly status: EmailBroadcastStatus;
+  readonly funding_hold?: EmailBroadcastFundingHold;
   /**
    * What to do next about this broadcast, given the state it is in. Each entry names one action and
    * says why it is worth taking. Present on reads that compute it: an empty list means there is
@@ -5044,7 +5091,7 @@ export type EmailBroadcast = {
    */
   readonly scheduled_at?: string;
   /**
-   * When the broadcast started sending. Absent until then. Compare with `sent_at`, which is when the broadcast finished sending.
+   * When the broadcast started sending. Absent until then. Older broadcasts waiting or paused for funds may lack that timestamp; they report their send authorization time, or creation time if that is also missing, so late-resume confirmation uses the same conservative time as the server. Compare with `sent_at`, which is when the broadcast finished sending.
    */
   readonly started_at?: string;
   /**
@@ -5300,7 +5347,7 @@ export type EmailSendAllowanceWindow = "none" | "monthly" | "daily";
  * - `plan`: the organization's monthly email limit. This is the plan's included volume unless we have set a different limit for the organization. If the limit matches the included volume, a plan with more included volume raises it. Otherwise, contact Bird support.
  * - `overage_off`: email overage is turned off, so sending stops at the included volume. Turn email overage back on to raise the monthly email limit.
  * - `overdue_payment`: an overdue payment pauses email overage, so sending stops at the included volume. Pay the overdue invoice to raise the monthly email limit.
- * - `unfunded`: the wallet cannot cover email overage, or its funding cannot be confirmed, so sending stops at the included volume. Top up the wallet if it lacks funds. Email overage resumes once sufficient funding is confirmed.
+ * - `unfunded`: funding for email overage could not be confirmed, so sending stops at the included volume. Top up the wallet if it lacks funds. If it has sufficient funds, retry the allowance check. Email overage resumes once sufficient funding is confirmed.
  * - `overage_ceiling`: email overage is billed up to a configured multiple of the included volume. A plan with more included volume raises the email overage ceiling.
  * - `custom_limit`: we have set a monthly email limit for the organization that differs from the plan's included volume. Contact Bird support to change it. These limits currently report as `plan`. This enum value is declared in advance so reporting them as `custom_limit` will not be a breaking change.
  *
@@ -5338,11 +5385,23 @@ export type EmailBroadcastCountAllowance = {
 };
 
 /**
+ * Declared ahead of server support for funding recovery. When returned in the send-allowance response, this describes what a broadcast does if your balance runs out while it is sending. Recipients already sent to are not affected either way.
+ *
+ * - `wait_for_top_up`: The broadcast waits up to 20 minutes for a manual or automatic top-up. It checks once a minute and continues by itself when funds cover the next batch of recipients, then pauses if the wait ends. Waiting does not change your automatic top-up settings or initiate a payment.
+ * - `pause`: The broadcast pauses until you add funds and resume it.
+ *
+ */
+export type EmailBroadcastInsufficientFundsBehavior =
+  "wait_for_top_up" | "pause";
+
+/**
  * The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.
  *
  * The organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.
  *
- * `limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit.
+ * The optional `can_start` and `on_insufficient_funds` fields are declared ahead of server support for funding recovery. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.
+ *
+ * `limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.
  *
  */
 export type EmailBroadcastSendQuota = {
@@ -5356,7 +5415,7 @@ export type EmailBroadcastSendQuota = {
    *
    * Partially covered broadcasts send in whole batches. This count is rounded down to a batch boundary and can be lower than `remaining`. Read this value directly instead of calculating it from `limit` and `remaining`.
    *
-   * A value of 0 means no recipients would receive the broadcast. This happens if the audience exceeds the full email limit, which rejects the send, or if the remaining allowance cannot cover a batch.
+   * A value of 0 means no recipients are currently covered. This happens if the audience exceeds the full email limit, which rejects the send, or if the remaining allowance cannot cover a batch. When `can_start` is present, use it to decide whether a balance-limited broadcast can start and wait for funds. If it is absent, a zero allowance does not provide a way to send.
    *
    */
   readonly allowed: number;
@@ -5382,6 +5441,14 @@ export type EmailBroadcastSendQuota = {
   readonly resets_at?: string;
   readonly limit_reason?: EmailSendAllowanceLimitReason;
   readonly broadcasts?: EmailBroadcastCountAllowance;
+  readonly on_insufficient_funds?: EmailBroadcastInsufficientFundsBehavior;
+  /**
+   * When present, whether the organization's email limits let this broadcast start at `send_at`, or now if you omit it. A balance that cannot pay for the next batch does not make this `false`: once started, the broadcast waits or pauses until funds return, as `on_insufficient_funds` describes.
+   *
+   * It is `false` when no recipient would be sent, including when the audience exceeds the full daily or monthly limit or none of that limit remains. A `true` value does not reserve allowance or promise that every recipient is sent. Other checks still apply when you send.
+   *
+   */
+  readonly can_start?: boolean;
 };
 
 /**
@@ -6054,16 +6121,16 @@ export type ContactPropertyCreateRequest = {
   key: string;
   type: ContactPropertyType;
   /**
-   * Default used when a contact has no value for this property and the template does not supply an inline fallback. A string, number, boolean, or RFC 3339 datetime matching the declared type (strings up to `500` characters), or `null` for no fallback; a value of another type returns a validation error.
+   * Default used when a contact has no value for this property and the template does not supply an inline fallback. A string, number, boolean, or RFC 3339 datetime string matching the declared type (strings up to `500` characters); a value of another type returns a validation error. Omit or set to `null` for no fallback.
    */
-  fallback_value?: unknown;
+  fallback_value?: string | number | boolean | null;
 };
 
 export type ContactPropertyUpdateRequest = {
   /**
-   * Default used when a contact has no value for this property and the template does not supply an inline fallback. A string, number, boolean, or RFC 3339 datetime matching the declared type (strings up to `500` characters); a value of another type returns a validation error. Set to `null` to remove the fallback.
+   * Default used when a contact has no value for this property and the template does not supply an inline fallback. A string, number, boolean, or RFC 3339 datetime string matching the declared type (strings up to `500` characters); a value of another type returns a validation error. Set to `null` to remove the fallback; omit to leave it unchanged.
    */
-  fallback_value?: unknown;
+  fallback_value?: string | number | boolean | null;
 };
 
 export type AudienceCreateRequest = {
@@ -28603,10 +28670,10 @@ export type VoiceTrunkCreate = {
 };
 
 /**
- * A change to how the trunk carries call audio. An omitted member is left unchanged.
+ * A change to how the trunk encrypts call audio.
  */
 export type VoiceTrunkMediaUpdate = {
-  encryption?: VoiceTrunkMediaEncryption;
+  encryption: VoiceTrunkMediaEncryption;
 };
 
 export type VoiceTrunkIpaclCreate = {
@@ -29245,7 +29312,7 @@ export type VoiceVerifiedNumberCreate = {
 };
 
 /**
- * A change to the verified number's label. Every field is optional; an omitted field is left unchanged.
+ * A replacement for the verified number's label.
  *
  */
 export type VoiceVerifiedNumberUpdate = {
@@ -29253,7 +29320,7 @@ export type VoiceVerifiedNumberUpdate = {
    * Your new label for this verified number. Send `null` to clear it and go back to identifying the verified number by its number alone. It is yours to choose and appears nowhere on a call, so renaming never affects what the person you are calling sees, and it leaves the number and its verification untouched.
    *
    */
-  name?: string | null;
+  name: string | null;
 };
 
 export type VoiceVerifiedNumberVerifyRequest = {
@@ -29314,13 +29381,13 @@ export type VoiceRingGroupCreate = {
 };
 
 /**
- * A change to the ring group. An omitted field is left unchanged.
+ * A change to the ring group's name.
  */
 export type VoiceRingGroupUpdate = {
   /**
    * The ring group's new name.
    */
-  name?: string;
+  name: string;
 };
 
 /**
@@ -32378,6 +32445,26 @@ export type EmailBroadcastTemplateWritable = {
   parameter_overrides?: EmailBroadcastParameterOverridesWritable;
 };
 
+/**
+ * Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.
+ *
+ * Funding recovery is declared ahead of server support. The send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.
+ *
+ * The automatic wait lasts at most 20 minutes from the first time sending stops for funds. Later stops and top-ups do not extend it. Resuming a paused broadcast starts a new wait for any later stop.
+ *
+ */
+export type EmailBroadcastFundingHoldWritable = {
+  reason: EmailBroadcastFundingHoldReason;
+  /**
+   * When the automatic wait ends, or ended. Absent when the broadcast paused without waiting.
+   */
+  wait_until?: string;
+  /**
+   * When the broadcast paused. Present only while `status` is `paused`.
+   */
+  paused_at?: string;
+};
+
 export type EmailBroadcastWritable = {
   /**
    * The address this broadcast sends from. `name` is filled in when the broadcast was given a display name to send under. Left out on a draft that has not picked a sender yet.
@@ -32453,7 +32540,9 @@ export type EmailBroadcastCountsWritable = {
  *
  * The organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.
  *
- * `limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit.
+ * The optional `can_start` and `on_insufficient_funds` fields are declared ahead of server support for funding recovery. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.
+ *
+ * `limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.
  *
  */
 export type EmailBroadcastSendQuotaWritable = {

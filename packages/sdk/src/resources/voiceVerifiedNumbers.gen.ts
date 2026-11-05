@@ -68,7 +68,7 @@ export class VoiceVerifiedNumbersResource extends Resource {
    * const verifiedNumber = await bird.voice.verifiedNumbers.update("vvn_01krdgeqcxet5s7t44vh8rt9mg", { name: "Sales line" });
    * console.log(verifiedNumber.name);
    */
-  update(verifiedNumberId: string, params: VoiceVerifiedNumbersUpdateParams = {}, options?: RequestOptions): APIPromise<VoiceVerifiedNumber> {
+  update(verifiedNumberId: string, params: VoiceVerifiedNumbersUpdateParams, options?: RequestOptions): APIPromise<VoiceVerifiedNumber> {
     return this.call<VoiceVerifiedNumber>("PATCH", options, ({ signal, headers }) =>
       updateVoiceVerifiedNumber({ client: this.client, path: { verified_number_id: verifiedNumberId }, body: params, headers, signal }));
   }

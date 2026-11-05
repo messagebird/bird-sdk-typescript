@@ -55,7 +55,7 @@ export class VoiceRingGroupsResourceBase extends Resource {
    * const group = await bird.voice.ringGroups.update("RING_GROUP_ID", { name: "Tier 2 support" });
    * console.log(group.id, group.name);
    */
-  update(ringGroupId: string, params: VoiceRingGroupsUpdateParams = {}, options?: RequestOptions): APIPromise<VoiceRingGroup> {
+  update(ringGroupId: string, params: VoiceRingGroupsUpdateParams, options?: RequestOptions): APIPromise<VoiceRingGroup> {
     return this.call<VoiceRingGroup>("PATCH", options, ({ signal, headers }) =>
       updateVoiceRingGroup({ client: this.client, path: { ring_group_id: ringGroupId }, body: params, headers, signal }));
   }

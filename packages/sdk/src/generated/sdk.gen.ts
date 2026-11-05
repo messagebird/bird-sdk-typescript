@@ -2710,7 +2710,7 @@ export const sendEmailBroadcast = <ThrowOnError extends boolean = false>(
 /**
  * Cancel a broadcast
  *
- * Cancels a scheduled, accepted, or sending broadcast. Canceling it while it is sending stops every delivery that has not gone out yet, though messages already on their way to a recipient are not recalled.
+ * Cancels a broadcast that is scheduled, accepted, sending, waiting for funds, or paused. Canceling it while it is sending stops every delivery that has not gone out yet, though messages already on their way to a recipient are not recalled.
  *
  * Calling this again on a broadcast that is already canceling or canceled is idempotent: it returns the broadcast's current state rather than an error. A draft cannot be canceled, because it was never sent; use [Delete a broadcast](/docs/api/reference/delete-email-broadcast) instead. A broadcast that already sent or failed has reached a terminal state and returns a conflict.
  *
@@ -15901,7 +15901,7 @@ export const getVoiceVerifiedNumber = <ThrowOnError extends boolean = false>(
 /**
  * Update a verified number
  *
- * Updates the verified number's label. Omitted fields stay unchanged, and sending `name` as null clears the label. The number itself cannot be changed: register the number you want and verify it separately. Renaming leaves the verification state untouched, so a verified number stays usable and a pending one keeps the code it is waiting for.
+ * Sets the verified number's label. Send `name` as null to clear the label. The number itself cannot be changed: register the number you want and verify it separately. Renaming leaves the verification state untouched, so a verified number stays usable and a pending one keeps the code it is waiting for.
  *
  */
 export const updateVoiceVerifiedNumber = <ThrowOnError extends boolean = false>(
