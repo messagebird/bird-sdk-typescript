@@ -6258,7 +6258,7 @@ export const VerificationAttemptFailureReasonSchema = {
     "not_billable",
   ],
   description:
-    "Why a passcode send did not deliver:\n\n- `carrier_rejected`: The SMS carrier rejected the send.\n- `hard_bounce`: The email permanently bounced.\n- `soft_bounce`: The email temporarily bounced, such as when a mailbox is full.\n- `undelivered`: The channel reported a generic delivery failure.\n- `channel_unavailable`: The channel could not be used, so the verification\n  moved to the next channel.\n- `channel_disabled`: Sending on the channel is temporarily disabled, so the\n  verification moved to the next channel.\n- `channel_restricted`: The channel does not carry passcodes to this\n  destination country. The verification moves to the next channel enabled\n  there, or fails when the country has no other.\n- `delivery_timeout`: No delivery confirmation arrived before the channel's\n  timeout, so the verification moved to the next channel.\n- `not_billable`: The send could not be charged, so it was never handed to the\n  channel. Usually the workspace balance is too low to cover it. Topping up\n  the balance is what clears this.\n\nNew reasons may be added over time. Treat unrecognized values as reasons added\nlater rather than errors.",
+    "Why a passcode send did not deliver:\n\n- `carrier_rejected`: The SMS carrier rejected the send.\n- `hard_bounce`: The email permanently bounced.\n- `soft_bounce`: The email temporarily bounced, such as when a mailbox is full.\n- `undelivered`: The channel reported a generic delivery failure.\n- `channel_unavailable`: The channel could not be used, so the verification\n  moved to the next channel.\n- `channel_disabled`: Sending on the channel is temporarily disabled, so the\n  verification moved to the next channel.\n- `channel_restricted`: A destination or session restriction prevented the\n  channel from being used. The verification can try the next eligible channel\n  while the session remains pending and unexpired.\n- `delivery_timeout`: No delivery confirmation arrived before the channel's\n  timeout, so the verification moved to the next channel.\n- `not_billable`: The send could not be charged, so it was never handed to the\n  channel. Usually the workspace balance is too low to cover it. Topping up\n  the balance is what clears this.\n\nNew reasons may be added over time. Treat unrecognized values as reasons added\nlater rather than errors.",
 } as const;
 
 export const RealtimeAppIDSchema = {
@@ -21890,30 +21890,13 @@ export const WhatsAppMessageSendRequestSchema = {
     },
   },
   example: {
-    to: "+31612345678",
+    to: "+15551234567",
     template: {
       slug: "bird_otp",
       language: "en",
-      components: [
-        {
-          type: "body",
-          parameters: [
-            {
-              type: "text",
-              text: "1234",
-            },
-          ],
-        },
-        {
-          type: "button",
-          parameters: [
-            {
-              type: "text",
-              text: "1234",
-            },
-          ],
-        },
-      ],
+      parameters: {
+        code: "123456",
+      },
     },
   },
 } as const;
@@ -42841,6 +42824,31 @@ export const ThreadIDSchema = {
   example: "thr_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const EmailThreadParticipantNameSchema = {
+  type: "object",
+  additionalProperties: false,
+  description: "A conversation participant's display name.",
+  required: ["address", "name"],
+  properties: {
+    address: {
+      type: "string",
+      format: "email",
+      minLength: 1,
+      description:
+        "Participant address, as listed in the conversation's `participants`.",
+      example: "ada@example.com",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 256,
+      description:
+        "Display name for this participant, such as `Ada Lovelace`. It is not verified.",
+      example: "Ada Lovelace",
+    },
+  },
+} as const;
+
 export const EmailThreadHighlightsSchema = {
   type: "object",
   additionalProperties: false,
@@ -42882,6 +42890,7 @@ export const EmailThreadSchema = {
     "contact_id",
     "subject",
     "participants",
+    "participant_names",
     "message_count",
     "unread_count",
     "last_message_at",
@@ -42933,6 +42942,14 @@ export const EmailThreadSchema = {
       },
       description:
         "Addresses that appear on the retained messages in this conversation, including the mailbox's own address.",
+    },
+    participant_names: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailThreadParticipantName",
+      },
+      description:
+        "Display names for participants, taken from this conversation's messages. A name is either the one a sender gave in their From header or the one your mailbox gave a To or Cc recipient when sending. When a participant was named more than once, the most recent name is shown. Names are not verified, so identify participants by address. A participant without a name is absent.",
     },
     message_count: {
       type: "integer",
@@ -43214,6 +43231,7 @@ export const EmailThreadMessageSchema = {
     "channel",
     "thread_id",
     "from",
+    "from_name",
     "to",
     "cc",
     "delivered_to",
@@ -43294,6 +43312,14 @@ export const EmailThreadMessageSchema = {
       readOnly: true,
       minLength: 1,
       description: "Sender address.",
+    },
+    from_name: {
+      type: ["string", "null"],
+      readOnly: true,
+      maxLength: 256,
+      description:
+        "Display name in the sender's From header, such as `Ada Lovelace`. The sender chooses it and it is not verified, so identify the sender by `from`. Null when the sender gave no name or the name is not available.",
+      example: "Ada Lovelace",
     },
     to: {
       type: "array",
@@ -65079,6 +65105,7 @@ export const EmailThreadWritableSchema = {
     "contact_id",
     "subject",
     "participants",
+    "participant_names",
     "message_count",
     "unread_count",
     "last_message_at",
@@ -65130,6 +65157,14 @@ export const EmailThreadWritableSchema = {
       },
       description:
         "Addresses that appear on the retained messages in this conversation, including the mailbox's own address.",
+    },
+    participant_names: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/EmailThreadParticipantName",
+      },
+      description:
+        "Display names for participants, taken from this conversation's messages. A name is either the one a sender gave in their From header or the one your mailbox gave a To or Cc recipient when sending. When a participant was named more than once, the most recent name is shown. Names are not verified, so identify participants by address. A participant without a name is absent.",
     },
     message_count: {
       type: "integer",

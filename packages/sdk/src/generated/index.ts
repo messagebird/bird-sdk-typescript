@@ -1940,6 +1940,7 @@ export type {
   EmailThreadMessageSource,
   EmailThreadMessageUpdateRequest,
   EmailThreadMessageWritable,
+  EmailThreadParticipantName,
   EmailThreadReadState,
   EmailThreadUpdateRequest,
   EmailThreadWritable,

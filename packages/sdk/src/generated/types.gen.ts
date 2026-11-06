@@ -3443,9 +3443,9 @@ export type VerificationTerminalReason =
  *   moved to the next channel.
  * - `channel_disabled`: Sending on the channel is temporarily disabled, so the
  *   verification moved to the next channel.
- * - `channel_restricted`: The channel does not carry passcodes to this
- *   destination country. The verification moves to the next channel enabled
- *   there, or fails when the country has no other.
+ * - `channel_restricted`: A destination or session restriction prevented the
+ *   channel from being used. The verification can try the next eligible channel
+ *   while the session remains pending and unexpired.
  * - `delivery_timeout`: No delivery confirmation arrived before the channel's
  *   timeout, so the verification moved to the next channel.
  * - `not_billable`: The send could not be charged, so it was never handed to the
@@ -23710,6 +23710,20 @@ export type EmailThreadReadState = "read" | "unread";
 export type ThreadId = string;
 
 /**
+ * A conversation participant's display name.
+ */
+export type EmailThreadParticipantName = {
+  /**
+   * Participant address, as listed in the conversation's `participants`.
+   */
+  address: string;
+  /**
+   * Display name for this participant, such as `Ada Lovelace`. It is not verified.
+   */
+  name: string;
+};
+
+/**
  * Matched search fragments for a thread, one array per field the query matched, with the matched terms wrapped in `**`. A field is present only when the query matched it, so the keys that are present tell you which fields produced the hit. Returned only on thread search results.
  *
  */
@@ -23753,6 +23767,10 @@ export type EmailThread = {
    * Addresses that appear on the retained messages in this conversation, including the mailbox's own address.
    */
   participants: Array<string>;
+  /**
+   * Display names for participants, taken from this conversation's messages. A name is either the one a sender gave in their From header or the one your mailbox gave a To or Cc recipient when sending. When a participant was named more than once, the most recent name is shown. Names are not verified, so identify participants by address. A participant without a name is absent.
+   */
+  participant_names: Array<EmailThreadParticipantName>;
   /**
    * Number of retained messages in this conversation, both directions.
    */
@@ -23941,6 +23959,10 @@ export type EmailThreadMessage = {
    * Sender address.
    */
   readonly from: string;
+  /**
+   * Display name in the sender's From header, such as `Ada Lovelace`. The sender chooses it and it is not verified, so identify the sender by `from`. Null when the sender gave no name or the name is not available.
+   */
+  readonly from_name: string | null;
   /**
    * Recipient addresses on the To line.
    */
@@ -35871,6 +35893,10 @@ export type EmailThreadWritable = {
    * Addresses that appear on the retained messages in this conversation, including the mailbox's own address.
    */
   participants: Array<string>;
+  /**
+   * Display names for participants, taken from this conversation's messages. A name is either the one a sender gave in their From header or the one your mailbox gave a To or Cc recipient when sending. When a participant was named more than once, the most recent name is shown. Names are not verified, so identify participants by address. A participant without a name is absent.
+   */
+  participant_names: Array<EmailThreadParticipantName>;
   /**
    * Number of retained messages in this conversation, both directions.
    */
