@@ -48379,7 +48379,7 @@ export const EventVoiceBaseSchema = {
       type: "string",
       minLength: 1,
       description:
-        "The dialled destination: an E.164 number, a SIP extension such as `1001` on a trunk call, or the `usr_` or `vrg_` ID of the workspace user or ring group a browser called.",
+        "The dialled destination: an E.164 number, a SIP extension such as `1001` on a trunk call, or the `usr_`, `vrg_` or `vsq_` ID of the workspace user, ring group or sequence a browser called.",
       example: "+16505559876",
     },
   },
@@ -50563,7 +50563,7 @@ export const VoiceLegSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "The dialled destination: an E.164 number, a SIP extension such as `1001` on a trunk call, or the `usr_` or `vrg_` ID of the workspace user or ring group a browser called.",
+        "The dialled destination: an E.164 number, a SIP extension such as `1001` on a trunk call, or the `usr_`, `vrg_` or `vsq_` ID of the workspace user, ring group or sequence a browser called.",
       example: "+16505559876",
     },
     actor: {
@@ -50668,7 +50668,7 @@ export const VoiceLegSchema = {
         },
       ],
       description:
-        "Who answered when Bird rang your workspace users for this leg, through a ring group or a browser call to a user or a ring group. When a sequence rings more than once, it names who answered the latest ring. `null` when no workspace user answered, and on legs recorded before this field existed. Handle unknown `type` values as future answerer kinds.",
+        "Who answered when Bird rang your workspace users for this leg, through a ring group or a browser call to a user or a ring group. When a sequence rings more than once, it names who answered the latest ring. `null` when no workspace user answered, on legs recorded before this field existed, or when the API does not support the stored answerer kind. New kinds may be added; handle unknown `type` values as future answerer kinds.",
     },
     ended_at: {
       type: ["string", "null"],

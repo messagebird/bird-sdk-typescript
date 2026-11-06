@@ -26776,7 +26776,7 @@ export type EventVoiceBase = {
    */
   from: string;
   /**
-   * The dialled destination: an E.164 number, a SIP extension such as `1001` on a trunk call, or the `usr_` or `vrg_` ID of the workspace user or ring group a browser called.
+   * The dialled destination: an E.164 number, a SIP extension such as `1001` on a trunk call, or the `usr_`, `vrg_` or `vsq_` ID of the workspace user, ring group or sequence a browser called.
    */
   to: string;
 };
@@ -28065,7 +28065,7 @@ export type VoiceLeg = {
    */
   readonly from: string;
   /**
-   * The dialled destination: an E.164 number, a SIP extension such as `1001` on a trunk call, or the `usr_` or `vrg_` ID of the workspace user or ring group a browser called.
+   * The dialled destination: an E.164 number, a SIP extension such as `1001` on a trunk call, or the `usr_`, `vrg_` or `vsq_` ID of the workspace user, ring group or sequence a browser called.
    */
   readonly to: string;
   /**
@@ -28113,7 +28113,7 @@ export type VoiceLeg = {
    */
   readonly answered_at?: string | null;
   /**
-   * Who answered when Bird rang your workspace users for this leg, through a ring group or a browser call to a user or a ring group. When a sequence rings more than once, it names who answered the latest ring. `null` when no workspace user answered, and on legs recorded before this field existed. Handle unknown `type` values as future answerer kinds.
+   * Who answered when Bird rang your workspace users for this leg, through a ring group or a browser call to a user or a ring group. When a sequence rings more than once, it names who answered the latest ring. `null` when no workspace user answered, on legs recorded before this field existed, or when the API does not support the stored answerer kind. New kinds may be added; handle unknown `type` values as future answerer kinds.
    */
   readonly answered_by?: VoiceLegAnsweredBy | null;
   /**
@@ -75845,7 +75845,7 @@ export type ListVoiceLegsData = {
      */
     from?: string;
     /**
-     * Return only legs placed to this called party number, matched as a whole number rather than as a fragment. Give it in international form: `+16505559876`, `16505559876`, and `0016505559876` all select the same legs. A number given without a country code is read as an international one, so give the country code to be sure of what you are matching. A `usr_` or `vrg_` ID matches a browser's call to that workspace user or ring group, exactly as given. Use `number` instead to match part of a number, or either side of the leg.
+     * Return only legs placed to this called party number, matched as a whole number rather than as a fragment. Give it in international form: `+16505559876`, `16505559876`, and `0016505559876` all select the same legs. A number given without a country code is read as an international one, so give the country code to be sure of what you are matching. A `usr_`, `vrg_` or `vsq_` ID matches a browser's call to that workspace user, ring group or sequence, exactly as given. Use `number` instead to match part of a number, or either side of the leg.
      *
      */
     to?: string;
