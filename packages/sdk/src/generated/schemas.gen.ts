@@ -48378,7 +48378,8 @@ export const EventVoiceBaseSchema = {
     to: {
       type: "string",
       minLength: 1,
-      description: "Called party number in E.164 format.",
+      description:
+        "The dialled destination: an E.164 number, a SIP extension such as `1001` on a trunk call, or the `usr_` or `vrg_` ID of the workspace user or ring group a browser called.",
       example: "+16505559876",
     },
   },
@@ -50021,6 +50022,19 @@ export const VoicePartySchema = {
       description:
         "The workspace trunk on this side of the leg. `null` when this side sat behind no trunk.",
     },
+    user_id: {
+      readOnly: true,
+      oneOf: [
+        {
+          $ref: "#/components/schemas/UserID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The workspace user this side acted for, such as a user's browser, the ring group member whose side a recording captured, or the user who started a sequence call. `null` for every other participant, including an API key.",
+    },
   },
 } as const;
 
@@ -50298,6 +50312,66 @@ export const VoiceLegInboundRouteSchema = {
   },
 } as const;
 
+export const VoiceLegAnsweredByTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["user"],
+  description:
+    "Which kind of registration answered.\n\n- `user`: a workspace user's browser-phone registration.\n",
+  example: "user",
+} as const;
+
+export const VoiceRegistrationIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^vur_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vur_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoiceLegAnsweredByUserSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "A workspace user answered, on their browser-phone registration. The registration is deleted soon after its browser disconnects, so `registration_id` may no longer be listed.",
+  required: ["type", "registration_id", "user_id"],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegAnsweredByType",
+        },
+      ],
+      const: "user",
+    },
+    registration_id: {
+      $ref: "#/components/schemas/VoiceRegistrationID",
+      description: "The registration that answered.",
+    },
+    user_id: {
+      $ref: "#/components/schemas/UserID",
+      description: "The workspace user who answered.",
+    },
+  },
+} as const;
+
+export const VoiceLegAnsweredBySchema = {
+  description:
+    "Who answered, by kind. `type` says which: today always `user`, a workspace user's browser-phone registration. More kinds may be added, so treat an unknown `type` as an answer whose details this client cannot show. Until a kind is listed here, an answer of that kind reads as `null`.",
+  readOnly: true,
+  oneOf: [
+    {
+      $ref: "#/components/schemas/VoiceLegAnsweredByUser",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      user: "#/components/schemas/VoiceLegAnsweredByUser",
+    },
+  },
+} as const;
+
 export const VoiceMediaQualitySchema = {
   type: "object",
   additionalProperties: false,
@@ -50488,7 +50562,8 @@ export const VoiceLegSchema = {
       type: "string",
       minLength: 1,
       readOnly: true,
-      description: "Called party number in E.164 format.",
+      description:
+        "The dialled destination: an E.164 number, a SIP extension such as `1001` on a trunk call, or the `usr_` or `vrg_` ID of the workspace user or ring group a browser called.",
       example: "+16505559876",
     },
     actor: {
@@ -50581,6 +50656,19 @@ export const VoiceLegSchema = {
       readOnly: true,
       description:
         "When the leg was answered (`200` OK received). `null` for unanswered legs.",
+    },
+    answered_by: {
+      readOnly: true,
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegAnsweredBy",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Who answered when Bird rang your workspace users for this leg, through a ring group or a browser call to a user or a ring group. When a sequence rings more than once, it names who answered the latest ring. `null` when no workspace user answered, and on legs recorded before this field existed. Handle unknown `type` values as future answerer kinds.",
     },
     ended_at: {
       type: ["string", "null"],
@@ -67252,6 +67340,50 @@ export const VoicePartyEndpointWritableSchema = {
 export const VoicePartyWritableSchema = {
   type: "object",
   additionalProperties: false,
+} as const;
+
+export const VoiceLegAnsweredByUserWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  description:
+    "A workspace user answered, on their browser-phone registration. The registration is deleted soon after its browser disconnects, so `registration_id` may no longer be listed.",
+  required: ["type", "registration_id", "user_id"],
+  properties: {
+    type: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegAnsweredByType",
+        },
+      ],
+      const: "user",
+    },
+    registration_id: {
+      $ref: "#/components/schemas/VoiceRegistrationID",
+      description: "The registration that answered.",
+    },
+    user_id: {
+      $ref: "#/components/schemas/UserID",
+      description: "The workspace user who answered.",
+    },
+  },
+} as const;
+
+export const VoiceLegAnsweredByWritableSchema = {
+  description:
+    "Who answered, by kind. `type` says which: today always `user`, a workspace user's browser-phone registration. More kinds may be added, so treat an unknown `type` as an answer whose details this client cannot show. Until a kind is listed here, an answer of that kind reads as `null`.",
+  readOnly: true,
+  oneOf: [
+    {
+      $ref: "#/components/schemas/VoiceLegAnsweredByUserWritable",
+    },
+  ],
+  discriminator: {
+    propertyName: "type",
+    mapping: {
+      user: "#/components/schemas/VoiceLegAnsweredByUserWritable",
+    },
+  },
 } as const;
 
 export const VoiceLegMediaPathWritableSchema = {

@@ -26776,7 +26776,7 @@ export type EventVoiceBase = {
    */
   from: string;
   /**
-   * Called party number in E.164 format.
+   * The dialled destination: an E.164 number, a SIP extension such as `1001` on a trunk call, or the `usr_` or `vrg_` ID of the workspace user or ring group a browser called.
    */
   to: string;
 };
@@ -27717,6 +27717,10 @@ export type VoiceParty = {
    * The workspace trunk on this side of the leg. `null` when this side sat behind no trunk.
    */
   readonly trunk_id?: SipTrunkId | null;
+  /**
+   * The workspace user this side acted for, such as a user's browser, the ring group member whose side a recording captured, or the user who started a sequence call. `null` for every other participant, including an API key.
+   */
+  readonly user_id?: UserId | null;
 };
 
 /**
@@ -27930,6 +27934,36 @@ export type VoiceLegInboundRoute =
       type: "ring_group";
     } & VoiceLegInboundRouteRingGroup);
 
+/**
+ * Which kind of registration answered.
+ *
+ * - `user`: a workspace user's browser-phone registration.
+ *
+ */
+export type VoiceLegAnsweredByType = "user";
+
+export type VoiceRegistrationId = string;
+
+/**
+ * A workspace user answered, on their browser-phone registration. The registration is deleted soon after its browser disconnects, so `registration_id` may no longer be listed.
+ */
+export type VoiceLegAnsweredByUser = {
+  type: VoiceLegAnsweredByType;
+  /**
+   * The registration that answered.
+   */
+  registration_id: VoiceRegistrationId;
+  /**
+   * The workspace user who answered.
+   */
+  user_id: UserId;
+};
+
+/**
+ * Who answered, by kind. `type` says which: today always `user`, a workspace user's browser-phone registration. More kinds may be added, so treat an unknown `type` as an answer whose details this client cannot show. Until a kind is listed here, an answer of that kind reads as `null`.
+ */
+export type VoiceLegAnsweredBy = VoiceLegAnsweredByUser;
+
 export type VoiceMediaQuality = {
   /**
    * Mean opinion score, the single number for how the call sounded, from 1 (unintelligible) to 5 (as good as being in the same room). Anything at or above 4.0 is what most people would call a clear line, and below 3.5 is where callers start asking each other to repeat themselves. The three other fields are the impairments that move it.
@@ -28031,7 +28065,7 @@ export type VoiceLeg = {
    */
   readonly from: string;
   /**
-   * Called party number in E.164 format.
+   * The dialled destination: an E.164 number, a SIP extension such as `1001` on a trunk call, or the `usr_` or `vrg_` ID of the workspace user or ring group a browser called.
    */
   readonly to: string;
   /**
@@ -28078,6 +28112,10 @@ export type VoiceLeg = {
    * When the leg was answered (`200` OK received). `null` for unanswered legs.
    */
   readonly answered_at?: string | null;
+  /**
+   * Who answered when Bird rang your workspace users for this leg, through a ring group or a browser call to a user or a ring group. When a sequence rings more than once, it names who answered the latest ring. `null` when no workspace user answered, and on legs recorded before this field existed. Handle unknown `type` values as future answerer kinds.
+   */
+  readonly answered_by?: VoiceLegAnsweredBy | null;
   /**
    * When the leg ended (BYE or final non-2xx response). `null` for legs that ended abnormally without a recorded end event.
    */
@@ -36938,6 +36976,26 @@ export type VoicePartyEndpointWritable = {
 export type VoicePartyWritable = {
   [key: string]: never;
 };
+
+/**
+ * A workspace user answered, on their browser-phone registration. The registration is deleted soon after its browser disconnects, so `registration_id` may no longer be listed.
+ */
+export type VoiceLegAnsweredByUserWritable = {
+  type: VoiceLegAnsweredByType;
+  /**
+   * The registration that answered.
+   */
+  registration_id: VoiceRegistrationId;
+  /**
+   * The workspace user who answered.
+   */
+  user_id: UserId;
+};
+
+/**
+ * Who answered, by kind. `type` says which: today always `user`, a workspace user's browser-phone registration. More kinds may be added, so treat an unknown `type` as an answer whose details this client cannot show. Until a kind is listed here, an answer of that kind reads as `null`.
+ */
+export type VoiceLegAnsweredByWritable = VoiceLegAnsweredByUserWritable;
 
 export type VoiceLegMediaPathWritable = {
   /**
@@ -75787,7 +75845,7 @@ export type ListVoiceLegsData = {
      */
     from?: string;
     /**
-     * Return only legs placed to this called party number, matched as a whole number rather than as a fragment. Give it in international form: `+16505559876`, `16505559876`, and `0016505559876` all select the same legs. A number given without a country code is read as an international one, so give the country code to be sure of what you are matching. Use `number` instead to match part of a number, or either side of the leg.
+     * Return only legs placed to this called party number, matched as a whole number rather than as a fragment. Give it in international form: `+16505559876`, `16505559876`, and `0016505559876` all select the same legs. A number given without a country code is read as an international one, so give the country code to be sure of what you are matching. A `usr_` or `vrg_` ID matches a browser's call to that workspace user or ring group, exactly as given. Use `number` instead to match part of a number, or either side of the leg.
      *
      */
     to?: string;
