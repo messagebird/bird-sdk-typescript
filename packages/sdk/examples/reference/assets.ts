@@ -78,21 +78,36 @@ export async function assets_uploads_create() {
 }
 
 export async function assets_uploads_get() {
-  const upload = await bird.assets.uploads.get("aus_01krdgeqcxet5s7t44vh8rt9mg");
+  const upload = await bird.assets.uploads.get(
+    "aus_01krdgeqcxet5s7t44vh8rt9mg",
+  );
   console.log(upload.state);
 }
 
 export async function assets_uploads_prepare() {
-  const upload = await bird.assets.uploads.prepare("aus_01krdgeqcxet5s7t44vh8rt9mg");
+  const upload = await bird.assets.uploads.prepare(
+    "aus_01krdgeqcxet5s7t44vh8rt9mg",
+  );
   console.log(upload.state);
 }
 
 export async function assets_uploads_complete() {
-  const upload = await bird.assets.uploads.complete("aus_01krdgeqcxet5s7t44vh8rt9mg");
+  const upload = await bird.assets.uploads.complete(
+    "aus_01krdgeqcxet5s7t44vh8rt9mg",
+  );
   console.log(upload.state);
 }
 
 export async function assets_uploads_cancel() {
-  const upload = await bird.assets.uploads.cancel("aus_01krdgeqcxet5s7t44vh8rt9mg");
+  const upload = await bird.assets.uploads.cancel(
+    "aus_01krdgeqcxet5s7t44vh8rt9mg",
+  );
   console.log(upload.state);
+}
+
+export async function assets_uploads_handoff() {
+  const handoff = await bird.assets.uploads.handoff(
+    "aus_01krdgeqcxet5s7t44vh8rt9mg",
+  );
+  if (handoff.browser_url) console.log(handoff.browser_url);
 }

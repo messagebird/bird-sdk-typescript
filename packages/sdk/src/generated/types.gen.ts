@@ -612,6 +612,17 @@ export type WorkspaceRateLimitCap = {
 };
 
 /**
+ * Which limit bounds the workspace's own usage.
+ *
+ * - `manual`: the workspace's own active limit.
+ * - `automatic`: the workspace's share of the organization limit under its automatic allocation.
+ * - `organization`: no workspace limit applies; only the shared organization limit does.
+ *
+ */
+export type WorkspaceRateLimitLimitSource =
+  "manual" | "automatic" | "organization" | (string & {});
+
+/**
  * Whether workspace usage has been measured for long enough to set a new workspace limit.
  *
  * - `unavailable`: workspace limits cannot be set in this region yet.
@@ -662,11 +673,11 @@ export type WorkspaceRateLimitUsage = {
    */
   organization_remaining: number | null;
   /**
-   * The workspace's own limit requests were checked against when usage was read. `null` when no workspace limit applied or usage is unavailable.
+   * The workspace's own limit or automatic share requests were checked against when usage was read. `null` when no workspace limit applied or usage is unavailable.
    */
   workspace_limit: number | null;
   /**
-   * Units this workspace can still use under its own limit. `null` when no workspace limit applied, usage is unavailable, or workspace usage is not yet measured for long enough.
+   * Units this workspace can still use under its own limit or automatic share. `null` when no workspace limit applied, usage is unavailable, or workspace usage is not yet measured for long enough.
    */
   workspace_remaining: number | null;
   /**
@@ -698,13 +709,22 @@ export type WorkspaceRateLimit = {
    */
   organization_limit: number;
   /**
-   * The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.
+   * The workspace's own saved limit. `null` when none is saved; `limit_source` and `automatic_limit` then show whether an automatic share applies.
    */
   workspace_limit: WorkspaceRateLimitCap | null;
   /**
-   * The lower of the organization limit and any active workspace limit. Requests can still be refused below it when other workspaces use the shared organization limit.
+   * The lower of the organization limit and the workspace's active limit or automatic share. Requests can still be refused below it when other workspaces use the shared organization limit.
    */
   limit: number;
+  limit_source: WorkspaceRateLimitLimitSource;
+  /**
+   * The workspace's share under the organization's automatic allocation, at least 1 per window. Set only when `limit_source` is `automatic`; it is never saved as a workspace limit.
+   */
+  automatic_limit: number | null;
+  /**
+   * Whether the organization has an automatic allocation of this policy. It can be `true` while `limit_source` is `manual`. When `true`, changing or removing this workspace's limit can change other workspaces' automatic shares.
+   */
+  allocation_enabled: boolean;
   attribution: WorkspaceRateLimitAttribution;
   usage: WorkspaceRateLimitUsage;
 };
@@ -7097,7 +7117,7 @@ export type SmsTemplate = {
  */
 export type TemplateVariable = {
   /**
-   * The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the `name` on the matching parameter inside `components`, or, in the template parameters preview, the key in the send's `template.parameters`. A WhatsApp template whose placeholders are positional uses the position itself as `1`, `2` and so on, and values with no placeholder use fixed keys: `header_url`, `header_filename`, `header_location` and `code`, plus `button_url` (or `button_url_1`, `button_url_2` for a carousel card) for a url button whose suffix is numbered.
+   * The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the key in the send's `template.parameters`, or the `name` on the matching parameter inside `components`. A WhatsApp template whose placeholders are positional uses the position itself as `1`, `2` and so on, and values with no placeholder use fixed keys: `header_url`, `header_filename`, `header_location` and `code`, plus `button_url` (or `button_url_1`, `button_url_2` for a carousel card) for a url button whose suffix is numbered.
    *
    */
   readonly key: string;
@@ -7122,7 +7142,7 @@ export type TemplateVariable = {
    */
   readonly sensitive?: boolean;
   /**
-   * Whether the value comes from Bird rather than from the send. Absent means false. System slots are identified by the reserved `bird` key or a dotted path beneath it. They appear on email templates, and, in the template parameters preview, on WhatsApp templates whose parameter bindings read contact data; every SMS slot is yours to fill. A draft can also name a reserved key no Bird value fills, including `bird` itself: `constraint` says so, and publishing that draft is rejected.
+   * Whether the value comes from Bird rather than from the send. Absent means false. System slots are identified by the reserved `bird` key or a dotted path beneath it. They appear on email templates, and on WhatsApp templates whose parameter bindings read contact data; every SMS slot is yours to fill. A draft can also name a reserved key no Bird value fills, including `bird` itself: `constraint` says so, and publishing that draft is rejected.
    *
    */
   readonly system?: boolean;
@@ -8494,6 +8514,21 @@ export type AssetUploadSessionPrepared = AssetUploadSession & {
    */
   state: "pending";
   upload: AssetUploadInstruction;
+};
+
+export type AssetUploadBrowserHandoff = {
+  /**
+   * The original upload session and any saved publication receipt. In this response, `session.next` is empty; follow the top-level `next` steps.
+   */
+  session: AssetUploadSessionDetails;
+  /**
+   * Bird page for a pending session, or null when it no longer accepts an upload. The link grants no access; the person must sign in and have asset write permission in the workspace.
+   */
+  browser_url: string | null;
+  /**
+   * Ordered steps to finish the fallback or read its outcome.
+   */
+  next: Array<NextAction>;
 };
 
 /**
@@ -10274,27 +10309,6 @@ export type WhatsAppNumberId = string;
 
 export type WhatsAppMessageId = string;
 
-export type WhatsAppEventId = string;
-
-/**
- * Failure detail for a message that could not be delivered or was rejected.
- */
-export type WhatsAppError = {
-  code: WhatsAppErrorCode;
-  /**
-   * Human-readable explanation of the failure.
-   */
-  readonly description: string;
-  /**
-   * Raw error code from the WhatsApp Cloud API, when available, for low-level debugging.
-   */
-  readonly meta_error_code?: string | null;
-  /**
-   * When the failure occurred.
-   */
-  readonly occurred_at: string;
-} | null;
-
 /**
  * The kind of value a template parameter carries, which follows the block it fills. The `text` type is a plain string substituted into a placeholder. This includes a coupon button's code, which the recipient copies from the button. The `image`, `video`, `gif`, and `document` types carry a media header's file in `url`. Each matches its header's `format`. The `location` type fills a location header and carries a point on the map. Open enum: more kinds may be added over time.
  *
@@ -10624,6 +10638,13 @@ export type WhatsAppMessageTemplate = {
    *
    */
   readonly bid_multiplier?: number;
+  /**
+   * The `template.parameters` map the message was sent with, keeping only the keys the template language reads; keys the send ignored are dropped. `components` shows the values the template rendered from it. Absent for a `components` send, for an authentication template, and for messages sent before Bird stored it.
+   *
+   */
+  readonly parameters?: {
+    [key: string]: unknown;
+  };
   /**
    * The values that filled the template's placeholders. Empty for an authentication template, whose content is never returned.
    *
@@ -11209,6 +11230,25 @@ export type Actor = {
 export type WhatsAppMessageOrigin =
   "business_agent_echo" | "business_app_echo" | "history_sync" | (string & {});
 
+/**
+ * Failure detail for a message that could not be delivered or was rejected.
+ */
+export type WhatsAppError = {
+  code: WhatsAppErrorCode;
+  /**
+   * Human-readable explanation of the failure.
+   */
+  readonly description: string;
+  /**
+   * Raw error code from the WhatsApp Cloud API, when available, for low-level debugging.
+   */
+  readonly meta_error_code?: string | null;
+  /**
+   * When the failure occurred.
+   */
+  readonly occurred_at: string;
+} | null;
+
 export type WhatsAppMessage = {
   /**
    * ID of the message, assigned when the send is accepted. Pass it as `message_id` to the get-message and list-events endpoints.
@@ -11410,6 +11450,13 @@ export type WhatsAppTemplateSend = unknown & {
    * Multiplies `optimization_spec.bid_amount` × country multiplier for this message. Range 0.01–100; default 1. Requires `optimization_spec` on a marketing template language.
    */
   bid_multiplier?: number;
+  /**
+   * The template's inputs as one map, instead of `components`. Each key is a name in the version's `variables`: a placeholder's own name, or its number (`1`, `2`) for a numbered placeholder, `header_url` (or `header_url_1`, `header_url_2` for a carousel card), `header_filename`, `header_location` and `code` for values with no placeholder, `button_url` (or `button_url_1`, `button_url_2` for a carousel card) for a numbered URL suffix, or an input a parameter binding reads. A media header left out, or whose value is empty, sends the template's approved sample; a template without one, such as one imported from WhatsApp, needs its media URL. A value is a string, number or boolean, except `header_location`, an object with `latitude` and `longitude`, and optionally `name` and `address`. Keys the language does not use are ignored, and `bird` is reserved. At most 16 KB. Send `parameters` or `components`, not both. A template with parameter bindings, or with named variables in a card or a button URL, takes only `parameters`.
+   *
+   */
+  parameters?: {
+    [key: string]: unknown;
+  };
   /**
    * Copy each language component's `example_parameters` into that part's `parameters`, replacing examples with real values. Map `buttons` to one `button` part per button with examples, in order; map `carousel` to `cards`, built likewise. A location header requires a `location` parameter. Omit other blocks without examples.
    */
@@ -12028,6 +12075,8 @@ export type WhatsAppEventType =
   | "whatsapp.rejected"
   | "whatsapp.sent"
   | (string & {});
+
+export type WhatsAppEventId = string;
 
 export type WhatsAppEvent = {
   /**
@@ -13005,6 +13054,37 @@ export type WhatsAppTemplateCategoryWrite =
   "authentication" | "utility" | "marketing";
 
 /**
+ * The Liquid that fills a location header, one string per field. Latitude and longitude must render to a number.
+ *
+ */
+export type WhatsAppTemplateLocationBinding = {
+  /**
+   * Liquid for the latitude, in degrees.
+   */
+  latitude: string;
+  /**
+   * Liquid for the longitude, in degrees.
+   */
+  longitude: string;
+  /**
+   * Liquid for the location's name.
+   */
+  name?: string;
+  /**
+   * Liquid for the location's address.
+   */
+  address?: string;
+};
+
+/**
+ * Liquid over the send's `template.parameters`, keyed by the name of the value it fills. A placeholder's name is its own, such as `order_id`, or its number, such as `1`. A value with no placeholder has a fixed name: `header_url` (or `header_url_1`, `header_url_2` and so on for a carousel card), `header_filename`, `header_location` and `code`. A numbered url suffix is `button_url` (or `button_url_1`, `button_url_2` for a card). A value is a Liquid string, except `header_location`'s, which is an object of four. A value no key binds is filled by the input of the same name. Bindings never reach WhatsApp.
+ *
+ */
+export type WhatsAppTemplateParameterBindings = {
+  [key: string]: string | WhatsAppTemplateLocationBinding;
+};
+
+/**
  * How Meta bids for each delivery.
  *
  * - `lowest_cost_with_bid_cap`: Meta delivers at the lowest cost it can find, never above the bid.
@@ -13257,6 +13337,11 @@ export type WhatsAppTemplateRevision = number;
  */
 export type WhatsAppTemplateLanguageUpsert = {
   /**
+   * Liquid that computes this language's send values from the send's `template.parameters`. Omit it to keep the current bindings, and send `null` to remove them. Changing only the bindings never needs a new review.
+   *
+   */
+  parameter_bindings?: WhatsAppTemplateParameterBindings | null;
+  /**
    * This language's maximum price. Omit it to keep the current one. A new language written without it uses Meta's standard rate. Send `null` to return to the standard rate. Changing only the price updates Meta without a new review. A send at a maximum price needs the business account's `marketing_messages_onboarding_status` to be `onboarded`. Otherwise it fails with WhatsApp error 131061.
    *
    */
@@ -13421,6 +13506,11 @@ export type WhatsAppTemplateVersionSummary = {
    */
   readonly submitted_at: string | null;
   /**
+   * The variable slots this version's content fills in from the values you supply when sending. Combined across every language, because languages need not declare the same slots: if the English body uses `first_name` and the French one uses `last_name`, both appear here. A template with named parameters keys them by name; a positional one keys them by their `{{n}}` position, as `1`, `2` and so on. Supply the slots the language you send declares, by these keys in `template.parameters` or through `components`.
+   *
+   */
+  readonly variables?: Array<TemplateVariable>;
+  /**
    * What this version's submission did with each language it holds, keyed by BCP-47 language tag. Content is not here: read the version for that.
    *
    */
@@ -13457,6 +13547,10 @@ export type WhatsAppTemplateVersionList = {
  * One language's content in one version, and what that submission did with it.
  */
 export type WhatsAppTemplateVersionLanguage = {
+  /**
+   * This language's bindings in this version, absent when it has none.
+   */
+  parameter_bindings?: WhatsAppTemplateParameterBindings;
   /**
    * This language's content in this version, in display order.
    */
@@ -13501,6 +13595,11 @@ export type WhatsAppTemplateVersion = {
    *
    */
   readonly submitted_at: string | null;
+  /**
+   * The variable slots this version's content fills in from the values you supply when sending. Combined across every language, because languages need not declare the same slots: if the English body uses `first_name` and the French one uses `last_name`, both appear here. A template with named parameters keys them by name; a positional one keys them by their `{{n}}` position, as `1`, `2` and so on. Supply the slots the language you send declares, by these keys in `template.parameters` or through `components`.
+   *
+   */
+  readonly variables?: Array<TemplateVariable>;
   /**
    * This version's content, keyed by BCP-47 language tag, with what its submission did with each language.
    *
@@ -13730,6 +13829,10 @@ export type WhatsAppTemplatePause = {
  *
  */
 export type WhatsAppTemplateLanguage = {
+  /**
+   * This language's bindings, absent when it has none.
+   */
+  parameter_bindings?: WhatsAppTemplateParameterBindings;
   /**
    * This language's maximum price, or `null` when Meta's standard rate applies.
    */
@@ -14572,7 +14675,7 @@ export type AmbBusinessAccountEvent = {
   readonly type: string;
   readonly summary: string;
   /**
-   * Details of the change. source identifies whether a customer or Bird staff recorded it.
+   * Details of the change. `source` identifies who recorded it, `customer`, `staff` or `automated_review`.
    */
   readonly metadata: {
     [key: string]: unknown;
@@ -14709,6 +14812,12 @@ export type AmbBusinessSubmissionId = string;
 export type AmbBusinessAccountSubmissionStatus =
   "submitted" | "in_review" | "approved" | "rejected";
 
+/**
+ * Who recorded an attempt's outcome. `automated_review` is Bird's automated review of the evidence. `staff` is Bird staff, including when they record Apple's decision. Treat unrecognized values as future deciders.
+ */
+export type AmbBusinessAccountSubmissionDecider =
+  "staff" | "automated_review" | (string & {});
+
 export type AmbBusinessAccountSubmission = {
   readonly id: AmbBusinessSubmissionId;
   readonly business_account_id: AmbBusinessId;
@@ -14728,9 +14837,13 @@ export type AmbBusinessAccountSubmission = {
    */
   readonly status: AmbBusinessAccountSubmissionStatus;
   /**
-   * Review feedback on this attempt, such as the reason Apple rejected it. May contain basic Markdown, such as emphasis and lists.
+   * Review feedback on this attempt, such as the automated review's feedback or the reason Apple rejected it. May contain basic Markdown, such as emphasis, lists and links.
    */
   readonly status_reason: string | null;
+  /**
+   * Who recorded this attempt's outcome, `automated_review` when Bird's automated review rejected it or `staff`. Null while the attempt waits, and for outcomes recorded before automated reviews.
+   */
+  readonly decided_by: AmbBusinessAccountSubmissionDecider | null;
   readonly created_at: string;
   /**
    * Read the parent business account for current eligibility and next actions. Present on create responses and each customer submission-list item; historical attempts do not establish current account state.
@@ -31485,13 +31598,22 @@ export type WorkspaceRateLimitWritable = {
    */
   organization_limit: number;
   /**
-   * The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.
+   * The workspace's own saved limit. `null` when none is saved; `limit_source` and `automatic_limit` then show whether an automatic share applies.
    */
   workspace_limit: WorkspaceRateLimitCapWritable | null;
   /**
-   * The lower of the organization limit and any active workspace limit. Requests can still be refused below it when other workspaces use the shared organization limit.
+   * The lower of the organization limit and the workspace's active limit or automatic share. Requests can still be refused below it when other workspaces use the shared organization limit.
    */
   limit: number;
+  limit_source: WorkspaceRateLimitLimitSource;
+  /**
+   * The workspace's share under the organization's automatic allocation, at least 1 per window. Set only when `limit_source` is `automatic`; it is never saved as a workspace limit.
+   */
+  automatic_limit: number | null;
+  /**
+   * Whether the organization has an automatic allocation of this policy. It can be `true` while `limit_source` is `manual`. When `true`, changing or removing this workspace's limit can change other workspaces' automatic shares.
+   */
+  allocation_enabled: boolean;
   attribution: WorkspaceRateLimitAttribution;
   usage: WorkspaceRateLimitUsage;
 };
@@ -33047,6 +33169,21 @@ export type AssetUploadSessionDetailsWritable = AssetUploadSessionWritable;
  */
 export type AssetUploadSessionPreparedWritable = AssetUploadSessionWritable;
 
+export type AssetUploadBrowserHandoffWritable = {
+  /**
+   * The original upload session and any saved publication receipt. In this response, `session.next` is empty; follow the top-level `next` steps.
+   */
+  session: AssetUploadSessionDetailsWritable;
+  /**
+   * Bird page for a pending session, or null when it no longer accepts an upload. The link grants no access; the person must sign in and have asset write permission in the workspace.
+   */
+  browser_url: string | null;
+  /**
+   * Ordered steps to finish the fallback or read its outcome.
+   */
+  next: Array<NextAction>;
+};
+
 export type AssetListWritable = {
   data: Array<AssetWritable>;
 } & ListEnvelopeWithTotal;
@@ -33192,13 +33329,6 @@ export type VerificationCheckResultWritable = {
 };
 
 /**
- * Failure detail for a message that could not be delivered or was rejected.
- */
-export type WhatsAppErrorWritable = {
-  code: WhatsAppErrorCode;
-} | null;
-
-/**
  * The template a message was sent from. On reads `slug`, `language`, `category`, and `components` are always present; `components` is an empty array for an authentication template (the filled-in values, for example a verification code, are never returned).
  *
  */
@@ -33308,6 +33438,13 @@ export type ActorWritable = {
    */
   type: string;
 };
+
+/**
+ * Failure detail for a message that could not be delivered or was rejected.
+ */
+export type WhatsAppErrorWritable = {
+  code: WhatsAppErrorCode;
+} | null;
 
 export type WhatsAppMessageWritable = {
   /**
@@ -33654,6 +33791,10 @@ export type WhatsAppTemplateVersionListWritable = {
  */
 export type WhatsAppTemplateVersionLanguageWritable = {
   /**
+   * This language's bindings in this version, absent when it has none.
+   */
+  parameter_bindings?: WhatsAppTemplateParameterBindings;
+  /**
    * This language's content in this version, in display order.
    */
   components: Array<unknown>;
@@ -33739,6 +33880,10 @@ export type WhatsAppTemplateQualityWritable = {
  *
  */
 export type WhatsAppTemplateLanguageWritable = {
+  /**
+   * This language's bindings, absent when it has none.
+   */
+  parameter_bindings?: WhatsAppTemplateParameterBindings;
   /**
    * This language's maximum price, or `null` when Meta's standard rate applies.
    */
@@ -46512,6 +46657,110 @@ export type CancelAssetUploadSessionResponses = {
 
 export type CancelAssetUploadSessionResponse =
   CancelAssetUploadSessionResponses[keyof CancelAssetUploadSessionResponses];
+
+export type CreateAssetUploadBrowserHandoffData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * ID of the media-library upload session.
+     */
+    upload_id: AssetUploadSessionId;
+  };
+  query?: never;
+  url: "/v1/asset-upload-sessions/{upload_id}/browser";
+};
+
+export type CreateAssetUploadBrowserHandoffErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateAssetUploadBrowserHandoffError =
+  CreateAssetUploadBrowserHandoffErrors[keyof CreateAssetUploadBrowserHandoffErrors];
+
+export type CreateAssetUploadBrowserHandoffResponses = {
+  /**
+   * The session, its browser fallback URL when pending, and its next steps.
+   */
+  200: AssetUploadBrowserHandoff;
+};
+
+export type CreateAssetUploadBrowserHandoffResponse =
+  CreateAssetUploadBrowserHandoffResponses[keyof CreateAssetUploadBrowserHandoffResponses];
 
 export type ListAssetsData = {
   body?: never;

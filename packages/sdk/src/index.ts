@@ -497,6 +497,7 @@ export {
   EsimActionName,
   EsimActionUnavailableReason,
   AMBBusinessAccountReviewStatus,
+  AMBBusinessAccountSubmissionDecider,
   AMBMessageEventType,
   AMBFormKeyboardType,
   AMBFormTextContentType,
@@ -596,6 +597,7 @@ export {
   WhatsAppTemplateRejectionCategory,
   WhatsAppUsernameStatus,
   WorkspaceQuotaLimitSource,
+  WorkspaceRateLimitLimitSource,
 } from "./open-enums.gen.js";
 export type {
   AssetKindValue,
@@ -603,6 +605,7 @@ export type {
   EsimActionNameValue,
   EsimActionUnavailableReasonValue,
   AMBBusinessAccountReviewStatusValue,
+  AMBBusinessAccountSubmissionDeciderValue,
   AMBMessageEventTypeValue,
   AMBFormKeyboardTypeValue,
   AMBFormTextContentTypeValue,
@@ -702,6 +705,7 @@ export type {
   WhatsAppTemplateRejectionCategoryValue,
   WhatsAppUsernameStatusValue,
   WorkspaceQuotaLimitSourceValue,
+  WorkspaceRateLimitLimitSourceValue,
 } from "./open-enums.gen.js";
 export type {
   Mailbox,
@@ -1061,6 +1065,7 @@ export type {
 export type { WorkspaceSortField } from "./generated/types.gen.js";
 
 export type {
+  AssetUploadBrowserHandoff,
   AssetUploadSessionInstruction,
   AssetUploadSessionPrepared,
   AssetUploadSessionDetails,

@@ -25,7 +25,7 @@ export class AmbBusinessAccountsSubmissionsResource extends Resource {
   }
 
   /**
-   * Submits an account for review, making its name, Apple UUID and three uploaded evidence attachments available to Bird staff. This does not approve the account.
+   * Submits an account for review and queues an automated review of its three evidence attachments. The review can reject the attempt with the changes needed. Otherwise Bird staff review it and relay it to Apple when it is ready. Read the outcome with `amb.business_accounts.submissions.list`. This does not approve the account.
    *
    * @example 
    * const result = await bird.amb.businessAccounts.submissions.create(

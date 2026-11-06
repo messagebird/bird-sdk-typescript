@@ -61,6 +61,9 @@ import type {
   CreateAssetFolderData,
   CreateAssetFolderErrors,
   CreateAssetFolderResponses,
+  CreateAssetUploadBrowserHandoffData,
+  CreateAssetUploadBrowserHandoffErrors,
+  CreateAssetUploadBrowserHandoffResponses,
   CreateAssetUploadInstructionData,
   CreateAssetUploadInstructionErrors,
   CreateAssetUploadInstructionResponses,
@@ -1439,16 +1442,16 @@ export const getCurrentWorkspace = <ThrowOnError extends boolean = false>(
 /**
  * List workspace rate limits
  *
- * Only relevant to organizations with several workspaces, or one left with a single workspace that kept a workspace limit after a deletion, which still applies. When deleting workspaces leaves one, that workspace keeps its workspace limits and they still apply until they are removed or expire; otherwise an organization with one workspace only needs its organization rate limits.
+ * Only relevant to organizations with several workspaces, or one left with a workspace limit or enabled allocation after a deletion. When deleting workspaces leaves one, its manual limits apply until removed or expired, and enabled allocation continues. Without an active manual limit or allocation, one workspace uses the shared organization limit.
  *
  * Returns every rate-limit policy as it applies to the current workspace: the organization limit shared by
- * all workspaces, the workspace's own limit when one is set, and the remaining capacity observed in the
+ * all workspaces, any manual or automatic workspace limit, and the remaining capacity observed in the
  * current window.
  *
  * A workspace limit is not reserved capacity. A request is refused when either the organization
  * limit or the workspace limit is reached. When usage cannot be read, `usage.status` is `unavailable` and
- * the remaining counts are `null`. `usage.workspace_remaining` is also `null` when the workspace has no
- * limit of its own or `attribution.status` is not `ready`, so check `usage.status` before treating `null`
+ * the remaining counts are `null`. `usage.workspace_remaining` is also `null` when neither a manual nor
+ * an automatic limit applies, or `attribution.status` is not `ready`, so check `usage.status` before treating `null`
  * as a failed read.
  *
  * Rate limits are served from the organization's home region. A request sent to another region returns `421 Misdirected Request`; retry it on that region's host.
@@ -4734,6 +4737,30 @@ export const cancelAssetUploadSession = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Open a browser fallback for a media upload
+ *
+ * Offers an existing upload session to a signed-in person with asset write access in its workspace. Only the same OAuth connection or API key that created the session can request this fallback. The file, metadata, capacity reservation and one-hour deadline stay unchanged. Repeating the request returns the same page for a pending session. A non-pending session returns its current state without a browser URL. Enabling the handoff allows any currently authorized person in that workspace to complete or cancel it, independently of the original connection's continued access. The person must select matching file bytes; opening the page never publishes them.
+ */
+export const createAssetUploadBrowserHandoff = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateAssetUploadBrowserHandoffData, ThrowOnError>,
+): RequestResult<
+  CreateAssetUploadBrowserHandoffResponses,
+  CreateAssetUploadBrowserHandoffErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateAssetUploadBrowserHandoffResponses,
+    CreateAssetUploadBrowserHandoffErrors,
+    ThrowOnError
+  >({
+    security: [{ scheme: "bearer", type: "http" }],
+    url: "/v1/asset-upload-sessions/{upload_id}/browser",
+    ...options,
+  });
+
+/**
  * List workspace media-library assets
  *
  * Returns a cursor page of the workspace's media-library assets, most recently created first. Filters can narrow results by media type, name, deletion status, or folder placement.
@@ -6350,7 +6377,11 @@ export const listWhatsAppMessages = <ThrowOnError extends boolean = false>(
  * A **template** is the only content WhatsApp delivers outside an open
  * customer service window, so it is what starts a conversation. Name the
  * template, optionally pick its language variant, and fill its placeholders in
- * `components`. A Bird-managed template selects its sender number from its
+ * `components`, or by name in `parameters`. A template whose language has
+ * parameter bindings, or named variables in a carousel card or a button URL,
+ * takes only `parameters`. One whose bindings read contact data returns `422`
+ * `WhatsAppTemplateContactUnavailable`, because a single send has no contact
+ * record. A Bird-managed template selects its sender number from its
  * category, so the request carries no `from`; a template your workspace
  * authored requires one. Browse your workspace's templates in the Bird
  * dashboard.
@@ -9104,7 +9135,7 @@ export const listAmbBusinessAccountSubmissions = <
 /**
  * Submit an Apple Messages for Business business for review
  *
- * Submits an account for review, making its name, Apple UUID and three uploaded evidence attachments available to Bird staff. This does not approve the account.
+ * Submits an account for review and queues an automated review of its three evidence attachments. The review can reject the attempt with the changes needed. Otherwise Bird staff review it and relay it to Apple when it is ready. Each submission spends one of the organization's daily automated reviews (`amb_reviews_daily_max`) and one of the account's 10 daily reviews. This does not approve the account.
  */
 export const createAmbBusinessAccountSubmission = <
   ThrowOnError extends boolean = false,

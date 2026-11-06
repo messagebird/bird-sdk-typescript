@@ -8,7 +8,7 @@ export type { WorkspaceRateLimitList };
 
 export class WorkspaceRateLimitsResource extends Resource {
   /**
-   * Only relevant to organizations with several workspaces, or one left with a single workspace that kept a workspace limit after a deletion, which still applies. List every rate-limit policy as it applies to the current workspace: the shared organization limit, any workspace limit, and remaining capacity in the current window. Remaining counts are null, not zero, when usage.status is unavailable. usage.workspace_remaining is also null when the workspace has no limit of its own or attribution.status is not ready, so check usage.status before treating null as a failed read.
+   * Only relevant to organizations with several workspaces, or one left with a workspace limit or enabled allocation after a deletion. List every rate-limit policy as it applies to the current workspace: the shared organization limit, any manual or automatic workspace limit, and remaining capacity in the current window. Remaining counts are null, not zero, when usage.status is unavailable. usage.workspace_remaining is also null when neither a manual nor an automatic limit applies or attribution.status is not ready, so check usage.status before treating null as a failed read.
    *
    * @example List the rate limits that apply to this workspace
    * // Workspace limits matter with several workspaces, or one that kept a limit after a deletion.

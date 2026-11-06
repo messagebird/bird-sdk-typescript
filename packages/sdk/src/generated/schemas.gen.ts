@@ -979,6 +979,14 @@ export const WorkspaceRateLimitCapSchema = {
   },
 } as const;
 
+export const WorkspaceRateLimitLimitSourceSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["manual", "automatic", "organization"],
+  description:
+    "Which limit bounds the workspace's own usage.\n\n- `manual`: the workspace's own active limit.\n- `automatic`: the workspace's share of the organization limit under its automatic allocation.\n- `organization`: no workspace limit applies; only the shared organization limit does.\n",
+} as const;
+
 export const WorkspaceRateLimitAttributionStatusSchema = {
   type: "string",
   minLength: 1,
@@ -1054,13 +1062,13 @@ export const WorkspaceRateLimitUsageSchema = {
       type: ["integer", "null"],
       minimum: 1,
       description:
-        "The workspace's own limit requests were checked against when usage was read. `null` when no workspace limit applied or usage is unavailable.",
+        "The workspace's own limit or automatic share requests were checked against when usage was read. `null` when no workspace limit applied or usage is unavailable.",
     },
     workspace_remaining: {
       type: ["integer", "null"],
       minimum: 0,
       description:
-        "Units this workspace can still use under its own limit. `null` when no workspace limit applied, usage is unavailable, or workspace usage is not yet measured for long enough.",
+        "Units this workspace can still use under its own limit or automatic share. `null` when no workspace limit applied, usage is unavailable, or workspace usage is not yet measured for long enough.",
     },
     resets_in_seconds: {
       type: ["integer", "null"],
@@ -1085,6 +1093,9 @@ export const WorkspaceRateLimitSchema = {
     "organization_limit",
     "workspace_limit",
     "limit",
+    "limit_source",
+    "automatic_limit",
+    "allocation_enabled",
     "attribution",
     "usage",
   ],
@@ -1121,7 +1132,7 @@ export const WorkspaceRateLimitSchema = {
     },
     workspace_limit: {
       description:
-        "The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.",
+        "The workspace's own saved limit. `null` when none is saved; `limit_source` and `automatic_limit` then show whether an automatic share applies.",
       oneOf: [
         {
           $ref: "#/components/schemas/WorkspaceRateLimitCap",
@@ -1135,7 +1146,21 @@ export const WorkspaceRateLimitSchema = {
       type: "integer",
       minimum: 1,
       description:
-        "The lower of the organization limit and any active workspace limit. Requests can still be refused below it when other workspaces use the shared organization limit.",
+        "The lower of the organization limit and the workspace's active limit or automatic share. Requests can still be refused below it when other workspaces use the shared organization limit.",
+    },
+    limit_source: {
+      $ref: "#/components/schemas/WorkspaceRateLimitLimitSource",
+    },
+    automatic_limit: {
+      type: ["integer", "null"],
+      minimum: 1,
+      description:
+        "The workspace's share under the organization's automatic allocation, at least 1 per window. Set only when `limit_source` is `automatic`; it is never saved as a workspace limit.",
+    },
+    allocation_enabled: {
+      type: "boolean",
+      description:
+        "Whether the organization has an automatic allocation of this policy. It can be `true` while `limit_source` is `manual`. When `true`, changing or removing this workspace's limit can change other workspaces' automatic shares.",
     },
     attribution: {
       $ref: "#/components/schemas/WorkspaceRateLimitAttribution",
@@ -12661,7 +12686,7 @@ export const TemplateVariableSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the `name` on the matching parameter inside `components`, or, in the template parameters preview, the key in the send's `template.parameters`. A WhatsApp template whose placeholders are positional uses the position itself as `1`, `2` and so on, and values with no placeholder use fixed keys: `header_url`, `header_filename`, `header_location` and `code`, plus `button_url` (or `button_url_1`, `button_url_2` for a carousel card) for a url button whose suffix is numbered.\n",
+        "The key this slot is filled by. When `system` is true it is the reserved `bird` key or a dotted path beneath it, such as `bird.contact.first_name`, and naming it in a send is rejected. Otherwise, on email and SMS it is the key you set in the send's `parameters` object, and on WhatsApp the key in the send's `template.parameters`, or the `name` on the matching parameter inside `components`. A WhatsApp template whose placeholders are positional uses the position itself as `1`, `2` and so on, and values with no placeholder use fixed keys: `header_url`, `header_filename`, `header_location` and `code`, plus `button_url` (or `button_url_1`, `button_url_2` for a carousel card) for a url button whose suffix is numbered.\n",
     },
     type: {
       type: "string",
@@ -12713,7 +12738,7 @@ export const TemplateVariableSchema = {
       readOnly: true,
       default: false,
       description:
-        "Whether the value comes from Bird rather than from the send. Absent means false. System slots are identified by the reserved `bird` key or a dotted path beneath it. They appear on email templates, and, in the template parameters preview, on WhatsApp templates whose parameter bindings read contact data; every SMS slot is yours to fill. A draft can also name a reserved key no Bird value fills, including `bird` itself: `constraint` says so, and publishing that draft is rejected.\n",
+        "Whether the value comes from Bird rather than from the send. Absent means false. System slots are identified by the reserved `bird` key or a dotted path beneath it. They appear on email templates, and on WhatsApp templates whose parameter bindings read contact data; every SMS slot is yours to fill. A draft can also name a reserved key no Bird value fills, including `bird` itself: `constraint` says so, and publishing that draft is rejected.\n",
     },
   },
 } as const;
@@ -15288,6 +15313,77 @@ export const AssetUploadSessionPreparedSchema = {
       },
     },
   ],
+} as const;
+
+export const AssetUploadBrowserHandoffSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["session", "browser_url", "next"],
+  properties: {
+    session: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AssetUploadSessionDetails",
+        },
+      ],
+      description:
+        "The original upload session and any saved publication receipt. In this response, `session.next` is empty; follow the top-level `next` steps.",
+    },
+    browser_url: {
+      type: ["string", "null"],
+      format: "uri",
+      minLength: 1,
+      description:
+        "Bird page for a pending session, or null when it no longer accepts an upload. The link grants no access; the person must sign in and have asset write permission in the workspace.",
+    },
+    next: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+      description: "Ordered steps to finish the fallback or read its outcome.",
+    },
+  },
+  example: {
+    session: {
+      id: "aus_01krdgeqcxet5s7t44vh8rt9mg",
+      state: "pending",
+      expires_at: "2026-11-04T23:00:00Z",
+      name: "Invoice",
+      alt_text: null,
+      folder_id: null,
+      file: {
+        filename: "invoice.pdf",
+        content_type: "application/pdf",
+        size_bytes: 1024,
+        sha256:
+          "4e2090a479f7ce6b17ad31f991988f12571bcafbd4a441cc4063644fc1400ae0",
+      },
+      result: null,
+      last_error: null,
+      next: [],
+      asset: null,
+    },
+    browser_url:
+      "https://bird.com/dashboard/w/ws_01krdgeqcxet5s7t44vh8rt9mg/media-library/uploads/aus_01krdgeqcxet5s7t44vh8rt9mg",
+    next: [
+      {
+        kind: "external",
+        description:
+          "Open browser_url and have a person with asset write access select the original file and publish it. Their browser must reach the storage hostname. Opening the page does not complete the upload.",
+      },
+      {
+        kind: "operation",
+        operation: "getAssetUploadSession",
+        params: {
+          upload_id: "aus_01krdgeqcxet5s7t44vh8rt9mg",
+        },
+        description:
+          "After the person finishes, read the saved result using the original workspace and connection.",
+      },
+    ],
+  },
 } as const;
 
 export const AssetSortFieldSchema = {
@@ -18438,48 +18534,6 @@ export const WhatsAppMessageIDSchema = {
   example: "wam_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
-export const WhatsAppEventIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^ev_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "ev_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const WhatsAppErrorSchema = {
-  type: ["object", "null"],
-  additionalProperties: false,
-  readOnly: true,
-  required: ["code", "description", "occurred_at"],
-  description:
-    "Failure detail for a message that could not be delivered or was rejected.",
-  properties: {
-    code: {
-      $ref: "#/components/schemas/WhatsAppErrorCode",
-    },
-    description: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description: "Human-readable explanation of the failure.",
-      example: "Message could not be delivered.",
-    },
-    meta_error_code: {
-      type: ["string", "null"],
-      readOnly: true,
-      description:
-        "Raw error code from the WhatsApp Cloud API, when available, for low-level debugging.",
-      example: "131026",
-    },
-    occurred_at: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      readOnly: true,
-      description: "When the failure occurred.",
-    },
-  },
-} as const;
-
 export const WhatsAppTemplateParameterTypeSchema = {
   type: "string",
   minLength: 1,
@@ -19033,6 +19087,17 @@ export const WhatsAppMessageTemplateSchema = {
       description:
         "The `bid_multiplier` the message was sent with. Absent when the send named none, which bids at 1. Also absent on messages sent before Bird stored it.\n",
       example: 0.8,
+    },
+    parameters: {
+      type: "object",
+      readOnly: true,
+      additionalProperties: true,
+      description:
+        "The `template.parameters` map the message was sent with, keeping only the keys the template language reads; keys the send ignored are dropped. `components` shows the values the template rendered from it. Absent for a `components` send, for an authentication template, and for messages sent before Bird stored it.\n",
+      example: {
+        order_id: "A-4192",
+        first_name: "Ava",
+      },
     },
     components: {
       type: "array",
@@ -19963,6 +20028,41 @@ export const WhatsAppMessageOriginSchema = {
   example: "business_agent_echo",
 } as const;
 
+export const WhatsAppErrorSchema = {
+  type: ["object", "null"],
+  additionalProperties: false,
+  readOnly: true,
+  required: ["code", "description", "occurred_at"],
+  description:
+    "Failure detail for a message that could not be delivered or was rejected.",
+  properties: {
+    code: {
+      $ref: "#/components/schemas/WhatsAppErrorCode",
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description: "Human-readable explanation of the failure.",
+      example: "Message could not be delivered.",
+    },
+    meta_error_code: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "Raw error code from the WhatsApp Cloud API, when available, for low-level debugging.",
+      example: "131026",
+    },
+    occurred_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When the failure occurred.",
+    },
+  },
+} as const;
+
 export const WhatsAppMessageSchema = {
   type: "object",
   additionalProperties: false,
@@ -20261,7 +20361,7 @@ export const WhatsAppTemplateSendSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Supply exactly one of `id` or `slug`, optionally a language, and fill required placeholders through `components`.",
+    "Supply exactly one of `id` or `slug`, optionally a language, and fill required placeholders through `parameters` or `components`.",
   oneOf: [
     {
       required: ["id"],
@@ -20302,6 +20402,16 @@ export const WhatsAppTemplateSendSchema = {
       description:
         "Multiplies `optimization_spec.bid_amount` × country multiplier for this message. Range 0.01–100; default 1. Requires `optimization_spec` on a marketing template language.",
       example: 0.8,
+    },
+    parameters: {
+      type: "object",
+      additionalProperties: true,
+      description:
+        "The template's inputs as one map, instead of `components`. Each key is a name in the version's `variables`: a placeholder's own name, or its number (`1`, `2`) for a numbered placeholder, `header_url` (or `header_url_1`, `header_url_2` for a carousel card), `header_filename`, `header_location` and `code` for values with no placeholder, `button_url` (or `button_url_1`, `button_url_2` for a carousel card) for a numbered URL suffix, or an input a parameter binding reads. A media header left out, or whose value is empty, sends the template's approved sample; a template without one, such as one imported from WhatsApp, needs its media URL. A value is a string, number or boolean, except `header_location`, an object with `latitude` and `longitude`, and optionally `name` and `address`. Keys the language does not use are ignored, and `bird` is reserved. At most 16 KB. Send `parameters` or `components`, not both. A template with parameter bindings, or with named variables in a card or a button URL, takes only `parameters`.\n",
+      example: {
+        order_id: "A-4192",
+        first_name: "Ava",
+      },
     },
     components: {
       type: "array",
@@ -21855,6 +21965,13 @@ export const WhatsAppEventTypeSchema = {
     "whatsapp.sent",
   ],
   example: "whatsapp.delivered",
+} as const;
+
+export const WhatsAppEventIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^ev_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "ev_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const WhatsAppEventSchema = {
@@ -23518,6 +23635,68 @@ export const WhatsAppTemplateCategoryWriteSchema = {
   example: "utility",
 } as const;
 
+export const WhatsAppTemplateLocationBindingSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["latitude", "longitude"],
+  description:
+    "The Liquid that fills a location header, one string per field. Latitude and longitude must render to a number.\n",
+  properties: {
+    latitude: {
+      type: "string",
+      description: "Liquid for the latitude, in degrees.",
+      minLength: 1,
+      maxLength: 2000,
+      example: "{{ store_lat }}",
+    },
+    longitude: {
+      type: "string",
+      description: "Liquid for the longitude, in degrees.",
+      minLength: 1,
+      maxLength: 2000,
+      example: "{{ store_lng }}",
+    },
+    name: {
+      type: "string",
+      description: "Liquid for the location's name.",
+      maxLength: 2000,
+      example: "{{ store_name }}",
+    },
+    address: {
+      type: "string",
+      description: "Liquid for the location's address.",
+      maxLength: 2000,
+      example: "{{ store_address }}",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateParameterBindingsSchema = {
+  type: "object",
+  maxProperties: 100,
+  propertyNames: {
+    type: "string",
+    pattern: "^[a-z0-9_]+$",
+  },
+  additionalProperties: {
+    oneOf: [
+      {
+        type: "string",
+        maxLength: 2000,
+      },
+      {
+        $ref: "#/components/schemas/WhatsAppTemplateLocationBinding",
+      },
+    ],
+  },
+  description:
+    "Liquid over the send's `template.parameters`, keyed by the name of the value it fills. A placeholder's name is its own, such as `order_id`, or its number, such as `1`. A value with no placeholder has a fixed name: `header_url` (or `header_url_1`, `header_url_2` and so on for a carousel card), `header_filename`, `header_location` and `code`. A numbered url suffix is `button_url` (or `button_url_1`, `button_url_2` for a card). A value is a Liquid string, except `header_location`'s, which is an object of four. A value no key binds is filled by the input of the same name. Bindings never reach WhatsApp.\n",
+  example: {
+    full_name: "{{ first_name | append: ' ' | append: last_name }}",
+    header_url: "https://cdn.example.com/inv/{{ order_id }}.pdf",
+  },
+} as const;
+
 export const WhatsAppTemplateBidStrategyWriteSchema = {
   type: "string",
   minLength: 1,
@@ -23899,6 +24078,18 @@ export const WhatsAppTemplateLanguageUpsertSchema = {
     ],
   },
   properties: {
+    parameter_bindings: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateParameterBindings",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Liquid that computes this language's send values from the send's `template.parameters`. Omit it to keep the current bindings, and send `null` to remove them. Changing only the bindings never needs a new review.\n",
+    },
     optimization_spec: {
       oneOf: [
         {
@@ -24175,6 +24366,15 @@ export const WhatsAppTemplateVersionSummarySchema = {
         "When this version was submitted to Meta. Null on a draft, which has not been submitted, and null for a built-in template's version, which Bird ships already approved rather than submitting on your behalf.\n",
       example: "2026-07-20T11:04:00Z",
     },
+    variables: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/TemplateVariable",
+      },
+      description:
+        "The variable slots this version's content fills in from the values you supply when sending. Combined across every language, because languages need not declare the same slots: if the English body uses `first_name` and the French one uses `last_name`, both appear here. A template with named parameters keys them by name; a positional one keys them by their `{{n}}` position, as `1`, `2` and so on. Supply the slots the language you send declares, by these keys in `template.parameters` or through `components`.\n",
+    },
     languages: {
       type: "object",
       example: {
@@ -24239,6 +24439,15 @@ export const WhatsAppTemplateVersionLanguageSchema = {
   additionalProperties: false,
   required: ["components"],
   properties: {
+    parameter_bindings: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateParameterBindings",
+        },
+      ],
+      description:
+        "This language's bindings in this version, absent when it has none.",
+    },
     components: {
       type: "array",
       description: "This language's content in this version, in display order.",
@@ -24308,6 +24517,15 @@ export const WhatsAppTemplateVersionSchema = {
       description:
         "When this version was submitted to Meta. Null on a draft, which has not been submitted, and null for a built-in template's version, which Bird ships already approved rather than submitting on your behalf.\n",
       example: "2026-07-20T11:04:00Z",
+    },
+    variables: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/TemplateVariable",
+      },
+      description:
+        "The variable slots this version's content fills in from the values you supply when sending. Combined across every language, because languages need not declare the same slots: if the English body uses `first_name` and the French one uses `last_name`, both appear here. A template with named parameters keys them by name; a positional one keys them by their `{{n}}` position, as `1`, `2` and so on. Supply the slots the language you send declares, by these keys in `template.parameters` or through `components`.\n",
     },
     languages: {
       type: "object",
@@ -24673,6 +24891,14 @@ export const WhatsAppTemplateLanguageSchema = {
     "updated_at",
   ],
   properties: {
+    parameter_bindings: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateParameterBindings",
+        },
+      ],
+      description: "This language's bindings, absent when it has none.",
+    },
     optimization_spec: {
       oneOf: [
         {
@@ -26173,7 +26399,7 @@ export const AMBBusinessAccountEventSchema = {
       additionalProperties: true,
       readOnly: true,
       description:
-        "Details of the change. source identifies whether a customer or Bird staff recorded it.",
+        "Details of the change. `source` identifies who recorded it, `customer`, `staff` or `automated_review`.",
     },
     created_at: {
       type: "string",
@@ -26465,6 +26691,15 @@ export const AMBBusinessAccountSubmissionStatusSchema = {
   example: "submitted",
 } as const;
 
+export const AMBBusinessAccountSubmissionDeciderSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["staff", "automated_review"],
+  description:
+    "Who recorded an attempt's outcome. `automated_review` is Bird's automated review of the evidence. `staff` is Bird staff, including when they record Apple's decision. Treat unrecognized values as future deciders.",
+  example: "automated_review",
+} as const;
+
 export const AMBBusinessAccountSubmissionSchema = {
   type: "object",
   additionalProperties: false,
@@ -26478,6 +26713,7 @@ export const AMBBusinessAccountSubmissionSchema = {
     "video_attachment",
     "status",
     "status_reason",
+    "decided_by",
     "created_at",
     "updated_at",
   ],
@@ -26552,7 +26788,21 @@ export const AMBBusinessAccountSubmissionSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "Review feedback on this attempt, such as the reason Apple rejected it. May contain basic Markdown, such as emphasis and lists.",
+        "Review feedback on this attempt, such as the automated review's feedback or the reason Apple rejected it. May contain basic Markdown, such as emphasis, lists and links.",
+    },
+    decided_by: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBBusinessAccountSubmissionDecider",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Who recorded this attempt's outcome, `automated_review` when Bird's automated review rejected it or `staff`. Null while the attempt waits, and for outcomes recorded before automated reviews.",
+      example: null,
     },
     created_at: {
       type: "string",
@@ -57120,6 +57370,9 @@ export const WorkspaceRateLimitWritableSchema = {
     "organization_limit",
     "workspace_limit",
     "limit",
+    "limit_source",
+    "automatic_limit",
+    "allocation_enabled",
     "attribution",
     "usage",
   ],
@@ -57156,7 +57409,7 @@ export const WorkspaceRateLimitWritableSchema = {
     },
     workspace_limit: {
       description:
-        "The workspace's own limit. `null` when the workspace has none and uses only the shared organization limit.",
+        "The workspace's own saved limit. `null` when none is saved; `limit_source` and `automatic_limit` then show whether an automatic share applies.",
       oneOf: [
         {
           $ref: "#/components/schemas/WorkspaceRateLimitCapWritable",
@@ -57170,7 +57423,21 @@ export const WorkspaceRateLimitWritableSchema = {
       type: "integer",
       minimum: 1,
       description:
-        "The lower of the organization limit and any active workspace limit. Requests can still be refused below it when other workspaces use the shared organization limit.",
+        "The lower of the organization limit and the workspace's active limit or automatic share. Requests can still be refused below it when other workspaces use the shared organization limit.",
+    },
+    limit_source: {
+      $ref: "#/components/schemas/WorkspaceRateLimitLimitSource",
+    },
+    automatic_limit: {
+      type: ["integer", "null"],
+      minimum: 1,
+      description:
+        "The workspace's share under the organization's automatic allocation, at least 1 per window. Set only when `limit_source` is `automatic`; it is never saved as a workspace limit.",
+    },
+    allocation_enabled: {
+      type: "boolean",
+      description:
+        "Whether the organization has an automatic allocation of this policy. It can be `true` while `limit_source` is `manual`. When `true`, changing or removing this workspace's limit can change other workspaces' automatic shares.",
     },
     attribution: {
       $ref: "#/components/schemas/WorkspaceRateLimitAttribution",
@@ -59738,6 +60005,77 @@ export const AssetUploadSessionPreparedWritableSchema = {
   ],
 } as const;
 
+export const AssetUploadBrowserHandoffWritableSchema = {
+  type: "object",
+  readOnly: true,
+  additionalProperties: false,
+  required: ["session", "browser_url", "next"],
+  properties: {
+    session: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AssetUploadSessionDetailsWritable",
+        },
+      ],
+      description:
+        "The original upload session and any saved publication receipt. In this response, `session.next` is empty; follow the top-level `next` steps.",
+    },
+    browser_url: {
+      type: ["string", "null"],
+      format: "uri",
+      minLength: 1,
+      description:
+        "Bird page for a pending session, or null when it no longer accepts an upload. The link grants no access; the person must sign in and have asset write permission in the workspace.",
+    },
+    next: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+      description: "Ordered steps to finish the fallback or read its outcome.",
+    },
+  },
+  example: {
+    session: {
+      id: "aus_01krdgeqcxet5s7t44vh8rt9mg",
+      state: "pending",
+      expires_at: "2026-11-04T23:00:00Z",
+      name: "Invoice",
+      alt_text: null,
+      folder_id: null,
+      file: {
+        filename: "invoice.pdf",
+        content_type: "application/pdf",
+        size_bytes: 1024,
+        sha256:
+          "4e2090a479f7ce6b17ad31f991988f12571bcafbd4a441cc4063644fc1400ae0",
+      },
+      result: null,
+      last_error: null,
+      next: [],
+      asset: null,
+    },
+    browser_url:
+      "https://bird.com/dashboard/w/ws_01krdgeqcxet5s7t44vh8rt9mg/media-library/uploads/aus_01krdgeqcxet5s7t44vh8rt9mg",
+    next: [
+      {
+        kind: "external",
+        description:
+          "Open browser_url and have a person with asset write access select the original file and publish it. Their browser must reach the storage hostname. Opening the page does not complete the upload.",
+      },
+      {
+        kind: "operation",
+        operation: "getAssetUploadSession",
+        params: {
+          upload_id: "aus_01krdgeqcxet5s7t44vh8rt9mg",
+        },
+        description:
+          "After the person finishes, read the saved result using the original workspace and connection.",
+      },
+    ],
+  },
+} as const;
+
 export const AssetListWritableSchema = {
   allOf: [
     {
@@ -60022,20 +60360,6 @@ export const VerificationCheckResultWritableSchema = {
   },
 } as const;
 
-export const WhatsAppErrorWritableSchema = {
-  type: ["object", "null"],
-  additionalProperties: false,
-  readOnly: true,
-  required: ["code"],
-  description:
-    "Failure detail for a message that could not be delivered or was rejected.",
-  properties: {
-    code: {
-      $ref: "#/components/schemas/WhatsAppErrorCode",
-    },
-  },
-} as const;
-
 export const WhatsAppMessageTemplateWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -60209,6 +60533,20 @@ export const ActorWritableSchema = {
       description:
         "New actor types may be added. Treat unrecognized values as future types, not errors.\n- `user`: a member's own session.\n- `api_key`: a workspace API key.\n- `oauth_token`: a token issued to a caller on a member's behalf.\n- `system`: an action we perform without a customer actor.\n- `sso`: an organization's SSO connection.\n- `service_account`: a workspace's connected Integration acting with no member behind it.\n- `automation`: an automation execution in your workspace.",
       example: "user",
+    },
+  },
+} as const;
+
+export const WhatsAppErrorWritableSchema = {
+  type: ["object", "null"],
+  additionalProperties: false,
+  readOnly: true,
+  required: ["code"],
+  description:
+    "Failure detail for a message that could not be delivered or was rejected.",
+  properties: {
+    code: {
+      $ref: "#/components/schemas/WhatsAppErrorCode",
     },
   },
 } as const;
@@ -60862,6 +61200,15 @@ export const WhatsAppTemplateVersionLanguageWritableSchema = {
   additionalProperties: false,
   required: ["components"],
   properties: {
+    parameter_bindings: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateParameterBindings",
+        },
+      ],
+      description:
+        "This language's bindings in this version, absent when it has none.",
+    },
     components: {
       type: "array",
       description: "This language's content in this version, in display order.",
@@ -60996,6 +61343,14 @@ export const WhatsAppTemplateLanguageWritableSchema = {
   additionalProperties: false,
   required: ["language", "components"],
   properties: {
+    parameter_bindings: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppTemplateParameterBindings",
+        },
+      ],
+      description: "This language's bindings, absent when it has none.",
+    },
     optimization_spec: {
       oneOf: [
         {

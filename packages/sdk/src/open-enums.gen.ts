@@ -15,6 +15,19 @@ export const AMBBusinessAccountReviewStatus = {
 export type AMBBusinessAccountReviewStatusValue = (typeof AMBBusinessAccountReviewStatus)[keyof typeof AMBBusinessAccountReviewStatus];
 
 /**
+ * Values of AMBBusinessAccountSubmissionDecider known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const AMBBusinessAccountSubmissionDecider = {
+  AutomatedReview: "automated_review",
+  Staff: "staff",
+} as const;
+
+/** A known AMBBusinessAccountSubmissionDecider value. */
+export type AMBBusinessAccountSubmissionDeciderValue = (typeof AMBBusinessAccountSubmissionDecider)[keyof typeof AMBBusinessAccountSubmissionDecider];
+
+/**
  * Values of AMBFormKeyboardType known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -1728,3 +1741,17 @@ export const WorkspaceQuotaLimitSource = {
 
 /** A known WorkspaceQuotaLimitSource value. */
 export type WorkspaceQuotaLimitSourceValue = (typeof WorkspaceQuotaLimitSource)[keyof typeof WorkspaceQuotaLimitSource];
+
+/**
+ * Values of WorkspaceRateLimitLimitSource known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WorkspaceRateLimitLimitSource = {
+  Automatic: "automatic",
+  Manual: "manual",
+  Organization: "organization",
+} as const;
+
+/** A known WorkspaceRateLimitLimitSource value. */
+export type WorkspaceRateLimitLimitSourceValue = (typeof WorkspaceRateLimitLimitSource)[keyof typeof WorkspaceRateLimitLimitSource];
