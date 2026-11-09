@@ -12811,7 +12811,7 @@ export type WhatsAppGroupJoinRequestDecisionResult = {
  * Language review and health status:
  *
  * - `approved`: Passed review and can be sent.
- * - `pending`: Not yet approved or rejected.
+ * - `pending`: Awaiting Meta's verdict, with no estimate. This includes a submission Meta has not yet confirmed receiving. Bird cannot speed it up.
  * - `rejected`: Failed review.
  * - `paused` or `disabled`: Sending is suspended.
  * - `in_appeal`: A decision is being appealed.
@@ -14354,7 +14354,7 @@ export type WhatsAppNumber = {
    */
   readonly waba?: string;
   /**
-   * The number in E.164 format. Null only while the number itself is not yet known: a number your workspace holds carries its E.164 from the moment setup starts, so a value here does not mean the number can send. `status` is what says that.
+   * The number in E.164 format. Null only while the number itself is not yet known: a number your workspace holds carries its E.164 from the moment setup starts, so a value here does not mean the number can send. Check `status` for connection state.
    *
    */
   readonly phone_number: string | null;
@@ -14384,7 +14384,7 @@ export type WhatsAppNumber = {
    */
   readonly data_localization_region?: WhatsAppDataLocalizationRegion;
   /**
-   * WhatsApp's own state for this number as of `meta_synced_at`, except for the three states we answer ourselves because WhatsApp holds nothing to report. A connection we are still verifying reads `preparing`, one waiting for someone to finish signup reads `awaiting_signup`, and a permanently refused one reads `failed`, with `error` saying why. `pending` is WhatsApp's own token for a number it does not hold as registered, and is also what a number with no stored WhatsApp status reads, including after setup completes, so it does not by itself establish whether setup is complete. A number we operate on your behalf reads `connected` as our own assertion rather than a reading from WhatsApp for every number we ship today; that tier carries no `meta_synced_at`.
+   * WhatsApp's own state for this number as of `meta_synced_at`, except for the three states we answer ourselves because WhatsApp holds nothing to report. A connection we are still verifying reads `preparing`, one waiting for someone to finish signup reads `awaiting_signup`, and a permanently refused one reads `failed`, with `error` saying why. `pending` is WhatsApp's own token for a number it does not hold as registered, and is also what a number with no stored WhatsApp status reads, including after setup completes, so it does not by itself establish whether setup is complete. A number we operate on your behalf reads `connected` as our own assertion rather than a reading from WhatsApp for every number we ship today; that tier carries no `meta_synced_at`. A connected virtual +1 555 or +1 711 number still has a daily sending limit until its current name is approved. Read `display_name_status` from the live profile for display name approval.
    */
   readonly status: WhatsAppNumberStatus;
   /**
@@ -14476,7 +14476,7 @@ export type WhatsAppNumberEvent = {
    */
   summary: string;
   /**
-   * Structured details for the event. `from` and `to` carry the values that changed, and `from` is absent when the number had no prior value to report. A status change into `failed` also carries the `reason`; a display-name decision carries `new_display_name`, `decision`, and, when WhatsApp named one for a rejection, `rejection_reason`. A messaging-limit change also carries the `trigger` WhatsApp named for it, such as `onboarding` or `throughput_upgrade`, when it named one. A `whatsapp_number.created` event carries the `source` the number came from, and its `phone_number` once one is known.
+   * Structured details for the event. `from` and `to` carry the values that changed, and `from` is absent when the number had no prior value to report. A status change into `failed` also carries the `reason`; a display-name decision carries `new_display_name`, `decision`, and, when WhatsApp named one for a rejection, `rejection_reason`. For `whatsapp_number.profile_name_update`, `decision: available_without_review` means Meta accepted the requested name without review; `approved` records approval. Older events also used `approved` for acceptance without review, so those historical events cannot establish approval. Read `display_name_status` from `GET /v1/whatsapp/numbers/{number_id}/profile` for the current name's approval. A messaging-limit change also carries the `trigger` WhatsApp named for it, such as `onboarding` or `throughput_upgrade`, when it named one. A `whatsapp_number.created` event carries the `source` the number came from, and its `phone_number` once one is known.
    */
   metadata: {
     [key: string]: unknown;
@@ -14495,7 +14495,7 @@ export type WhatsAppNumberEventList = {
 } & ListEnvelope;
 
 /**
- * Where WhatsApp's review of the display name stands. `available_without_review` means the name met WhatsApp's criteria for immediate use without a review step, and `none` means no display name has been submitted yet. WhatsApp adds states over time, so a value outside this list can be returned.
+ * Where WhatsApp's review of the display name stands. `available_without_review` means WhatsApp accepted the name without reviewing it; `approved` means the name passed review. `none` means no display name has been submitted yet.
  */
 export type WhatsAppDisplayNameStatus =
   | "approved"
@@ -14550,7 +14550,7 @@ export type WhatsAppNumberProfile = {
    */
   readonly display_name?: string;
   /**
-   * Where WhatsApp's review of the display name stands. A name still under review is not yet shown at the top of a chat.
+   * Where WhatsApp's review of the current display name stands. `available_without_review` means the name was accepted without review, and `approved` means it passed review. A virtual +1 555 or +1 711 number still has a daily sending limit while its current name is unapproved. See [virtual-number display name review](/docs/knowledge-base/whatsapp/virtual-numbers#display-name-review).
    *
    */
   readonly display_name_status?: WhatsAppDisplayNameStatus;
@@ -14560,7 +14560,7 @@ export type WhatsAppNumberProfile = {
    */
   readonly new_display_name?: string;
   /**
-   * Where the requested display name stands with WhatsApp, including whether it is being reviewed or was accepted for immediate use without a review. Absent when no change is pending. If WhatsApp accepts the name it becomes `display_name`. Every other outcome leaves the number on the name it already had: `declined` is WhatsApp refusing the name, and `expired` is a request that no longer stands and has to be made again.
+   * Where the requested display name stands with WhatsApp, including whether it is being reviewed or was accepted without a review. Absent when no change is pending. An accepted name becomes `display_name` once the change is applied. This status belongs to the requested name; check `display_name_status` for approval of the current name. Applying a name accepted without review does not establish display name approval. `declined` is WhatsApp refusing the name, and `expired` is a request that no longer stands and has to be made again.
    *
    */
   readonly new_display_name_status?: WhatsAppDisplayNameStatus;
@@ -15348,7 +15348,7 @@ export type AmbNativeRichLinkData = {
  */
 export type AmbRichLinkConstruct = {
   /**
-   * The App Clip, Apple Music, or Apple Maps URL to build a preview for. An `http://` URL is refused with a `422` `AMBEndpointNotHTTPS`. A URL Apple cannot build a preview for is refused with a `422` `AMBConstructPayloadFailed`; send `rich_link` content with your own `title` and `image` instead.
+   * The App Clip, Apple Music, or Apple Maps URL to build a preview for. An `http://` URL is refused with a `422` `AMBEndpointNotHTTPS`. Apple builds the preview when the message is sent. If Apple refuses the URL, or fails to build it with a `500` at least 5 times over at least 10 minutes, the message ends `send_failed` with `bird:construct_rejected`; send `rich_link` content with your own `title` and `image` instead. If Apple stays unreachable for the whole retry budget, the message ends `send_failed` with `bird:attempts_exhausted`.
    */
   url: string;
   /**
@@ -26794,7 +26794,7 @@ export type EventVoiceBase = {
   workspace_id: WorkspaceId;
   direction: VoiceCallDirection;
   /**
-   * Calling party number in E.164 format.
+   * The calling party: an E.164 number, a SIP extension on a trunk call, or the `usr_` ID of a browser caller to a workspace user or ring group. A withheld caller may be `anonymous`.
    */
   from: string;
   /**
@@ -28083,7 +28083,7 @@ export type VoiceLeg = {
   readonly workspace_id: WorkspaceId;
   readonly direction: VoiceCallDirection;
   /**
-   * Calling party number in E.164 format.
+   * The calling party: an E.164 number, a SIP extension on a trunk call, or the `usr_` ID of a browser caller to a workspace user or ring group. A withheld caller may be `anonymous`.
    */
   readonly from: string;
   /**
@@ -34071,7 +34071,7 @@ export type WhatsAppNumberEventWritable = {
    */
   summary: string;
   /**
-   * Structured details for the event. `from` and `to` carry the values that changed, and `from` is absent when the number had no prior value to report. A status change into `failed` also carries the `reason`; a display-name decision carries `new_display_name`, `decision`, and, when WhatsApp named one for a rejection, `rejection_reason`. A messaging-limit change also carries the `trigger` WhatsApp named for it, such as `onboarding` or `throughput_upgrade`, when it named one. A `whatsapp_number.created` event carries the `source` the number came from, and its `phone_number` once one is known.
+   * Structured details for the event. `from` and `to` carry the values that changed, and `from` is absent when the number had no prior value to report. A status change into `failed` also carries the `reason`; a display-name decision carries `new_display_name`, `decision`, and, when WhatsApp named one for a rejection, `rejection_reason`. For `whatsapp_number.profile_name_update`, `decision: available_without_review` means Meta accepted the requested name without review; `approved` records approval. Older events also used `approved` for acceptance without review, so those historical events cannot establish approval. Read `display_name_status` from `GET /v1/whatsapp/numbers/{number_id}/profile` for the current name's approval. A messaging-limit change also carries the `trigger` WhatsApp named for it, such as `onboarding` or `throughput_upgrade`, when it named one. A `whatsapp_number.created` event carries the `source` the number came from, and its `phone_number` once one is known.
    */
   metadata: {
     [key: string]: unknown;
@@ -75866,7 +75866,7 @@ export type ListVoiceLegsData = {
      */
     sip_trunk_id?: SipTrunkId;
     /**
-     * Return only legs placed from this calling party number, matched as a whole number rather than as a fragment. Give it in international form: `+14155551234`, `14155551234`, and `0014155551234` all select the same legs. A number given without a country code is read as an international one, so give the country code to be sure of what you are matching. Use `number` instead to match part of a number, or either side of the leg.
+     * Return only legs placed from this calling party, matched exactly. Give a number in international form: `+14155551234`, `14155551234`, and `0014155551234` all select the same legs. A number given without a country code is read as an international one, so give the country code to be sure of what you are matching. A `usr_` ID matches the recorded calling party exactly as given; it does not establish who placed the call. Use `number` instead to match part of a number, or either side of the leg.
      *
      */
     from?: string;
