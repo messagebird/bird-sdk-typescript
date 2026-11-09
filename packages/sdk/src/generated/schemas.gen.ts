@@ -16798,7 +16798,7 @@ export const SMSSenderStatusSchema = {
   minLength: 1,
   enum: ["active", "pending_number_ownership", "pending_registrations"],
   description:
-    "Where a sender stands on its own setup: the ownership paperwork its number owes, and the\nregistrations it holds.\n\n- `active`: nothing this sender holds is outstanding.\n- `pending_number_ownership`: the paperwork proving you own this sender's number is not in\n  place, either because it has not been supplied or because the country that issued the\n  number has not accepted it yet. Every send from this sender is refused until it does.\n- `pending_registrations`: the sender holds country registrations and none is approved yet.\n  That covers a registration under review and one that was refused, so read `next` for which.\n\nThis is not whether a message will be accepted. That is decided per destination country, and\n[Get sender requirements](/docs/api/reference/list-workspace-sms-sender-requirements) is the\nonly read that answers it. A sender that has registered nowhere is `active`, even where every\ncountry it can reach wants a registration first. Read `next` for where to go from here.\n",
+    "Where a sender stands on its own setup: the ownership paperwork its number owes, and whether\nany destination is active yet.\n\n- `active`: at least one destination is active.\n- `pending_number_ownership`: the paperwork proving you own this sender's number is not in\n  place, either because it has not been supplied or because the country that issued the\n  number has not accepted it yet. Every send from this sender is refused until it does.\n- `pending_registrations`: no destination is active yet, whether because the sender has not\n  registered where a registration is required, its registration is under review, or it was\n  refused.\n  Follow `next` to the requirements read to see which, country by country.\n\nThis is not whether a message will be accepted. That is decided per destination country, and\n[Get sender requirements](/docs/api/reference/list-workspace-sms-sender-requirements) is the\nonly read that answers it. A country that requires a registration, where you have not\nregistered, is in none of the three `destinations` lists. Read `next` for where to go from here.\n",
 } as const;
 
 export const SMSSenderDestinationsSchema = {
@@ -50069,6 +50069,15 @@ export const VoicePartySchema = {
         "This side's own address, in E.164 or as a `sip:` URI. `null` when the observation carried none, which does not say whether one was withheld, missing, or nonexistent.",
       example: "+14155551234",
     },
+    overdial_suffix: {
+      readOnly: true,
+      type: "string",
+      minLength: 1,
+      maxLength: 16,
+      pattern: "^[0-9]+$",
+      description:
+        "Digits dialled after this party's number, including leading zeroes. Absent when no overdial was received.",
+    },
     trunk_id: {
       readOnly: true,
       oneOf: [
@@ -50626,6 +50635,15 @@ export const VoiceLegSchema = {
       description:
         "The dialled destination: an E.164 number, a SIP extension such as `1001` on a trunk call, or the `usr_`, `vrg_` or `vsq_` ID of the workspace user, ring group or sequence a browser called.",
       example: "+16505559876",
+    },
+    overdial_suffix: {
+      type: "string",
+      readOnly: true,
+      description:
+        "Digits appended to this leg's destination number, preserving leading zeroes. Absent for a call without overdial.",
+      minLength: 1,
+      pattern: "^[0-9]+$",
+      maxLength: 16,
     },
     actor: {
       readOnly: true,
@@ -54593,6 +54611,14 @@ export const VoiceSequenceSavedExecutionPartySchema = {
       type: "string",
       minLength: 1,
       maxLength: 128,
+    },
+    overdial_suffix: {
+      type: "string",
+      description:
+        "Digits appended to the destination number; leading zeroes are preserved. Only the destination party supplies this fact; a value on the origin is ignored.",
+      minLength: 1,
+      maxLength: 16,
+      pattern: "^[0-9]+$",
     },
   },
 } as const;
