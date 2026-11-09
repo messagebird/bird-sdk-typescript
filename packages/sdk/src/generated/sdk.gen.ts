@@ -13059,6 +13059,8 @@ export const createEmailTemplate = <ThrowOnError extends boolean = false>(
  *
  * A template can't be deleted while a broadcast that has not started sending still uses it, because a `scheduled` or `accepted` broadcast has not pinned the content it will send yet. [List the broadcasts blocking a template delete](/docs/api/reference/list-email-template-broadcasts) to see which ones those are. A broadcast that has already started sending does not block the delete: it pinned its version when it started, so it keeps sending the content it froze.
  *
+ * A template that an active Verify configuration pins as the body of its custom email sender can't be deleted either. The conflict reports only how many verification configurations pin it, directly or for one country, not which; open Verify settings in the dashboard to find the configuration or country sender using it and switch it to Bird's built-in email or another template.
+ *
  * A message scheduled with this template does not block the delete either. It keeps only a reference to the template version until it falls due, so once the template is deleted that message is rejected with `generation_failure` at its scheduled time and no email is sent.
  *
  */
@@ -13301,7 +13303,7 @@ export const listEmailTemplateVersions = <ThrowOnError extends boolean = false>(
 /**
  * List the broadcasts blocking a template delete
  *
- * Returns the broadcasts that block deleting this template, as a cursor page, newest first. Those are the ones that have not started sending, so they have not pinned the content they will send: `scheduled` and `accepted`. Clear every one of them and the delete goes through. Canceling clears either status; repointing at another template only works while the broadcast is `scheduled`, because an `accepted` broadcast is committed to send and an edit returns a conflict. A broadcast that is already sending is not listed and does not block the delete, because it froze its version when it started.
+ * Returns the broadcasts that block deleting this template, as a cursor page, newest first. Those are the ones that have not started sending, so they have not pinned the content they will send: `scheduled` and `accepted`. Clear every one of them and the delete goes through, unless a Verify configuration pins the template as the body of its custom email sender; that dependency is not listed here, and is cleared in the dashboard's Verify settings. Canceling clears either status; repointing at another template only works while the broadcast is `scheduled`, because an `accepted` broadcast is committed to send and an edit returns a conflict. A broadcast that is already sending is not listed and does not block the delete, because it froze its version when it started.
  *
  */
 export const listEmailTemplateBroadcasts = <

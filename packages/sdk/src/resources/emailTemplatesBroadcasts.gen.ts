@@ -9,7 +9,7 @@ export type EmailTemplatesBroadcastsListQuery = NonNullable<ListEmailTemplateBro
 
 export class EmailTemplatesBroadcastsResource extends Resource {
   /**
-   * List the broadcasts that block deleting a template, newest first.
+   * List the broadcasts that block deleting a template, newest first. A Verify configuration pinning the template as its custom email sender's body also blocks the delete but is not listed here; it is cleared in the dashboard's Verify settings.
    */
   list(templateRef: string, query?: EmailTemplatesBroadcastsListQuery, options?: RequestOptions): PaginatedPromise<EmailTemplateBroadcastSummary> {
     return this.paginated<EmailTemplateBroadcastSummary>("GET", options, ({ signal, headers }, cursor) =>

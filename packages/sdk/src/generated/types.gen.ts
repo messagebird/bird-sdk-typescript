@@ -10223,7 +10223,7 @@ export type Verification = {
 } & Timestamps;
 
 /**
- * Per-request overrides applied to this verification only.
+ * Per-request overrides applied to this verification only. `language` picks one of Bird's built-in translations; a custom sender that carries its own template renders the language that template stocks instead. An email template pinned to a custom email sender falls back to its own default language rather than to English (Verify only accepts templates whose language settings fall back). A WhatsApp authentication template follows its own missing-language policy: it falls back to its default or, when set to fail, refuses the send for a language it does not stock. The requested tag stays fixed for the verification.
  */
 export type VerificationOptions = {
   /**
@@ -10239,7 +10239,9 @@ export type VerificationOptions = {
    *
    * Omit it and the language is read from the recipient phone number's country, so a French number gets French without you asking. Set it to override that. A verification with no phone number, and one whose country has no translation here, sends English.
    *
-   * Supported: en, ar, bg, cs, da, de, el, es, fi, fr, he, hi, hr, hu, id, it, ja, ko, lt, lv, mk, mn, ms, nb-NO, nl, no, pl, pt, ro, ru, sk, sl, sr, sv, th, tr, uk, vi, zh, zh-TW. Every one of them is available on SMS and email. Mongolian (mn) is the one WhatsApp cannot carry, so a WhatsApp passcode falls back to English for it.
+   * Supported: en, ar, bg, cs, da, de, el, es, fi, fr, he, hi, hr, hu, id, it, ja, ko, lt, lv, mk, mn, ms, nb-NO, nl, no, pl, pt, ro, ru, sk, sl, sr, sv, th, tr, uk, vi, zh, zh-TW. Every one of them is available on SMS and on Bird's built-in email. Mongolian (mn) is the one WhatsApp cannot carry, so a WhatsApp passcode falls back to English for it.
+   *
+   * A custom sender that carries its own template sends that template's content instead: a custom WhatsApp sender uses its authentication template's approved languages under that template's missing-language policy, and a custom email sender pinned to one of your email templates uses the template's published languages, falling back to the template's default language rather than to English. The requested tag stays fixed for the verification; the dashboard's verification detail shows the language each attempt actually rendered.
    *
    */
   language?: LanguageTag;
@@ -15284,6 +15286,37 @@ export type AmbNativeAttachment = (
   readonly size?: number;
 };
 
+/**
+ * How Apple displays a rich link's image. Apple picks the layout from the image's shape and width, so the image is resized or cropped to produce the one you choose:
+ *
+ * - `icon` shows a small image beside the title. The image is scaled to under 150 px wide. Use it for logos.
+ * - `square` shows a square image. The image is cropped to a square and sized to 240 px, or as small as 150 px when it needs to fit Apple's 200 kB limit.
+ * - `large` shows a wide image. A square or portrait image is cropped to a 2:1 rectangle, and a landscape image keeps its shape.
+ *
+ * `square` enlarges an image whose shorter side is under 240 px, and `large` one narrower than 240 px, which can blur it. Omit `layout` to keep the image's own shape, so Apple picks the layout from its shape and width.
+ *
+ */
+export type AmbRichLinkLayout = "icon" | "square" | "large";
+
+/**
+ * How the links in `body` of a message you send are previewed. Each `https://`, `http://` or `www.` link is sent as its own rich link, built from the linked page's title and image. Punctuation that ends a link's sentence is dropped, so it does not arrive on its own after the card.
+ *
+ * For the image, the page's `og:image` is tried first, then its largest `apple-touch-icon` or icon, then the largest image in the page. `layout` applies to every preview in the message: `icon` and `square` try the icon first, and `large` tries the images in the page before the icon.
+ *
+ * Only a `text` sent on its own can set `link_previews`. A request that sets it beside `rich_link` or `interactive` is refused with `422`. Leave it out there, and links in that text become previews in the default layout.
+ *
+ * A message is accepted and then ends `send_failed` when:
+ *
+ * - It has more than 20 links.
+ * - A page does not load over HTTPS, or has no title or usable image. Every page is fetched over HTTPS, upgrading `http://` and `www.` links.
+ *
+ * Every link is checked before the first part is sent, so the customer receives none of the message. A retry after some parts were delivered checks only the parts still to send, so a link that stops loading by then fails the message after those parts arrived.
+ *
+ */
+export type AmbLinkPreviews = {
+  layout?: AmbRichLinkLayout;
+};
+
 export type AmbText = (
   | unknown
   | {
@@ -15302,17 +15335,19 @@ export type AmbText = (
    * Ordered attachments. A send supplies each one by source_url or attachment_id.
    */
   attachments?: Array<AmbNativeAttachment>;
+  link_previews?: AmbLinkPreviews;
 };
 
 export type AmbNativeRichLinkImage = {
   /**
-   * HTTPS URL of a PNG preview image up to 200 kB. Bird fetches and encodes it when sending. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.
+   * HTTPS URL of a PNG, JPEG, GIF or WebP preview image of up to 5 MiB and 6 megapixels, or 3 megapixels for a 16-bit PNG. It is fetched when the message is sent, converted to PNG and shrunk to Apple's 200 kB limit. Without `layout`, a PNG of 200 kB or less goes to Apple unchanged, so the pixel limit does not apply to it. An image over these limits, or one that cannot be converted, ends the message `send_failed`. It is checked before the first part and again on a retry, so an image that changes by then fails the message after the earlier parts arrived. A non-HTTPS URL is refused with a `422` `AMBEndpointNotHTTPS`. In a template it may contain `{{ }}` placeholders; the rendered value must be HTTPS.
    */
   source_url: string;
   /**
-   * PNG media type required by Apple. Defaults to image/png.
+   * Media type sent to Apple, which accepts only PNG. Defaults to image/png.
    */
   mime_type?: "image/png";
+  layout?: AmbRichLinkLayout;
 };
 
 export type AmbNativeRichLinkVideo = {
@@ -16250,7 +16285,7 @@ export type AmbTemplateSend = unknown & {
 };
 
 /**
- * A message to send. Supply `text`, `rich_link` or `interactive` (the last two optionally with `text` sent first as its own bubble), or `template` (a stored template, whose category is derived).
+ * A message to send. Supply `text`, `rich_link` or `interactive` (the last two optionally with `text` to introduce them), or `template` (a stored template, whose category is derived).
  *
  */
 export type AmbMessageSendRequest = {
@@ -16267,7 +16302,7 @@ export type AmbMessageSendRequest = {
    */
   source?: AmbMessageSource;
   /**
-   * A text message. Alongside `rich_link` or `interactive`, it is sent first as its own text bubble, in the same message.
+   * A text message. Alongside `interactive`, it is sent first as its own text bubble, in the same message. Alongside `rich_link`, the card takes the place of the first copy of its URL in `body`, splitting the text around it, or follows the text when `body` does not contain that URL. Later copies of that URL are removed.
    */
   text?: AmbText;
   /**
@@ -34284,6 +34319,7 @@ export type AmbTextWritable = (
    * Ordered attachments. A send supplies each one by source_url or attachment_id.
    */
   attachments?: Array<AmbNativeAttachmentWritable>;
+  link_previews?: AmbLinkPreviews;
 };
 
 export type AmbInteractiveWritable = unknown & {
@@ -34341,7 +34377,7 @@ export type AmbMessageListWritable = {
 } & ListEnvelope;
 
 /**
- * A message to send. Supply `text`, `rich_link` or `interactive` (the last two optionally with `text` sent first as its own bubble), or `template` (a stored template, whose category is derived).
+ * A message to send. Supply `text`, `rich_link` or `interactive` (the last two optionally with `text` to introduce them), or `template` (a stored template, whose category is derived).
  *
  */
 export type AmbMessageSendRequestWritable = {
@@ -34358,7 +34394,7 @@ export type AmbMessageSendRequestWritable = {
    */
   source?: AmbMessageSource;
   /**
-   * A text message. Alongside `rich_link` or `interactive`, it is sent first as its own text bubble, in the same message.
+   * A text message. Alongside `interactive`, it is sent first as its own text bubble, in the same message. Alongside `rich_link`, the card takes the place of the first copy of its URL in `body`, splitting the text around it, or follows the text when `body` does not contain that URL. Later copies of that URL are removed.
    */
   text?: AmbTextWritable;
   /**
