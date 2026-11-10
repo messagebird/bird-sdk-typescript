@@ -22,7 +22,7 @@ export class EmailTemplatesVersionsResourceBase extends Resource {
   }
 
   /**
-   * Read one version of a template: its lifecycle metadata (`status`, `version_number`, `published_at`), the content it froze in every language, and its `variables`: the parameters a send supplies and the values Bird fills in, told apart by `system`.
+   * Read one version of a template: its lifecycle metadata (`status`, `version_number`, `published_at`), the content it froze in every language, and its `variables`: the parameters a send supplies and the values Bird fills in, told apart by `system`. A deleted workspace template's published versions remain readable by template ID; its slug and draft do not.
    */
   get(templateRef: string, versionId: string, options?: RequestOptions): APIPromise<EmailTemplateVersion> {
     return this.call<EmailTemplateVersion>("GET", options, ({ signal, headers }) =>

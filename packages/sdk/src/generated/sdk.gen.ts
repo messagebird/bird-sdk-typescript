@@ -2432,6 +2432,8 @@ export const getEmailBroadcastCounts = <ThrowOnError extends boolean = false>(
  *
  * `recipients` is the number of contacts the broadcast could reach now. It matches the sendable count from the audience counts. `allowed` is the number covered by the email send allowance. It equals `recipients` when no email limit restricts the send. `limited_by` identifies the monthly email limit for the billing period or the daily email limit that prevents the rest from receiving the broadcast. `limit` and `remaining` describe that email limit. `resets_at` is its reset time. For a monthly email limit, `limit_reason` explains what sets it if you can read the organization's billing.
  *
+ * When present, `can_start` takes precedence over these allowance counts when deciding whether email limits permit starting. A temporary funding restriction can produce `allowed: 0` or `remaining: 0` while `can_start: true`; the broadcast can start and wait for funds. Full daily and funded monthly limits still apply. If `can_start` is absent, use `allowed` and do not assume waiting is supported. Other send checks still apply.
+ *
  * Pass `send_at` to check a later send, such as the `scheduled_at` you plan to use. If a daily or monthly window resets by that time, the check uses its full allowance. Otherwise, it uses the allowance remaining now. The check estimates your send quota using current limits without subtracting broadcasts that are scheduled but have not sent yet, so broadcasts scheduled for the same period may together exceed the limit even if each check shows enough quota. Without `send_at`, it checks a send now.
  *
  * `broadcasts` reports the separate broadcast count allowance for the billing period, or the UTC day when no current billing period is available. Sending or scheduling a draft uses one broadcast from this allowance. `send_at` does not change `broadcasts`.
@@ -3339,7 +3341,7 @@ export const createAudience = <ThrowOnError extends boolean = false>(
 /**
  * Delete an audience
  *
- * Deletes an audience and its memberships. Contacts themselves are not deleted. An audience cannot be deleted while a broadcast targeting it is scheduled, accepted, sending, or canceling; cancel that broadcast first, then retry.
+ * Deletes an audience and its memberships. Contacts themselves are not deleted. An audience cannot be deleted while a broadcast targeting it is scheduled, accepted, sending, waiting_for_funds, paused, or canceling; cancel that broadcast first, then retry.
  *
  */
 export const deleteAudience = <ThrowOnError extends boolean = false>(
@@ -13055,7 +13057,9 @@ export const createEmailTemplate = <ThrowOnError extends boolean = false>(
 /**
  * Delete an email template
  *
- * Deletes the template and all its versions. The slug becomes available for reuse in the workspace, and the deletion cannot be undone.
+ * Deletes the template from authoring and lists. The slug becomes available for reuse in the workspace, and the deletion cannot be undone.
+ *
+ * Published versions remain readable and previewable when you supply the template ID and version ID, so you can review the original content of a started broadcast. Deletion does not remove access to that published content. The draft is unavailable, and the old slug can refer to a different template after reuse.
  *
  * A template can't be deleted while a broadcast that has not started sending still uses it, because a `scheduled` or `accepted` broadcast has not pinned the content it will send yet. [List the broadcasts blocking a template delete](/docs/api/reference/list-email-template-broadcasts) to see which ones those are. A broadcast that has already started sending does not block the delete: it pinned its version when it started, so it keeps sending the content it froze.
  *
@@ -13239,6 +13243,8 @@ export const getEmailTemplateParameters = <
  *
  * Renders a template with the sample values you supply and returns the resulting subject, HTML, and plain-text bodies. Bird does not issue a recipient-specific unsubscribe URL in a preview. If you supply `bird.unsubscribe_url` in `parameters`, the preview renders your value; an empty link is not live. Bird adds unsubscribe content to marketing email at send time; transactional email gets no automatic unsubscribe footer. By default it renders the current draft, so you can check your changes before you submit it. Pass `version` to preview a specific published version instead; built-in `system` templates have no versions, so `version` on a `bird_` template returns a validation error. Pass `contact` to see the email the way one of your contacts would receive it. Works for your workspace templates and built-in `system` templates. Sample `parameters` are capped at 16 KB once serialized, and personalization that is not valid or not supported returns a validation error naming what to fix.
  *
+ * A retained published version remains available by template ID after the template is deleted. Its draft and slug are unavailable.
+ *
  * The response also reports what the HTML uses that mail clients remove, ignore, or render inconsistently. Each finding in `compatibility` names the pattern, the line and column it sits on, and what to use instead, and `compatibility_severity` reduces them to one word for the whole body. It is advisory: the preview renders either way.
  *
  */
@@ -13374,6 +13380,8 @@ export const deleteEmailTemplateVersion = <
  * - Its lifecycle metadata (`status`, `version_number`, `published_at`).
  * - The content it froze in every language.
  * - Its `variables`: the parameters you supply when sending and the values Bird fills in for each recipient, told apart by `system`.
+ *
+ * A deleted workspace template's published versions remain readable when you pass its template ID as `template_ref`. Its slug can belong to a newer template, and its draft is no longer readable. Use the pinned IDs from a broadcast to review its original content before resuming.
  *
  * Use [List email template versions](/docs/api/reference/list-email-template-versions) to enumerate the draft and published versions. [Roll back an email template](/docs/api/reference/rollback-email-template) makes an earlier published version live again. Returns a `404 Not Found` error if the template or version does not exist in the workspace.
  *
@@ -14481,10 +14489,17 @@ export const createMailboxMessage = <ThrowOnError extends boolean = false>(
  * - `trash`.
  * - `unread`.
  *
- * Then, every custom label currently in use on its conversations and
- * messages. Apply and remove labels through the conversation and message
- * update endpoints. These actions also create and remove custom labels. A
- * custom label exists while at least one message or conversation uses it.
+ * Then, every custom label in the workspace, ordered by name. All of a
+ * workspace's mailboxes share its custom labels. Apply and remove custom
+ * labels through the conversation and message update endpoints; applying a
+ * custom label name the workspace does not have yet creates that label, and
+ * reserved names are refused. Removing a custom label only unassigns it: the
+ * label stays in the workspace and in this list until it is deleted. System
+ * labels change state instead: a message update takes `unread` and `trash`.
+ * A conversation's read state changes through `read` and its folder through
+ * `folder` (`inbox`, `archive` or `spam`). Deleting it moves it to the
+ * trash, or removes it for good with `permanent=true`; `sent` and `blocked`
+ * are set automatically.
  *
  */
 export const listMailboxLabels = <ThrowOnError extends boolean = false>(

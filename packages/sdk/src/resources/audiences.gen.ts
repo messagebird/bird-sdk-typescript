@@ -70,7 +70,7 @@ export class AudiencesResource extends Resource {
   }
 
   /**
-   * Delete an audience and its memberships; contacts themselves are not deleted. Fails while a broadcast targeting the audience is scheduled, accepted, sending, or canceling.
+   * Delete an audience and its memberships; contacts themselves are not deleted. Fails while a broadcast targeting the audience is scheduled, accepted, sending, waiting_for_funds, paused, or canceling.
    *
    * @example Delete an audience by id
    * await bird.audiences.delete("adn_01krdgeqcxet5s7t44vh8rt9mg");

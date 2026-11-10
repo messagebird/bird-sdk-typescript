@@ -605,6 +605,25 @@ export const EmailLookupResult = {
 export type EmailLookupResultValue = (typeof EmailLookupResult)[keyof typeof EmailLookupResult];
 
 /**
+ * Values of EmailRejectionReason known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const EmailRejectionReason = {
+  DomainUnverified: "domain_unverified",
+  GenerationFailure: "generation_failure",
+  PolicyRejection: "policy_rejection",
+  QuotaExceeded: "quota_exceeded",
+  RecipientNotAllowed: "recipient_not_allowed",
+  RecipientSuppressed: "recipient_suppressed",
+  TransmissionFailed: "transmission_failed",
+  WorkspaceSuspended: "workspace_suspended",
+} as const;
+
+/** A known EmailRejectionReason value. */
+export type EmailRejectionReasonValue = (typeof EmailRejectionReason)[keyof typeof EmailRejectionReason];
+
+/**
  * Values of EmailTemplateParameterType known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -905,6 +924,7 @@ export const SMSErrorCode = {
   SenderUnregistered: "sender_unregistered",
   Unknown: "unknown",
   Unreachable: "unreachable",
+  WorkspaceSuspended: "workspace_suspended",
 } as const;
 
 /** A known SMSErrorCode value. */
@@ -1098,6 +1118,7 @@ export const VerificationAttemptFailureReason = {
   NotBillable: "not_billable",
   SoftBounce: "soft_bounce",
   Undelivered: "undelivered",
+  WorkspaceSuspended: "workspace_suspended",
 } as const;
 
 /** A known VerificationAttemptFailureReason value. */
@@ -1370,6 +1391,7 @@ export const WhatsAppErrorCode = {
   RecipientSuppressed: "recipient_suppressed",
   ServiceWindowExpired: "service_window_expired",
   Undeliverable: "undeliverable",
+  WorkspaceSuspended: "workspace_suspended",
 } as const;
 
 /** A known WhatsAppErrorCode value. */

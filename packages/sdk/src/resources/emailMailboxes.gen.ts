@@ -113,7 +113,7 @@ export class EmailMailboxesResourceBase extends Resource {
   }
 
   /**
-   * List the labels available in a mailbox: the built-in system labels (inbox, archive, spam, blocked, sent, trash, unread) plus every custom label in use.
+   * List the labels available in a mailbox: the built-in system labels (inbox, archive, spam, blocked, sent, trash, unread) plus every custom label in the workspace, which all its mailboxes share.
    *
    * @example List a mailbox's labels
    * const labels = await bird.email.mailboxes.labels("mbx_01abc");

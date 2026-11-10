@@ -931,6 +931,14 @@ export const WorkspaceSchema = {
           description:
             "HTTPS URL to the current workspace logo. `null` when unset.",
         },
+        suspended_at: {
+          type: ["string", "null"],
+          format: "date-time",
+          readOnly: true,
+          description:
+            "When Bird suspended the workspace. `null` while the workspace is active. A suspended workspace cannot send messages, place calls other than emergency calls, or buy numbers or eSIMs. Its members can still sign in, read it and change its configuration.\n",
+          example: null,
+        },
       },
     },
     {
@@ -4025,10 +4033,11 @@ export const SMSErrorCodeSchema = {
     "recipient_opted_out",
     "provider_unavailable",
     "insufficient_balance",
+    "workspace_suspended",
     "unknown",
   ],
   description:
-    "Standardized failure reason:\n\n- `invalid_destination`: The number is unassigned, ported out, or malformed.\n- `unreachable`: The handset is off or outside coverage.\n- `blocked_by_carrier`: The carrier filtered the message.\n- `blocked_by_fraud_protection`: Bird fraud protection blocked suspected SMS pumping.\n- `blocked_by_recipient`: The recipient device blocked the sender.\n- `landline_unreachable`: The destination is a landline that does not accept SMS.\n- `content_rejected`: The carrier rejected the content.\n- `sender_unregistered`: The sender is not registered for the destination.\n- `recipient_opted_out`: The recipient is on a suppression list.\n- `provider_unavailable`: The provider remained unavailable after retries.\n- `insufficient_balance`: The workspace wallet could not fund the send.\n- `unknown`: The failure could not be classified.\n\nThis is an open enum. Accept unrecognized values.\n",
+    "Standardized failure reason:\n\n- `invalid_destination`: The number is unassigned, ported out, or malformed.\n- `unreachable`: The handset is off or outside coverage.\n- `blocked_by_carrier`: The carrier filtered the message.\n- `blocked_by_fraud_protection`: Bird fraud protection blocked suspected SMS pumping.\n- `blocked_by_recipient`: The recipient device blocked the sender.\n- `landline_unreachable`: The destination is a landline that does not accept SMS.\n- `content_rejected`: The carrier rejected the content.\n- `sender_unregistered`: The sender is not registered for the destination.\n- `recipient_opted_out`: The recipient is on a suppression list.\n- `provider_unavailable`: The provider remained unavailable after retries.\n- `insufficient_balance`: The workspace wallet could not fund the send.\n- `workspace_suspended`: The workspace is suspended, so Bird stopped this message and will not send it after reactivation. In rare cases an earlier attempt that Bird could not confirm may still have been delivered. A message refused after it was charged keeps its charge. Contact Bird support to reactivate the workspace.\n- `unknown`: The failure could not be classified.\n\nThis is an open enum. Accept unrecognized values.\n",
 } as const;
 
 export const SMSErrorCodeStatsPointSchema = {
@@ -4423,7 +4432,7 @@ export const WhatsAppDeliveryStatsSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, or the wallet could not fund the send. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.",
+        "Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, the wallet could not fund the send, or the workspace is suspended. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.",
       example: 412,
     },
     delivery_rate: {
@@ -4788,7 +4797,7 @@ export const WhatsAppDeliveryCountsSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, or the wallet could not fund the send. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.",
+        "Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, the wallet could not fund the send, or the workspace is suspended. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.",
       example: 412,
     },
   },
@@ -5098,9 +5107,10 @@ export const WhatsAppErrorCodeSchema = {
     "rate_limited",
     "recipient_suppressed",
     "media_rejected",
+    "workspace_suspended",
   ],
   description:
-    "Standardized failure reason:\n\n- `insufficient_balance`: The workspace wallet could not fund the send.\n- `price_not_found`: No price was configured for the destination and template.\n- `internal_error`: An unexpected service failure occurred.\n- `undeliverable`: The recipient could not be reached.\n- `service_window_expired`: The 24-hour service window closed; send a template.\n- `rate_limited`: The send was throttled.\n- `recipient_suppressed`: The recipient is on the workspace suppression list.\n- `media_rejected`: WhatsApp could not fetch the media URL, or refused the file it found there; `description` carries its reason.\n\nThis is an open enum. Accept unrecognized values.\n",
+    "Standardized failure reason:\n\n- `insufficient_balance`: The workspace wallet could not fund the send.\n- `price_not_found`: No price was configured for the destination and template.\n- `internal_error`: An unexpected service failure occurred.\n- `undeliverable`: The recipient could not be reached.\n- `service_window_expired`: The 24-hour service window closed; send a template.\n- `rate_limited`: The send was throttled.\n- `recipient_suppressed`: The recipient is on the workspace suppression list.\n- `media_rejected`: WhatsApp could not fetch the media URL, or refused the file it found there; `description` carries its reason.\n- `workspace_suspended`: The workspace is suspended, so Bird stopped this message and will not send it after reactivation. In rare cases an earlier attempt that Bird could not confirm may still have been delivered. A message refused after it was charged keeps its charge. Contact Bird support to reactivate the workspace.\n\nThis is an open enum. Accept unrecognized values.\n",
 } as const;
 
 export const WhatsAppErrorCodeStatsPointSchema = {
@@ -5384,7 +5394,7 @@ export const AMBOutboundStatsCountsSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Distinct accepted messages that Apple refused or that exhausted their send attempts. See `last_error.code` on the message for the reason; a refused charge is not a send failure, it is `rejected`.",
+        "Distinct accepted messages that Apple refused, that exhausted their send attempts, or that a workspace suspension stopped. See `last_error.code` on the message for the reason; a refused charge is not a send failure, it is `rejected`.",
       example: 30,
     },
     rejected: {
@@ -5392,7 +5402,7 @@ export const AMBOutboundStatsCountsSchema = {
       minimum: 0,
       readOnly: true,
       description:
-        "Distinct messages refused before any send attempt, because the destination has no price, the wallet could not fund the send, or the content cannot be sent yet. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `send_failure_rate`, which covers send failures only.",
+        "Distinct messages refused before any send attempt, because the destination has no price, the wallet could not fund the send, the workspace is suspended, or the content cannot be sent yet. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `send_failure_rate`, which covers send failures only.",
       example: 4,
     },
     sent_rate: {
@@ -6256,9 +6266,10 @@ export const VerificationAttemptFailureReasonSchema = {
     "channel_restricted",
     "delivery_timeout",
     "not_billable",
+    "workspace_suspended",
   ],
   description:
-    "Why a passcode send did not deliver:\n\n- `carrier_rejected`: The SMS carrier rejected the send.\n- `hard_bounce`: The email permanently bounced.\n- `soft_bounce`: The email temporarily bounced, such as when a mailbox is full.\n- `undelivered`: The channel reported a generic delivery failure.\n- `channel_unavailable`: The channel could not be used, so the verification\n  moved to the next channel.\n- `channel_disabled`: Sending on the channel is temporarily disabled, so the\n  verification moved to the next channel.\n- `channel_restricted`: A destination or session restriction prevented the\n  channel from being used. The verification can try the next eligible channel\n  while the session remains pending and unexpired.\n- `delivery_timeout`: No delivery confirmation arrived before the channel's\n  timeout, so the verification moved to the next channel.\n- `not_billable`: The send could not be charged, so it was never handed to the\n  channel. Usually the workspace balance is too low to cover it. Topping up\n  the balance is what clears this.\n\nNew reasons may be added over time. Treat unrecognized values as reasons added\nlater rather than errors.",
+    "Why a passcode send did not deliver:\n\n- `carrier_rejected`: The SMS carrier rejected the send.\n- `hard_bounce`: The email permanently bounced.\n- `soft_bounce`: The email temporarily bounced, such as when a mailbox is full.\n- `undelivered`: The channel reported a generic delivery failure.\n- `channel_unavailable`: The channel could not be used, so the verification\n  moved to the next channel.\n- `channel_disabled`: Sending on the channel is temporarily disabled, so the\n  verification moved to the next channel.\n- `channel_restricted`: A destination or session restriction prevented the\n  channel from being used. The verification can try the next eligible channel\n  while the session remains pending and unexpired.\n- `delivery_timeout`: No delivery confirmation arrived before the channel's\n  timeout, so the verification moved to the next channel.\n- `not_billable`: The send could not be charged, so it was never handed to the\n  channel. Usually the workspace balance is too low to cover it. Topping up\n  the balance is what clears this.\n- `workspace_suspended`: The workspace was suspended, so Bird stopped this\n  attempt and no other channel is tried. In rare cases the channel had already\n  accepted the passcode, so a passcode can still be checked while the\n  verification is `pending`. Contact Bird support to reactivate the workspace; verifications\n  created after reactivation send normally.\n\nNew reasons may be added over time. Treat unrecognized values as reasons added\nlater rather than errors.",
 } as const;
 
 export const RealtimeAppIDSchema = {
@@ -8093,10 +8104,11 @@ export const EmailRecipientSchema = {
         "domain_unverified",
         "quota_exceeded",
         "recipient_not_allowed",
+        "workspace_suspended",
         null,
       ],
       description:
-        "Present on `status: rejected` rows. Specifies why the recipient was rejected:\n\n- `recipient_suppressed`: The recipient is on the workspace suppression list, so\n  delivery was never attempted.\n- `transmission_failed`: The message could not be transmitted for delivery.\n- `generation_failure`: The message could not be built for delivery (template or\n  content issue).\n- `policy_rejection`: The message was refused by sending policy.\n- `domain_unverified`: The sending domain was not verified.\n- `quota_exceeded`: The organization's send quota was reached.\n- `recipient_not_allowed`: A recipient was not permitted for this send (for shared\n  onboarding-domain sends, recipients must be verified workspace members).\n",
+        "Present on `status: rejected` rows. Specifies why the recipient was rejected:\n\n- `recipient_suppressed`: The recipient is on the workspace suppression list, so\n  delivery was never attempted.\n- `transmission_failed`: The message could not be transmitted for delivery.\n- `generation_failure`: The message could not be built for delivery (template or\n  content issue).\n- `policy_rejection`: The message was refused by sending policy.\n- `domain_unverified`: The sending domain was not verified.\n- `quota_exceeded`: The organization's send quota was reached.\n- `recipient_not_allowed`: A recipient was not permitted for this send (for shared\n  onboarding-domain sends, recipients must be verified workspace members).\n- `workspace_suspended`: The workspace is suspended, so this mail was not sent and will not be sent after reactivation. Contact Bird support to reactivate the workspace.\n",
     },
     bounce_type: {
       type: ["string", "null"],
@@ -8288,10 +8300,11 @@ export const EmailEventSchema = {
         "domain_unverified",
         "quota_exceeded",
         "recipient_not_allowed",
+        "workspace_suspended",
         null,
       ],
       description:
-        "Specific cause of rejection. Present on `email.rejected` events only.\n\n- `recipient_suppressed`: The recipient is on the workspace suppression list.\n- `transmission_failed`: The message could not be transmitted for delivery.\n- `generation_failure`: The message could not be built for delivery, because of a template or content issue.\n- `policy_rejection`: The message was refused by sending policy.\n- `domain_unverified`: The sending domain was not verified.\n- `quota_exceeded`: The organization's send quota was reached.\n- `recipient_not_allowed`: This recipient was not allowed for this send. For a send from the shared onboarding domain, every recipient has to be a verified member of the workspace.\n",
+        "Specific cause of rejection. Present on `email.rejected` events only.\n\n- `recipient_suppressed`: The recipient is on the workspace suppression list.\n- `transmission_failed`: The message could not be transmitted for delivery.\n- `generation_failure`: The message could not be built for delivery, because of a template or content issue.\n- `policy_rejection`: The message was refused by sending policy.\n- `domain_unverified`: The sending domain was not verified.\n- `quota_exceeded`: The organization's send quota was reached.\n- `recipient_not_allowed`: This recipient was not allowed for this send. For a send from the shared onboarding domain, every recipient has to be a verified member of the workspace.\n- `workspace_suspended`: The workspace is suspended, so this mail was not sent and will not be sent after reactivation. Contact Bird support to reactivate the workspace.\n",
     },
     sending_ip: {
       type: ["string", "null"],
@@ -8416,7 +8429,7 @@ export const EmailBroadcastStatusSchema = {
     "failed",
   ],
   description:
-    "Where the broadcast itself has got to. This is separate from what happened to individual recipients, which the broadcast's own `sent_count`, `delivered_count`, `bounced_count` and `complained_count` tell you. Those four are fields on the broadcast, not on everything that carries this status, and reading the broadcast's recipients or its events gives the same outcomes one recipient at a time.\n\nThe `waiting_for_funds` and `paused` values are declared ahead of server support for funding recovery. The send-allowance response includes `can_start` when that support is available. If the field is absent, do not assume the broadcast can wait for funds or resume.\n\n- `draft`: Created, and not sent or scheduled yet.\n- `scheduled`: Due to send at `scheduled_at`. You can still edit it, and you can still change the time, right up until sending starts.\n- `accepted`: Taken for immediate sending. Nothing has gone out yet.\n- `sending`: On its way. Some recipients have been sent to and some have not.\n- `waiting_for_funds`: Sending stopped because your balance cannot pay for more email. You can add funds manually or let your existing automatic top-up restore the balance. Bird checks once a minute and continues sending to the remaining recipients when a funding check succeeds before `funding_hold.wait_until`. Otherwise the broadcast becomes `paused`, even if funds arrive after the last check.\n- `paused`: Sending stopped because your balance cannot pay for more email, and it does not continue by itself. `funding_hold.reason` says why. Add funds, then resume the broadcast, or cancel it.\n- `sent`: Every recipient has been sent to.\n- `canceling`: A cancellation is under way and the remaining sends are stopping.\n- `canceled`: The cancellation finished. Anything already on its way to a recipient when you canceled cannot be pulled back.\n- `failed`: The broadcast could not be sent. Reading the broadcast gives `failure_reason`, which says why. If it had already started sending, the recipients it reached keep their delivery status and carry on producing events.\n\nA draft is deleted rather than canceled, because it was never sent. Recipients already sent to before a broadcast waits or pauses keep their delivery status, and are not sent to again when it continues.\n",
+    "Where the broadcast itself has got to. This is separate from what happened to individual recipients, which the broadcast's own `sent_count`, `delivered_count`, `bounced_count` and `complained_count` tell you. Those four are fields on the broadcast, not on everything that carries this status, and reading the broadcast's recipients or its events gives the same outcomes one recipient at a time.\n\nThe send-allowance response includes `can_start` when funding recovery is available. If the field is absent, do not assume the broadcast can wait for funds or resume.\n\n- `draft`: Created, and not sent or scheduled yet.\n- `scheduled`: Due to send at `scheduled_at`. You can still edit it, and you can still change the time, right up until sending starts.\n- `accepted`: Taken for immediate sending. Nothing has gone out yet.\n- `sending`: On its way. Some recipients have been sent to and some have not.\n- `waiting_for_funds`: Sending stopped because your balance cannot pay for more email. You can add funds manually or let your existing automatic top-up restore the balance. Bird checks once a minute and continues sending to the remaining recipients when a funding check succeeds before `funding_hold.wait_until`. Otherwise the broadcast becomes `paused`, even if funds arrive after the last check.\n- `paused`: Sending stopped because your balance cannot pay for more email, and it does not continue by itself. `funding_hold.reason` says why. Add funds, then resume the broadcast, or cancel it.\n- `sent`: Every recipient has been sent to.\n- `canceling`: A cancellation is under way and the remaining sends are stopping.\n- `canceled`: The cancellation finished. Anything already on its way to a recipient when you canceled cannot be pulled back.\n- `failed`: The broadcast could not be sent. Reading the broadcast gives `failure_reason`, which says why. If it had already started sending, the recipients it reached keep their delivery status and carry on producing events.\n\nA draft is deleted rather than canceled, because it was never sent. Recipients already sent to before a broadcast waits or pauses keep their delivery status, and are not sent to again when it continues.\n",
 } as const;
 
 export const AudienceIDSchema = {
@@ -8524,7 +8537,7 @@ export const EmailBroadcastFundingHoldSchema = {
   additionalProperties: false,
   required: ["reason"],
   description:
-    "Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.\n\nFunding recovery is declared ahead of server support. The send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.\n\nThe automatic wait lasts at most 20 minutes from the first time sending stops for funds. Later stops and top-ups do not extend it. Resuming a paused broadcast starts a new wait for any later stop.\n",
+    "Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.\n\nThe send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.\n\nEach interruption can wait up to 20 minutes for funds. Checks, refused batches and partial top-ups during the same interruption do not extend its deadline. Automatic continuation or an explicit resume clears the hold; if sending later stops for funds again, a new 20-minute wait begins.\n",
   properties: {
     reason: {
       example: "funds_required",
@@ -8763,7 +8776,7 @@ export const EmailBroadcastSchema = {
       format: "int64",
       example: 18432,
       description:
-        "Size of the HTML body this broadcast sends, in bytes, or 0 when its content has no HTML part. Measured on the template version the broadcast sends, using the selected language. Recipient merge values can change its size. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending or canceling one returns, none of which measure the content. Absent too when the broadcast has no template or its content can no longer be read.\n",
+        "Size of the HTML body this broadcast sends, in bytes, or 0 when its content has no HTML part. Measured on the template version the broadcast sends, using the selected language. Recipient merge values can change its size. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending, resuming or canceling one returns, none of which measure the content. Absent too when the broadcast has no template or its content can no longer be read.\n",
     },
     text_bytes: {
       type: "integer",
@@ -8802,7 +8815,7 @@ export const EmailBroadcastSchema = {
         type: "string",
       },
       description:
-        "Any custom email headers set on the broadcast. Returned on a single broadcast read and on the broadcast that creating, updating, sending or canceling one returns, and absent from the list. The unsubscribe headers we add ourselves are not included.",
+        "Any custom email headers set on the broadcast. Returned on a single broadcast read and on the broadcast that creating, updating, sending, resuming or canceling one returns, and absent from the list. The unsubscribe headers we add ourselves are not included.",
     },
     status: {
       readOnly: true,
@@ -8823,7 +8836,7 @@ export const EmailBroadcastSchema = {
       type: "array",
       readOnly: true,
       description:
-        "What to do next about this broadcast, given the state it is in. Each entry names one action and\nsays why it is worth taking. Present on reads that compute it: an empty list means there is\nnothing to do, and the field is absent entirely on responses that do not report next actions.\n",
+        "What to do next about this broadcast, given the state it is in. Each entry names one action and\nsays why it is worth taking. Responses that compute next actions include this field: an empty list means there is\nnothing to do. Other responses omit it.\n",
       items: {
         $ref: "#/components/schemas/NextAction",
       },
@@ -8838,11 +8851,12 @@ export const EmailBroadcastSchema = {
         "insufficient_funds",
         "quota_exceeded",
         "internal_error",
+        "workspace_suspended",
         null,
       ],
       example: null,
       description:
-        "Why the broadcast failed. Set when `status` is `failed`, and `null` the rest of the time.\n\n- `empty_audience`: There was nobody to send to. Either the audience has no members, or every address in it is suppressed.\n- `audience_unavailable`: The audience no longer exists, so there was nothing to resolve.\n- `content_invalid`: The broadcast could not be set up to send. `failure_detail` explains what went wrong. It is one of these:\n  - The broadcast has no template, or the template it uses no longer exists. Choose an existing template and send the broadcast again.\n  - The template has no published version, or its published version has no subject and no body. Publish the template, or add content and publish it.\n  - The template uses a loop or reads a value that a broadcast cannot provide. Remove it, or use a contact property instead, then publish the template again.\n  - The template requires a language, but the broadcast has not selected one. Set `template.language` to one of the template's languages and send the broadcast again.\n  - The selected language is not available on the published template version. Choose one of that version's languages, or publish a version that includes the selected language.\n  - The sending domain is no longer verified. Verify the domain again.\n  - The configured IP pool has no usable IP address.\n  - We could not hand the prepared message to the delivery system. This is a problem on our side.\n- `insufficient_funds`: There was not enough in the workspace balance to pay for the send.\n- `quota_exceeded`: The send would have gone past your organization's daily or monthly email allowance, whichever runs out first. This can happen when the broadcast is being prepared, or partway through sending if the remaining recipients no longer fit. `failure_detail` gives you the count and the limit.\n- `internal_error`: Something went wrong on our side. Retry, and open a support ticket if it keeps happening.\n",
+        "Why the broadcast failed. Set when `status` is `failed`, and `null` the rest of the time.\n\n- `empty_audience`: There was nobody to send to. Either the audience has no members, or every address in it is suppressed.\n- `audience_unavailable`: The audience no longer exists, so there was nothing to resolve.\n- `content_invalid`: The broadcast could not be set up to send. `failure_detail` explains what went wrong. It is one of these:\n  - The broadcast has no template, or the template it uses no longer exists. Choose an existing template and send the broadcast again.\n  - The template has no published version, or its published version has no subject and no body. Publish the template, or add content and publish it.\n  - The template uses a loop or reads a value that a broadcast cannot provide. Remove it, or use a contact property instead, then publish the template again.\n  - The template requires a language, but the broadcast has not selected one. Set `template.language` to one of the template's languages and send the broadcast again.\n  - The selected language is not available on the published template version. Choose one of that version's languages, or publish a version that includes the selected language.\n  - The sending domain is no longer verified. Verify the domain again.\n  - The configured IP pool has no usable IP address.\n  - We could not hand the prepared message to the delivery system. This is a problem on our side.\n- `insufficient_funds`: There was not enough in the workspace balance to pay for the send.\n- `quota_exceeded`: The send would have gone past your organization's daily or monthly email allowance, whichever runs out first. This can happen when the broadcast is being prepared, or partway through sending if the remaining recipients no longer fit. `failure_detail` gives you the count and the limit.\n- `internal_error`: Something went wrong on our side. Retry, and open a support ticket if it keeps happening.\n- `workspace_suspended`: The workspace is suspended, so the broadcast stopped sending. Recipients not yet sent to are not sent to, even after reactivation. Contact Bird support to reactivate the workspace.\n",
     },
     failure_detail: {
       type: ["string", "null"],
@@ -8868,7 +8882,7 @@ export const EmailBroadcastSchema = {
       readOnly: true,
       example: 4820,
       description:
-        "How many recipients the broadcast has been sent to, counting every recipient whose status is `processed` or later. The number rises while the broadcast is `sending` and stops changing once the broadcast has finished. These counters are exact. The email stats endpoints report on the same sending but are approximate, so use these numbers when you need the precise count. Absent when the broadcast comes back from creating, updating, sending or canceling it, none of which read the counters. List and single-broadcast reads return 0 when no delivery events are recorded. When counters are unavailable, those reads still return 200 and omit the counters. Read the broadcast again for the numbers.",
+        "How many recipients the broadcast has been sent to, counting every recipient whose status is `processed` or later. The number rises while the broadcast is `sending` and stops changing once the broadcast has finished. These counters are exact. The email stats endpoints report on the same sending but are approximate, so use these numbers when you need the precise count. Absent when the broadcast comes back from creating, updating, sending, resuming or canceling it, none of which read the counters. List and single-broadcast reads return 0 when no delivery events are recorded. When counters are unavailable, those reads still return 200 and omit the counters. Read the broadcast again for the numbers.",
     },
     delivered_count: {
       type: "integer",
@@ -8924,7 +8938,7 @@ export const EmailBroadcastSchema = {
       },
       example: ["198.51.100.42"],
       description:
-        "The IP addresses this broadcast's messages went out from, up to 100 of them. A broadcast is spread across every address in its pool, so more than one can appear. The receiving mail systems name the address when they deliver, bounce or defer a message, so this stays absent until the first of those comes back. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending or canceling one returns, none of which read them. For delivery and latency broken down per address, read the sending-IP stats.\n",
+        "The IP addresses this broadcast's messages went out from, up to 100 of them. A broadcast is spread across every address in its pool, so more than one can appear. The receiving mail systems name the address when they deliver, bounce or defer a message, so this stays absent until the first of those comes back. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending, resuming or canceling one returns, none of which read them. For delivery and latency broken down per address, read the sending-IP stats.\n",
     },
     unique_opens_non_prefetched: {
       type: "integer",
@@ -9029,7 +9043,7 @@ export const EmailBroadcastSchema = {
       $ref: "#/components/schemas/EmailBroadcastFailureParameters",
       readOnly: true,
       description:
-        "Why the broadcast failed, when it could not prepare or render its template inputs. A failed broadcast cannot be updated or sent again. Correct the input or template that `pointer` and `problems` name, then create a new broadcast with the corrected inputs and send it. When `code` is `transport_missing` or `transport_invalid`, the broadcast's saved content cannot be used and changing an input does not fix it, so contact Bird support.\n\nAbsent when the broadcast did not fail this way. Returned on a single broadcast read and on the broadcast that creating, updating, sending or canceling one returns, and absent from the list.\n",
+        "Why the broadcast failed, when it could not prepare or render its template inputs. A failed broadcast cannot be updated or sent again. Correct the input or template that `pointer` and `problems` name, then create a new broadcast with the corrected inputs and send it. When `code` is `transport_missing` or `transport_invalid`, the broadcast's saved content cannot be used and changing an input does not fix it, so contact Bird support.\n\nAbsent when the broadcast did not fail this way. Returned on a single broadcast read and on the broadcast that creating, updating, sending, resuming or canceling one returns, and absent from the list.\n",
     },
   },
   example: {
@@ -9473,7 +9487,7 @@ export const EmailBroadcastInsufficientFundsBehaviorSchema = {
   minLength: 1,
   enum: ["wait_for_top_up", "pause"],
   description:
-    "Declared ahead of server support for funding recovery. When returned in the send-allowance response, this describes what a broadcast does if your balance runs out while it is sending. Recipients already sent to are not affected either way.\n\n- `wait_for_top_up`: The broadcast waits up to 20 minutes for a manual or automatic top-up. It checks once a minute and continues by itself when funds cover the next batch of recipients, then pauses if the wait ends. Waiting does not change your automatic top-up settings or initiate a payment.\n- `pause`: The broadcast pauses until you add funds and resume it.\n",
+    "When returned in the send-allowance response, this describes what a broadcast does if your balance runs out while it is sending. Recipients already sent to are not affected either way.\n\n- `wait_for_top_up`: The broadcast waits up to 20 minutes for a manual or automatic top-up. It checks once a minute and continues by itself when the insufficient-funds restriction clears, then pauses if the wait ends. Waiting does not change your automatic top-up settings or initiate a payment.\n- `pause`: The broadcast pauses until you add funds and resume it.\n",
 } as const;
 
 export const EmailBroadcastSendQuotaSchema = {
@@ -9481,7 +9495,7 @@ export const EmailBroadcastSendQuotaSchema = {
   additionalProperties: false,
   required: ["recipients", "allowed", "limited_by"],
   description:
-    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\nThe optional `can_start` and `on_insufficient_funds` fields are declared ahead of server support for funding recovery. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.\n",
+    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\nServers that support funding recovery return `can_start`; callers with billing read access also receive `on_insufficient_funds`. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.\n",
   example: {
     recipients: 12000,
     allowed: 5000,
@@ -9513,7 +9527,7 @@ export const EmailBroadcastSendQuotaSchema = {
       readOnly: true,
       example: 5000,
       description:
-        "Number of recipients covered by the organization's email send allowance at `send_at`, or now if you omit it. Equals `recipients` when no email limit restricts the send. It is lower when the remaining allowance cannot cover the audience.\n\nPartially covered broadcasts send in whole batches. This count is rounded down to a batch boundary and can be lower than `remaining`. Read this value directly instead of calculating it from `limit` and `remaining`.\n\nA value of 0 means no recipients are currently covered. This happens if the audience exceeds the full email limit, which rejects the send, or if the remaining allowance cannot cover a batch. When `can_start` is present, use it to decide whether a balance-limited broadcast can start and wait for funds. If it is absent, a zero allowance does not provide a way to send.\n",
+        "Number of recipients covered by the organization's email send allowance at `send_at`, or now if you omit it. Equals `recipients` when no email limit restricts the send. It is lower when the remaining allowance cannot cover the audience.\n\nPartially covered broadcasts send in whole batches. This count is rounded down to a batch boundary and can be lower than `remaining`. Read this value directly instead of calculating it from `limit` and `remaining`.\n\nA value of 0 means no recipients are currently covered. This happens if the audience exceeds a full daily or funded monthly limit, if a temporary funding restriction blocks sending, or if the remaining allowance cannot cover a batch. When `can_start` is present, use it to decide whether a balance-limited broadcast can start and wait for funds. If it is absent, a zero allowance does not provide a way to send.\n",
     },
     limited_by: {
       readOnly: true,
@@ -9545,7 +9559,7 @@ export const EmailBroadcastSendQuotaSchema = {
       readOnly: true,
       example: "2026-09-01T00:00:00Z",
       description:
-        "When usage resets to 0 for the email limit identified by `limited_by`, evaluated at `send_at`, or now if you omit it.\n\nA broadcast sent before this time uses the same window and the allowance left after other sends. A broadcast sent at or after this time uses a new window. If `recipients` exceeds the full `limit`, the send is rejected in any window with that limit. Pass the later time as `send_at` to check whether the other email limit still restricts the send.\n\nOmitted when no email limit restricts the send, when the reset is at or before `send_at`, or when the billing period has ended and the next one has not started.\n",
+        "When usage resets to 0 for the email limit identified by `limited_by`, evaluated at `send_at`, or now if you omit it.\n\nA broadcast sent before this time uses the same window and the allowance left after other sends. A broadcast sent at or after this time uses a new window. If `recipients` exceeds a full daily or funded monthly limit, the send is rejected in any window with that limit. When `limit_reason` is `unfunded`, the reported `limit` can instead be a temporary funding restriction; use `can_start`, when present, to determine whether the broadcast can start and wait for funds. Pass the later time as `send_at` to check whether the other email limit still restricts the send.\n\nOmitted when no email limit restricts the send, when the reset is at or before `send_at`, or when the billing period has ended and the next one has not started.\n",
     },
     limit_reason: {
       readOnly: true,
@@ -9566,7 +9580,7 @@ export const EmailBroadcastSendQuotaSchema = {
       readOnly: true,
       example: true,
       description:
-        "When present, whether the organization's email limits let this broadcast start at `send_at`, or now if you omit it. A balance that cannot pay for the next batch does not make this `false`: once started, the broadcast waits or pauses until funds return, as `on_insufficient_funds` describes.\n\nIt is `false` when no recipient would be sent, including when the audience exceeds the full daily or monthly limit or none of that limit remains. A `true` value does not reserve allowance or promise that every recipient is sent. Other checks still apply when you send.\n",
+        "When present, whether the organization's email limits let this broadcast start at `send_at`, or now if you omit it. This ignores a temporary funding restriction, including exhausted included volume when paid overage is available. It still checks daily limits and the monthly limit that applies after funding is restored.\n\nIt is `false` when no recipient fits the daily or funded monthly limits, including when the audience exceeds a full daily or funded monthly limit, or when usage has exhausted either limit. The response field `remaining` can instead reflect the temporary funding restriction: with `limit_reason: unfunded`, `remaining: 0` can accompany `can_start: true` if those daily and funded monthly limits allow sending. The broadcast can then start and wait for funds. A `true` value does not reserve allowance or promise that every recipient is sent. Other checks still apply when you send.\n",
     },
   },
 } as const;
@@ -25802,6 +25816,14 @@ export const WhatsAppNumberSchema = {
       description:
         "The number you hold with us that this WhatsApp number was connected from, as its id in GET /v1/numbers. Absent for a number you brought yourself.\n",
     },
+    meta_preverified_id: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "WhatsApp's own id for the number while we prepare it for you. We hand it to WhatsApp when you finish signing up, so WhatsApp knows this is the number we already verified for you. Absent for a number you brought yourself. WhatsApp discards the id once signup claims it, so an id still shown here on a connected number no longer names anything.\n",
+      example: "106540352242922",
+    },
     verified_until: {
       type: "string",
       format: "date-time",
@@ -27583,7 +27605,7 @@ export const AMBMessageStatusSchema = {
   minLength: 1,
   enum: ["accepted", "sent", "send_failed", "rejected", "received"],
   description:
-    "Send status:\n\n- `accepted`: Accepted and queued for delivery to Apple.\n- `sent`: Handed to Apple. There is no delivery or read receipt on this\n  channel, so `sent` is the furthest an outbound message's status\n  advances.\n- `send_failed`: Sending stopped because of a business or conversation\n  restriction, a recipient opt-out, an Apple refusal, or exhausted attempts.\n  An earlier attempt may have reached Apple if its response or the local\n  record of success was lost. See `last_error` for why sending stopped.\n- `rejected`: Refused by Bird before any send attempt and never charged:\n  the destination has no price, the wallet could not fund the send, or the\n  content cannot be sent yet. See `last_error`.\n- `received`: Received as an inbound message.\n",
+    "Send status:\n\n- `accepted`: Accepted and queued for delivery to Apple.\n- `sent`: Handed to Apple. There is no delivery or read receipt on this\n  channel, so `sent` is the furthest an outbound message's status\n  advances.\n- `send_failed`: Sending stopped because of a business or conversation\n  restriction, a recipient opt-out, an Apple refusal, a workspace\n  suspension, or exhausted attempts. A message stopped after it was charged\n  keeps its charge. An earlier attempt may have reached Apple if its\n  response or the local record of success was lost. See `last_error` for\n  why sending stopped.\n- `rejected`: Refused by Bird before any send attempt and never charged:\n  the destination has no price, the wallet could not fund the send, the\n  workspace is suspended, or the content cannot be sent yet. See\n  `last_error`.\n- `received`: Received as an inbound message.\n",
 } as const;
 
 export const AMBMessageSourceSchema = {
@@ -43094,8 +43116,30 @@ export const EmailThreadWritableFolderSchema = {
 export const EmailThreadLabelsUpdateSchema = {
   type: "object",
   additionalProperties: false,
+  not: {
+    anyOf: [
+      {
+        required: ["set", "add"],
+        properties: {
+          set: {},
+          add: {},
+        },
+      },
+      {
+        required: ["set", "remove"],
+        properties: {
+          set: {},
+          remove: {},
+        },
+      },
+    ],
+  },
+  example: {
+    add: ["urgent"],
+    remove: ["pending"],
+  },
   description:
-    "Custom labels to add or remove. System and reserved names are refused; use read and folder for thread state. The resulting custom-label set must contain at most 20 labels; larger sets return 422.",
+    "Custom labels to add or remove, or the full set to replace them with. Send `set` on its own; combining it with `add` or `remove` returns 422. System names are refused; use read and folder for thread state. Reserved names are refused too, except a label the conversation already carries from before its name was reserved, which can still be removed, and kept in a `set` in any casing. The resulting custom-label set must contain at most 20 labels; larger sets return 422. A custom name added or set that the workspace does not have yet becomes a workspace label that stays after it is removed from every conversation; once the workspace has 100 labels, a write that would create one more is refused with `E17058`. Custom label names match the workspace's labels in any casing, so adding `Urgent` where the workspace has `urgent` applies `urgent`, and responses return the workspace's spelling.",
   properties: {
     add: {
       type: "array",
@@ -43122,6 +43166,20 @@ export const EmailThreadLabelsUpdateSchema = {
       maxItems: 20,
       description: "Labels to take off.",
       example: ["pending"],
+    },
+    set: {
+      type: "array",
+      items: {
+        type: "string",
+        minLength: 1,
+        maxLength: 64,
+        pattern:
+          "^[^,\\s\\x00-\\x1F\\x7F-\\x9F](?:[^,\\x00-\\x1F\\x7F-\\x9F]*[^,\\s\\x00-\\x1F\\x7F-\\x9F])?$",
+      },
+      maxItems: 20,
+      description:
+        "The custom labels the conversation should carry, replacing all of its current ones. An empty array removes every custom label.",
+      example: ["urgent", "follow-up"],
     },
   },
 } as const;
@@ -43531,8 +43589,30 @@ export const EmailThreadMessageListSchema = {
 export const EmailLabelsUpdateSchema = {
   type: "object",
   additionalProperties: false,
+  not: {
+    anyOf: [
+      {
+        required: ["set", "add"],
+        properties: {
+          set: {},
+          add: {},
+        },
+      },
+      {
+        required: ["set", "remove"],
+        properties: {
+          set: {},
+          remove: {},
+        },
+      },
+    ],
+  },
+  example: {
+    add: ["urgent"],
+    remove: ["pending"],
+  },
   description:
-    "Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. On a message, adding or removing `unread` flips read state. Adding or removing `trash` moves it to or out of the trash. Placement labels cannot be applied to a message; use `folder` on [Update a thread](/docs/api/reference/update-email-thread) (`PATCH /v1/email/threads/{thread_id}`) to move its conversation. A sent message cannot use unread. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be used as custom labels, in any casing. A conversation or message has at most 20 labels, system labels included.\n",
+    "Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. `set` instead replaces every custom label and leaves system labels as they are; send it on its own, since combining it with `add` or `remove` returns 422. On a message, adding or removing `unread` flips read state. Adding or removing `trash` moves it to or out of the trash. Placement labels cannot be applied to a message; use `folder` on [Update a thread](/docs/api/reference/update-email-thread) (`PATCH /v1/email/threads/{thread_id}`) to move its conversation. A sent message cannot use unread. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `assigned`, `closed`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `open`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be applied as custom labels, in any casing. A label applied before its name was reserved can still be removed, added again under the same name with no effect, and kept in a `set` in any casing. A conversation or message has at most 20 labels, system labels included. A custom name added or set that the workspace does not have yet becomes a workspace label that stays after it is removed from every conversation; once the workspace has 100 labels, a write that would create one more is refused with `E17058`. A name in both `add` and `remove` is removed and does not count as added. Custom label names match the workspace's labels in any casing: adding `Urgent` where the workspace has `urgent` applies `urgent`, and responses return the workspace's spelling.\n",
   properties: {
     add: {
       type: "array",
@@ -43557,6 +43637,20 @@ export const EmailLabelsUpdateSchema = {
       maxItems: 20,
       description: "Labels to take off.",
       example: ["pending"],
+    },
+    set: {
+      type: "array",
+      items: {
+        type: "string",
+        minLength: 1,
+        maxLength: 64,
+        pattern:
+          "^[^,\\s\\x00-\\x1F\\x7F-\\x9F](?:[^,\\x00-\\x1F\\x7F-\\x9F]*[^,\\s\\x00-\\x1F\\x7F-\\x9F])?$",
+      },
+      maxItems: 20,
+      description:
+        "The custom labels the message should carry, replacing all of its current ones; system labels such as `unread` and `trash` are unchanged. An empty array removes every custom label.",
+      example: ["urgent", "follow-up"],
     },
   },
 } as const;
@@ -46300,7 +46394,7 @@ export const EventEmailReceivedSchema = {
 export const EmailRejectionReasonSchema = {
   type: "string",
   minLength: 1,
-  enum: [
+  "x-extensible-enum": [
     "recipient_suppressed",
     "transmission_failed",
     "generation_failure",
@@ -46308,18 +46402,10 @@ export const EmailRejectionReasonSchema = {
     "domain_unverified",
     "quota_exceeded",
     "recipient_not_allowed",
-  ],
-  "x-enum-varnames": [
-    "EmailRejectionReasonRecipientSuppressed",
-    "EmailRejectionReasonTransmissionFailed",
-    "EmailRejectionReasonGenerationFailure",
-    "EmailRejectionReasonPolicyRejection",
-    "EmailRejectionReasonDomainUnverified",
-    "EmailRejectionReasonQuotaExceeded",
-    "EmailRejectionReasonRecipientNotAllowed",
+    "workspace_suspended",
   ],
   description:
-    "Why an email was rejected before delivery.\n\n- `recipient_suppressed`: The recipient is on the workspace suppression list, so\n  delivery was never attempted.\n- `transmission_failed`: The message could not be transmitted for delivery.\n- `generation_failure`: The message could not be built for delivery (template or\n  content issue).\n- `policy_rejection`: The message was refused by sending policy.\n- `domain_unverified`: The sending domain was not verified.\n- `quota_exceeded`: The organization's send quota was reached.\n- `recipient_not_allowed`: A recipient was not permitted for this send (for shared\n  onboarding-domain sends, recipients must be verified workspace members).\n",
+    "Why an email was rejected before delivery.\n\n- `recipient_suppressed`: The recipient is on the workspace suppression list, so\n  delivery was never attempted.\n- `transmission_failed`: The message could not be transmitted for delivery.\n- `generation_failure`: The message could not be built for delivery (template or\n  content issue).\n- `policy_rejection`: The message was refused by sending policy.\n- `domain_unverified`: The sending domain was not verified.\n- `quota_exceeded`: The organization's send quota was reached.\n- `recipient_not_allowed`: A recipient was not permitted for this send (for shared\n  onboarding-domain sends, recipients must be verified workspace members).\n- `workspace_suspended`: The workspace is suspended, so this mail was not sent and will not be sent after reactivation. Contact Bird support to reactivate the workspace.\n",
   example: "recipient_suppressed",
 } as const;
 
@@ -48270,13 +48356,13 @@ export const EventVerifyVerificationFailedDataSchema = {
             },
           ],
           description:
-            "The last channel the verification tried, the one whose failure left it with nowhere else to go. Null when no channel was attributed.",
+            "The last channel the verification tried, the one whose failure ended it. Null when no channel was attributed.",
           example: "sms",
         },
         last_attempt_reason: {
           $ref: "#/components/schemas/VerificationAttemptFailureReason",
           description:
-            "Why that last send did not deliver. This is the actionable half of the event: `not_billable` means the workspace balance could not cover the send, while the delivery reasons point at the recipient or the channel.",
+            "Why that last send did not deliver. This is the actionable half of the event: `not_billable` means the workspace balance could not cover the send, `workspace_suspended` means the workspace was suspended so no channel after that send is tried (contact Bird support to reactivate the workspace), and the delivery reasons point at the recipient or the channel. An earlier channel may still have been tried and refused for its own reason.",
           example: "not_billable",
         },
         failed_at: {
@@ -48295,7 +48381,7 @@ export const EventVerifyVerificationFailedSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "The verification ended without the recipient receiving a passcode: every planned channel reported that its send would not arrive.",
+    "The verification ended without the recipient receiving a passcode: no channel Bird tried sent one, and Bird tries no further channel.",
   required: ["type", "timestamp", "data"],
   properties: {
     type: {
@@ -58860,10 +58946,11 @@ export const EmailEventWritableSchema = {
         "domain_unverified",
         "quota_exceeded",
         "recipient_not_allowed",
+        "workspace_suspended",
         null,
       ],
       description:
-        "Specific cause of rejection. Present on `email.rejected` events only.\n\n- `recipient_suppressed`: The recipient is on the workspace suppression list.\n- `transmission_failed`: The message could not be transmitted for delivery.\n- `generation_failure`: The message could not be built for delivery, because of a template or content issue.\n- `policy_rejection`: The message was refused by sending policy.\n- `domain_unverified`: The sending domain was not verified.\n- `quota_exceeded`: The organization's send quota was reached.\n- `recipient_not_allowed`: This recipient was not allowed for this send. For a send from the shared onboarding domain, every recipient has to be a verified member of the workspace.\n",
+        "Specific cause of rejection. Present on `email.rejected` events only.\n\n- `recipient_suppressed`: The recipient is on the workspace suppression list.\n- `transmission_failed`: The message could not be transmitted for delivery.\n- `generation_failure`: The message could not be built for delivery, because of a template or content issue.\n- `policy_rejection`: The message was refused by sending policy.\n- `domain_unverified`: The sending domain was not verified.\n- `quota_exceeded`: The organization's send quota was reached.\n- `recipient_not_allowed`: This recipient was not allowed for this send. For a send from the shared onboarding domain, every recipient has to be a verified member of the workspace.\n- `workspace_suspended`: The workspace is suspended, so this mail was not sent and will not be sent after reactivation. Contact Bird support to reactivate the workspace.\n",
     },
     sending_ip: {
       type: ["string", "null"],
@@ -59005,7 +59092,7 @@ export const EmailBroadcastFundingHoldWritableSchema = {
   additionalProperties: false,
   required: ["reason"],
   description:
-    "Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.\n\nFunding recovery is declared ahead of server support. The send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.\n\nThe automatic wait lasts at most 20 minutes from the first time sending stops for funds. Later stops and top-ups do not extend it. Resuming a paused broadcast starts a new wait for any later stop.\n",
+    "Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.\n\nThe send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.\n\nEach interruption can wait up to 20 minutes for funds. Checks, refused batches and partial top-ups during the same interruption do not extend its deadline. Automatic continuation or an explicit resume clears the hold; if sending later stops for funds again, a new 20-minute wait begins.\n",
   properties: {
     reason: {
       example: "funds_required",
@@ -59085,7 +59172,7 @@ export const EmailBroadcastWritableSchema = {
         type: "string",
       },
       description:
-        "Any custom email headers set on the broadcast. Returned on a single broadcast read and on the broadcast that creating, updating, sending or canceling one returns, and absent from the list. The unsubscribe headers we add ourselves are not included.",
+        "Any custom email headers set on the broadcast. Returned on a single broadcast read and on the broadcast that creating, updating, sending, resuming or canceling one returns, and absent from the list. The unsubscribe headers we add ourselves are not included.",
     },
     tags: {
       type: "array",
@@ -59162,7 +59249,7 @@ export const EmailBroadcastSendQuotaWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\nThe optional `can_start` and `on_insufficient_funds` fields are declared ahead of server support for funding recovery. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.\n",
+    "The recipients covered by the organization's email send allowance. If you pass `send_at`, the estimate is for that time. Otherwise, it is for a send now.\n\nThe organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.\n\nServers that support funding recovery return `can_start`; callers with billing read access also receive `on_insufficient_funds`. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.\n\n`limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.\n",
   example: {
     recipients: 12000,
     allowed: 5000,

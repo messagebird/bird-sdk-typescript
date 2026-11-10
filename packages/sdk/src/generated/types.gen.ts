@@ -581,6 +581,11 @@ export type Workspace = {
    * HTTPS URL to the current workspace logo. `null` when unset.
    */
   readonly logo_url?: string | null;
+  /**
+   * When Bird suspended the workspace. `null` while the workspace is active. A suspended workspace cannot send messages, place calls other than emergency calls, or buy numbers or eSIMs. Its members can still sign in, read it and change its configuration.
+   *
+   */
+  readonly suspended_at?: string | null;
 } & Timestamps;
 
 /**
@@ -2221,6 +2226,7 @@ export type SmsStatsLifecycleSortMetric =
  * - `recipient_opted_out`: The recipient is on a suppression list.
  * - `provider_unavailable`: The provider remained unavailable after retries.
  * - `insufficient_balance`: The workspace wallet could not fund the send.
+ * - `workspace_suspended`: The workspace is suspended, so Bird stopped this message and will not send it after reactivation. In rare cases an earlier attempt that Bird could not confirm may still have been delivered. A message refused after it was charged keeps its charge. Contact Bird support to reactivate the workspace.
  * - `unknown`: The failure could not be classified.
  *
  * This is an open enum. Accept unrecognized values.
@@ -2238,6 +2244,7 @@ export type SmsErrorCode =
   | "recipient_opted_out"
   | "provider_unavailable"
   | "insufficient_balance"
+  | "workspace_suspended"
   | "unknown"
   | (string & {});
 
@@ -2448,7 +2455,7 @@ export type WhatsAppDeliveryStats = {
    */
   readonly failed: number;
   /**
-   * Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, or the wallet could not fund the send. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.
+   * Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, the wallet could not fund the send, or the workspace is suspended. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.
    */
   readonly rejected: number;
   /**
@@ -2612,7 +2619,7 @@ export type WhatsAppDeliveryCounts = {
    */
   readonly failed: number;
   /**
-   * Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, or the wallet could not fund the send. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.
+   * Distinct messages rejected before any send attempt, because the recipient is on the workspace's suppression list, no reachable recipient was given, the destination has no price, the wallet could not fund the send, or the workspace is suspended. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `failure_rate`, which covers send failures only.
    */
   readonly rejected: number;
 };
@@ -2750,6 +2757,7 @@ export type WhatsAppStatsByCountryResponse = {
  * - `rate_limited`: The send was throttled.
  * - `recipient_suppressed`: The recipient is on the workspace suppression list.
  * - `media_rejected`: WhatsApp could not fetch the media URL, or refused the file it found there; `description` carries its reason.
+ * - `workspace_suspended`: The workspace is suspended, so Bird stopped this message and will not send it after reactivation. In rare cases an earlier attempt that Bird could not confirm may still have been delivered. A message refused after it was charged keeps its charge. Contact Bird support to reactivate the workspace.
  *
  * This is an open enum. Accept unrecognized values.
  *
@@ -2763,6 +2771,7 @@ export type WhatsAppErrorCode =
   | "rate_limited"
   | "recipient_suppressed"
   | "media_rejected"
+  | "workspace_suspended"
   | (string & {});
 
 /**
@@ -2930,11 +2939,11 @@ export type AmbOutboundStatsCounts = {
    */
   readonly sent: number;
   /**
-   * Distinct accepted messages that Apple refused or that exhausted their send attempts. See `last_error.code` on the message for the reason; a refused charge is not a send failure, it is `rejected`.
+   * Distinct accepted messages that Apple refused, that exhausted their send attempts, or that a workspace suspension stopped. See `last_error.code` on the message for the reason; a refused charge is not a send failure, it is `rejected`.
    */
   readonly send_failed: number;
   /**
-   * Distinct messages refused before any send attempt, because the destination has no price, the wallet could not fund the send, or the content cannot be sent yet. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `send_failure_rate`, which covers send failures only.
+   * Distinct messages refused before any send attempt, because the destination has no price, the wallet could not fund the send, the workspace is suspended, or the content cannot be sent yet. Rejected messages are never charged and are not counted in `accepted`, so the total addressed is `accepted + rejected`. Excluded from `send_failure_rate`, which covers send failures only.
    */
   readonly rejected: number;
   /**
@@ -3451,6 +3460,11 @@ export type VerificationTerminalReason =
  * - `not_billable`: The send could not be charged, so it was never handed to the
  *   channel. Usually the workspace balance is too low to cover it. Topping up
  *   the balance is what clears this.
+ * - `workspace_suspended`: The workspace was suspended, so Bird stopped this
+ *   attempt and no other channel is tried. In rare cases the channel had already
+ *   accepted the passcode, so a passcode can still be checked while the
+ *   verification is `pending`. Contact Bird support to reactivate the workspace; verifications
+ *   created after reactivation send normally.
  *
  * New reasons may be added over time. Treat unrecognized values as reasons added
  * later rather than errors.
@@ -3465,6 +3479,7 @@ export type VerificationAttemptFailureReason =
   | "channel_restricted"
   | "delivery_timeout"
   | "not_billable"
+  | "workspace_suspended"
   | (string & {});
 
 export type RealtimeAppId = string;
@@ -4441,6 +4456,7 @@ export type EmailRecipient = {
    * - `quota_exceeded`: The organization's send quota was reached.
    * - `recipient_not_allowed`: A recipient was not permitted for this send (for shared
    *   onboarding-domain sends, recipients must be verified workspace members).
+   * - `workspace_suspended`: The workspace is suspended, so this mail was not sent and will not be sent after reactivation. Contact Bird support to reactivate the workspace.
    *
    */
   readonly rejection_reason?:
@@ -4451,6 +4467,7 @@ export type EmailRecipient = {
     | "domain_unverified"
     | "quota_exceeded"
     | "recipient_not_allowed"
+    | "workspace_suspended"
     | null;
   /**
    * Bounce classification for `bounced` and `deferred` rows, or null when the recipient
@@ -4609,6 +4626,7 @@ export type EmailEvent = {
    * - `domain_unverified`: The sending domain was not verified.
    * - `quota_exceeded`: The organization's send quota was reached.
    * - `recipient_not_allowed`: This recipient was not allowed for this send. For a send from the shared onboarding domain, every recipient has to be a verified member of the workspace.
+   * - `workspace_suspended`: The workspace is suspended, so this mail was not sent and will not be sent after reactivation. Contact Bird support to reactivate the workspace.
    *
    */
   rejection_reason?:
@@ -4619,6 +4637,7 @@ export type EmailEvent = {
     | "domain_unverified"
     | "quota_exceeded"
     | "recipient_not_allowed"
+    | "workspace_suspended"
     | null;
   /**
    * The IP address used to send this message. Useful for spotting a deliverability problem that is tied to one specific sending IP rather than affecting all of them. Present on `email.delivered`, `email.bounced`, `email.out_of_band_bounce`, and `email.deferred` events.
@@ -4694,7 +4713,7 @@ export type EmailMessageContent = {
 /**
  * Where the broadcast itself has got to. This is separate from what happened to individual recipients, which the broadcast's own `sent_count`, `delivered_count`, `bounced_count` and `complained_count` tell you. Those four are fields on the broadcast, not on everything that carries this status, and reading the broadcast's recipients or its events gives the same outcomes one recipient at a time.
  *
- * The `waiting_for_funds` and `paused` values are declared ahead of server support for funding recovery. The send-allowance response includes `can_start` when that support is available. If the field is absent, do not assume the broadcast can wait for funds or resume.
+ * The send-allowance response includes `can_start` when funding recovery is available. If the field is absent, do not assume the broadcast can wait for funds or resume.
  *
  * - `draft`: Created, and not sent or scheduled yet.
  * - `scheduled`: Due to send at `scheduled_at`. You can still edit it, and you can still change the time, right up until sending starts.
@@ -4784,9 +4803,9 @@ export type EmailBroadcastFundingHoldReason =
 /**
  * Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.
  *
- * Funding recovery is declared ahead of server support. The send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.
+ * The send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.
  *
- * The automatic wait lasts at most 20 minutes from the first time sending stops for funds. Later stops and top-ups do not extend it. Resuming a paused broadcast starts a new wait for any later stop.
+ * Each interruption can wait up to 20 minutes for funds. Checks, refused batches and partial top-ups during the same interruption do not extend its deadline. Automatic continuation or an explicit resume clears the hold; if sending later stops for funds again, a new 20-minute wait begins.
  *
  */
 export type EmailBroadcastFundingHold = {
@@ -4964,7 +4983,7 @@ export type EmailBroadcast = {
    */
   template?: EmailBroadcastTemplate | null;
   /**
-   * Size of the HTML body this broadcast sends, in bytes, or 0 when its content has no HTML part. Measured on the template version the broadcast sends, using the selected language. Recipient merge values can change its size. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending or canceling one returns, none of which measure the content. Absent too when the broadcast has no template or its content can no longer be read.
+   * Size of the HTML body this broadcast sends, in bytes, or 0 when its content has no HTML part. Measured on the template version the broadcast sends, using the selected language. Recipient merge values can change its size. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending, resuming or canceling one returns, none of which measure the content. Absent too when the broadcast has no template or its content can no longer be read.
    *
    */
   readonly html_bytes?: number;
@@ -4986,7 +5005,7 @@ export type EmailBroadcast = {
    */
   reply_to?: Array<EmailAddress>;
   /**
-   * Any custom email headers set on the broadcast. Returned on a single broadcast read and on the broadcast that creating, updating, sending or canceling one returns, and absent from the list. The unsubscribe headers we add ourselves are not included.
+   * Any custom email headers set on the broadcast. Returned on a single broadcast read and on the broadcast that creating, updating, sending, resuming or canceling one returns, and absent from the list. The unsubscribe headers we add ourselves are not included.
    */
   headers?: {
     [key: string]: string;
@@ -4999,8 +5018,8 @@ export type EmailBroadcast = {
   readonly funding_hold?: EmailBroadcastFundingHold;
   /**
    * What to do next about this broadcast, given the state it is in. Each entry names one action and
-   * says why it is worth taking. Present on reads that compute it: an empty list means there is
-   * nothing to do, and the field is absent entirely on responses that do not report next actions.
+   * says why it is worth taking. Responses that compute next actions include this field: an empty list means there is
+   * nothing to do. Other responses omit it.
    *
    */
   readonly next?: Array<NextAction>;
@@ -5021,6 +5040,7 @@ export type EmailBroadcast = {
    * - `insufficient_funds`: There was not enough in the workspace balance to pay for the send.
    * - `quota_exceeded`: The send would have gone past your organization's daily or monthly email allowance, whichever runs out first. This can happen when the broadcast is being prepared, or partway through sending if the remaining recipients no longer fit. `failure_detail` gives you the count and the limit.
    * - `internal_error`: Something went wrong on our side. Retry, and open a support ticket if it keeps happening.
+   * - `workspace_suspended`: The workspace is suspended, so the broadcast stopped sending. Recipients not yet sent to are not sent to, even after reactivation. Contact Bird support to reactivate the workspace.
    *
    */
   readonly failure_reason?:
@@ -5030,6 +5050,7 @@ export type EmailBroadcast = {
     | "insufficient_funds"
     | "quota_exceeded"
     | "internal_error"
+    | "workspace_suspended"
     | null;
   /**
    * A sentence explaining the failure in more detail than `failure_reason` does, and `null` when the broadcast has not failed. Show it to the person using your app. Do not write code that reads it, because the wording can change. Branch on `failure_reason` instead.
@@ -5040,7 +5061,7 @@ export type EmailBroadcast = {
    */
   readonly recipient_count: number;
   /**
-   * How many recipients the broadcast has been sent to, counting every recipient whose status is `processed` or later. The number rises while the broadcast is `sending` and stops changing once the broadcast has finished. These counters are exact. The email stats endpoints report on the same sending but are approximate, so use these numbers when you need the precise count. Absent when the broadcast comes back from creating, updating, sending or canceling it, none of which read the counters. List and single-broadcast reads return 0 when no delivery events are recorded. When counters are unavailable, those reads still return 200 and omit the counters. Read the broadcast again for the numbers.
+   * How many recipients the broadcast has been sent to, counting every recipient whose status is `processed` or later. The number rises while the broadcast is `sending` and stops changing once the broadcast has finished. These counters are exact. The email stats endpoints report on the same sending but are approximate, so use these numbers when you need the precise count. Absent when the broadcast comes back from creating, updating, sending, resuming or canceling it, none of which read the counters. List and single-broadcast reads return 0 when no delivery events are recorded. When counters are unavailable, those reads still return 200 and omit the counters. Read the broadcast again for the numbers.
    */
   readonly sent_count?: number;
   /**
@@ -5064,7 +5085,7 @@ export type EmailBroadcast = {
    */
   readonly click_count?: number;
   /**
-   * The IP addresses this broadcast's messages went out from, up to 100 of them. A broadcast is spread across every address in its pool, so more than one can appear. The receiving mail systems name the address when they deliver, bounce or defer a message, so this stays absent until the first of those comes back. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending or canceling one returns, none of which read them. For delivery and latency broken down per address, read the sending-IP stats.
+   * The IP addresses this broadcast's messages went out from, up to 100 of them. A broadcast is spread across every address in its pool, so more than one can appear. The receiving mail systems name the address when they deliver, bounce or defer a message, so this stays absent until the first of those comes back. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending, resuming or canceling one returns, none of which read them. For delivery and latency broken down per address, read the sending-IP stats.
    *
    */
   readonly sending_ips?: Array<string>;
@@ -5125,7 +5146,7 @@ export type EmailBroadcast = {
   /**
    * Why the broadcast failed, when it could not prepare or render its template inputs. A failed broadcast cannot be updated or sent again. Correct the input or template that `pointer` and `problems` name, then create a new broadcast with the corrected inputs and send it. When `code` is `transport_missing` or `transport_invalid`, the broadcast's saved content cannot be used and changing an input does not fix it, so contact Bird support.
    *
-   * Absent when the broadcast did not fail this way. Returned on a single broadcast read and on the broadcast that creating, updating, sending or canceling one returns, and absent from the list.
+   * Absent when the broadcast did not fail this way. Returned on a single broadcast read and on the broadcast that creating, updating, sending, resuming or canceling one returns, and absent from the list.
    *
    */
   readonly failure_parameters?: EmailBroadcastFailureParameters;
@@ -5405,9 +5426,9 @@ export type EmailBroadcastCountAllowance = {
 };
 
 /**
- * Declared ahead of server support for funding recovery. When returned in the send-allowance response, this describes what a broadcast does if your balance runs out while it is sending. Recipients already sent to are not affected either way.
+ * When returned in the send-allowance response, this describes what a broadcast does if your balance runs out while it is sending. Recipients already sent to are not affected either way.
  *
- * - `wait_for_top_up`: The broadcast waits up to 20 minutes for a manual or automatic top-up. It checks once a minute and continues by itself when funds cover the next batch of recipients, then pauses if the wait ends. Waiting does not change your automatic top-up settings or initiate a payment.
+ * - `wait_for_top_up`: The broadcast waits up to 20 minutes for a manual or automatic top-up. It checks once a minute and continues by itself when the insufficient-funds restriction clears, then pauses if the wait ends. Waiting does not change your automatic top-up settings or initiate a payment.
  * - `pause`: The broadcast pauses until you add funds and resume it.
  *
  */
@@ -5419,7 +5440,7 @@ export type EmailBroadcastInsufficientFundsBehavior =
  *
  * The organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.
  *
- * The optional `can_start` and `on_insufficient_funds` fields are declared ahead of server support for funding recovery. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.
+ * Servers that support funding recovery return `can_start`; callers with billing read access also receive `on_insufficient_funds`. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.
  *
  * `limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.
  *
@@ -5435,7 +5456,7 @@ export type EmailBroadcastSendQuota = {
    *
    * Partially covered broadcasts send in whole batches. This count is rounded down to a batch boundary and can be lower than `remaining`. Read this value directly instead of calculating it from `limit` and `remaining`.
    *
-   * A value of 0 means no recipients are currently covered. This happens if the audience exceeds the full email limit, which rejects the send, or if the remaining allowance cannot cover a batch. When `can_start` is present, use it to decide whether a balance-limited broadcast can start and wait for funds. If it is absent, a zero allowance does not provide a way to send.
+   * A value of 0 means no recipients are currently covered. This happens if the audience exceeds a full daily or funded monthly limit, if a temporary funding restriction blocks sending, or if the remaining allowance cannot cover a batch. When `can_start` is present, use it to decide whether a balance-limited broadcast can start and wait for funds. If it is absent, a zero allowance does not provide a way to send.
    *
    */
   readonly allowed: number;
@@ -5453,7 +5474,7 @@ export type EmailBroadcastSendQuota = {
   /**
    * When usage resets to 0 for the email limit identified by `limited_by`, evaluated at `send_at`, or now if you omit it.
    *
-   * A broadcast sent before this time uses the same window and the allowance left after other sends. A broadcast sent at or after this time uses a new window. If `recipients` exceeds the full `limit`, the send is rejected in any window with that limit. Pass the later time as `send_at` to check whether the other email limit still restricts the send.
+   * A broadcast sent before this time uses the same window and the allowance left after other sends. A broadcast sent at or after this time uses a new window. If `recipients` exceeds a full daily or funded monthly limit, the send is rejected in any window with that limit. When `limit_reason` is `unfunded`, the reported `limit` can instead be a temporary funding restriction; use `can_start`, when present, to determine whether the broadcast can start and wait for funds. Pass the later time as `send_at` to check whether the other email limit still restricts the send.
    *
    * Omitted when no email limit restricts the send, when the reset is at or before `send_at`, or when the billing period has ended and the next one has not started.
    *
@@ -5463,9 +5484,9 @@ export type EmailBroadcastSendQuota = {
   readonly broadcasts?: EmailBroadcastCountAllowance;
   readonly on_insufficient_funds?: EmailBroadcastInsufficientFundsBehavior;
   /**
-   * When present, whether the organization's email limits let this broadcast start at `send_at`, or now if you omit it. A balance that cannot pay for the next batch does not make this `false`: once started, the broadcast waits or pauses until funds return, as `on_insufficient_funds` describes.
+   * When present, whether the organization's email limits let this broadcast start at `send_at`, or now if you omit it. This ignores a temporary funding restriction, including exhausted included volume when paid overage is available. It still checks daily limits and the monthly limit that applies after funding is restored.
    *
-   * It is `false` when no recipient would be sent, including when the audience exceeds the full daily or monthly limit or none of that limit remains. A `true` value does not reserve allowance or promise that every recipient is sent. Other checks still apply when you send.
+   * It is `false` when no recipient fits the daily or funded monthly limits, including when the audience exceeds a full daily or funded monthly limit, or when usage has exhausted either limit. The response field `remaining` can instead reflect the temporary funding restriction: with `limit_reason: unfunded`, `remaining: 0` can accompany `can_start: true` if those daily and funded monthly limits allow sending. The broadcast can then start and wait for funds. A `true` value does not reserve allowance or promise that every recipient is sent. Other checks still apply when you send.
    *
    */
   readonly can_start?: boolean;
@@ -14368,6 +14389,11 @@ export type WhatsAppNumber = {
    */
   readonly number_id?: AllocatedNumberId;
   /**
+   * WhatsApp's own id for the number while we prepare it for you. We hand it to WhatsApp when you finish signing up, so WhatsApp knows this is the number we already verified for you. Absent for a number you brought yourself. WhatsApp discards the id once signup claims it, so an id still shown here on a connected number no longer names anything.
+   *
+   */
+  readonly meta_preverified_id?: string;
+  /**
    * When we expect WhatsApp to release this pre-verified number if you have not finished signup by then. Present only while the number is `awaiting_signup`. Absent for a number pre-verified before we started recording this moment, and for a number you brought yourself.
    *
    */
@@ -15229,12 +15255,15 @@ export type AmbMessageDirection = "outbound" | "inbound";
  *   channel, so `sent` is the furthest an outbound message's status
  *   advances.
  * - `send_failed`: Sending stopped because of a business or conversation
- *   restriction, a recipient opt-out, an Apple refusal, or exhausted attempts.
- *   An earlier attempt may have reached Apple if its response or the local
- *   record of success was lost. See `last_error` for why sending stopped.
+ *   restriction, a recipient opt-out, an Apple refusal, a workspace
+ *   suspension, or exhausted attempts. A message stopped after it was charged
+ *   keeps its charge. An earlier attempt may have reached Apple if its
+ *   response or the local record of success was lost. See `last_error` for
+ *   why sending stopped.
  * - `rejected`: Refused by Bird before any send attempt and never charged:
- *   the destination has no price, the wallet could not fund the send, or the
- *   content cannot be sent yet. See `last_error`.
+ *   the destination has no price, the wallet could not fund the send, the
+ *   workspace is suspended, or the content cannot be sent yet. See
+ *   `last_error`.
  * - `received`: Received as an inbound message.
  *
  */
@@ -23866,7 +23895,7 @@ export type EmailThreadList = {
 export type EmailThreadWritableFolder = "inbox" | "archive" | "spam";
 
 /**
- * Custom labels to add or remove. System and reserved names are refused; use read and folder for thread state. The resulting custom-label set must contain at most 20 labels; larger sets return 422.
+ * Custom labels to add or remove, or the full set to replace them with. Send `set` on its own; combining it with `add` or `remove` returns 422. System names are refused; use read and folder for thread state. Reserved names are refused too, except a label the conversation already carries from before its name was reserved, which can still be removed, and kept in a `set` in any casing. The resulting custom-label set must contain at most 20 labels; larger sets return 422. A custom name added or set that the workspace does not have yet becomes a workspace label that stays after it is removed from every conversation; once the workspace has 100 labels, a write that would create one more is refused with `E17058`. Custom label names match the workspace's labels in any casing, so adding `Urgent` where the workspace has `urgent` applies `urgent`, and responses return the workspace's spelling.
  */
 export type EmailThreadLabelsUpdate = {
   /**
@@ -23877,6 +23906,10 @@ export type EmailThreadLabelsUpdate = {
    * Labels to take off.
    */
   remove?: Array<string>;
+  /**
+   * The custom labels the conversation should carry, replacing all of its current ones. An empty array removes every custom label.
+   */
+  set?: Array<string>;
 };
 
 /**
@@ -24118,7 +24151,7 @@ export type EmailThreadMessageList = {
 } & ListEnvelope;
 
 /**
- * Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. On a message, adding or removing `unread` flips read state. Adding or removing `trash` moves it to or out of the trash. Placement labels cannot be applied to a message; use `folder` on [Update a thread](/docs/api/reference/update-email-thread) (`PATCH /v1/email/threads/{thread_id}`) to move its conversation. A sent message cannot use unread. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be used as custom labels, in any casing. A conversation or message has at most 20 labels, system labels included.
+ * Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. `set` instead replaces every custom label and leaves system labels as they are; send it on its own, since combining it with `add` or `remove` returns 422. On a message, adding or removing `unread` flips read state. Adding or removing `trash` moves it to or out of the trash. Placement labels cannot be applied to a message; use `folder` on [Update a thread](/docs/api/reference/update-email-thread) (`PATCH /v1/email/threads/{thread_id}`) to move its conversation. A sent message cannot use unread. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `assigned`, `closed`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `open`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be applied as custom labels, in any casing. A label applied before its name was reserved can still be removed, added again under the same name with no effect, and kept in a `set` in any casing. A conversation or message has at most 20 labels, system labels included. A custom name added or set that the workspace does not have yet becomes a workspace label that stays after it is removed from every conversation; once the workspace has 100 labels, a write that would create one more is refused with `E17058`. A name in both `add` and `remove` is removed and does not count as added. Custom label names match the workspace's labels in any casing: adding `Urgent` where the workspace has `urgent` applies `urgent`, and responses return the workspace's spelling.
  *
  */
 export type EmailLabelsUpdate = {
@@ -24130,6 +24163,10 @@ export type EmailLabelsUpdate = {
    * Labels to take off.
    */
   remove?: Array<string>;
+  /**
+   * The custom labels the message should carry, replacing all of its current ones; system labels such as `unread` and `trash` are unchanged. An empty array removes every custom label.
+   */
+  set?: Array<string>;
 };
 
 /**
@@ -25621,6 +25658,7 @@ export type EventEmailReceived = {
  * - `quota_exceeded`: The organization's send quota was reached.
  * - `recipient_not_allowed`: A recipient was not permitted for this send (for shared
  *   onboarding-domain sends, recipients must be verified workspace members).
+ * - `workspace_suspended`: The workspace is suspended, so this mail was not sent and will not be sent after reactivation. Contact Bird support to reactivate the workspace.
  *
  */
 export type EmailRejectionReason =
@@ -25630,7 +25668,9 @@ export type EmailRejectionReason =
   | "policy_rejection"
   | "domain_unverified"
   | "quota_exceeded"
-  | "recipient_not_allowed";
+  | "recipient_not_allowed"
+  | "workspace_suspended"
+  | (string & {});
 
 /**
  * Payload of the email.rejected event.
@@ -26751,11 +26791,11 @@ export type EventVerifyVerificationFailedData = EventVerifyBase & {
    */
   reason: VerificationTerminalReason;
   /**
-   * The last channel the verification tried, the one whose failure left it with nowhere else to go. Null when no channel was attributed.
+   * The last channel the verification tried, the one whose failure ended it. Null when no channel was attributed.
    */
   channel: VerificationChannel | null;
   /**
-   * Why that last send did not deliver. This is the actionable half of the event: `not_billable` means the workspace balance could not cover the send, while the delivery reasons point at the recipient or the channel.
+   * Why that last send did not deliver. This is the actionable half of the event: `not_billable` means the workspace balance could not cover the send, `workspace_suspended` means the workspace was suspended so no channel after that send is tried (contact Bird support to reactivate the workspace), and the delivery reasons point at the recipient or the channel. An earlier channel may still have been tried and refused for its own reason.
    */
   last_attempt_reason: VerificationAttemptFailureReason;
   /**
@@ -26765,7 +26805,7 @@ export type EventVerifyVerificationFailedData = EventVerifyBase & {
 };
 
 /**
- * The verification ended without the recipient receiving a passcode: every planned channel reported that its send would not arrive.
+ * The verification ended without the recipient receiving a passcode: no channel Bird tried sent one, and Bird tries no further channel.
  */
 export type EventVerifyVerificationFailed = {
   type: VerifyVerificationFailedEventType;
@@ -32595,6 +32635,7 @@ export type EmailEventWritable = {
    * - `domain_unverified`: The sending domain was not verified.
    * - `quota_exceeded`: The organization's send quota was reached.
    * - `recipient_not_allowed`: This recipient was not allowed for this send. For a send from the shared onboarding domain, every recipient has to be a verified member of the workspace.
+   * - `workspace_suspended`: The workspace is suspended, so this mail was not sent and will not be sent after reactivation. Contact Bird support to reactivate the workspace.
    *
    */
   rejection_reason?:
@@ -32605,6 +32646,7 @@ export type EmailEventWritable = {
     | "domain_unverified"
     | "quota_exceeded"
     | "recipient_not_allowed"
+    | "workspace_suspended"
     | null;
   /**
    * The IP address used to send this message. Useful for spotting a deliverability problem that is tied to one specific sending IP rather than affecting all of them. Present on `email.delivered`, `email.bounced`, `email.out_of_band_bounce`, and `email.deferred` events.
@@ -32694,9 +32736,9 @@ export type EmailBroadcastTemplateWritable = {
 /**
  * Why sending stopped for funds and what happens next. Present only while `status` is `waiting_for_funds` or `paused`.
  *
- * Funding recovery is declared ahead of server support. The send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.
+ * The send-allowance response includes `can_start` when waiting and resuming are available. If `can_start` is absent, do not assume a top-up can recover a broadcast or that a failed broadcast can resume.
  *
- * The automatic wait lasts at most 20 minutes from the first time sending stops for funds. Later stops and top-ups do not extend it. Resuming a paused broadcast starts a new wait for any later stop.
+ * Each interruption can wait up to 20 minutes for funds. Checks, refused batches and partial top-ups during the same interruption do not extend its deadline. Automatic continuation or an explicit resume clears the hold; if sending later stops for funds again, a new 20-minute wait begins.
  *
  */
 export type EmailBroadcastFundingHoldWritable = {
@@ -32737,7 +32779,7 @@ export type EmailBroadcastWritable = {
    */
   reply_to?: Array<EmailAddress>;
   /**
-   * Any custom email headers set on the broadcast. Returned on a single broadcast read and on the broadcast that creating, updating, sending or canceling one returns, and absent from the list. The unsubscribe headers we add ourselves are not included.
+   * Any custom email headers set on the broadcast. Returned on a single broadcast read and on the broadcast that creating, updating, sending, resuming or canceling one returns, and absent from the list. The unsubscribe headers we add ourselves are not included.
    */
   headers?: {
     [key: string]: string;
@@ -32786,7 +32828,7 @@ export type EmailBroadcastCountsWritable = {
  *
  * The organization shares this allowance across its email sends. `allowed` can change as other sends use the allowance. `recipients` can change with audience membership and suppressions. These counts are live estimates. Other sends can use the allowance before a broadcast sends, even if its audience fits now.
  *
- * The optional `can_start` and `on_insufficient_funds` fields are declared ahead of server support for funding recovery. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.
+ * Servers that support funding recovery return `can_start`; callers with billing read access also receive `on_insufficient_funds`. If `can_start` is absent, use `allowed` to check the current allowance and do not assume automatic waiting or resumability. An absent field is different from `can_start: false`, which explicitly says the broadcast cannot start.
  *
  * `limit_reason` is present only when `limited_by` is `monthly` and you have `org:billing` read access. The reason can reveal the organization's payment state. `broadcasts` is present only for a draft when the organization has a broadcast count limit. `on_insufficient_funds` says what happens if the balance runs out mid-send. Like `limit_reason`, it is present only when you have `org:billing` read access.
  *
@@ -43796,7 +43838,7 @@ export type ListSmsMessagesData = {
      */
     status?: Array<string>;
     /**
-     * Keep only messages whose failure reason (`last_error.code`) matches; repeat the parameter to match any of several. One of `invalid_destination`, `unreachable`, `blocked_by_carrier`, `blocked_by_fraud_protection`, `blocked_by_recipient`, `landline_unreachable`, `content_rejected`, `sender_unregistered`, `recipient_opted_out`, `provider_unavailable`, `insufficient_balance`, or `unknown`. With a `status` or `error_code` filter a page can hold fewer messages than `limit`, or none; keep paging until `next_cursor` is null.
+     * Keep only messages whose failure reason (`last_error.code`) matches; repeat the parameter to match any of several. Accepts any SMS error code, including codes added later, such as `invalid_destination`, `unreachable`, `blocked_by_carrier`, `blocked_by_fraud_protection`, `blocked_by_recipient`, `landline_unreachable`, `content_rejected`, `sender_unregistered`, `recipient_opted_out`, `provider_unavailable`, `insufficient_balance`, `workspace_suspended`, or `unknown`. With a `status` or `error_code` filter a page can hold fewer messages than `limit`, or none; keep paging until `next_cursor` is null.
      *
      */
     error_code?: Array<string>;
@@ -70026,7 +70068,7 @@ export type ListEmailThreadsData = {
      */
     read_state?: EmailThreadReadState;
     /**
-     * Match every listed custom label. Repeat labels to supply more than one. System label names are refused.
+     * Match every listed custom label. Repeat labels to supply more than one. System label names are refused. Names match in any casing.
      */
     labels?: Array<string>;
     /**
@@ -70514,7 +70556,7 @@ export type ListEmailThreadMessagesData = {
      */
     direction?: MessageDirection;
     /**
-     * Filter to messages that have this label. `trash` lists trashed messages. Any other label, whether that is `archive`, `spam`, `blocked`, `unread` or one of your own, lists the messages that have it and are not in the trash. When omitted, every message that is not trashed is returned, whichever folder the conversation is in.
+     * Filter to messages that have this label. `trash` lists trashed messages. Any other label, whether that is `archive`, `spam`, `blocked`, `unread` or one of your own, lists the messages that have it and are not in the trash. When omitted, every message that is not trashed is returned, whichever folder the conversation is in. A custom label name matches in any casing.
      *
      */
     label?: string;
