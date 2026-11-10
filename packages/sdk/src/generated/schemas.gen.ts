@@ -11214,7 +11214,7 @@ export const SMSMessageStatusSchema = {
     "received",
   ],
   description:
-    "Delivery status:\n\n- `accepted`: Accepted and awaiting carrier handoff.\n- `sent`: Handed to the carrier and awaiting a delivery receipt.\n- `delivered`: Confirmed as delivered.\n- `undelivered`: The carrier reported delivery as failed for a reason that may clear later, such as a handset out of coverage or a carrier at capacity. Final all the same: the message is not retried, so reaching the recipient means sending again.\n- `failed`: The carrier reported delivery as failed for a reason that will not clear, such as an unassigned number, a recipient who has opted out, or content the carrier refused.\n- `rejected`: Refused before carrier handoff.\n- `expired`: Reached its validity limit without a final receipt.\n- `received`: Received as an inbound message.\n\n`scheduled` and `canceled` are declared ahead of the send-later scheduling\nfeature that produces them, so their arrival is not a breaking change. No\nmessage carries either status today.\n",
+    "Delivery status:\n\n- `accepted`: Accepted and awaiting carrier handoff.\n- `sent`: Handed to the carrier and awaiting a delivery receipt.\n- `delivered`: Confirmed as delivered.\n- `undelivered`: The carrier reported delivery as failed for a reason that may clear later, such as a handset out of coverage or a carrier at capacity. Bird does not retry it, so reaching the recipient means sending again; a carrier report of another outcome that occurred later, such as a delivery, replaces it.\n- `failed`: The carrier reported delivery as failed for a reason not expected to clear, such as an unassigned number, a recipient who has opted out, or content the carrier refused. Bird does not retry it, but a carrier report of another outcome that occurred later, such as a delivery, replaces it.\n- `rejected`: Refused before carrier handoff.\n- `expired`: Reached its validity limit without a final receipt.\n- `received`: Received as an inbound message.\n\n`scheduled` and `canceled` are declared ahead of the send-later scheduling\nfeature that produces them, so their arrival is not a breaking change. No\nmessage carries either status today.\n",
 } as const;
 
 export const SMSBinarySchema = {
@@ -47574,7 +47574,7 @@ export const EventSMSFailedDataSchema = {
       properties: {
         error: {
           $ref: "#/components/schemas/SMSError",
-          description: "Why the message terminally failed.",
+          description: "Why the message failed.",
         },
         carrier: {
           type: "string",
@@ -47596,7 +47596,8 @@ export const EventSMSFailedDataSchema = {
 export const EventSMSFailedSchema = {
   type: "object",
   additionalProperties: false,
-  description: "Message delivery failed permanently.",
+  description:
+    "The carrier reported that delivery failed for a reason not expected to clear. Bird does not retry the message, but a carrier report of another outcome that occurred later, such as `sms.delivered`, can follow.",
   required: ["type", "timestamp", "data"],
   properties: {
     type: {
@@ -47896,7 +47897,7 @@ export const EventSMSUndeliveredSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "The carrier reported a non-permanent failure to deliver the message.",
+    "The carrier reported a non-permanent failure to deliver the message. Bird does not retry it, but a carrier report of another outcome that occurred later, such as `sms.delivered`, can follow.",
   required: ["type", "timestamp", "data"],
   properties: {
     type: {
@@ -51418,7 +51419,7 @@ export const NumbersOrderStatusSchema = {
     "failed",
   ],
   description:
-    "Lifecycle state of a number purchase order:\n\n- `charging`: Securing funds.\n- `ordering`: Placing the order with the carrier.\n- `pending`: The carrier accepted the order and is provisioning the number.\n- `completed`: Your workspace owns the number.\n- `failed`: The purchase did not complete.\n\nA setup fee already charged is non-refundable. Contact support about a failed\norder.",
+    "Lifecycle state of a number purchase order:\n\n- `charging`: Securing funds.\n- `ordering`: Placing the order with the carrier.\n- `pending`: The carrier accepted the order and is provisioning the number. A carrier\n  number's first recurring charge is taken on delivery: keep funds available, because a\n  delivered number that still cannot be charged is released no sooner than 72 hours after the order\n  was placed: its order fails and its setup fee is refunded.\n- `completed`: Your workspace owns the number.\n- `failed`: The purchase did not complete.\n\nApart from that release, a setup fee already charged is non-refundable. Contact\nsupport about a failed order.",
 } as const;
 
 export const NumbersOrderIDSchema = {
@@ -66599,7 +66600,7 @@ export const EventSMSFailedDataWritableSchema = {
       properties: {
         error: {
           $ref: "#/components/schemas/SMSErrorWritable",
-          description: "Why the message terminally failed.",
+          description: "Why the message failed.",
         },
         carrier: {
           type: "string",
@@ -66621,7 +66622,8 @@ export const EventSMSFailedDataWritableSchema = {
 export const EventSMSFailedWritableSchema = {
   type: "object",
   additionalProperties: false,
-  description: "Message delivery failed permanently.",
+  description:
+    "The carrier reported that delivery failed for a reason not expected to clear. Bird does not retry the message, but a carrier report of another outcome that occurred later, such as `sms.delivered`, can follow.",
   required: ["type", "timestamp", "data"],
   properties: {
     type: {
@@ -66894,7 +66896,7 @@ export const EventSMSUndeliveredWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "The carrier reported a non-permanent failure to deliver the message.",
+    "The carrier reported a non-permanent failure to deliver the message. Bird does not retry it, but a carrier report of another outcome that occurred later, such as `sms.delivered`, can follow.",
   required: ["type", "timestamp", "data"],
   properties: {
     type: {

@@ -6035,6 +6035,9 @@ export const listWorkspaceSmsSenderRequirements = <
  * in progress returns `503`; retry later. A registration that already exists for the country and is
  * neither rejected nor suspended returns `409`, and that includes one still `pending` review; a
  * rejected registration is resubmitted, and a suspended one reactivated, by calling this again.
+ * A `409` can also mean the contract's billing frequency changed just before the call: a priced
+ * sender's setup fee is then charged and no registration is kept, so retrying pays it again;
+ * contact support instead.
  *
  * A sender covered by a dedicated program, such as a US 10DLC campaign or toll-free
  * verification, returns `422` and must use that program instead. Short-code registrations
