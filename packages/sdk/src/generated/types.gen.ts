@@ -23415,6 +23415,10 @@ export type Mailbox = {
    */
   readonly local_part_generated: boolean;
   /**
+   * When the mailbox last sent or received a message. Bird records this activity from 26 August 2026, so compare `null` with `created_at`: a mailbox created after that date has had no activity, while an older one has had none since that date.
+   */
+  last_message_at: string | null;
+  /**
    * When the mailbox was created.
    */
   readonly created_at: string;
@@ -35887,6 +35891,10 @@ export type MailboxWritable = {
   metadata: {
     [key: string]: unknown;
   };
+  /**
+   * When the mailbox last sent or received a message. Bird records this activity from 26 August 2026, so compare `null` with `created_at`: a mailbox created after that date has had no activity, while an older one has had none since that date.
+   */
+  last_message_at: string | null;
 };
 
 export type MailboxListWritable = {

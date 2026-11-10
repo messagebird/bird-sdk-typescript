@@ -42041,6 +42041,7 @@ export const MailboxSchema = {
     "size_bytes",
     "metadata",
     "local_part_generated",
+    "last_message_at",
     "created_at",
     "updated_at",
   ],
@@ -42162,6 +42163,12 @@ export const MailboxSchema = {
       type: "boolean",
       description:
         "Whether we generated the local part of the address. `false` means a custom handle was chosen at creation. On the shared `inbox.ai` domain a custom handle counts against your plan's custom-handle allowance.",
+    },
+    last_message_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When the mailbox last sent or received a message. Bird records this activity from 26 August 2026, so compare `null` with `created_at`: a mailbox created after that date has had no activity, while an older one has had none since that date.",
     },
     created_at: {
       type: "string",
@@ -65049,6 +65056,7 @@ export const MailboxWritableSchema = {
     "receive_policy",
     "retention_tier",
     "metadata",
+    "last_message_at",
   ],
   properties: {
     name: {
@@ -65090,6 +65098,12 @@ export const MailboxWritableSchema = {
       additionalProperties: true,
       description:
         "Your own key/value data attached to the mailbox. Up to 2 KB. Keys starting with `__bird` are reserved.",
+    },
+    last_message_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When the mailbox last sent or received a message. Bird records this activity from 26 August 2026, so compare `null` with `created_at`: a mailbox created after that date has had no activity, while an older one has had none since that date.",
     },
   },
 } as const;
