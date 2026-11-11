@@ -5327,7 +5327,7 @@ export const getWorkspaceComplianceSubmission = <
  * Replaces rejected, expired, or missing answers on an existing submission. Accepted answers
  * normally cannot be changed and should be omitted.
  *
- * A number, business identity or SMS sender registration accepts changes to any answer until its submission is approved, including
+ * A number, emergency calling service, business identity or SMS sender registration accepts changes to any answer until its submission is approved, including
  * answers awaiting review or already accepted; read `answers_editable` on the requirements. Each
  * changed answer loses its verdict and is reviewed again, and unchanged entries are ignored. When
  * Bird closed this submission and the requirements report `resubmission_allowed` with this
@@ -5337,6 +5337,10 @@ export const getWorkspaceComplianceSubmission = <
  * When a verifier requests corrections, you can replace selected accepted answers while that
  * correction remains open and before its deadline. Unchanged entries are ignored, and at least one answer must change.
  * Changed answers are reviewed again; other answers remain unchanged.
+ *
+ * After an emergency calling submission is approved, its service-address fields can also be
+ * changed without an open verifier correction. Business details are corrected through the
+ * number's ownership registration; contact support for help correcting those details.
  *
  * The answers are a legal representation under the name of the business they describe. Accepted
  * dossiers can be registered with the carrier or regulator after compliance review.
@@ -14617,7 +14621,7 @@ export const listWebhooks = <ThrowOnError extends boolean = false>(
 /**
  * Create a webhook endpoint
  *
- * Registers an `active` webhook endpoint that receives the event types in `events` as signed HTTPS `POST` requests. See the [webhooks guide](/docs/guides/webhooks) for delivery, signing, and retry behavior.
+ * Registers an `active` webhook endpoint that receives the event types in `events` as signed HTTPS `POST` requests. The call stores the endpoint, subscribes it to each event type, generates its signing secret and, for a connector destination, stores a connection holding the credentials supplied. Nothing is sent when the endpoint is created; deliveries start with the next matching event. See the [webhooks guide](/docs/guides/webhooks) for delivery, signing, and retry behavior.
  *
  * The `201` response is the only response that includes the signing secret (`whsec_` prefix). Store it immediately; if it is lost, [rotate the signing secret](/docs/api/reference/rotate-webhook-secret).
  *
@@ -14780,7 +14784,7 @@ export const rotateWebhookSecret = <ThrowOnError extends boolean = false>(
  *
  * Sends a signed synthetic event and returns whether your endpoint accepted it, its HTTP status, and the round-trip latency. An unreachable endpoint returns `status: failed` in the response body. The endpoint has 10 seconds to respond.
  *
- * The body is a minimal JSON object with the event `type` and `test: true`, signed like a real delivery. When the endpoint has a filter, `data` contains its configured equality values. It does not mirror that event's payload. Tests work on paused endpoints and do not appear in [List delivery attempts](/docs/api/reference/list-webhook-attempts).
+ * The body is a minimal JSON object with the event `type` and `test: true`, signed like a real delivery. When the endpoint has a filter, `data` contains its configured equality values. It does not mirror that event's payload. Tests work on paused endpoints and do not appear in [List delivery attempts](/docs/api/reference/list-webhook-attempts). When a test event is delivered, a `degraded` endpoint returns to `active` and its failure count resets, as after a successful live delivery; the test changes nothing else.
  *
  * For a connector endpoint, the test checks the endpoint's fields with the connected platform. Where the platform can be read without starting anything, as with Claude Managed Agents, Bird reads it instead of sending an event and returns `kind: probe`. The status, body and latency are then the platform's answer, and `delivered` means it accepted the fields, not that an event was delivered. When the platform's answer identifies a wrong field, `field` names it.
  *
@@ -15351,7 +15355,7 @@ export const createVoiceTrunk = <ThrowOnError extends boolean = false>(
 /**
  * Delete a SIP trunk
  *
- * Removes the SIP trunk. Calls already in progress on this trunk are not affected. After deletion, new calls cannot use the trunk. Historical leg records retain the trunk reference. The generated domain is not reused.
+ * Removes the SIP trunk. Calls already in progress on this trunk are not affected. Clear an attached emergency number in the dashboard before deleting the trunk. After deletion, new calls cannot use the trunk. Historical leg records retain the trunk reference. The generated domain is not reused. Deletion returns 412 if it would leave a live emergency number without a supported callback route; configure another route before deleting the trunk.
  *
  */
 export const deleteVoiceTrunk = <ThrowOnError extends boolean = false>(
@@ -15407,7 +15411,7 @@ export const getVoiceTrunk = <ThrowOnError extends boolean = false>(
 /**
  * Update a SIP trunk
  *
- * Updates a SIP trunk's `name`, access control (`ip_acls`, `allowed_api_key_ids`), and Digest algorithm offer (`digest_algorithms`). Omitted fields stay unchanged; each list, when present, replaces the previous list wholesale. An empty body or invalid list entry returns a 422 `validation_error`; a trunk outside the workspace returns a 404 `not_found_error`.
+ * Updates a SIP trunk's `name`, access control (`ip_acls`, `allowed_api_key_ids`), and Digest algorithm offer (`digest_algorithms`). Omitted fields stay unchanged; each list, when present, replaces the previous list wholesale. An empty body or invalid list entry returns a 422 `validation_error`; a trunk outside the workspace returns a 404 `not_found_error`. Turning inbound off returns 412 if it would leave a live emergency number without a supported callback route.
  *
  */
 export const updateVoiceTrunk = <ThrowOnError extends boolean = false>(
@@ -15755,6 +15759,10 @@ export const getVoiceNumber = <ThrowOnError extends boolean = false>(
  * the calls made to it, so inbound_configuration is refused on it. The label
  * can be set on either.
  *
+ * A number with a live emergency service must keep an effective route to a
+ * browser ring group or an inbound-enabled SIP trunk. A change that would
+ * leave another route returns 412.
+ *
  */
 export const updateVoiceNumber = <ThrowOnError extends boolean = false>(
   options: Options<UpdateVoiceNumberData, ThrowOnError>,
@@ -15835,6 +15843,9 @@ export const getVoiceSettings = <ThrowOnError extends boolean = false>(
  * one of your trunks returns 404. A ring_group_id that is not one of your ring
  * groups or the default group returns 422. Deleting the trunk, or
  * turning off its inbound calling, sets the default back to "reject".
+ * If a number with a live emergency service follows this default, changing it
+ * to anything other than a browser ring group or inbound-enabled SIP trunk
+ * returns 412.
  *
  * `daily_spend_limit.workspace_limit` sets your workspace's own daily spend limit. It can be
  * above or below `default_limit`, up to `max_limit`, and must be in your organization's

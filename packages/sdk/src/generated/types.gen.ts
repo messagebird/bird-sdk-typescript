@@ -209,6 +209,31 @@ export type WebhookEvent =
       type: "whatsapp_suppression.created";
     } & EventWhatsAppSuppressionCreated);
 
+/**
+ * Sort direction, ascending or descending.
+ */
+export type SortOrder = "asc" | "desc";
+
+export type Timestamps = {
+  readonly created_at: string;
+  readonly updated_at: string;
+};
+
+export type ListEnvelope = {
+  /**
+   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
+   */
+  next_cursor: string | null;
+  /**
+   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
+   */
+  prev_cursor: string | null;
+  /**
+   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
+   */
+  refresh_cursor: string | null;
+};
+
 export type ErrorDetail = {
   /**
    * Dotted field path, such as `to[0].email`, `subject`, or `.`. When the request was rejected for a query parameter the endpoint does not declare, this carries that parameter's name instead of a field path.
@@ -382,26 +407,6 @@ export type Error = {
   error: ErrorBody;
 };
 
-/**
- * Sort direction, ascending or descending.
- */
-export type SortOrder = "asc" | "desc";
-
-export type ListEnvelope = {
-  /**
-   * Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.
-   */
-  next_cursor: string | null;
-  /**
-   * Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.
-   */
-  prev_cursor: string | null;
-  /**
-   * Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.
-   */
-  refresh_cursor: string | null;
-};
-
 export type ListEnvelopeWithTotal = ListEnvelope & {
   /**
    * Total number of items matching the request's filters across all pages. Present only when `include_total=true` was passed, and omitted otherwise.
@@ -565,11 +570,6 @@ export type WorkspaceNotificationEmails = {
    * Addresses for operational notifications about this workspace (sending domain authentication failures, webhook endpoint degradation). When empty, these notifications go to the organization owners. Maximum 10 addresses.
    */
   operational?: Array<string>;
-};
-
-export type Timestamps = {
-  readonly created_at: string;
-  readonly updated_at: string;
 };
 
 export type Workspace = {
@@ -8417,7 +8417,7 @@ export type ComplianceRequirementField = {
    */
   readonly expires_at: string | null;
   /**
-   * Whether you may replace this accepted answer to correct the submission after external verification. This permission does not change its `state` or `reason`. Submit only answers whose content or attachment identity you change.
+   * Whether you may replace this accepted answer to correct the submission after external verification or update an approved emergency service address. This permission does not change its `state` or `reason`. Submit only answers whose content or attachment identity you change.
    *
    */
   readonly editable_for_verifier_repair: boolean;
@@ -9017,14 +9017,17 @@ export type AssetFolderUpdate = {
  * - `sms_sender`: a sender registered to send to one country.
  * - `number`: a phone number you hold that needs ownership paperwork before it
  *   can carry traffic.
+ * - `number_emergency`: emergency calling on a dedicated number you hold. The
+ *   subject is created by turning emergency calling on for the number.
  * - `identity`: a business you operate as, registered once and reused by
  *   later registrations that name it.
  *
  */
-export type ComplianceSubjectKind = "sms_sender" | "number" | "identity";
+export type ComplianceSubjectKind =
+  "sms_sender" | "number" | "number_emergency" | "identity";
 
 /**
- * What is being registered. For `sms_sender` this is the `scr_` id returned when you register a sender for a country. For `number` it is the `nda_` id of a dedicated number you hold, as returned by `GET /v1/numbers`. A shared short code (`nal_`) is not accepted: it is shared, so its ownership paperwork is not yours to file. For `identity` it is the `cid_` id of the party being registered, picked from the parties your workspace holds, as returned by `GET /v1/compliance/identities`.
+ * What is being registered. For `sms_sender` this is the `scr_` id returned when you register a sender for a country. For `number` it is the `nda_` id of a dedicated number you hold, as returned by `GET /v1/numbers`. For `number_emergency`, it is the `nes_` ID of the emergency service being registered. A shared short code (`nal_`) is not accepted: it is shared, so its ownership paperwork is not yours to file. For `identity` it is the `cid_` id of the party being registered, picked from the parties your workspace holds, as returned by `GET /v1/compliance/identities`.
  *
  */
 export type ComplianceSubjectId = string;
@@ -9152,7 +9155,7 @@ export type ComplianceRequirement = {
    */
   readonly review_pending: boolean;
   /**
-   * Whether you may change any answer, not only one that was refused or has gone stale. True for a number, business identity or SMS sender registration whose submission has not been approved yet, including answers awaiting review or already accepted, and for a closed submission when `resubmission_allowed` is true. An SMS sender registration goes to the carrier or registry when it is approved, so it stays editable only until then. A changed answer loses its verdict and is reviewed again. Send only the answers you change. False once the submission is approved: replace only answers in `fields` whose state is `not_supplied`, `rejected` or `expired`, or those marked `editable_for_verifier_repair`.
+   * Whether you may change any answer, not only one that was refused or has gone stale. True for a number, emergency calling service, business identity or SMS sender registration whose submission has not been approved yet, including answers awaiting review or already accepted, and for a closed submission when `resubmission_allowed` is true. An SMS sender registration goes to the carrier or registry when it is approved, so it stays editable only until then. A changed answer loses its verdict and is reviewed again. Send only the answers you change. False once the submission is approved: replace only answers in `fields` whose state is `not_supplied`, `rejected` or `expired`, or those marked `editable_for_verifier_repair`.
    *
    */
   readonly answers_editable: boolean;
@@ -9358,7 +9361,8 @@ export type ComplianceSubmission = {
  * submission; send only the ones you change. With `submission_id` null, create a new submission instead.
  *
  * When the requirements response marks an accepted answer as `editable_for_verifier_repair`,
- * you can replace it during that open correction and before its deadline. Accepted-answer
+ * you can replace it during an open correction and before its deadline, or update an
+ * approved emergency service address. Accepted-answer
  * repairs must change content; unchanged accepted entries are ignored. Rejected, expired,
  * or missing answers follow the ordinary resupply rules, including same-value retries
  * after a grant is withdrawn. Supplied replacements are reviewed again.
@@ -14683,7 +14687,7 @@ export type AmbBusinessAccountStatus =
   "pending" | "active" | "suspended" | "disconnected";
 
 /**
- * Latest review outcome recorded by Bird staff.
+ * Latest review outcome, recorded by Bird staff or Bird's automated review. Absent while the business is a draft. `approved` can come without a submission, such as for a business that Apple approved under another messaging service provider before it moved to Bird.
  */
 export type AmbBusinessAccountReviewStatus =
   "pending" | "approved" | "rejected" | (string & {});
@@ -14706,7 +14710,7 @@ export type AmbBusinessAccount = {
    */
   readonly status: AmbBusinessAccountStatus;
   /**
-   * Reason for the current operational suspension, when recorded. Review feedback is retained on the submission. May contain basic Markdown, such as emphasis and lists.
+   * Reason for the current rejection or suspension, when recorded. A rejection's feedback is here even when no submission carries it. May contain basic Markdown, such as emphasis and lists.
    */
   readonly status_reason?: string;
   /**
@@ -14726,7 +14730,7 @@ export type AmbBusinessAccount = {
    */
   readonly next?: Array<NextAction>;
   /**
-   * Latest recorded review outcome. Absent before the first submission.
+   * Latest recorded review outcome. Absent while the business is a draft.
    */
   readonly account_review_status?: AmbBusinessAccountReviewStatus;
   /**
@@ -14747,7 +14751,7 @@ export type AmbBusinessAccountEvent = {
   readonly type: string;
   readonly summary: string;
   /**
-   * Details of the change. `source` identifies who recorded it, `customer`, `staff` or `automated_review`.
+   * Details of the change. `source` identifies who recorded it, `customer`, `staff` or `automated_review`. Status, review and suspension events have `from` and `to`, and `reason` when Bird staff recorded one. An automated review event has `submission_id` instead, and its feedback is on that submission. An invitation access event has `enabled`.
    */
   readonly metadata: {
     [key: string]: unknown;
@@ -14866,7 +14870,7 @@ export type AmbBusinessAccountUpdate = {
    */
   name?: string;
   /**
-   * The Business ID Apple issued for this brand. Accepted only while the account has not yet been submitted and is connected. Updating it does not submit the business.
+   * The Business ID Apple issued for this brand. Accepted only while the account is a draft and connected, including after Bird staff return it to draft. Updating it does not submit the business.
    */
   apple_business_id?: string;
 };
@@ -23388,11 +23392,11 @@ export type Mailbox = {
    */
   readonly forwarding_address: string | null;
   /**
-   * Sender name shown alongside the address in outgoing mail. `null` when unset.
+   * Optional sender name recipients see in the From header of outgoing mail. We recommend setting it so recipients can recognize the sender. `null` when unset.
    */
   name: string | null;
   /**
-   * Name shown to your team in the dashboard and tools. Defaults to `name` when no override is set. When `name` is unset, outgoing mail uses this value as the sender name.
+   * Name shown to your team in the dashboard and tools. Defaults to `name` when no override is set.
    */
   display_name: string | null;
   /**
@@ -23473,7 +23477,7 @@ export type Mailbox = {
    */
   readonly deleted_at?: string | null;
   /**
-   * What to do next with this mailbox. The response that creates it suggests subscribing to the mail it receives. Forwarding-address setup suggests configuring the email provider. Other reads of one mailbox return an empty list, and lists omit it.
+   * What to do next with this mailbox. The response that creates it suggests subscribing to the mail it receives. Forwarding-address setup suggests configuring the email provider. Create and update responses recommend setting the sender name when it is unset. Other single-mailbox responses return an empty list, and lists omit this field.
    */
   readonly next?: Array<NextAction>;
 };
@@ -23495,11 +23499,11 @@ export type MailboxCreate = {
    */
   domain?: string;
   /**
-   * Sender name shown alongside the address in outgoing mail. Must contain a non-whitespace character and cannot contain carriage returns or line feeds.
+   * Optional sender name recipients see in the From header of outgoing mail. We recommend setting it so recipients can recognize the sender. Must contain a non-whitespace character and cannot contain carriage returns or line feeds.
    */
   name?: string;
   /**
-   * Name shown to your team in the dashboard and tools. Defaults to `name` when omitted. When `name` is unset, outgoing mail uses this value as the sender name.
+   * Name shown to your team in the dashboard and tools. Defaults to `name` when omitted.
    */
   display_name?: string;
   /**
@@ -23540,11 +23544,11 @@ export type MailboxIdentifier = string;
  */
 export type MailboxUpdate = {
   /**
-   * Sender name shown alongside the address in outgoing mail. Must contain a non-whitespace character and cannot contain carriage returns or line feeds. `null` clears it.
+   * Optional sender name recipients see in the From header of outgoing mail. We recommend setting it so recipients can recognize the sender. Must contain a non-whitespace character and cannot contain carriage returns or line feeds. `null` clears it.
    */
   name?: string | null;
   /**
-   * Name shown to your team in the dashboard and tools. `null` clears the override and uses `name`. When `name` is unset, outgoing mail uses this value as the sender name.
+   * Name shown to your team in the dashboard and tools. `null` clears the override and uses `name`.
    */
   display_name?: string | null;
   /**
@@ -26952,7 +26956,7 @@ export type EventVoiceCallAnswered = {
 export type EventVoiceCallEndedData = EventVoiceBase & {
   status: VoiceCallStatus;
   /**
-   * Final SIP response code received from the carrier. Null when no SIP response was received, for example on timeout or DNS failure.
+   * Final SIP response code for the leg, including a Bird refusal. Null when no SIP response was received, for example on timeout or DNS failure.
    */
   sip_response_code: number | null;
   /**
@@ -27932,12 +27936,21 @@ export type VoiceSessionCredential = {
  *   your account allows. Wait for one to end or ask support to raise the limit.
  * - `calls_per_second_exceeded`: You placed legs faster than your account
  *   allows. Reduce your dialing rate and retry.
+ * - `sequence_paused`: The sequence receiving this call is paused. Resume it
+ *   to receive calls.
+ * - `sequence_archived`: The sequence receiving this call is archived. Route
+ *   the number to an available sequence.
+ * - `sequence_unpublished`: The sequence receiving this call has no active
+ *   publication. Publish it to receive calls.
  *
- * - `emergency_number_inactive`: The trunk's emergency number does not have an
- *   active emergency service. If the service is pending, wait for it to become
- *   active. If it needs changes, finish the filing it is waiting on. If it was
- *   rejected or canceled, the number needs a new emergency service, or the trunk
- *   needs a different emergency number.
+ * - `emergency_number_inactive`: The trunk's emergency number is not active, or
+ *   the workspace has no active emergency site for a browser call. Set up an
+ *   emergency site if needed. If the service is pending, wait for activation.
+ *   If it needs changes, complete the filing. If it was rejected or canceled,
+ *   start a new service or choose another emergency number.
+ * - `emergency_country_mismatch`: The dialed emergency number is not recognised
+ *   in the configured emergency site's country. Dial an emergency number for
+ *   that country or use another line.
  * - `emergency_cap_exceeded`: The trunk already carries 10 emergency calls.
  *   The 11th is refused until one ends.
  *
@@ -27967,7 +27980,11 @@ export type VoiceLegRejectionReason =
   | "calls_per_second_exceeded"
   | "call_not_permitted"
   | "number_ownership_not_verified"
+  | "sequence_paused"
+  | "sequence_archived"
+  | "sequence_unpublished"
   | "emergency_number_inactive"
+  | "emergency_country_mismatch"
   | "emergency_cap_exceeded"
   | "emergency_carrier_unavailable"
   | (string & {});
@@ -28031,16 +28048,16 @@ export type VoiceSequenceNodeId = string;
 
 export type VoiceLegInboundRouteSequence = {
   /**
-   * The leg was handled by one of your sequences.
+   * The selected route points to one of your sequences.
    */
   type: VoiceLegInboundRouteType;
   /**
-   * The sequence that handled the leg. Recorded as it was at the time, so it may name a sequence you have since changed or deleted.
+   * The sequence selected for the leg. Recorded as it was at the time, so it may name a sequence you have since changed or deleted. A refused leg may have no sequence run.
    *
    */
   sequence_id: VoiceSequenceId;
   /**
-   * The entry the leg started from in the publication that handled it. Recorded as it was at the time, so it may name an entry the sequence no longer has.
+   * The selected entry. Recorded as it was at the time, so it may name an entry the sequence no longer has; selection does not mean a run was admitted.
    *
    */
   entry_node_id: VoiceSequenceNodeId;
@@ -28235,17 +28252,20 @@ export type VoiceLeg = {
   readonly sip_call_id?: string;
   readonly status: VoiceCallStatus;
   /**
-   * Final SIP response code received from the carrier. `null` when no SIP response was received, for example on timeout or DNS failure.
+   * Final SIP response code for the leg. `null` when no SIP response was received, for example on timeout or DNS failure.
    */
   readonly sip_response_code?: number | null;
   /**
-   * Why we rejected the leg. Absent on connected legs and legs rejected
+   * Why we rejected the leg. Sequence-state reasons require
+   * `voice_management:read`; the field is absent without that permission.
+   * Also absent on connected legs and legs rejected
    * by the carrier or recipient. For carrier or recipient rejections, see
    * `sip_response_code`; a `6xx` decline gives the leg a `rejected` status.
    *
-   * Read alongside `route` when present. A refusal caused by the number's
-   * configuration has no rejection reason; the route records that
-   * configuration.
+   * Read alongside `route` when present. A number's own configured rejection
+   * has no rejection reason; the route records that configuration. An
+   * unavailable sequence has a reason identifying its state when you have
+   * that permission.
    *
    */
   readonly rejection_reason?: VoiceLegRejectionReason;
@@ -29031,7 +29051,7 @@ export type VoiceTrunkUpdate = {
    */
   outbound_enabled?: boolean;
   /**
-   * Whether this trunk may receive calls. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. The gateways remain configured. Omit the field to leave it unchanged.
+   * Whether this trunk may receive calls. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. Clear an attached emergency number in the dashboard before turning inbound off. The gateways remain configured. Omit the field to leave it unchanged.
    *
    */
   inbound_enabled?: boolean;
@@ -35899,11 +35919,11 @@ export type InboundAttachmentListWritable = {
  */
 export type MailboxWritable = {
   /**
-   * Sender name shown alongside the address in outgoing mail. `null` when unset.
+   * Optional sender name recipients see in the From header of outgoing mail. We recommend setting it so recipients can recognize the sender. `null` when unset.
    */
   name: string | null;
   /**
-   * Name shown to your team in the dashboard and tools. Defaults to `name` when no override is set. When `name` is unset, outgoing mail uses this value as the sender name.
+   * Name shown to your team in the dashboard and tools. Defaults to `name` when no override is set.
    */
   display_name: string | null;
   /**
@@ -37951,9 +37971,14 @@ export type EndingBefore = string;
 export type OrderDesc = SortOrder;
 
 /**
- * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+ * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
  */
-export type IncludeTotal = boolean;
+export type XWorkspaceId = string;
+
+/**
+ * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+ */
+export type XOrganizationId = string;
 
 /**
  * Client-supplied key. On operations supporting request deduplication, a retained
@@ -37981,14 +38006,9 @@ export type IncludeTotal = boolean;
 export type IdempotencyKey = string;
 
 /**
- * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+ * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
  */
-export type XWorkspaceId = string;
-
-/**
- * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
- */
-export type XOrganizationId = string;
+export type IncludeTotal = boolean;
 
 /**
  * Sort direction. Defaults to `asc`, which sorts alphabetically or from oldest to newest, depending on the selected sort field.
@@ -48029,7 +48049,7 @@ export type GetWorkspaceComplianceRequirementsData = {
      */
     subject_kind: ComplianceSubjectKind;
     /**
-     * The registration to answer for. Omit it to read the form on its own, before you hold anything to register: the requirements come back unanswered, which is what to do when you are deciding whether to take a number or a sender on in the first place. Omitting it makes `program` required, since the coordinate is otherwise resolved from the subject. When you do supply it, it is an `scr_` id when `subject_kind` is `sms_sender`, an `nda_` id when it is `number`, and a `cid_` party id when it is `identity`.
+     * The registration to answer for. Omit it to read the form on its own, before you hold anything to register: the requirements come back unanswered, which is what to do when you are deciding whether to take a number or a sender on in the first place. Omitting it makes `program` required, since the coordinate is otherwise resolved from the subject. When you do supply it, it is an `scr_` id when `subject_kind` is `sms_sender`, an `nda_` id when it is `number`, an `nes_` id when it is `number_emergency`, and a `cid_` party id when it is `identity`.
      */
     subject_id?: ComplianceSubjectId;
     /**
@@ -72461,6 +72481,11 @@ export type ListWorkspaceNumbersErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type ListWorkspaceNumbersError =
@@ -73053,6 +73078,11 @@ export type GetWorkspaceNumberErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type GetWorkspaceNumberError =
@@ -73653,6 +73683,10 @@ export type DeleteVoiceTrunkErrors = {
    * Resource conflict
    */
   409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
@@ -74626,6 +74660,10 @@ export type UpdateVoiceNumberErrors = {
    * Resource conflict
    */
   409: Error;
+  /**
+   * Precondition failed
+   */
+  412: Error;
   /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *

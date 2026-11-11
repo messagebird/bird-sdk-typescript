@@ -294,6 +294,60 @@ export const WebhookEventSchema = {
   },
 } as const;
 
+export const SortOrderSchema = {
+  type: "string",
+  enum: ["asc", "desc"],
+  description: "Sort direction, ascending or descending.",
+} as const;
+
+export const TimestampsSchema = {
+  type: "object",
+  required: ["created_at", "updated_at"],
+  properties: {
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      example: "2026-05-20T09:14:52Z",
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      example: "2026-05-25T16:42:01Z",
+    },
+  },
+} as const;
+
+export const _ListEnvelopeSchema = {
+  type: "object",
+  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
+  properties: {
+    next_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
+    },
+    prev_cursor: {
+      type: ["string", "null"],
+      description:
+        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
+      example: null,
+    },
+    refresh_cursor: {
+      type: ["string", "null"],
+      description:
+        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
+      example:
+        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
+    },
+  },
+} as const;
+
 export const ErrorDetailSchema = {
   type: "object",
   additionalProperties: false,
@@ -530,39 +584,6 @@ export const ErrorSchema = {
   properties: {
     error: {
       $ref: "#/components/schemas/ErrorBody",
-    },
-  },
-} as const;
-
-export const SortOrderSchema = {
-  type: "string",
-  enum: ["asc", "desc"],
-  description: "Sort direction, ascending or descending.",
-} as const;
-
-export const _ListEnvelopeSchema = {
-  type: "object",
-  required: ["next_cursor", "prev_cursor", "refresh_cursor"],
-  properties: {
-    next_cursor: {
-      type: ["string", "null"],
-      description:
-        "Cursor for the next page. Pass back as `starting_after` to advance forward. `null` when no next page exists.",
-      example:
-        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE0OjAzOjEwWlwiIiwiaSI6IjAxOTJmM2IxLTRjN2UtN2EyYi05ZDYxLThmM2E1YzJlN2I0MCJ9",
-    },
-    prev_cursor: {
-      type: ["string", "null"],
-      description:
-        "Cursor for the previous page. Pass back as `ending_before` to step backward. `null` when no previous page exists.",
-      example: null,
-    },
-    refresh_cursor: {
-      type: ["string", "null"],
-      description:
-        "Refresh anchor, the first row of this response. Pass back as `ending_before` to fetch what precedes it in the current sort order. On a newest-first sort those are the items that have appeared since; on any other sort they are the items that sort earlier, so refreshing such a list means re-fetching it instead. Non-`null` whenever `data` is non-empty; `null` only on an empty page. Distinct from `prev_cursor`.",
-      example:
-        "eyJ2IjoxLCJzIjoiXCIyMDI2LTA1LTI1VDE2OjQyOjAxWlwiIiwiaSI6IjAxOTJmM2IxLTllMDQtN2NkMy1iODE3LTJhNmY0ZDFjOGUwOSJ9",
     },
   },
 } as const;
@@ -871,27 +892,6 @@ export const WorkspaceNotificationEmailsSchema = {
       example: ["alerts@example.com"],
       description:
         "Addresses for operational notifications about this workspace (sending domain authentication failures, webhook endpoint degradation). When empty, these notifications go to the organization owners. Maximum 10 addresses.",
-    },
-  },
-} as const;
-
-export const TimestampsSchema = {
-  type: "object",
-  required: ["created_at", "updated_at"],
-  properties: {
-    created_at: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      readOnly: true,
-      example: "2026-05-20T09:14:52Z",
-    },
-    updated_at: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      readOnly: true,
-      example: "2026-05-25T16:42:01Z",
     },
   },
 } as const;
@@ -14934,7 +14934,7 @@ export const ComplianceRequirementFieldSchema = {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether you may replace this accepted answer to correct the submission after external verification. This permission does not change its `state` or `reason`. Submit only answers whose content or attachment identity you change.\n",
+        "Whether you may replace this accepted answer to correct the submission after external verification or update an approved emergency service address. This permission does not change its `state` or `reason`. Submit only answers whose content or attachment identity you change.\n",
     },
     reason: {
       type: ["string", "null"],
@@ -16166,18 +16166,18 @@ export const AssetFolderUpdateSchema = {
 export const ComplianceSubjectKindSchema = {
   type: "string",
   minLength: 1,
-  enum: ["sms_sender", "number", "identity"],
+  enum: ["sms_sender", "number", "number_emergency", "identity"],
   description:
-    "What is being registered.\n\n- `sms_sender`: a sender registered to send to one country.\n- `number`: a phone number you hold that needs ownership paperwork before it\n  can carry traffic.\n- `identity`: a business you operate as, registered once and reused by\n  later registrations that name it.\n",
+    "What is being registered.\n\n- `sms_sender`: a sender registered to send to one country.\n- `number`: a phone number you hold that needs ownership paperwork before it\n  can carry traffic.\n- `number_emergency`: emergency calling on a dedicated number you hold. The\n  subject is created by turning emergency calling on for the number.\n- `identity`: a business you operate as, registered once and reused by\n  later registrations that name it.\n",
 } as const;
 
 export const ComplianceSubjectIDSchema = {
   type: "string",
   minLength: 1,
-  pattern: "^(scr|nda|cid)_[0-9a-hjkmnp-tv-z]{26}$",
+  pattern: "^(scr|nda|nes|cid)_[0-9a-hjkmnp-tv-z]{26}$",
   example: "scr_01krdgeqcxet5s7t44vh8rt9mg",
   description:
-    "What is being registered. For `sms_sender` this is the `scr_` id returned when you register a sender for a country. For `number` it is the `nda_` id of a dedicated number you hold, as returned by `GET /v1/numbers`. A shared short code (`nal_`) is not accepted: it is shared, so its ownership paperwork is not yours to file. For `identity` it is the `cid_` id of the party being registered, picked from the parties your workspace holds, as returned by `GET /v1/compliance/identities`.\n",
+    "What is being registered. For `sms_sender` this is the `scr_` id returned when you register a sender for a country. For `number` it is the `nda_` id of a dedicated number you hold, as returned by `GET /v1/numbers`. For `number_emergency`, it is the `nes_` ID of the emergency service being registered. A shared short code (`nal_`) is not accepted: it is shared, so its ownership paperwork is not yours to file. For `identity` it is the `cid_` id of the party being registered, picked from the parties your workspace holds, as returned by `GET /v1/compliance/identities`.\n",
 } as const;
 
 export const ComplianceProgramSchema = {
@@ -16369,7 +16369,7 @@ export const ComplianceRequirementSchema = {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether you may change any answer, not only one that was refused or has gone stale. True for a number, business identity or SMS sender registration whose submission has not been approved yet, including answers awaiting review or already accepted, and for a closed submission when `resubmission_allowed` is true. An SMS sender registration goes to the carrier or registry when it is approved, so it stays editable only until then. A changed answer loses its verdict and is reviewed again. Send only the answers you change. False once the submission is approved: replace only answers in `fields` whose state is `not_supplied`, `rejected` or `expired`, or those marked `editable_for_verifier_repair`.\n",
+        "Whether you may change any answer, not only one that was refused or has gone stale. True for a number, emergency calling service, business identity or SMS sender registration whose submission has not been approved yet, including answers awaiting review or already accepted, and for a closed submission when `resubmission_allowed` is true. An SMS sender registration goes to the carrier or registry when it is approved, so it stays editable only until then. A changed answer loses its verdict and is reviewed again. Send only the answers you change. False once the submission is approved: replace only answers in `fields` whose state is `not_supplied`, `rejected` or `expired`, or those marked `editable_for_verifier_repair`.\n",
     },
     resubmission_allowed: {
       type: "boolean",
@@ -16822,7 +16822,7 @@ export const ComplianceSubmissionResupplySchema = {
   additionalProperties: false,
   required: ["answers"],
   description:
-    "Replacement answers for an existing submission. Rejected, expired, or missing answers can\nbe supplied again; accepted answers normally cannot be changed. While the requirements\nresponse reports `answers_editable` with a `submission_id`, you can change any answer on that\nsubmission; send only the ones you change. With `submission_id` null, create a new submission instead.\n\nWhen the requirements response marks an accepted answer as `editable_for_verifier_repair`,\nyou can replace it during that open correction and before its deadline. Accepted-answer\nrepairs must change content; unchanged accepted entries are ignored. Rejected, expired,\nor missing answers follow the ordinary resupply rules, including same-value retries\nafter a grant is withdrawn. Supplied replacements are reviewed again.\n",
+    "Replacement answers for an existing submission. Rejected, expired, or missing answers can\nbe supplied again; accepted answers normally cannot be changed. While the requirements\nresponse reports `answers_editable` with a `submission_id`, you can change any answer on that\nsubmission; send only the ones you change. With `submission_id` null, create a new submission instead.\n\nWhen the requirements response marks an accepted answer as `editable_for_verifier_repair`,\nyou can replace it during an open correction and before its deadline, or update an\napproved emergency service address. Accepted-answer\nrepairs must change content; unchanged accepted entries are ignored. Rejected, expired,\nor missing answers follow the ordinary resupply rules, including same-value retries\nafter a grant is withdrawn. Supplied replacements are reviewed again.\n",
   properties: {
     answers: {
       type: "array",
@@ -26325,7 +26325,8 @@ export const AMBBusinessAccountReviewStatusSchema = {
   type: "string",
   minLength: 1,
   "x-extensible-enum": ["pending", "approved", "rejected"],
-  description: "Latest review outcome recorded by Bird staff.",
+  description:
+    "Latest review outcome, recorded by Bird staff or Bird's automated review. Absent while the business is a draft. `approved` can come without a submission, such as for a business that Apple approved under another messaging service provider before it moved to Bird.",
   example: "approved",
 } as const;
 
@@ -26372,7 +26373,7 @@ export const AMBBusinessAccountSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "Reason for the current operational suspension, when recorded. Review feedback is retained on the submission. May contain basic Markdown, such as emphasis and lists.",
+        "Reason for the current rejection or suspension, when recorded. A rejection's feedback is here even when no submission carries it. May contain basic Markdown, such as emphasis and lists.",
     },
     invitations_enabled: {
       type: "boolean",
@@ -26410,7 +26411,7 @@ export const AMBBusinessAccountSchema = {
       $ref: "#/components/schemas/AMBBusinessAccountReviewStatus",
       readOnly: true,
       description:
-        "Latest recorded review outcome. Absent before the first submission.",
+        "Latest recorded review outcome. Absent while the business is a draft.",
     },
     finish_setup_url: {
       type: "string",
@@ -26468,7 +26469,7 @@ export const AMBBusinessAccountEventSchema = {
       additionalProperties: true,
       readOnly: true,
       description:
-        "Details of the change. `source` identifies who recorded it, `customer`, `staff` or `automated_review`.",
+        "Details of the change. `source` identifies who recorded it, `customer`, `staff` or `automated_review`. Status, review and suspension events have `from` and `to`, and `reason` when Bird staff recorded one. An automated review event has `submission_id` instead, and its feedback is on that submission. An invitation access event has `enabled`.",
     },
     created_at: {
       type: "string",
@@ -26731,7 +26732,7 @@ export const AMBBusinessAccountUpdateSchema = {
       format: "uuid",
       minLength: 1,
       description:
-        "The Business ID Apple issued for this brand. Accepted only while the account has not yet been submitted and is connected. Updating it does not submit the business.",
+        "The Business ID Apple issued for this brand. Accepted only while the account is a draft and connected, including after Bird staff return it to draft. Updating it does not submit the business.",
       example: "b52d6267-2b62-4f8a-8842-0533d0f1dc07",
     },
   },
@@ -42134,14 +42135,14 @@ export const MailboxSchema = {
       type: ["string", "null"],
       maxLength: 255,
       description:
-        "Sender name shown alongside the address in outgoing mail. `null` when unset.",
+        "Optional sender name recipients see in the From header of outgoing mail. We recommend setting it so recipients can recognize the sender. `null` when unset.",
       example: "Acme Concierge",
     },
     display_name: {
       type: ["string", "null"],
       maxLength: 255,
       description:
-        "Name shown to your team in the dashboard and tools. Defaults to `name` when no override is set. When `name` is unset, outgoing mail uses this value as the sender name.",
+        "Name shown to your team in the dashboard and tools. Defaults to `name` when no override is set.",
       example: "Customer Support",
     },
     default_reply_to: {
@@ -42258,7 +42259,7 @@ export const MailboxSchema = {
       type: "array",
       readOnly: true,
       description:
-        "What to do next with this mailbox. The response that creates it suggests subscribing to the mail it receives. Forwarding-address setup suggests configuring the email provider. Other reads of one mailbox return an empty list, and lists omit it.",
+        "What to do next with this mailbox. The response that creates it suggests subscribing to the mail it receives. Forwarding-address setup suggests configuring the email provider. Create and update responses recommend setting the sender name when it is unset. Other single-mailbox responses return an empty list, and lists omit this field.",
       items: {
         $ref: "#/components/schemas/NextAction",
       },
@@ -42314,14 +42315,14 @@ export const MailboxCreateSchema = {
       minLength: 1,
       maxLength: 255,
       description:
-        "Sender name shown alongside the address in outgoing mail. Must contain a non-whitespace character and cannot contain carriage returns or line feeds.",
+        "Optional sender name recipients see in the From header of outgoing mail. We recommend setting it so recipients can recognize the sender. Must contain a non-whitespace character and cannot contain carriage returns or line feeds.",
     },
     display_name: {
       type: "string",
       minLength: 1,
       maxLength: 255,
       description:
-        "Name shown to your team in the dashboard and tools. Defaults to `name` when omitted. When `name` is unset, outgoing mail uses this value as the sender name.",
+        "Name shown to your team in the dashboard and tools. Defaults to `name` when omitted.",
       example: "Acme Concierge",
     },
     default_reply_to: {
@@ -42380,13 +42381,13 @@ export const MailboxUpdateSchema = {
       minLength: 1,
       maxLength: 255,
       description:
-        "Sender name shown alongside the address in outgoing mail. Must contain a non-whitespace character and cannot contain carriage returns or line feeds. `null` clears it.",
+        "Optional sender name recipients see in the From header of outgoing mail. We recommend setting it so recipients can recognize the sender. Must contain a non-whitespace character and cannot contain carriage returns or line feeds. `null` clears it.",
     },
     display_name: {
       type: ["string", "null"],
       maxLength: 255,
       description:
-        "Name shown to your team in the dashboard and tools. `null` clears the override and uses `name`. When `name` is unset, outgoing mail uses this value as the sender name.",
+        "Name shown to your team in the dashboard and tools. `null` clears the override and uses `name`.",
     },
     default_reply_to: {
       type: ["string", "null"],
@@ -48656,7 +48657,7 @@ export const EventVoiceCallEndedDataSchema = {
           type: ["integer", "null"],
           minimum: 100,
           description:
-            "Final SIP response code received from the carrier. Null when no SIP response was received, for example on timeout or DNS failure.",
+            "Final SIP response code for the leg, including a Bird refusal. Null when no SIP response was received, for example on timeout or DNS failure.",
           example: 200,
         },
         duration_ms: {
@@ -50333,12 +50334,16 @@ export const VoiceLegRejectionReasonSchema = {
     "calls_per_second_exceeded",
     "call_not_permitted",
     "number_ownership_not_verified",
+    "sequence_paused",
+    "sequence_archived",
+    "sequence_unpublished",
     "emergency_number_inactive",
+    "emergency_country_mismatch",
     "emergency_cap_exceeded",
     "emergency_carrier_unavailable",
   ],
   description:
-    "Why we rejected the leg. Use `rejection_reason` to identify the cause;\n`sip_response_code` alone cannot distinguish these reasons. Treat an\nunrecognized value as a reason added later.\n\nYou can resolve these issues:\n\n- `source_not_allowed`: The leg came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it or use a verified caller ID.\n- `number_ownership_not_verified`: The ownership documents for this purchased\n  number have not yet been accepted under its country's requirements. We\n  block outgoing and incoming legs on the number until verification is\n  complete. Blocked incoming legs never reach your PBX, and their route type\n  is `reject` regardless of the number's configuration. Open the number\n  under **Numbers** and complete its ownership requirements, then retry\n  the leg.\n- `destination_not_enabled`: Calling to this destination country is disabled.\n  Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet balance was too low for the leg.\n  Top up or enable automatic top-ups.\n- `daily_spend_exceeded`: The leg would exceed your organization's daily\n  voice spend limit. Retry after the limit resets at the start of the next\n  UTC day.\n- `concurrent_calls_exceeded`: You already have as many legs in progress as\n  your account allows. Wait for one to end or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed legs faster than your account\n  allows. Reduce your dialing rate and retry.\n\n- `emergency_number_inactive`: The trunk's emergency number does not have an\n  active emergency service. If the service is pending, wait for it to become\n  active. If it needs changes, finish the filing it is waiting on. If it was\n  rejected or canceled, the number needs a new emergency service, or the trunk\n  needs a different emergency number.\n- `emergency_cap_exceeded`: The trunk already carries 10 emergency calls.\n  The 11th is refused until one ends.\n\nFor all other reasons, contact support and provide the leg `id`:\n\n- `routing_not_configured`: This trunk has no dial plan, which can happen on\n  a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The leg could not be priced for your account.\n- `emergency_carrier_unavailable`: No carrier we use accepts emergency calls\n  from the trunk's emergency number.\n",
+    "Why we rejected the leg. Use `rejection_reason` to identify the cause;\n`sip_response_code` alone cannot distinguish these reasons. Treat an\nunrecognized value as a reason added later.\n\nYou can resolve these issues:\n\n- `source_not_allowed`: The leg came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it or use a verified caller ID.\n- `number_ownership_not_verified`: The ownership documents for this purchased\n  number have not yet been accepted under its country's requirements. We\n  block outgoing and incoming legs on the number until verification is\n  complete. Blocked incoming legs never reach your PBX, and their route type\n  is `reject` regardless of the number's configuration. Open the number\n  under **Numbers** and complete its ownership requirements, then retry\n  the leg.\n- `destination_not_enabled`: Calling to this destination country is disabled.\n  Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet balance was too low for the leg.\n  Top up or enable automatic top-ups.\n- `daily_spend_exceeded`: The leg would exceed your organization's daily\n  voice spend limit. Retry after the limit resets at the start of the next\n  UTC day.\n- `concurrent_calls_exceeded`: You already have as many legs in progress as\n  your account allows. Wait for one to end or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed legs faster than your account\n  allows. Reduce your dialing rate and retry.\n- `sequence_paused`: The sequence receiving this call is paused. Resume it\n  to receive calls.\n- `sequence_archived`: The sequence receiving this call is archived. Route\n  the number to an available sequence.\n- `sequence_unpublished`: The sequence receiving this call has no active\n  publication. Publish it to receive calls.\n\n- `emergency_number_inactive`: The trunk's emergency number is not active, or\n  the workspace has no active emergency site for a browser call. Set up an\n  emergency site if needed. If the service is pending, wait for activation.\n  If it needs changes, complete the filing. If it was rejected or canceled,\n  start a new service or choose another emergency number.\n- `emergency_country_mismatch`: The dialed emergency number is not recognised\n  in the configured emergency site's country. Dial an emergency number for\n  that country or use another line.\n- `emergency_cap_exceeded`: The trunk already carries 10 emergency calls.\n  The 11th is refused until one ends.\n\nFor all other reasons, contact support and provide the leg `id`:\n\n- `routing_not_configured`: This trunk has no dial plan, which can happen on\n  a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The leg could not be priced for your account.\n- `emergency_carrier_unavailable`: No carrier we use accepts emergency calls\n  from the trunk's emergency number.\n",
   example: "destination_not_enabled",
 } as const;
 
@@ -50454,7 +50459,7 @@ export const VoiceLegInboundRouteSequenceSchema = {
     type: {
       $ref: "#/components/schemas/VoiceLegInboundRouteType",
       const: "sequence",
-      description: "The leg was handled by one of your sequences.",
+      description: "The selected route points to one of your sequences.",
     },
     sequence_id: {
       allOf: [
@@ -50463,7 +50468,7 @@ export const VoiceLegInboundRouteSequenceSchema = {
         },
       ],
       description:
-        "The sequence that handled the leg. Recorded as it was at the time, so it may name a sequence you have since changed or deleted.\n",
+        "The sequence selected for the leg. Recorded as it was at the time, so it may name a sequence you have since changed or deleted. A refused leg may have no sequence run.\n",
     },
     entry_node_id: {
       allOf: [
@@ -50472,7 +50477,7 @@ export const VoiceLegInboundRouteSequenceSchema = {
         },
       ],
       description:
-        "The entry the leg started from in the publication that handled it. Recorded as it was at the time, so it may name an entry the sequence no longer has.\n",
+        "The selected entry. Recorded as it was at the time, so it may name an entry the sequence no longer has; selection does not mean a run was admitted.\n",
     },
   },
 } as const;
@@ -50846,7 +50851,7 @@ export const VoiceLegSchema = {
       type: ["integer", "null"],
       minimum: 100,
       description:
-        "Final SIP response code received from the carrier. `null` when no SIP response was received, for example on timeout or DNS failure.",
+        "Final SIP response code for the leg. `null` when no SIP response was received, for example on timeout or DNS failure.",
       example: 200,
     },
     rejection_reason: {
@@ -50857,7 +50862,7 @@ export const VoiceLegSchema = {
         },
       ],
       description:
-        "Why we rejected the leg. Absent on connected legs and legs rejected\nby the carrier or recipient. For carrier or recipient rejections, see\n`sip_response_code`; a `6xx` decline gives the leg a `rejected` status.\n\nRead alongside `route` when present. A refusal caused by the number's\nconfiguration has no rejection reason; the route records that\nconfiguration.\n",
+        "Why we rejected the leg. Sequence-state reasons require\n`voice_management:read`; the field is absent without that permission.\nAlso absent on connected legs and legs rejected\nby the carrier or recipient. For carrier or recipient rejections, see\n`sip_response_code`; a `6xx` decline gives the leg a `rejected` status.\n\nRead alongside `route` when present. A number's own configured rejection\nhas no rejection reason; the route records that configuration. An\nunavailable sequence has a reason identifying its state when you have\nthat permission.\n",
     },
     route: {
       readOnly: true,
@@ -52330,7 +52335,7 @@ export const VoiceTrunkUpdateSchema = {
     inbound_enabled: {
       type: "boolean",
       description:
-        "Whether this trunk may receive calls. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. The gateways remain configured. Omit the field to leave it unchanged.\n",
+        "Whether this trunk may receive calls. Turning it off resets number routes that use this trunk to reject incoming calls. Turning it back on does not restore those routes. Clear an attached emergency number in the dashboard before turning inbound off. The gateways remain configured. Omit the field to leave it unchanged.\n",
       example: true,
     },
     media_bypass: {
@@ -65126,14 +65131,14 @@ export const MailboxWritableSchema = {
       type: ["string", "null"],
       maxLength: 255,
       description:
-        "Sender name shown alongside the address in outgoing mail. `null` when unset.",
+        "Optional sender name recipients see in the From header of outgoing mail. We recommend setting it so recipients can recognize the sender. `null` when unset.",
       example: "Acme Concierge",
     },
     display_name: {
       type: ["string", "null"],
       maxLength: 255,
       description:
-        "Name shown to your team in the dashboard and tools. Defaults to `name` when no override is set. When `name` is unset, outgoing mail uses this value as the sender name.",
+        "Name shown to your team in the dashboard and tools. Defaults to `name` when no override is set.",
       example: "Customer Support",
     },
     default_reply_to: {

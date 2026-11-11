@@ -1183,11 +1183,15 @@ export const VoiceLegRejectionReason = {
   DestinationNotEnabled: "destination_not_enabled",
   EmergencyCapExceeded: "emergency_cap_exceeded",
   EmergencyCarrierUnavailable: "emergency_carrier_unavailable",
+  EmergencyCountryMismatch: "emergency_country_mismatch",
   EmergencyNumberInactive: "emergency_number_inactive",
   InsufficientBalance: "insufficient_balance",
   NoRouteFound: "no_route_found",
   NumberOwnershipNotVerified: "number_ownership_not_verified",
   RoutingNotConfigured: "routing_not_configured",
+  SequenceArchived: "sequence_archived",
+  SequencePaused: "sequence_paused",
+  SequenceUnpublished: "sequence_unpublished",
   SourceNotAllowed: "source_not_allowed",
 } as const;
 
