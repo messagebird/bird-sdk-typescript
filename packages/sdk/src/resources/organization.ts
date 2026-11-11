@@ -1,5 +1,5 @@
 import { Resource } from "./base.js";
-import { OrganizationWorkspacesResource } from "./organizationWorkspaces.gen.js";
+import { OrganizationWorkspacesResource } from "./organizationWorkspaces.js";
 
 export class OrganizationResource extends Resource {
   readonly workspaces: OrganizationWorkspacesResource;

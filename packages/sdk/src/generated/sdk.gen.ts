@@ -145,6 +145,9 @@ import type {
   CreateNumbersOrderData,
   CreateNumbersOrderErrors,
   CreateNumbersOrderResponses,
+  CreateOrganizationWorkspaceWhatsAppNumberData,
+  CreateOrganizationWorkspaceWhatsAppNumberErrors,
+  CreateOrganizationWorkspaceWhatsAppNumberResponses,
   CreatePhoneNumberLookupData,
   CreatePhoneNumberLookupErrors,
   CreatePhoneNumberLookupResponses,
@@ -1666,6 +1669,62 @@ export const updateOrganizationWorkspace = <
       },
     ],
     url: "/v1/organization/workspaces/{workspace_id}",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Connect a number from your multi-partner solution
+ *
+ * Connects a number that your own Embedded Signup onboarded through your
+ * multi-partner solution with Bird. Bird confirms that the WhatsApp Business
+ * Account came through your solution and holds the number, then sets the
+ * number up in the workspace you name. Checking that your customer owns the
+ * account is up to you.
+ *
+ * Setup continues in the background. Poll the returned number in the same
+ * workspace, which an organization credential has to select explicitly. It
+ * can send once its status is `connected`, and
+ * `failed` means setup stopped, with `error` saying why. Calling
+ * again for a number already connected in the workspace runs its setup again,
+ * and the number cannot send until it reconnects.
+ *
+ * Call it with an organization credential: a master key, or a signed-in
+ * owner or organization admin. A workspace API key or a workspace member
+ * gets a 403. Only organizations with an active multi-partner solution can
+ * call this.
+ * An organization not enabled for multi-partner solutions gets a 403 and
+ * connects numbers with Embedded Signup in the Bird dashboard. An enabled one
+ * whose solution is not active, because it has none yet or Bird is still
+ * reviewing it, gets a 409.
+ *
+ */
+export const createOrganizationWorkspaceWhatsAppNumber = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<CreateOrganizationWorkspaceWhatsAppNumberData, ThrowOnError>,
+): RequestResult<
+  CreateOrganizationWorkspaceWhatsAppNumberResponses,
+  CreateOrganizationWorkspaceWhatsAppNumberErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateOrganizationWorkspaceWhatsAppNumberResponses,
+    CreateOrganizationWorkspaceWhatsAppNumberErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/organization/workspaces/{workspace_id}/whatsapp/numbers",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -4620,7 +4679,7 @@ export const getComplianceAttachment = <ThrowOnError extends boolean = false>(
 /**
  * Create a media-library upload session
  *
- * Creates or recovers a session. An upload instruction is omitted when the session is no longer pending or another instruction was issued within the last 30 seconds; follow the returned state and next steps. Repeating the same client reference with identical input recovers its original session. A changed request with that reference is refused. Upload instructions can be refreshed after 30 seconds. Creating a session does not publish the file. Completion publishes it at a permanent public URL.
+ * Creates or recovers a session. An upload instruction is omitted when the session is no longer pending or another instruction was issued within the last 30 seconds; follow the returned state and next steps. Repeating the same client reference with identical input recovers its original session, including the active file descriptor if a browser selection changed it. A changed request with that reference is refused. Upload instructions can be refreshed after 30 seconds. Creating a session does not publish the file. Completion publishes it at a permanent public URL.
  *
  * In each region, you can have up to 20 unexpired sessions per workspace, 100 per organization, and 500 MiB of reserved source bytes per organization. A new session reserves `file.size_bytes`; a request that would exceed a limit returns `429` with `E20021`. Replaying an existing session does not reserve capacity again.
  *
@@ -4673,7 +4732,7 @@ export const getAssetUploadSession = <ThrowOnError extends boolean = false>(
 /**
  * Refresh a media-library upload instruction
  *
- * Refreshes the temporary upload instruction for a pending session. File properties and the one-hour session deadline remain unchanged. No replacement file or metadata is accepted.
+ * Refreshes the temporary upload instruction for a pending session. File properties and the one-hour session deadline remain unchanged. This operation accepts no replacement file or metadata; an authorized browser may have selected a different source since creation. Use the returned file descriptor.
  */
 export const createAssetUploadInstruction = <
   ThrowOnError extends boolean = false,
@@ -4741,7 +4800,7 @@ export const cancelAssetUploadSession = <ThrowOnError extends boolean = false>(
 /**
  * Open a browser fallback for a media upload
  *
- * Offers an existing upload session to a signed-in person with asset write access in its workspace. Only the same OAuth connection or API key that created the session can request this fallback. The file, metadata, capacity reservation and one-hour deadline stay unchanged. Repeating the request returns the same page for a pending session. A non-pending session returns its current state without a browser URL. Enabling the handoff allows any currently authorized person in that workspace to complete or cancel it, independently of the original connection's continued access. The person must select matching file bytes; opening the page never publishes them.
+ * Offers an existing upload session to a signed-in person with asset write access in its workspace. Only the same OAuth connection or API key that created the session can request this fallback. Enabling the handoff leaves the file and reservation unchanged. The browser can then bind a selected file to the pending session and adjust its reservation. Publication metadata and the one-hour deadline stay unchanged. Repeating the request returns the same page for a pending session. A non-pending session returns its current state without a browser URL. Enabling the handoff allows any currently authorized person in that workspace to complete or cancel it, independently of the original connection's continued access. Completion validates the selected bytes; opening the page never publishes them.
  */
 export const createAssetUploadBrowserHandoff = <
   ThrowOnError extends boolean = false,

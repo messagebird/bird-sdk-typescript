@@ -6332,6 +6332,417 @@ export const OrganizationWorkspaceUpdateSchema = {
   },
 } as const;
 
+export const WhatsAppDataLocalizationRegionSchema = {
+  type: "string",
+  minLength: 2,
+  enum: [
+    "AU",
+    "ID",
+    "IN",
+    "JP",
+    "SG",
+    "KR",
+    "DE",
+    "CH",
+    "GB",
+    "BR",
+    "BH",
+    "ZA",
+    "AE",
+    "CA",
+  ],
+  description:
+    "A country where WhatsApp can store a business phone number's message content at rest, as its two-letter ISO 3166 code.\n",
+  example: "DE",
+} as const;
+
+export const OrganizationWorkspaceWhatsAppNumberCreateSchema = {
+  type: "object",
+  description:
+    "A number your multi-partner solution onboarded, and the workspace label and storage country it takes. `data_localization_region` cannot be changed once the number is connected, so set it in this call if your customer needs one.\n",
+  additionalProperties: false,
+  required: ["waba", "meta_phone_number_id"],
+  properties: {
+    waba: {
+      type: "string",
+      minLength: 1,
+      pattern: "^[0-9]+$",
+      description:
+        "The WhatsApp Business Account your Embedded Signup returned, from the session info's `messaging_account_ids`.\n",
+      example: "102290129340398",
+    },
+    meta_phone_number_id: {
+      type: "string",
+      minLength: 1,
+      pattern: "^[0-9]+$",
+      description:
+        "The phone number your Embedded Signup returned, from the session info's `phone_number_id`.\n",
+      example: "109364591979012",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      description:
+        "The workspace's own label for the number. Leave it out and the number's own phone number stands in. A number already connected in the workspace keeps its label unless you pass one. This has no bearing on what WhatsApp displays to people the number messages.\n",
+      example: "Northwind Support",
+    },
+    data_localization_region: {
+      $ref: "#/components/schemas/WhatsAppDataLocalizationRegion",
+      description:
+        "Store this number's message content at rest in a specific country, given as its two-letter ISO 3166 code. Leave it out to use WhatsApp's default storage. This cannot be changed once the number is connected, so set it now if your customer requires it.\n",
+    },
+  },
+} as const;
+
+export const WhatsAppNumberIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^wan_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "wan_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AllocatedNumberIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^(nda|nal)_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "nda_01krdgeqcxet5s7t44vh8rt9mg",
+  description:
+    "Identifier of a number allocated to your workspace, as returned in the id field of `GET /v1/numbers`.",
+} as const;
+
+export const WhatsAppNumberScopeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["system", "workspace"],
+  example: "workspace",
+} as const;
+
+export const WhatsAppNumberStatusSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "awaiting_signup",
+    "banned",
+    "connected",
+    "deleted",
+    "disconnected",
+    "failed",
+    "flagged",
+    "migrated",
+    "pending",
+    "preparing",
+    "rate_limited",
+    "restricted",
+  ],
+  description:
+    "Operational state of a business phone number. The `preparing` status means the service is verifying a managed number. The `awaiting_signup` status means verification finished and you must complete signup. The `pending` status is WhatsApp's own token for a number it does not hold as registered, and is also returned when no WhatsApp status has been stored, including after setup completes. It does not by itself establish whether setup is complete. The `connected` status means registration completed. The `failed` status means connection was refused permanently. Other values are WhatsApp's own operational states for a number already connected. This is an open enum. Accept unrecognized values.",
+  example: "connected",
+} as const;
+
+export const WhatsAppNumberErrorCodeSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "registration_pin_rejected",
+    "registration_pin_rate_limited",
+    "registration_attempts_exhausted",
+    "number_verification_required",
+    "number_not_registered",
+    "number_already_linked",
+    "number_already_in_use",
+    "verification_code_not_received",
+    "verification_rate_limited",
+    "business_account_locked",
+    "business_verification_required",
+    "credit_currency_mismatch",
+    "billing_close",
+    "permission_denied",
+    "invalid_request",
+    "internal_error",
+  ],
+  description:
+    "Standardized number-connection failure:\n\n- `registration_pin_rejected`: WhatsApp refused the two-step verification PIN.\n- `registration_pin_rate_limited`: Too many PIN attempts occurred recently.\n- `registration_attempts_exhausted`: The number has no registration attempts left. WhatsApp's own lockout clears after 72 hours; the number's attempt budget does not, so contact support if repair keeps ending here.\n- `number_verification_required`: WhatsApp requires the number to be verified again.\n- `number_not_registered`: WhatsApp does not hold the number as registered.\n- `number_already_linked`: Another WhatsApp integration uses the number.\n- `number_already_in_use`: WhatsApp cannot accept the number.\n- `verification_code_not_received`: The verification text did not arrive.\n- `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.\n- `business_account_locked`: WhatsApp locked the business account.\n- `business_verification_required`: WhatsApp refused to register the number because the business portfolio is not verified, usually because an unverified portfolio may hold only a few registered numbers. Verify the business or free a registered number on the portfolio, then repair the number.\n- `credit_currency_mismatch`: WhatsApp bills the business account in a currency other than USD, EUR, or your organization's billing currency. In Meta Business Suite, remove the account's payment method and then set its currency to one of those. If Meta doesn't allow the change, connect the number under a business account WhatsApp bills in one of them or has set no currency on.\n- `billing_close`: WhatsApp refused to set up billing for the business account while its monthly billing close ran. The close usually ends within the first few days of the new month; nothing about the number or the account needs changing. Once those days have passed, repair the number.\n- `permission_denied`: WhatsApp refused access to the account.\n- `invalid_request`: WhatsApp rejected the connection details.\n- `internal_error`: The service could not classify or resolve the failure.\n\nThis is an open enum. Accept unrecognized values.\n",
+  example: "registration_pin_rejected",
+} as const;
+
+export const WhatsAppNumberErrorSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["code"],
+  description:
+    "Why a number's connection was refused for good. `code` is the standardized reason. `description` explains the failure where one was recorded, and `meta_error_code` carries WhatsApp's own code when available. It accompanies the `failed` status only; a number still being retried carries no error.",
+  properties: {
+    code: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberErrorCode",
+        },
+      ],
+      readOnly: true,
+      description: "Standardized failure reason.",
+    },
+    description: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Why the connection failed: WhatsApp's own words, in the language of the account it refused, when WhatsApp answered; our own explanation when the number was refused before WhatsApp was asked; a generic sentence when WhatsApp refused without giving a reason. Absent when the attempt failed without ever reaching WhatsApp, which leaves `code` as the only account of the failure. Show it to the person who owns the number; never match on its text.",
+      example:
+        "Cannot Create Certificate: Please ensure two-factor authentication is disabled.",
+    },
+    meta_error_code: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "WhatsApp's most specific code for the refusal: its error subcode where it sent one, otherwise its top-level code. Null when WhatsApp did not provide a code. Treat it as an opaque string.",
+      example: "2388001",
+    },
+  },
+} as const;
+
+export const WhatsAppNumberQualityRatingSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["green", "yellow", "red", "unknown"],
+  description:
+    "WhatsApp quality rating for a business phone number, based on recipient feedback. `green`, `yellow`, and `red` indicate decreasing quality; sustained `red` can restrict the number. `unknown` is itself a reported rating. This is separate from a template-language quality score. Accept unrecognized values.",
+  example: "green",
+} as const;
+
+export const WhatsAppNumberMessagingLimitSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "tier_50",
+    "tier_250",
+    "tier_1k",
+    "tier_10k",
+    "tier_100k",
+    "tier_unlimited",
+  ],
+  description:
+    "How many unique WhatsApp users can be messaged outside a customer service window in a rolling 24 hours, as WhatsApp's own tier token. WhatsApp calculates this for the business portfolio, and every number in that portfolio shares it; it is not this number's private capacity, and one number can consume all of it. Values are WhatsApp's own tokens, lower-cased. Open enum: WhatsApp documents a 2,000 limit its published tier vocabulary has no token for, so treat an unrecognized value as a tier WhatsApp added.",
+  example: "tier_250",
+} as const;
+
+export const WhatsAppNumberThroughputLevelSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["standard"],
+  description:
+    "How fast WhatsApp lets this number send, as WhatsApp's own level token. `standard` is 80 messages per second; WhatsApp upgrades an eligible number to 1,000 per second automatically. Values are WhatsApp's own tokens, lower-cased. This enum is open because WhatsApp publishes no vocabulary for the field. The `standard` value is the only value Bird has measured. The upgraded level's token remains unknown until a number returns it.",
+  example: "standard",
+} as const;
+
+export const WhatsAppNumberSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "phone_number",
+    "name",
+    "scope",
+    "status",
+    "created_at",
+    "updated_at",
+  ],
+  properties: {
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberID",
+        },
+      ],
+      readOnly: true,
+      description: "Unique identifier for the connected number.",
+    },
+    waba: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "The WhatsApp Business Account this number is connected under. Present only for a number your workspace connected itself.\n",
+      example: "102290129340398",
+    },
+    phone_number: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "The number in E.164 format. Null only while the number itself is not yet known: a number your workspace holds carries its E.164 from the moment setup starts, so a value here does not mean the number can send. Check `status` for connection state.\n",
+      example: "+15550001234",
+    },
+    number_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AllocatedNumberID",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The number you hold with us that this WhatsApp number was connected from, as its id in GET /v1/numbers. Absent for a number you brought yourself.\n",
+    },
+    meta_preverified_id: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "WhatsApp's own id for the number while we prepare it for you. We hand it to WhatsApp when you finish signing up, so WhatsApp knows this is the number we already verified for you. Absent for a number you brought yourself. WhatsApp discards the id once signup claims it, so an id still shown here on a connected number no longer names anything.\n",
+      example: "106540352242922",
+    },
+    verified_until: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When we expect WhatsApp to release this pre-verified number if you have not finished signup by then. Present only while the number is `awaiting_signup`. Absent for a number pre-verified before we started recording this moment, and for a number you brought yourself.\n",
+      example: "2026-11-19T10:22:31Z",
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      maxLength: 100,
+      readOnly: true,
+      description:
+        "Your workspace's own label for this number, given when it was connected and changeable afterwards. It has no bearing on what WhatsApp displays to people the number messages; `GET /v1/whatsapp/numbers/{number_id}/profile` returns that as `display_name`. For a number we operate on your behalf, this is our own label instead and cannot be changed.\n",
+      example: "Sales EU",
+    },
+    scope: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberScope",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Whether the number sends under a WhatsApp Business Account we operate on your behalf (`system`) or one your workspace connected itself (`workspace`).\n",
+    },
+    data_localization_region: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppDataLocalizationRegion",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The country this number's message content is stored at rest in, as its two-letter ISO 3166 code. Absent when it uses WhatsApp's default storage. It can differ from the region requested at connection when WhatsApp requires a particular country for the number.\n",
+    },
+    status: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberStatus",
+        },
+      ],
+      readOnly: true,
+      description:
+        "WhatsApp's own state for this number as of `meta_synced_at`, except for the three states we answer ourselves because WhatsApp holds nothing to report. A connection we are still verifying reads `preparing`, one waiting for someone to finish signup reads `awaiting_signup`, and a permanently refused one reads `failed`, with `error` saying why. `pending` is WhatsApp's own token for a number it does not hold as registered, and is also what a number with no stored WhatsApp status reads, including after setup completes, so it does not by itself establish whether setup is complete. A number we operate on your behalf reads `connected` as our own assertion rather than a reading from WhatsApp for every number we ship today; that tier carries no `meta_synced_at`. A connected virtual +1 555 or +1 711 number still has a daily sending limit until its current name is approved. Read `display_name_status` from the live profile for display name approval.",
+    },
+    next: {
+      type: "array",
+      readOnly: true,
+      description:
+        "What to do next about this number, given the state it is in. Each entry names one\naction and says why it is worth taking, so you can act on this response without\nworking out the order yourself. Present on reads that compute it: an empty list\nmeans there is nothing to do, and the field is absent entirely on responses that\ndo not report next actions.\n\nWhile `status` is `awaiting_signup` this carries the browser step that finishes\nthe connection, because embedded signup sits behind an OAuth screen no API call\ncan stand in for.\n",
+      items: {
+        $ref: "#/components/schemas/NextAction",
+      },
+    },
+    error: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberError",
+        },
+      ],
+      readOnly: true,
+      description:
+        "Why this number's connection was refused for good. Present only while `status` is `failed`. A retryable step records its cause on a still-`pending` number without setting this field, because that cause is not a refusal yet, so a connection you are still waiting on reports no error here.",
+    },
+    finish_setup_url: {
+      type: "string",
+      format: "uri",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Where a person finishes connecting this number, present only while `status` is `awaiting_signup`. Finishing means completing WhatsApp's embedded signup, which is a browser flow behind an OAuth screen: it cannot be done over the API, so open this link and have someone with access to the workspace complete it. The number is offered to them already verified. Once they finish, `status` moves on and this link is no longer returned.",
+      example:
+        "https://bird.com/dashboard/w/ws_01krdgeqcxet5s7t44vh8rt9mg/whatsapp/numbers?finish_setup_number=wan_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    quality_rating: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberQualityRating",
+        },
+      ],
+      readOnly: true,
+      description:
+        "WhatsApp's quality rating for this number as of `meta_synced_at`. Absent until WhatsApp has reported one, and always absent for a number we operate on your behalf.",
+    },
+    messaging_limit: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberMessagingLimit",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The messaging limit WhatsApp applied to this number's business portfolio as of `meta_synced_at`. Absent until WhatsApp has reported one, and always absent for a number we operate on your behalf.",
+    },
+    throughput_level: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppNumberThroughputLevel",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The send rate WhatsApp allowed this number as of `meta_synced_at`. Absent until WhatsApp has reported one, and always absent for a number we operate on your behalf.",
+    },
+    is_official_business_account: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether WhatsApp grants this number Official Business Account status as of `meta_synced_at`. Absent until WhatsApp has reported it, and always absent for a number we operate on your behalf. WhatsApp grants the status per number, so two numbers on one WhatsApp Business Account can differ. The status also decides whether a rename is possible here: a number that has it cannot be renamed through `PATCH /v1/whatsapp/numbers/{number_id}/profile` at all, and has to be renamed through WhatsApp support instead.",
+    },
+    is_on_business_app: {
+      type: "boolean",
+      readOnly: true,
+      description:
+        "Whether this number is also in use on the WhatsApp Business app, so the business keeps sending one-to-one messages from the app while you send through the API. Absent until WhatsApp has reported it, and always absent for a number we operate on your behalf.",
+    },
+    meta_synced_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When this number's state was last read from WhatsApp. `status`, `quality_rating`, `messaging_limit`, `throughput_level`, and `is_official_business_account` all belong to that reading rather than representing live values. We re-read roughly hourly, so a change at WhatsApp can be up to an hour old here. Absent for a number we have never read back and for a number we operate on your behalf.",
+    },
+    pre_verification_requested_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When we last asked WhatsApp to send this number a verification code, which we do only for a number your workspace connected itself from a number you hold with us. Absent for a number we operate on your behalf, and for one you connected through Embedded Signup with a code you read yourself. Wait a few hours after this before repairing a number whose verification failed: WhatsApp rotates the routes it verifies over during that period, and throttles a number asked repeatedly in a short window. Distinct from `updated_at`, which any change to the number moves.",
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When this number was submitted for connection.",
+    },
+    updated_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description: "When this number was last changed.",
+    },
+  },
+} as const;
+
 export const RealtimeRegionSchema = {
   type: "object",
   additionalProperties: false,
@@ -8439,6 +8850,13 @@ export const AudienceIDSchema = {
   example: "adn_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const ContactIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^con_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "con_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const EmailBroadcastParameterNameSchema = {
   type: "string",
   pattern: "^[A-Za-z_][A-Za-z0-9_]*$",
@@ -8619,13 +9037,6 @@ export const EmailBroadcastParameterProblemSiteSchema = {
     "The part of the email where the input is used.\n\n- `subject`: the subject line.\n- `html`: the HTML body, including its inbox preview text.\n- `text`: the plain-text body.\n- `from_name`: the sender display name.\n- `reply_to`: the reply-to addresses.\n\nA custom header is reported as `header:` followed by the header name as the broadcast sets it, for example `header:X-Campaign`.\n",
   "x-extensible-enum": ["subject", "html", "text", "from_name", "reply_to"],
   example: "subject",
-} as const;
-
-export const ContactIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^con_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "con_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const EmailBroadcastParameterProblemSchema = {
@@ -13719,9 +14130,9 @@ export const SMSMessagingProfileOutboundMatchingSchema = {
 export const SMSMessagingProfileInboundSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["numbers", "callback_url", "outbound_matching"],
+  required: ["numbers", "callback_url", "keyword", "outbound_matching"],
   description:
-    "How the profile receives replies. A profile without numbers only sends.",
+    "How the profile receives replies. A profile with neither numbers nor a keyword only sends.",
   properties: {
     numbers: {
       type: "array",
@@ -13734,8 +14145,14 @@ export const SMSMessagingProfileInboundSchema = {
     callback_url: {
       type: ["string", "null"],
       description:
-        "The HTTPS URL that receives `sms.received` events for replies on this profile's numbers, signed with your workspace callback signing secret. Null when none is set, in which case replies use `options.callback_url`, then your webhook subscriptions. While a URL applies, a reply skips your plain webhook endpoints.\n",
+        "The HTTPS URL that receives `sms.received` events for messages received on this profile's numbers or routed to it by `keyword`, signed with your workspace callback signing secret. Null when none is set, in which case replies use `options.callback_url`, then your webhook subscriptions. While a URL applies, a reply skips your plain webhook endpoints.\n",
       example: "https://receipts.example.com/bird/sms/inbound",
+    },
+    keyword: {
+      type: ["string", "null"],
+      description:
+        "The keyword that routes a received message to this profile. A message whose text opens with it, in any letter case and after any leading whitespace, belongs to this profile whichever of your workspace's numbers it arrives on, ahead of the profile bound to that number. The opening word ends at the first character that is not a letter, digit, hyphen or underscore, so `JOIN?source=web` opens with `JOIN`. Null when none is set.\n",
+      example: "JOIN",
     },
     outbound_matching: {
       $ref: "#/components/schemas/SMSMessagingProfileOutboundMatching",
@@ -13805,7 +14222,7 @@ export const SMSMessagingProfileSchema = {
     "updated_at",
   ],
   description:
-    "A messaging profile: the senders, reply numbers, and defaults for one program in your workspace. A send that names the profile takes its sender, default category, smart encoding, validity period, cost center, and options from it when the send leaves them out. A message that names the profile sends its events to the profile's `options.callback_url`, filtered by `callback_events`, and a reply on one of the profile's numbers goes to `inbound.callback_url`, then `options.callback_url`. With outbound matching on, a reply is paired with the message it answers.\n",
+    "A messaging profile: the senders, reply numbers, and defaults for one program in your workspace. A send that names the profile takes its sender, default category, smart encoding, validity period, cost center, and options from it when the send leaves them out. A message that names the profile sends its events to the profile's `options.callback_url`, filtered by `callback_events`, and a reply on one of the profile's numbers, or one whose text opens with `inbound.keyword` on any of your numbers, goes to `inbound.callback_url`, then `options.callback_url`. With outbound matching on, a reply on one of the profile's numbers is paired with the message this profile sent from that number.\n",
   properties: {
     id: {
       $ref: "#/components/schemas/SMSMessagingProfileID",
@@ -13948,8 +14365,17 @@ export const SMSMessagingProfileInboundCreateSchema = {
       maxLength: 2048,
       format: "uri",
       description:
-        "The HTTPS URL that receives `sms.received` events for replies on this profile's numbers, signed with your workspace callback signing secret. Without it, replies use `options.callback_url`, then your webhook subscriptions. While a URL applies, a reply skips your plain webhook endpoints. It must be an absolute HTTPS URL of at most 2048 characters with a public host: an HTTP URL, a malformed one, or a private, loopback or link-local host returns `422`.\n",
+        "The HTTPS URL that receives `sms.received` events for messages received on this profile's numbers or routed to it by `keyword`, signed with your workspace callback signing secret. Without it, replies use `options.callback_url`, then your webhook subscriptions. While a URL applies, a reply skips your plain webhook endpoints. It must be an absolute HTTPS URL of at most 2048 characters with a public host: an HTTP URL, a malformed one, or a private, loopback or link-local host returns `422`.\n",
       example: "https://receipts.example.com/bird/sms/inbound",
+    },
+    keyword: {
+      type: "string",
+      minLength: 1,
+      maxLength: 32,
+      pattern: "^[A-Za-z0-9_-]+$",
+      description:
+        "The keyword that routes a received message to this profile. It is 1 to 32 ASCII letters, digits, hyphens or underscores. A message whose text opens with it, in any letter case and after any leading whitespace, belongs to this profile whichever of your workspace's numbers it arrives on, ahead of the profile bound to that number. The opening word ends at the first character that is not a letter, digit, hyphen or underscore, so `JOIN?source=web` opens with `JOIN`. Only one profile in a workspace can hold a keyword, compared without regard to letter case: one that another profile holds returns `422`.\n",
+      example: "JOIN",
     },
     outbound_matching: {
       $ref: "#/components/schemas/SMSMessagingProfileOutboundMatchingInput",
@@ -14095,8 +14521,17 @@ export const SMSMessagingProfileInboundUpdateSchema = {
       maxLength: 2048,
       format: "uri",
       description:
-        "The HTTPS URL that receives `sms.received` events for replies on this profile's numbers, signed with your workspace callback signing secret. Send `null` to clear it, so replies use `options.callback_url`, then your webhook subscriptions. While a URL applies, a reply skips your plain webhook endpoints. It must be an absolute HTTPS URL of at most 2048 characters with a public host: an HTTP URL, a malformed one, or a private, loopback or link-local host returns `422`.\n",
+        "The HTTPS URL that receives `sms.received` events for messages received on this profile's numbers or routed to it by `keyword`, signed with your workspace callback signing secret. Send `null` to clear it, so replies use `options.callback_url`, then your webhook subscriptions. While a URL applies, a reply skips your plain webhook endpoints. It must be an absolute HTTPS URL of at most 2048 characters with a public host: an HTTP URL, a malformed one, or a private, loopback or link-local host returns `422`.\n",
       example: "https://receipts.example.com/bird/sms/inbound",
+    },
+    keyword: {
+      type: ["string", "null"],
+      minLength: 1,
+      maxLength: 32,
+      pattern: "^[A-Za-z0-9_-]+$",
+      description:
+        "The keyword that routes a received message to this profile. It is 1 to 32 ASCII letters, digits, hyphens or underscores. A message whose text opens with it, in any letter case and after any leading whitespace, belongs to this profile whichever of your workspace's numbers it arrives on, ahead of the profile bound to that number. The opening word ends at the first character that is not a letter, digit, hyphen or underscore, so `JOIN?source=web` opens with `JOIN`. Only one profile in a workspace can hold a keyword, compared without regard to letter case: one that another profile holds returns `422`. Send `null` to clear it.\n",
+      example: "JOIN",
     },
     outbound_matching: {
       $ref: "#/components/schemas/SMSMessagingProfileOutboundMatchingInput",
@@ -14817,7 +15252,7 @@ export const AssetUploadFileSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Exact properties of the original file. Calculate size and SHA-256 from its bytes before creating a session. Images allow up to 5,242,880 bytes; other supported media allow up to 25,000,000 bytes.",
+    "Exact properties of the active source file. Calculate size and SHA-256 from its bytes before creating a session or preparing a browser-selected source. Images allow up to 5,242,880 bytes; other supported media allow up to 25,000,000 bytes.",
   required: ["filename", "content_type", "size_bytes", "sha256"],
   properties: {
     filename: {
@@ -14825,14 +15260,14 @@ export const AssetUploadFileSchema = {
       minLength: 1,
       maxLength: 255,
       example: "invoice.pdf",
-      description: "Original filename, including its extension.",
+      description: "Source filename, including its extension.",
     },
     content_type: {
       type: "string",
       minLength: 1,
       example: "application/pdf",
       description:
-        "Media type of the original file. Supported values are `image/png`, `image/jpeg`, `image/gif`, `video/mp4`, `video/webm`, `video/quicktime`, `audio/mpeg`, `audio/mp4`, `audio/ogg`, `audio/wav`, and `application/pdf`.\n\nSupply the exact value without parameters. Unsupported values return `E20001`. Completion checks this against the file's contents.\n",
+        "Media type of the source file. Supported values are `image/png`, `image/jpeg`, `image/gif`, `video/mp4`, `video/webm`, `video/quicktime`, `audio/mpeg`, `audio/mp4`, `audio/ogg`, `audio/wav`, and `application/pdf`.\n\nSupply the exact value without parameters. Unsupported values return `E20001`. Completion checks this against the file's contents.\n",
     },
     size_bytes: {
       type: "integer",
@@ -14840,7 +15275,7 @@ export const AssetUploadFileSchema = {
       minimum: 1,
       maximum: 25000000,
       example: 1024,
-      description: "Exact size of the original file in bytes.",
+      description: "Exact size of the source file in bytes.",
     },
     sha256: {
       type: "string",
@@ -14851,7 +15286,7 @@ export const AssetUploadFileSchema = {
       example:
         "4e2090a479f7ce6b17ad31f991988f12571bcafbd4a441cc4063644fc1400ae0",
       description:
-        "SHA-256 of the original bytes, encoded as lowercase hexadecimal.",
+        "SHA-256 of the source bytes, encoded as lowercase hexadecimal.",
     },
   },
 } as const;
@@ -14974,7 +15409,7 @@ export const AssetUploadSessionSchema = {
   readOnly: true,
   type: "object",
   description:
-    "An upload session owned by the workspace and the OAuth connection or API key that created it. Its file and metadata are frozen. Sessions expire after one hour; receipts remain available for at least 24 hours after expiry while cleanup finishes.",
+    "An upload session owned by the workspace and the OAuth connection or API key that created it. Its metadata is frozen. The file identifies the active upload source; a signed-in person can bind their selected file when preparing the browser fallback. Completion validates the bytes against the active source. Sessions expire after one hour; receipts remain available for at least 24 hours after expiry while cleanup finishes.",
   required: [
     "id",
     "state",
@@ -15062,7 +15497,7 @@ export const AssetUploadInstructionSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Send the original file bytes to this URL with the exact headers and content length. Send no Bird credentials or cookies. Keep the URL private and call complete after the PUT succeeds.",
+    "Send the active source bytes described by the session to this URL with the exact headers and content length. Send no Bird credentials or cookies. Keep the URL private and call complete after the PUT succeeds.",
   required: [
     "method",
     "url",
@@ -15385,7 +15820,7 @@ export const AssetUploadBrowserHandoffSchema = {
       {
         kind: "external",
         description:
-          "Open browser_url and have a person with asset write access select the original file and publish it. Their browser must reach the storage hostname. Opening the page does not complete the upload.",
+          "Open browser_url and have a person with asset write access select the local file they want to publish. The browser uses the selected bytes, which can differ from the chat attachment. Their browser must reach the storage hostname. Opening the page does not complete the upload.",
       },
       {
         kind: "operation",
@@ -16791,15 +17226,6 @@ export const SMSSenderSourceKindSchema = {
   "x-extensible-enum": ["number", "shared_number", "alpha"],
   description:
     "What backs an SMS sender: a dedicated number, a shared shortcode, or an alphanumeric sender string.\n",
-} as const;
-
-export const AllocatedNumberIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^(nda|nal)_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "nda_01krdgeqcxet5s7t44vh8rt9mg",
-  description:
-    "Identifier of a number allocated to your workspace, as returned in the id field of `GET /v1/numbers`.",
 } as const;
 
 export const SMSSenderSortFieldSchema = {
@@ -18533,13 +18959,6 @@ export const DomainIDSchema = {
   minLength: 1,
   pattern: "^dom_[0-9a-hjkmnp-tv-z]{26}$",
   example: "dom_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const WhatsAppNumberIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^wan_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "wan_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const WhatsAppMessageIDSchema = {
@@ -25398,52 +25817,6 @@ export const WhatsAppInboundStatsByPhoneNumberResponseSchema = {
   },
 } as const;
 
-export const WhatsAppDataLocalizationRegionSchema = {
-  type: "string",
-  minLength: 2,
-  enum: [
-    "AU",
-    "ID",
-    "IN",
-    "JP",
-    "SG",
-    "KR",
-    "DE",
-    "CH",
-    "GB",
-    "BR",
-    "BH",
-    "ZA",
-    "AE",
-    "CA",
-  ],
-  description:
-    "A country where WhatsApp can store a business phone number's message content at rest, as its two-letter ISO 3166 code.\n",
-  example: "DE",
-} as const;
-
-export const WhatsAppNumberStatusSchema = {
-  type: "string",
-  minLength: 1,
-  "x-extensible-enum": [
-    "awaiting_signup",
-    "banned",
-    "connected",
-    "deleted",
-    "disconnected",
-    "failed",
-    "flagged",
-    "migrated",
-    "pending",
-    "preparing",
-    "rate_limited",
-    "restricted",
-  ],
-  description:
-    "Operational state of a business phone number. The `preparing` status means the service is verifying a managed number. The `awaiting_signup` status means verification finished and you must complete signup. The `pending` status is WhatsApp's own token for a number it does not hold as registered, and is also returned when no WhatsApp status has been stored, including after setup completes. It does not by itself establish whether setup is complete. The `connected` status means registration completed. The `failed` status means connection was refused permanently. Other values are WhatsApp's own operational states for a number already connected. This is an open enum. Accept unrecognized values.",
-  example: "connected",
-} as const;
-
 export const WhatsAppAgentNotificationStatusSchema = {
   type: "string",
   minLength: 1,
@@ -25659,321 +26032,11 @@ export const WhatsAppAgentNotificationCreateSchema = {
     "Something that happened in your systems that the agent should tell the contact about, such as a payment landing or an order shipping. WhatsApp processes it in the background, so read the notification back for what came of it.\n",
 } as const;
 
-export const WhatsAppNumberScopeSchema = {
-  type: "string",
-  minLength: 1,
-  enum: ["system", "workspace"],
-  example: "workspace",
-} as const;
-
 export const WhatsAppNumberSortFieldSchema = {
   type: "string",
   enum: ["created_at"],
   default: "created_at",
   description: "Sortable fields for a WhatsApp number list.",
-} as const;
-
-export const WhatsAppNumberErrorCodeSchema = {
-  type: "string",
-  minLength: 1,
-  "x-extensible-enum": [
-    "registration_pin_rejected",
-    "registration_pin_rate_limited",
-    "registration_attempts_exhausted",
-    "number_verification_required",
-    "number_not_registered",
-    "number_already_linked",
-    "number_already_in_use",
-    "verification_code_not_received",
-    "verification_rate_limited",
-    "business_account_locked",
-    "business_verification_required",
-    "credit_currency_mismatch",
-    "billing_close",
-    "permission_denied",
-    "invalid_request",
-    "internal_error",
-  ],
-  description:
-    "Standardized number-connection failure:\n\n- `registration_pin_rejected`: WhatsApp refused the two-step verification PIN.\n- `registration_pin_rate_limited`: Too many PIN attempts occurred recently.\n- `registration_attempts_exhausted`: The number has no registration attempts left. WhatsApp's own lockout clears after 72 hours; the number's attempt budget does not, so contact support if repair keeps ending here.\n- `number_verification_required`: WhatsApp requires the number to be verified again.\n- `number_not_registered`: WhatsApp does not hold the number as registered.\n- `number_already_linked`: Another WhatsApp integration uses the number.\n- `number_already_in_use`: WhatsApp cannot accept the number.\n- `verification_code_not_received`: The verification text did not arrive.\n- `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.\n- `business_account_locked`: WhatsApp locked the business account.\n- `business_verification_required`: WhatsApp refused to register the number because the business portfolio is not verified, usually because an unverified portfolio may hold only a few registered numbers. Verify the business or free a registered number on the portfolio, then repair the number.\n- `credit_currency_mismatch`: WhatsApp bills the business account in a currency other than USD, EUR, or your organization's billing currency. In Meta Business Suite, remove the account's payment method and then set its currency to one of those. If Meta doesn't allow the change, connect the number under a business account WhatsApp bills in one of them or has set no currency on.\n- `billing_close`: WhatsApp refused to set up billing for the business account while its monthly billing close ran. The close usually ends within the first few days of the new month; nothing about the number or the account needs changing. Once those days have passed, repair the number.\n- `permission_denied`: WhatsApp refused access to the account.\n- `invalid_request`: WhatsApp rejected the connection details.\n- `internal_error`: The service could not classify or resolve the failure.\n\nThis is an open enum. Accept unrecognized values.\n",
-  example: "registration_pin_rejected",
-} as const;
-
-export const WhatsAppNumberErrorSchema = {
-  type: "object",
-  additionalProperties: false,
-  readOnly: true,
-  required: ["code"],
-  description:
-    "Why a number's connection was refused for good. `code` is the standardized reason. `description` explains the failure where one was recorded, and `meta_error_code` carries WhatsApp's own code when available. It accompanies the `failed` status only; a number still being retried carries no error.",
-  properties: {
-    code: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppNumberErrorCode",
-        },
-      ],
-      readOnly: true,
-      description: "Standardized failure reason.",
-    },
-    description: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "Why the connection failed: WhatsApp's own words, in the language of the account it refused, when WhatsApp answered; our own explanation when the number was refused before WhatsApp was asked; a generic sentence when WhatsApp refused without giving a reason. Absent when the attempt failed without ever reaching WhatsApp, which leaves `code` as the only account of the failure. Show it to the person who owns the number; never match on its text.",
-      example:
-        "Cannot Create Certificate: Please ensure two-factor authentication is disabled.",
-    },
-    meta_error_code: {
-      type: ["string", "null"],
-      readOnly: true,
-      description:
-        "WhatsApp's most specific code for the refusal: its error subcode where it sent one, otherwise its top-level code. Null when WhatsApp did not provide a code. Treat it as an opaque string.",
-      example: "2388001",
-    },
-  },
-} as const;
-
-export const WhatsAppNumberQualityRatingSchema = {
-  type: "string",
-  minLength: 1,
-  "x-extensible-enum": ["green", "yellow", "red", "unknown"],
-  description:
-    "WhatsApp quality rating for a business phone number, based on recipient feedback. `green`, `yellow`, and `red` indicate decreasing quality; sustained `red` can restrict the number. `unknown` is itself a reported rating. This is separate from a template-language quality score. Accept unrecognized values.",
-  example: "green",
-} as const;
-
-export const WhatsAppNumberMessagingLimitSchema = {
-  type: "string",
-  minLength: 1,
-  "x-extensible-enum": [
-    "tier_50",
-    "tier_250",
-    "tier_1k",
-    "tier_10k",
-    "tier_100k",
-    "tier_unlimited",
-  ],
-  description:
-    "How many unique WhatsApp users can be messaged outside a customer service window in a rolling 24 hours, as WhatsApp's own tier token. WhatsApp calculates this for the business portfolio, and every number in that portfolio shares it; it is not this number's private capacity, and one number can consume all of it. Values are WhatsApp's own tokens, lower-cased. Open enum: WhatsApp documents a 2,000 limit its published tier vocabulary has no token for, so treat an unrecognized value as a tier WhatsApp added.",
-  example: "tier_250",
-} as const;
-
-export const WhatsAppNumberThroughputLevelSchema = {
-  type: "string",
-  minLength: 1,
-  "x-extensible-enum": ["standard"],
-  description:
-    "How fast WhatsApp lets this number send, as WhatsApp's own level token. `standard` is 80 messages per second; WhatsApp upgrades an eligible number to 1,000 per second automatically. Values are WhatsApp's own tokens, lower-cased. This enum is open because WhatsApp publishes no vocabulary for the field. The `standard` value is the only value Bird has measured. The upgraded level's token remains unknown until a number returns it.",
-  example: "standard",
-} as const;
-
-export const WhatsAppNumberSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: [
-    "id",
-    "phone_number",
-    "name",
-    "scope",
-    "status",
-    "created_at",
-    "updated_at",
-  ],
-  properties: {
-    id: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppNumberID",
-        },
-      ],
-      readOnly: true,
-      description: "Unique identifier for the connected number.",
-    },
-    waba: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "The WhatsApp Business Account this number is connected under. Present only for a number your workspace connected itself.\n",
-      example: "102290129340398",
-    },
-    phone_number: {
-      type: ["string", "null"],
-      readOnly: true,
-      description:
-        "The number in E.164 format. Null only while the number itself is not yet known: a number your workspace holds carries its E.164 from the moment setup starts, so a value here does not mean the number can send. Check `status` for connection state.\n",
-      example: "+15550001234",
-    },
-    number_id: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/AllocatedNumberID",
-        },
-      ],
-      readOnly: true,
-      description:
-        "The number you hold with us that this WhatsApp number was connected from, as its id in GET /v1/numbers. Absent for a number you brought yourself.\n",
-    },
-    meta_preverified_id: {
-      type: "string",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "WhatsApp's own id for the number while we prepare it for you. We hand it to WhatsApp when you finish signing up, so WhatsApp knows this is the number we already verified for you. Absent for a number you brought yourself. WhatsApp discards the id once signup claims it, so an id still shown here on a connected number no longer names anything.\n",
-      example: "106540352242922",
-    },
-    verified_until: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "When we expect WhatsApp to release this pre-verified number if you have not finished signup by then. Present only while the number is `awaiting_signup`. Absent for a number pre-verified before we started recording this moment, and for a number you brought yourself.\n",
-      example: "2026-11-19T10:22:31Z",
-    },
-    name: {
-      type: "string",
-      minLength: 1,
-      maxLength: 100,
-      readOnly: true,
-      description:
-        "Your workspace's own label for this number, given when it was connected and changeable afterwards. It has no bearing on what WhatsApp displays to people the number messages; `GET /v1/whatsapp/numbers/{number_id}/profile` returns that as `display_name`. For a number we operate on your behalf, this is our own label instead and cannot be changed.\n",
-      example: "Sales EU",
-    },
-    scope: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppNumberScope",
-        },
-      ],
-      readOnly: true,
-      description:
-        "Whether the number sends under a WhatsApp Business Account we operate on your behalf (`system`) or one your workspace connected itself (`workspace`).\n",
-    },
-    data_localization_region: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppDataLocalizationRegion",
-        },
-      ],
-      readOnly: true,
-      description:
-        "The country this number's message content is stored at rest in, as its two-letter ISO 3166 code. Absent when it uses WhatsApp's default storage. It can differ from the region requested at connection when WhatsApp requires a particular country for the number.\n",
-    },
-    status: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppNumberStatus",
-        },
-      ],
-      readOnly: true,
-      description:
-        "WhatsApp's own state for this number as of `meta_synced_at`, except for the three states we answer ourselves because WhatsApp holds nothing to report. A connection we are still verifying reads `preparing`, one waiting for someone to finish signup reads `awaiting_signup`, and a permanently refused one reads `failed`, with `error` saying why. `pending` is WhatsApp's own token for a number it does not hold as registered, and is also what a number with no stored WhatsApp status reads, including after setup completes, so it does not by itself establish whether setup is complete. A number we operate on your behalf reads `connected` as our own assertion rather than a reading from WhatsApp for every number we ship today; that tier carries no `meta_synced_at`. A connected virtual +1 555 or +1 711 number still has a daily sending limit until its current name is approved. Read `display_name_status` from the live profile for display name approval.",
-    },
-    next: {
-      type: "array",
-      readOnly: true,
-      description:
-        "What to do next about this number, given the state it is in. Each entry names one\naction and says why it is worth taking, so you can act on this response without\nworking out the order yourself. Present on reads that compute it: an empty list\nmeans there is nothing to do, and the field is absent entirely on responses that\ndo not report next actions.\n\nWhile `status` is `awaiting_signup` this carries the browser step that finishes\nthe connection, because embedded signup sits behind an OAuth screen no API call\ncan stand in for.\n",
-      items: {
-        $ref: "#/components/schemas/NextAction",
-      },
-    },
-    error: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppNumberError",
-        },
-      ],
-      readOnly: true,
-      description:
-        "Why this number's connection was refused for good. Present only while `status` is `failed`. A retryable step records its cause on a still-`pending` number without setting this field, because that cause is not a refusal yet, so a connection you are still waiting on reports no error here.",
-    },
-    finish_setup_url: {
-      type: "string",
-      format: "uri",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "Where a person finishes connecting this number, present only while `status` is `awaiting_signup`. Finishing means completing WhatsApp's embedded signup, which is a browser flow behind an OAuth screen: it cannot be done over the API, so open this link and have someone with access to the workspace complete it. The number is offered to them already verified. Once they finish, `status` moves on and this link is no longer returned.",
-      example:
-        "https://bird.com/dashboard/w/ws_01krdgeqcxet5s7t44vh8rt9mg/whatsapp/numbers?finish_setup_number=wan_01krdgeqcxet5s7t44vh8rt9mg",
-    },
-    quality_rating: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppNumberQualityRating",
-        },
-      ],
-      readOnly: true,
-      description:
-        "WhatsApp's quality rating for this number as of `meta_synced_at`. Absent until WhatsApp has reported one, and always absent for a number we operate on your behalf.",
-    },
-    messaging_limit: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppNumberMessagingLimit",
-        },
-      ],
-      readOnly: true,
-      description:
-        "The messaging limit WhatsApp applied to this number's business portfolio as of `meta_synced_at`. Absent until WhatsApp has reported one, and always absent for a number we operate on your behalf.",
-    },
-    throughput_level: {
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppNumberThroughputLevel",
-        },
-      ],
-      readOnly: true,
-      description:
-        "The send rate WhatsApp allowed this number as of `meta_synced_at`. Absent until WhatsApp has reported one, and always absent for a number we operate on your behalf.",
-    },
-    is_official_business_account: {
-      type: "boolean",
-      readOnly: true,
-      description:
-        "Whether WhatsApp grants this number Official Business Account status as of `meta_synced_at`. Absent until WhatsApp has reported it, and always absent for a number we operate on your behalf. WhatsApp grants the status per number, so two numbers on one WhatsApp Business Account can differ. The status also decides whether a rename is possible here: a number that has it cannot be renamed through `PATCH /v1/whatsapp/numbers/{number_id}/profile` at all, and has to be renamed through WhatsApp support instead.",
-    },
-    is_on_business_app: {
-      type: "boolean",
-      readOnly: true,
-      description:
-        "Whether this number is also in use on the WhatsApp Business app, so the business keeps sending one-to-one messages from the app while you send through the API. Absent until WhatsApp has reported it, and always absent for a number we operate on your behalf.",
-    },
-    meta_synced_at: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "When this number's state was last read from WhatsApp. `status`, `quality_rating`, `messaging_limit`, `throughput_level`, and `is_official_business_account` all belong to that reading rather than representing live values. We re-read roughly hourly, so a change at WhatsApp can be up to an hour old here. Absent for a number we have never read back and for a number we operate on your behalf.",
-    },
-    pre_verification_requested_at: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      readOnly: true,
-      description:
-        "When we last asked WhatsApp to send this number a verification code, which we do only for a number your workspace connected itself from a number you hold with us. Absent for a number we operate on your behalf, and for one you connected through Embedded Signup with a code you read yourself. Wait a few hours after this before repairing a number whose verification failed: WhatsApp rotates the routes it verifies over during that period, and throttles a number asked repeatedly in a short window. Distinct from `updated_at`, which any change to the number moves.",
-    },
-    created_at: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      readOnly: true,
-      description: "When this number was submitted for connection.",
-    },
-    updated_at: {
-      type: "string",
-      format: "date-time",
-      minLength: 1,
-      readOnly: true,
-      description: "When this number was last changed.",
-    },
-  },
 } as const;
 
 export const WhatsAppNumberListSchema = {
@@ -58524,6 +58587,11 @@ export const OrganizationWorkspaceListWritableSchema = {
   ],
 } as const;
 
+export const WhatsAppNumberWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+} as const;
+
 export const RealtimeAppWritableSchema = {
   allOf: [
     {
@@ -60102,7 +60170,7 @@ export const AssetUploadSessionWritableSchema = {
   readOnly: true,
   type: "object",
   description:
-    "An upload session owned by the workspace and the OAuth connection or API key that created it. Its file and metadata are frozen. Sessions expire after one hour; receipts remain available for at least 24 hours after expiry while cleanup finishes.",
+    "An upload session owned by the workspace and the OAuth connection or API key that created it. Its metadata is frozen. The file identifies the active upload source; a signed-in person can bind their selected file when preparing the browser fallback. Completion validates the bytes against the active source. Sessions expire after one hour; receipts remain available for at least 24 hours after expiry while cleanup finishes.",
   required: [
     "id",
     "state",
@@ -60331,7 +60399,7 @@ export const AssetUploadBrowserHandoffWritableSchema = {
       {
         kind: "external",
         description:
-          "Open browser_url and have a person with asset write access select the original file and publish it. Their browser must reach the storage hostname. Opening the page does not complete the upload.",
+          "Open browser_url and have a person with asset write access select the local file they want to publish. The browser uses the selected bytes, which can differ from the chat attachment. Their browser must reach the storage hostname. Opening the page does not complete the upload.",
       },
       {
         kind: "operation",
@@ -61750,11 +61818,6 @@ export const WhatsAppAgentNotificationListWritableSchema = {
       $ref: "#/components/schemas/_ListEnvelope",
     },
   ],
-} as const;
-
-export const WhatsAppNumberWritableSchema = {
-  type: "object",
-  additionalProperties: false,
 } as const;
 
 export const WhatsAppNumberListWritableSchema = {

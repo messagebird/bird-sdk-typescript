@@ -9,7 +9,7 @@ export type OrganizationWorkspacesListQuery = NonNullable<ListWorkspacesData["qu
 export type OrganizationWorkspacesCreateParams = NonNullable<CreateWorkspaceData["body"]>;
 export type OrganizationWorkspacesUpdateParams = NonNullable<UpdateOrganizationWorkspaceData["body"]>;
 
-export class OrganizationWorkspacesResource extends Resource {
+export class OrganizationWorkspacesResourceBase extends Resource {
   /**
    * List the organization's workspaces as a page, newest first by default.
    *

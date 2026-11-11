@@ -93,6 +93,7 @@ export type _EmailMailboxesReceiveRules = Pick<BirdClient["email"]["mailboxes"][
 export type _EmailThreads = Pick<BirdClient["email"]["threads"], "list" | "get" | "update" | "delete" | "restore">;
 export type _EmailThreadsMessages = Pick<BirdClient["email"]["threads"]["messages"], "list" | "get" | "body" | "reply" | "attachments">;
 export type _OrganizationWorkspaces = Pick<BirdClient["organization"]["workspaces"], "list" | "create" | "get" | "update" | "delete">;
+export type _OrganizationWorkspacesWhatsappNumbers = Pick<BirdClient["organization"]["workspaces"]["whatsappNumbers"], "create">;
 export type _Realtime = Pick<BirdClient["realtime"], "publish" | "publishBatch">;
 export type _RealtimeChannels = Pick<BirdClient["realtime"]["channels"], "list" | "get" | "members">;
 export type _RealtimeMembers = Pick<BirdClient["realtime"]["members"], "send" | "disconnect">;

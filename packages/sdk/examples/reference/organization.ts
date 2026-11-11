@@ -35,3 +35,12 @@ export async function organizationWorkspacesUpdate() {
 export async function organizationWorkspacesDelete() {
   await bird.organization.workspaces.delete("ws_01krdgeqcxet5s7t44vh8rt9mg");
 }
+
+export async function organizationWorkspacesWhatsappNumbersCreate() {
+  const number = await bird.organization.workspaces.whatsappNumbers.create("ws_01krdgeqcxet5s7t44vh8rt9mg", {
+    waba: "102290129340398",
+    meta_phone_number_id: "109364591979012",
+    name: "Northwind Support",
+  });
+  console.log(number.id, number.status);
+}
