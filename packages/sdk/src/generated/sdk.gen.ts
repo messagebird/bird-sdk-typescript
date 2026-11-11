@@ -4086,7 +4086,7 @@ export const listSmsSuppressions = <ThrowOnError extends boolean = false>(
  *
  * Stops a sender's messages to a subscriber, with reason `manual`, blocking every category including transactional. Both ends are required: a suppression covers a sender-and-subscriber pair, so stopping all of your senders means one call per sender.
  *
- * Adding is idempotent. A `201` means a new suppression was recorded, and a `200` means a `manual` one for that pair was already in place and is returned unchanged. A pair already stopped for another reason, such as the subscriber having texted a stop keyword, still gets its own `manual` record, and messages stay stopped until every one of them has ended.
+ * Adding is idempotent. A `201` means a new suppression was recorded, and a `200` means a `manual` one for that pair was already in place and is returned with `last_asserted_at` moved to this call, nothing else changed. A pair already stopped for another reason, such as the subscriber having texted a stop keyword, still gets its own `manual` record, and messages stay stopped until every one of them has ended.
  *
  */
 export const createSmsSuppression = <ThrowOnError extends boolean = false>(
