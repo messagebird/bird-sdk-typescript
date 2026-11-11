@@ -2867,7 +2867,7 @@ export type WhatsAppInboundStatsPoint = {
 export type AmbBusinessId = string;
 
 /**
- * Derived message classification for filtering and statistics. Send requests use the `text`, `rich_link` and `interactive` keys. Create Apple Pay and authentication requests through the conversation payment and authentication operations.
+ * Derived message classification for filtering and statistics. Send requests use the `text`, `rich_link` and `interactive` keys. `apple_pay` and `authenticate` appear on existing messages. Sends and templates do not accept them.
  *
  * - text: Text, optionally with a subject.
  * - attachment: One or more files, images, audio clips, or videos.
@@ -2878,8 +2878,8 @@ export type AmbBusinessId = string;
  * - form: A multi-page form.
  * - imessage_app: A custom iMessage app interaction on a compatible device.
  * - interactive: An opaque interactive reference whose subtype is unknown.
- * - apple_pay: An Apple Pay request created through the conversation payment operations.
- * - authenticate: An identity verification request created through the conversation authentication operations.
+ * - apple_pay: An Apple Pay request, or the customer's response to one. Apple Pay requests are in preview.
+ * - authenticate: An identity verification request, or the customer's response to one.
  */
 export type AmbContentKind =
   | "text"
@@ -7718,7 +7718,7 @@ export type SmsSuppression = {
    */
   readonly created_at: string;
   /**
-   * When we last recorded the subscriber opting out of this sender. Later than `created_at` when they texted a stop keyword again while already suppressed, which adds no new record but does earn another confirmation reply.
+   * When we last recorded the subscriber opting out of this sender. Later than `created_at` when they texted a stop keyword again, or your workspace added it again, while already suppressed. A repeat adds no new record; a repeated stop keyword also earns another confirmation reply.
    *
    */
   readonly last_asserted_at: string;
@@ -15930,7 +15930,7 @@ export type AmbiMessageApp = {
 };
 
 /**
- * Apple Pay request created through the conversation payment endpoint. Contains no payment token or provider credentials.
+ * An Apple Pay request. Read-only. It appears on existing messages, and sends and templates do not accept it. Apple Pay requests are in preview. Contains no payment token or provider credentials.
  */
 export type AmbNativePayment = {
   readonly payment_id: AmbPaymentId;
@@ -15939,7 +15939,7 @@ export type AmbNativePayment = {
 export type AmbAuthenticationId = string;
 
 /**
- * Authentication attempt created through the conversation authentication endpoint. Contains no authorization parameters or credentials.
+ * An identity verification request. Read-only. It appears on existing messages, and sends and templates do not accept it. Contains no authorization parameters or credentials.
  */
 export type AmbNativeAuthentication = {
   readonly authentication_id: AmbAuthenticationId;
@@ -28175,12 +28175,12 @@ export type VoiceLegMediaPath = {
 };
 
 /**
- * What was charged for a leg, split into the components that make it up.
+ * The rated Voice charges for a leg, split into their components. For Flash calling (coming soon), this covers only network usage and excludes the verification attempt fee. A Flash leg that rang without an answer has a total of zero and a null `outbound_amount` because there was no connected usage to charge. The Verify attempt cost includes both charges.
  *
  */
 export type VoiceLegCost = {
   /**
-   * Total charged, as a decimal string: the sum of the components below. Net of tax, which applies to your wallet balance rather than to an individual charge.
+   * Sum of the Voice components below, as a decimal string. Net of tax, which applies to your wallet balance rather than to an individual charge. For Flash calling (coming soon), this excludes the verification attempt fee and can be `0.000000` for a rated, unanswered leg.
    *
    */
   readonly amount: string;
@@ -28315,7 +28315,7 @@ export type VoiceLeg = {
    */
   readonly media?: VoiceLegMediaPath;
   /**
-   * What the leg cost, net of tax, at full precision, split into the components that make it up. Absent until the leg has been rated; unanswered or unpriced legs have no cost, and neither does a verification call Bird places and answers on your behalf, which is exempt from rating.
+   * The rated Voice charges for this leg, net of tax, at full precision. Absent for an unrated or exempt leg, including a verification call Bird places and answers on your behalf. For Flash calling (coming soon), a leg that rang without an answer has a total of zero and a null `outbound_amount`; the verification attempt fee is excluded.
    */
   readonly cost?: VoiceLegCost;
 };

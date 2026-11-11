@@ -5308,7 +5308,7 @@ export const AMBContentKindSchema = {
     "interactive",
   ],
   description:
-    "Derived message classification for filtering and statistics. Send requests use the `text`, `rich_link` and `interactive` keys. Create Apple Pay and authentication requests through the conversation payment and authentication operations.\n\n- text: Text, optionally with a subject.\n- attachment: One or more files, images, audio clips, or videos.\n- rich_link: A link with a preview card.\n- quick_reply: Two to five reply choices.\n- list_picker: A grouped menu of choices.\n- time_picker: Appointment time slots; a reply may contain only a selected label.\n- form: A multi-page form.\n- imessage_app: A custom iMessage app interaction on a compatible device.\n- interactive: An opaque interactive reference whose subtype is unknown.\n- apple_pay: An Apple Pay request created through the conversation payment operations.\n- authenticate: An identity verification request created through the conversation authentication operations.",
+    "Derived message classification for filtering and statistics. Send requests use the `text`, `rich_link` and `interactive` keys. `apple_pay` and `authenticate` appear on existing messages. Sends and templates do not accept them.\n\n- text: Text, optionally with a subject.\n- attachment: One or more files, images, audio clips, or videos.\n- rich_link: A link with a preview card.\n- quick_reply: Two to five reply choices.\n- list_picker: A grouped menu of choices.\n- time_picker: Appointment time slots; a reply may contain only a selected label.\n- form: A multi-page form.\n- imessage_app: A custom iMessage app interaction on a compatible device.\n- interactive: An opaque interactive reference whose subtype is unknown.\n- apple_pay: An Apple Pay request, or the customer's response to one. Apple Pay requests are in preview.\n- authenticate: An identity verification request, or the customer's response to one.",
 } as const;
 
 export const AMBStatsSummaryPeriodSchema = {
@@ -13742,7 +13742,7 @@ export const SMSSuppressionSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "When we last recorded the subscriber opting out of this sender. Later than `created_at` when they texted a stop keyword again while already suppressed, which adds no new record but does earn another confirmation reply.\n",
+        "When we last recorded the subscriber opting out of this sender. Later than `created_at` when they texted a stop keyword again, or your workspace added it again, while already suppressed. A repeat adds no new record; a repeated stop keyword also earns another confirmation reply.\n",
     },
   },
 } as const;
@@ -28861,7 +28861,7 @@ export const AMBNativePaymentSchema = {
   additionalProperties: false,
   readOnly: true,
   description:
-    "Apple Pay request created through the conversation payment endpoint. Contains no payment token or provider credentials.",
+    "An Apple Pay request. Read-only. It appears on existing messages, and sends and templates do not accept it. Apple Pay requests are in preview. Contains no payment token or provider credentials.",
   required: ["payment_id"],
   properties: {
     payment_id: {
@@ -28883,7 +28883,7 @@ export const AMBNativeAuthenticationSchema = {
   additionalProperties: false,
   readOnly: true,
   description:
-    "Authentication attempt created through the conversation authentication endpoint. Contains no authorization parameters or credentials.",
+    "An identity verification request. Read-only. It appears on existing messages, and sends and templates do not accept it. Contains no authorization parameters or credentials.",
   required: ["authentication_id"],
   properties: {
     authentication_id: {
@@ -28898,7 +28898,7 @@ export const AMBInteractiveSchema = {
   additionalProperties: false,
   "x-sensitive": true,
   description:
-    "Something for the customer to tap: exactly one of `quick_reply`, `list_picker`, `event` (a time picker), `dynamic` (a form) or `imessage_app`. To introduce it with text or files, send `text` alongside it; that text arrives as its own bubble first. Apple Pay and identity verification requests are created through their conversation endpoints and read back here as `payment` and `authenticate`.",
+    "Something for the customer to tap: exactly one of `quick_reply`, `list_picker`, `event` (a time picker), `dynamic` (a form) or `imessage_app`. To introduce it with text or files, send `text` alongside it; that text arrives as its own bubble first. `payment` and `authenticate` are read-only. They appear on existing messages that contain an Apple Pay or identity verification request. Sends and templates do not accept them.",
   oneOf: [
     {
       required: ["quick_reply"],
@@ -50684,14 +50684,14 @@ export const VoiceLegCostSchema = {
     "transcription_amount",
   ],
   description:
-    "What was charged for a leg, split into the components that make it up.\n",
+    "The rated Voice charges for a leg, split into their components. For Flash calling (coming soon), this covers only network usage and excludes the verification attempt fee. A Flash leg that rang without an answer has a total of zero and a null `outbound_amount` because there was no connected usage to charge. The Verify attempt cost includes both charges.\n",
   properties: {
     amount: {
       type: "string",
       minLength: 1,
       readOnly: true,
       description:
-        "Total charged, as a decimal string: the sum of the components below. Net of tax, which applies to your wallet balance rather than to an individual charge.\n",
+        "Sum of the Voice components below, as a decimal string. Net of tax, which applies to your wallet balance rather than to an individual charge. For Flash calling (coming soon), this excludes the verification attempt fee and can be `0.000000` for a rated, unanswered leg.\n",
       example: "0.013000",
     },
     currency_code: {
@@ -50962,7 +50962,7 @@ export const VoiceLegSchema = {
       $ref: "#/components/schemas/VoiceLegCost",
       readOnly: true,
       description:
-        "What the leg cost, net of tax, at full precision, split into the components that make it up. Absent until the leg has been rated; unanswered or unpriced legs have no cost, and neither does a verification call Bird places and answers on your behalf, which is exempt from rating.",
+        "The rated Voice charges for this leg, net of tax, at full precision. Absent for an unrated or exempt leg, including a verification call Bird places and answers on your behalf. For Flash calling (coming soon), a leg that rang without an answer has a total of zero and a null `outbound_amount`; the verification attempt fee is excluded.",
     },
   },
 } as const;
@@ -62300,7 +62300,7 @@ export const AMBInteractiveWritableSchema = {
   additionalProperties: false,
   "x-sensitive": true,
   description:
-    "Something for the customer to tap: exactly one of `quick_reply`, `list_picker`, `event` (a time picker), `dynamic` (a form) or `imessage_app`. To introduce it with text or files, send `text` alongside it; that text arrives as its own bubble first. Apple Pay and identity verification requests are created through their conversation endpoints and read back here as `payment` and `authenticate`.",
+    "Something for the customer to tap: exactly one of `quick_reply`, `list_picker`, `event` (a time picker), `dynamic` (a form) or `imessage_app`. To introduce it with text or files, send `text` alongside it; that text arrives as its own bubble first. `payment` and `authenticate` are read-only. They appear on existing messages that contain an Apple Pay or identity verification request. Sends and templates do not accept them.",
   oneOf: [
     {
       required: ["quick_reply"],

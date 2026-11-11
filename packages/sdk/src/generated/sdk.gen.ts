@@ -9500,7 +9500,9 @@ export const listAmbMessages = <ThrowOnError extends boolean = false>(
  *
  * Send a message in an existing Apple Messages for Business conversation. `from` is the Apple business identifier and `to` is the customer’s opaque identifier for that business. An unknown conversation returns 404; a closed conversation returns 422. Only the customer can reopen a conversation.
  *
- * Choose text, rich_link, or interactive content. Interactive content contains a quick reply, list picker, event, form, or custom iMessage app. Native payment and authentication requests are not available through this public operation. Device support varies; an unsupported interaction returns 422.
+ * Choose text, rich_link, or interactive content. Interactive content contains a quick reply, list picker, event, form, or custom iMessage app. Device support varies; an unsupported interaction returns 422.
+ *
+ * You cannot send an identity verification or Apple Pay request with this operation. `interactive.authenticate` and `interactive.payment` are read-only. They appear on existing messages, in message reads and webhooks. To send an identity verification request, open the conversation in the dashboard and select Request, then Verification request. Apple Pay requests are in preview.
  *
  * Supply attachments by source URL. Bird downloads the files and uploads them to Apple before sending. Interactive images must be PNG files up to 200 kB each, totaling at most 5 MB. Each attachment must be smaller than 100 MB. A media or provider failure after acceptance changes the message status to send_failed.
  *
