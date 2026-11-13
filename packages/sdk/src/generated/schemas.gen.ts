@@ -6456,13 +6456,14 @@ export const WhatsAppNumberErrorCodeSchema = {
     "business_account_locked",
     "business_verification_required",
     "credit_currency_mismatch",
+    "payment_method_conflict",
     "billing_close",
     "permission_denied",
     "invalid_request",
     "internal_error",
   ],
   description:
-    "Standardized number-connection failure:\n\n- `registration_pin_rejected`: WhatsApp refused the two-step verification PIN.\n- `registration_pin_rate_limited`: Too many PIN attempts occurred recently.\n- `registration_attempts_exhausted`: The number has no registration attempts left. WhatsApp's own lockout clears after 72 hours; the number's attempt budget does not, so contact support if repair keeps ending here.\n- `number_verification_required`: WhatsApp requires the number to be verified again.\n- `number_not_registered`: WhatsApp does not hold the number as registered.\n- `number_already_linked`: Another WhatsApp integration uses the number.\n- `number_already_in_use`: WhatsApp cannot accept the number.\n- `verification_code_not_received`: The verification text did not arrive.\n- `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.\n- `business_account_locked`: WhatsApp locked the business account.\n- `business_verification_required`: WhatsApp refused to register the number because the business portfolio is not verified, usually because an unverified portfolio may hold only a few registered numbers. Verify the business or free a registered number on the portfolio, then repair the number.\n- `credit_currency_mismatch`: WhatsApp bills the business account in a currency other than USD, EUR, or your organization's billing currency. In Meta Business Suite, remove the account's payment method and then set its currency to one of those. If Meta doesn't allow the change, connect the number under a business account WhatsApp bills in one of them or has set no currency on.\n- `billing_close`: WhatsApp refused to set up billing for the business account while its monthly billing close ran. The close usually ends within the first few days of the new month; nothing about the number or the account needs changing. Once those days have passed, repair the number.\n- `permission_denied`: WhatsApp refused access to the account.\n- `invalid_request`: WhatsApp rejected the connection details.\n- `internal_error`: The service could not classify or resolve the failure.\n\nThis is an open enum. Accept unrecognized values.\n",
+    "Standardized number-connection failure:\n\n- `registration_pin_rejected`: WhatsApp refused the two-step verification PIN.\n- `registration_pin_rate_limited`: Too many PIN attempts occurred recently.\n- `registration_attempts_exhausted`: The number has no registration attempts left. WhatsApp's own lockout clears after 72 hours; the number's attempt budget does not, so contact support if repair keeps ending here.\n- `number_verification_required`: WhatsApp requires the number to be verified again.\n- `number_not_registered`: WhatsApp does not hold the number as registered.\n- `number_already_linked`: Another WhatsApp integration uses the number.\n- `number_already_in_use`: WhatsApp cannot accept the number.\n- `verification_code_not_received`: The verification text did not arrive.\n- `verification_rate_limited`: WhatsApp declined to send this number another verification code, having been asked too often. It clears with time; retrying sooner extends it.\n- `business_account_locked`: WhatsApp locked the business account.\n- `business_verification_required`: WhatsApp refused to register the number because the business portfolio is not verified, usually because an unverified portfolio may hold only a few registered numbers. Verify the business or free a registered number on the portfolio, then repair the number.\n- `credit_currency_mismatch`: WhatsApp bills the business account in a currency other than USD, EUR, or your organization's billing currency. In Meta Business Suite, remove the account's payment method and then set its currency to one of those. If Meta doesn't allow the change, connect the number under a business account WhatsApp bills in one of them or has set no currency on.\n- `payment_method_conflict`: The business account already pays through another payment method or another provider's credit line, and WhatsApp doesn't let an account change its credit line once one is attached. Disconnect the number and connect it again under a new WhatsApp Business Account, without adding a payment method to it. For a number also on the WhatsApp Business app, Meta's steps to get a new account are in the coexistence troubleshooting guide.\n- `billing_close`: WhatsApp refused to set up billing for the business account while its monthly billing close ran. The close usually ends within the first few days of the new month; nothing about the number or the account needs changing. Once those days have passed, repair the number.\n- `permission_denied`: WhatsApp refused access to the account.\n- `invalid_request`: WhatsApp rejected the connection details.\n- `internal_error`: The service could not classify or resolve the failure.\n\nThis is an open enum. Accept unrecognized values.\n",
   example: "registration_pin_rejected",
 } as const;
 
@@ -10374,6 +10375,21 @@ export const EmailBroadcastSendNowRequestSchema = {
   },
   example: {
     scheduled_at: "2026-12-01T09:00:00Z",
+  },
+} as const;
+
+export const EmailBroadcastResumeSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    confirm: {
+      type: "boolean",
+      description:
+        "Acknowledgment that the message reaches the remaining recipients later than intended. It is required to resume a broadcast that started sending at least 24 hours ago. Before setting it, read the broadcast's `started_at` and have a reviewer with `email_management:read` check its pinned template version using `template.id` and `template.version_id`. Workspace versions retain the original content. Built-in template lookups (`scope: system`) show current catalogue content. Broadcasts with frozen content keep it, but older broadcasts can read the catalogue again when resumed. Neither a current lookup nor an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Ask an authorized teammate if you lack that permission. It does not skip the funds or concurrent-broadcast checks.",
+    },
+  },
+  example: {
+    confirm: true,
   },
 } as const;
 
@@ -22879,7 +22895,7 @@ export const _ConversationUpdateSchema = {
       maxItems: 20,
       uniqueItems: true,
       description:
-        "Labels chosen by your workspace. On update, this replaces the full set; pass an empty array to clear every label. Labels do not change read state or inbox status.\n\nEach label must contain 1 to 64 characters, with no commas, control characters, or leading or trailing whitespace. Duplicate labels are rejected. The names `all`, `archived`, `assigned`, `closed`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `inbox`, `junk`, `muted`, `none`, `open`, `pinned`, `read`, `snoozed`, `spam`, `starred`, `trash`, and `unread` are reserved in every casing.\n",
+        "Labels from your workspace's label list. On update, this replaces the full set; pass an empty array to clear every label. Labels do not change read state or inbox status.\n\nA name matches the workspace's labels in any casing: adding \"Urgent\" where the workspace has \"urgent\" applies \"urgent\", and responses return the workspace's spelling. A name the workspace doesn't have yet becomes a new label. It must contain 1 to 64 characters, with no commas, control characters, or leading or trailing whitespace, and can't take the workspace past its limit of 100 labels. A new label can't use a reserved name: `all`, `archive`, `archived`, `assigned`, `blocked`, `closed`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `inbox`, `junk`, `muted`, `none`, `open`, `outbox`, `pinned`, `read`, `scheduled`, `sent`, `snoozed`, `spam`, `starred`, `trash` or `unread`, in any casing. A label the workspace already has keeps working even if its name is reserved.\n",
       example: ["billing", "vip"],
     },
     read: {
@@ -51449,7 +51465,13 @@ export const AvailableNumberSchema = {
       type: "string",
       "x-extensible-enum": ["anywhere", "country", "number_area"],
       description:
-        "Where the carrier requires the business address on this number's ownership registration\nto be. Present only when the carrier itself registers the number before it carries\ntraffic and states a rule; omitted otherwise. An address that does not meet the rule\nis refused after purchase, and only an address that meets it can fix the registration.\n\n- `anywhere`: any business address.\n- `country`: a business address in the number's country.\n- `number_area`: a business address inside the number's own area code, for example in\n  Amsterdam for an Amsterdam (020) number.\n",
+        "Where the carrier requires the business address on this number's ownership registration\nto be. Present only when the carrier itself registers the number before it carries\ntraffic, as `anywhere` when it restricts no address; omitted otherwise. An address that does not meet the rule\nis refused after purchase, and only an address that meets it can fix the registration.\nIf the paperwork is not approved by the registration deadline, the number is removed:\nany setup fee is credited back, and the first recurring charge is not refunded.\n\n- `anywhere`: any business address.\n- `country`: a business address in the number's country.\n- `number_area`: a business address inside the number's own area code, for example in\n  Amsterdam for an Amsterdam (020) number. `ownership_address_area_name` names the area\n  when it is known.\n",
+    },
+    ownership_address_area_name: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Name of the area this local number belongs to, for example `Amsterdam`: the area a `number_area` `ownership_address_scope` refers to. Text for display; the address is not checked against it before purchase. Omitted when the number has no `number_area` rule or the area is not known.",
     },
     pricing: {
       description:
@@ -68040,7 +68062,13 @@ export const AvailableNumberWritableSchema = {
       type: "string",
       "x-extensible-enum": ["anywhere", "country", "number_area"],
       description:
-        "Where the carrier requires the business address on this number's ownership registration\nto be. Present only when the carrier itself registers the number before it carries\ntraffic and states a rule; omitted otherwise. An address that does not meet the rule\nis refused after purchase, and only an address that meets it can fix the registration.\n\n- `anywhere`: any business address.\n- `country`: a business address in the number's country.\n- `number_area`: a business address inside the number's own area code, for example in\n  Amsterdam for an Amsterdam (020) number.\n",
+        "Where the carrier requires the business address on this number's ownership registration\nto be. Present only when the carrier itself registers the number before it carries\ntraffic, as `anywhere` when it restricts no address; omitted otherwise. An address that does not meet the rule\nis refused after purchase, and only an address that meets it can fix the registration.\nIf the paperwork is not approved by the registration deadline, the number is removed:\nany setup fee is credited back, and the first recurring charge is not refunded.\n\n- `anywhere`: any business address.\n- `country`: a business address in the number's country.\n- `number_area`: a business address inside the number's own area code, for example in\n  Amsterdam for an Amsterdam (020) number. `ownership_address_area_name` names the area\n  when it is known.\n",
+    },
+    ownership_address_area_name: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Name of the area this local number belongs to, for example `Amsterdam`: the area a `number_area` `ownership_address_scope` refers to. Text for display; the address is not checked against it before purchase. Omitted when the number has no `number_area` rule or the area is not known.",
     },
     pricing: {
       description:

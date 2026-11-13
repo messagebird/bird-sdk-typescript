@@ -1215,6 +1215,9 @@ import type {
   RestoreMailboxData,
   RestoreMailboxErrors,
   RestoreMailboxResponses,
+  ResumeEmailBroadcastData,
+  ResumeEmailBroadcastErrors,
+  ResumeEmailBroadcastResponses,
   ResumeEsimData,
   ResumeEsimErrors,
   ResumeEsimResponses,
@@ -2497,6 +2500,8 @@ export const getEmailBroadcastCounts = <ThrowOnError extends boolean = false>(
  *
  * `broadcasts` reports the separate broadcast count allowance for the billing period, or the UTC day when no current billing period is available. Sending or scheduling a draft uses one broadcast from this allowance. `send_at` does not change `broadcasts`.
  *
+ * A `503` means the email limits could not be read. Retry the check; this error does not establish whether sending is allowed.
+ *
  * These counts are live estimates. Audience membership, suppressions, and email usage can change before the broadcast sends. This check reserves nothing. The email send allowance is checked again when the broadcast sends. The broadcast must have an audience selected. A broadcast without an audience returns a `422`.
  *
  */
@@ -2801,6 +2806,44 @@ export const cancelEmailBroadcast = <ThrowOnError extends boolean = false>(
     ],
     url: "/v1/email/broadcasts/{broadcast_id}/cancel",
     ...options,
+  });
+
+/**
+ * Resume a broadcast
+ *
+ * Continues a `paused` broadcast using its saved template references and recipient list, skipping recipients already sent to and applying current consent and suppression checks for its saved category. Marketing broadcasts skip newly unsubscribed recipients; transactional broadcasts retain their category exemptions. Resuming does not use another broadcast from your monthly allowance. A `202` returns `status: sending`; delivery continues asynchronously. Use [get the broadcast](/docs/api/reference/get-email-broadcast) to follow progress.
+ *
+ * If the broadcast first started sending at least 24 hours ago, review its message and set `confirm` to `true` to acknowledge late delivery. For older broadcasts without `started_at`, the threshold uses the send authorization time, or the creation time if neither timestamp was recorded. You can also send `confirm: true` before that threshold; it does not skip other checks. To review the message, use the broadcast's `template.id` and `template.version_id` with [get a template version](/docs/api/reference/get-email-template-version), then check `template.language` or the version's `default_language`. This requires `email_management:read`. Published workspace versions retain their original content and remain readable by ID after template deletion; a deleted or reused slug cannot identify the original message. A built-in template version lookup (`scope: system`) returns current catalogue content. Broadcasts with frozen content keep sending that content, but older broadcasts can read the catalogue again when resumed. Neither the current lookup nor a copy of an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Once the funding wait has ended, adding funds alone does not restart a paused broadcast: call this operation explicitly after reviewing its content.
+ *
+ * Returns `403` if the workspace is suspended or has been suspended since the original send authorization. `E04102` means a later suspension revoked this broadcast's authorization; reactivation does not restore it, so cancel the broadcast instead of retrying. Do not resend to its full audience without excluding recipients already sent to. Returns `402` if the account is blocked for insufficient funds, or `409` if the broadcast is not paused or needs late-delivery confirmation. A `422` can mean the concurrent broadcast limit is reached or the sender or IP pool needs repair. Read the error details, then wait for a free slot or repair the sender or pool and retry. A `429` can mean a sending limit prevents resuming. These refusals leave the broadcast paused. A `503` means the balance or email limits could not be checked; the broadcast stays paused and you can retry.
+ *
+ */
+export const resumeEmailBroadcast = <ThrowOnError extends boolean = false>(
+  options: Options<ResumeEmailBroadcastData, ThrowOnError>,
+): RequestResult<
+  ResumeEmailBroadcastResponses,
+  ResumeEmailBroadcastErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    ResumeEmailBroadcastResponses,
+    ResumeEmailBroadcastErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/broadcasts/{broadcast_id}/resume",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**
@@ -6088,10 +6131,15 @@ export const listWorkspaceSmsSenderRequirements = <
  *
  * Registers a sender for a destination country. If the country requires review, the sender can send there after approval. If registration is optional, it takes effect immediately and records the intended message category.
  *
- * A priced alphanumeric sender incurs a setup fee and a recurring monthly charge, and needs
- * enough balance for both when it is billed: on this call where the country approves
- * immediately, or on approval where the country reviews, so a reviewed registration is created
- * unbilled. Insufficient balance at that moment returns `402`. Registering a number is free.
+ * A priced sender, alphanumeric or a number, incurs a setup fee and a recurring monthly charge.
+ * Where the country approves immediately,
+ * both are billed on this call. Where the country reviews, the registration is created unbilled:
+ * the setup fee is charged when its paperwork is submitted, or on approval if it needs none, and
+ * the recurring charge starts on approval. This call returns `402` only when it bills, on an
+ * immediate approval or a reactivation. A reviewed registration's paperwork submission charges
+ * only the setup fee but needs balance for the setup fee and the first monthly charge together,
+ * and returns `402` otherwise; that submission is the request to retry after topping up.
+ * Whether a sender is priced depends on its country and sender type.
  * A `412` means required identity verification is incomplete or organization eligibility
  * prevents registration. Follow the error's recovery guidance: complete missing verification,
  * or contact support about an eligibility review or denial. An eligibility assessment still

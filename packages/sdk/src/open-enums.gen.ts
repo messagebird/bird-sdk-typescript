@@ -1536,6 +1536,7 @@ export const WhatsAppNumberErrorCode = {
   NumberAlreadyLinked: "number_already_linked",
   NumberNotRegistered: "number_not_registered",
   NumberVerificationRequired: "number_verification_required",
+  PaymentMethodConflict: "payment_method_conflict",
   PermissionDenied: "permission_denied",
   RegistrationAttemptsExhausted: "registration_attempts_exhausted",
   RegistrationPinRateLimited: "registration_pin_rate_limited",

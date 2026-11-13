@@ -3594,6 +3594,7 @@ export type WhatsAppNumberStatus =
  * - `business_account_locked`: WhatsApp locked the business account.
  * - `business_verification_required`: WhatsApp refused to register the number because the business portfolio is not verified, usually because an unverified portfolio may hold only a few registered numbers. Verify the business or free a registered number on the portfolio, then repair the number.
  * - `credit_currency_mismatch`: WhatsApp bills the business account in a currency other than USD, EUR, or your organization's billing currency. In Meta Business Suite, remove the account's payment method and then set its currency to one of those. If Meta doesn't allow the change, connect the number under a business account WhatsApp bills in one of them or has set no currency on.
+ * - `payment_method_conflict`: The business account already pays through another payment method or another provider's credit line, and WhatsApp doesn't let an account change its credit line once one is attached. Disconnect the number and connect it again under a new WhatsApp Business Account, without adding a payment method to it. For a number also on the WhatsApp Business app, Meta's steps to get a new account are in the coexistence troubleshooting guide.
  * - `billing_close`: WhatsApp refused to set up billing for the business account while its monthly billing close ran. The close usually ends within the first few days of the new month; nothing about the number or the account needs changing. Once those days have passed, repair the number.
  * - `permission_denied`: WhatsApp refused access to the account.
  * - `invalid_request`: WhatsApp rejected the connection details.
@@ -3615,6 +3616,7 @@ export type WhatsAppNumberErrorCode =
   | "business_account_locked"
   | "business_verification_required"
   | "credit_currency_mismatch"
+  | "payment_method_conflict"
   | "billing_close"
   | "permission_denied"
   | "invalid_request"
@@ -5966,6 +5968,13 @@ export type EmailBroadcastSendNowRequest = {
    * When to send the broadcast. It has to be at least 30 seconds and at most 365 days from now. Leave it out to send straight away.
    */
   scheduled_at?: string;
+};
+
+export type EmailBroadcastResume = {
+  /**
+   * Acknowledgment that the message reaches the remaining recipients later than intended. It is required to resume a broadcast that started sending at least 24 hours ago. Before setting it, read the broadcast's `started_at` and have a reviewer with `email_management:read` check its pinned template version using `template.id` and `template.version_id`. Workspace versions retain the original content. Built-in template lookups (`scope: system`) show current catalogue content. Broadcasts with frozen content keep it, but older broadcasts can read the catalogue again when resumed. Neither a current lookup nor an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Ask an authorized teammate if you lack that permission. It does not skip the funds or concurrent-broadcast checks.
+   */
+  confirm?: boolean;
 };
 
 /**
@@ -12654,9 +12663,9 @@ export type ConversationUpdate = {
   assigned_to?: string | null;
   inbox_status?: ConversationInboxStatus;
   /**
-   * Labels chosen by your workspace. On update, this replaces the full set; pass an empty array to clear every label. Labels do not change read state or inbox status.
+   * Labels from your workspace's label list. On update, this replaces the full set; pass an empty array to clear every label. Labels do not change read state or inbox status.
    *
-   * Each label must contain 1 to 64 characters, with no commas, control characters, or leading or trailing whitespace. Duplicate labels are rejected. The names `all`, `archived`, `assigned`, `closed`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `inbox`, `junk`, `muted`, `none`, `open`, `pinned`, `read`, `snoozed`, `spam`, `starred`, `trash`, and `unread` are reserved in every casing.
+   * A name matches the workspace's labels in any casing: adding "Urgent" where the workspace has "urgent" applies "urgent", and responses return the workspace's spelling. A name the workspace doesn't have yet becomes a new label. It must contain 1 to 64 characters, with no commas, control characters, or leading or trailing whitespace, and can't take the workspace past its limit of 100 labels. A new label can't use a reserved name: `all`, `archive`, `archived`, `assigned`, `blocked`, `closed`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `inbox`, `junk`, `muted`, `none`, `open`, `outbox`, `pinned`, `read`, `scheduled`, `sent`, `snoozed`, `spam`, `starred`, `trash` or `unread`, in any casing. A label the workspace already has keeps working even if its name is reserved.
    *
    */
   labels?: Array<string>;
@@ -28578,16 +28587,23 @@ export type AvailableNumber = {
   /**
    * Where the carrier requires the business address on this number's ownership registration
    * to be. Present only when the carrier itself registers the number before it carries
-   * traffic and states a rule; omitted otherwise. An address that does not meet the rule
+   * traffic, as `anywhere` when it restricts no address; omitted otherwise. An address that does not meet the rule
    * is refused after purchase, and only an address that meets it can fix the registration.
+   * If the paperwork is not approved by the registration deadline, the number is removed:
+   * any setup fee is credited back, and the first recurring charge is not refunded.
    *
    * - `anywhere`: any business address.
    * - `country`: a business address in the number's country.
    * - `number_area`: a business address inside the number's own area code, for example in
-   *   Amsterdam for an Amsterdam (020) number.
+   *   Amsterdam for an Amsterdam (020) number. `ownership_address_area_name` names the area
+   *   when it is known.
    *
    */
   ownership_address_scope?: string;
+  /**
+   * Name of the area this local number belongs to, for example `Amsterdam`: the area a `number_area` `ownership_address_scope` refers to. Text for display; the address is not checked against it before purchase. Omitted when the number has no `number_area` rule or the area is not known.
+   */
+  ownership_address_area_name?: string;
   /**
    * What your organization pays for this number. Omitted on admin supplier searches, which have no organization to price for.
    */
@@ -37374,16 +37390,23 @@ export type AvailableNumberWritable = {
   /**
    * Where the carrier requires the business address on this number's ownership registration
    * to be. Present only when the carrier itself registers the number before it carries
-   * traffic and states a rule; omitted otherwise. An address that does not meet the rule
+   * traffic, as `anywhere` when it restricts no address; omitted otherwise. An address that does not meet the rule
    * is refused after purchase, and only an address that meets it can fix the registration.
+   * If the paperwork is not approved by the registration deadline, the number is removed:
+   * any setup fee is credited back, and the first recurring charge is not refunded.
    *
    * - `anywhere`: any business address.
    * - `country`: a business address in the number's country.
    * - `number_area`: a business address inside the number's own area code, for example in
-   *   Amsterdam for an Amsterdam (020) number.
+   *   Amsterdam for an Amsterdam (020) number. `ownership_address_area_name` names the area
+   *   when it is known.
    *
    */
   ownership_address_scope?: string;
+  /**
+   * Name of the area this local number belongs to, for example `Amsterdam`: the area a `number_area` `ownership_address_scope` refers to. Text for display; the address is not checked against it before purchase. Omitted when the number has no `number_area` rule or the area is not known.
+   */
+  ownership_address_area_name?: string;
   /**
    * What your organization pays for this number. Omitted on admin supplier searches, which have no organization to price for.
    */
@@ -38099,7 +38122,7 @@ export type ConversationInboxStatusFilter = ConversationInboxStatus;
 export type ConversationAssigneeFilter = string;
 
 /**
- * Return conversations carrying this label. Repeat the parameter to require every supplied label.
+ * Return conversations carrying this label, matched in any casing. Repeat the parameter to require every supplied label. A name the workspace doesn't have matches nothing.
  */
 export type ConversationLabelFilter = Array<string>;
 
@@ -40744,6 +40767,11 @@ export type GetEmailBroadcastSendQuotaErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type GetEmailBroadcastSendQuotaError =
@@ -41486,6 +41514,111 @@ export type CancelEmailBroadcastResponses = {
 
 export type CancelEmailBroadcastResponse =
   CancelEmailBroadcastResponses[keyof CancelEmailBroadcastResponses];
+
+export type ResumeEmailBroadcastData = {
+  body?: EmailBroadcastResume;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Broadcast identifier. Starts with `eb_`.
+     */
+    broadcast_id: EmailBroadcastId;
+  };
+  query?: never;
+  url: "/v1/email/broadcasts/{broadcast_id}/resume";
+};
+
+export type ResumeEmailBroadcastErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ResumeEmailBroadcastError =
+  ResumeEmailBroadcastErrors[keyof ResumeEmailBroadcastErrors];
+
+export type ResumeEmailBroadcastResponses = {
+  /**
+   * Resumption accepted with `status: sending`. Poll [get the broadcast](/docs/api/reference/get-email-broadcast) to follow delivery and later status changes.
+   *
+   */
+  202: EmailBroadcast;
+};
+
+export type ResumeEmailBroadcastResponse =
+  ResumeEmailBroadcastResponses[keyof ResumeEmailBroadcastResponses];
 
 export type ListContactsData = {
   body?: never;
@@ -51941,7 +52074,7 @@ export type ListWhatsAppConversationsData = {
      */
     service_window_status?: WhatsAppConversationServiceWindowStatus;
     /**
-     * Return conversations carrying this label. Repeat the parameter to require every supplied label.
+     * Return conversations carrying this label, matched in any casing. Repeat the parameter to require every supplied label. A name the workspace doesn't have matches nothing.
      */
     label?: Array<string>;
     /**
@@ -58693,7 +58826,7 @@ export type ListAmbConversationsData = {
      */
     assigned_to?: string;
     /**
-     * Return conversations carrying this label. Repeat the parameter to require every supplied label.
+     * Return conversations carrying this label, matched in any casing. Repeat the parameter to require every supplied label. A name the workspace doesn't have matches nothing.
      */
     label?: Array<string>;
     /**

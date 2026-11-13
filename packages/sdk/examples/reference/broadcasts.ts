@@ -28,7 +28,11 @@ export async function broadcastsCreate() {
 
 export async function broadcastsGet() {
   const broadcast = await bird.broadcasts.get("eb_01krdgeqcxet5s7t44vh8rt9mg");
-  console.log(broadcast.status, broadcast.sent_count, broadcast.delivered_count);
+  console.log(
+    broadcast.status,
+    broadcast.sent_count,
+    broadcast.delivered_count,
+  );
 }
 
 export async function broadcastsUpdate() {
@@ -57,12 +61,25 @@ export async function broadcastsSend() {
 }
 
 export async function broadcastsCancel() {
-  const broadcast = await bird.broadcasts.cancel("eb_01krdgeqcxet5s7t44vh8rt9mg");
+  const broadcast = await bird.broadcasts.cancel(
+    "eb_01krdgeqcxet5s7t44vh8rt9mg",
+  );
+  console.log(broadcast.status);
+}
+
+export async function broadcastsResume() {
+  // Confirm only after verifying the content remaining recipients will receive and started_at. Leave unverifiable content paused.
+  const broadcast = await bird.broadcasts.resume(
+    "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    { confirm: true },
+  );
   console.log(broadcast.status);
 }
 
 export async function broadcastsSendQuota() {
-  const quota = await bird.broadcasts.sendQuota("eb_01krdgeqcxet5s7t44vh8rt9mg");
+  const quota = await bird.broadcasts.sendQuota(
+    "eb_01krdgeqcxet5s7t44vh8rt9mg",
+  );
   if (quota.allowed < quota.recipients) {
     console.log(`${quota.limited_by} allowance covers only ${quota.allowed}`);
   }
@@ -74,22 +91,30 @@ export async function broadcastsCounts() {
 }
 
 export async function broadcastsListRecipients() {
-  for await (const recipient of bird.broadcasts.listRecipients("eb_01krdgeqcxet5s7t44vh8rt9mg")) {
+  for await (const recipient of bird.broadcasts.listRecipients(
+    "eb_01krdgeqcxet5s7t44vh8rt9mg",
+  )) {
     console.log(recipient.recipient, recipient.status);
   }
 }
 
 export async function broadcastsListEvents() {
-  for await (const event of bird.broadcasts.listEvents("eb_01krdgeqcxet5s7t44vh8rt9mg", {
-    type: "email.bounced",
-  })) {
+  for await (const event of bird.broadcasts.listEvents(
+    "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    {
+      type: "email.bounced",
+    },
+  )) {
     console.log(event.type, event.recipient_id, event.bounce_type);
   }
 }
 
 export async function broadcastsListClickedLinks() {
-  const links = await bird.broadcasts.listClickedLinks("eb_01krdgeqcxet5s7t44vh8rt9mg");
-  for (const link of links.data) console.log(link.url, link.click_count, link.recipient_count);
+  const links = await bird.broadcasts.listClickedLinks(
+    "eb_01krdgeqcxet5s7t44vh8rt9mg",
+  );
+  for (const link of links.data)
+    console.log(link.url, link.click_count, link.recipient_count);
 }
 
 export async function broadcastsValidate() {
