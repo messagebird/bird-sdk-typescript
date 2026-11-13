@@ -5972,7 +5972,7 @@ export type EmailBroadcastSendNowRequest = {
 
 export type EmailBroadcastResume = {
   /**
-   * Acknowledgment that the message reaches the remaining recipients later than intended. It is required to resume a broadcast that started sending at least 24 hours ago. Before setting it, read the broadcast's `started_at` and have a reviewer with `email_management:read` check its pinned template version using `template.id` and `template.version_id`. Workspace versions retain the original content. Built-in template lookups (`scope: system`) show current catalogue content. Broadcasts with frozen content keep it, but older broadcasts can read the catalogue again when resumed. Neither a current lookup nor an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Ask an authorized teammate if you lack that permission. It does not skip the funds or concurrent-broadcast checks.
+   * Acknowledgment that the message reaches the remaining recipients later than intended. It is required to resume a broadcast that started sending at least 24 hours ago. Before setting it, read the broadcast's `started_at` and have a reviewer with `email_management:read` read its template by `template.id` to check `scope`, then, for a workspace template or one the template read reports deleted (`404`), its pinned version using `template.id` and `template.version_id`. Workspace versions retain the original content. A built-in template (`scope: system`) shows current catalogue content, and only the template read returns `scope`. Broadcasts with frozen content keep it, but older broadcasts can read the catalogue again when resumed. Neither a current lookup nor an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Ask an authorized teammate if you lack that permission. It does not skip the funds or concurrent-broadcast checks.
    */
   confirm?: boolean;
 };
@@ -27885,6 +27885,39 @@ export type VoiceParty = {
   readonly user_id?: UserId | null;
 };
 
+export type VoiceCallTranscriptId = string;
+
+export type VoiceCallMediaId = string;
+
+/**
+ * Whether the attempt produced a transcript. `failed` is an outcome, not evidence that a later attempt cannot succeed.
+ */
+export type VoiceLegTranscriptState = "available" | "failed";
+
+/**
+ * Which direction of the leg the stream carries: `rx` for what the platform received, `tx` for what it sent.
+ */
+export type VoiceLegChannel = "rx" | "tx";
+
+export type VoiceLegTranscriptCue = {
+  /**
+   * Position of this cue in the transcript.
+   */
+  seq: number;
+  /**
+   * Offset of this cue from the start of its stream, in milliseconds. Set on `aligned` cues; `null` when nothing measured it, because a zero would be a claim about timing that was never made.
+   */
+  start_ms?: number | null;
+  /**
+   * Offset of the end of this cue from the start of its stream. `null` on the same terms as `start_ms`.
+   */
+  end_ms?: number | null;
+  /**
+   * What was transcribed for this cue. Empty on the single cue of a stream where nothing was heard.
+   */
+  text: string;
+};
+
 /**
  * A short-lived SIP digest credential for a calling client. The `password` is returned once and cannot be recovered. Create a new credential if you lose it.
  *
@@ -28581,7 +28614,7 @@ export type AvailableNumber = {
    */
   capabilities: Array<NumberCapability>;
   /**
-   * Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any `pricing.setup_price` is charged during purchase, plus any tax. The recurring charge, net of tax `pricing.recurring_price` multiplied by `pricing.intervals_per_charge`, is taken with any tax at assignment and at each renewal, even while approval is pending; assignment may follow completion of a pending supplier order.
+   * Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any `pricing.setup_price` is charged at assignment for Bird stock and usually on delivery for a carrier number, plus any tax. The recurring charge, net of tax `pricing.recurring_price` multiplied by `pricing.intervals_per_charge`, is taken with any tax at assignment and at each renewal, even while approval is pending; assignment may follow completion of a pending supplier order.
    */
   ownership_registration_required: boolean;
   /**
@@ -28619,15 +28652,16 @@ export type AvailableNumberList = {
  *
  * - `charging`: Securing funds.
  * - `ordering`: Placing the order with the carrier.
- * - `pending`: The carrier accepted the order and is provisioning the number. A carrier
- *   number's first recurring charge is taken on delivery: keep funds available, because a
- *   delivered number that still cannot be charged is released no sooner than 72 hours after the order
- *   was placed: its order fails and its setup fee is refunded.
+ * - `pending`: The carrier accepted the order and is provisioning the number. A carrier number
+ *   is usually charged on delivery: keep funds available, because a delivered number that still cannot
+ *   be charged is released no sooner than 72 hours after the order was placed, and its order fails.
  * - `completed`: Your workspace owns the number.
  * - `failed`: The purchase did not complete.
  *
- * Apart from that release, a setup fee already charged is non-refundable. Contact
- * support about a failed order.
+ * A number from a carrier is usually charged when the carrier delivers it. A setup fee
+ * already charged, for an inventory number or a carrier number charged upfront, is not
+ * refunded when its purchase fails, unless the deadline releases the delivered number.
+ * Contact support about a failed order.
  */
 export type NumbersOrderStatus =
   "charging" | "ordering" | "pending" | "completed" | "failed" | (string & {});
@@ -30364,6 +30398,193 @@ export type VoiceLegList = {
 } & ListEnvelope;
 
 /**
+ * What became of this stored audio.
+ *
+ * `open` while capture is still running. `available` once the bytes are
+ * stored. `failed` when capture did not produce any. `purged` is reserved for
+ * future use. Recordings are removed from the response after their retention
+ * period.
+ *
+ */
+export type VoiceLegMediaState = "open" | "available" | "failed" | "purged";
+
+export type VoiceLegRecordingMedia = {
+  /**
+   * Unique identifier for this stream.
+   */
+  id: VoiceCallMediaId;
+  /**
+   * The leg this stream was captured from.
+   */
+  leg_id: VoiceCallId;
+  /**
+   * `null` on a stream captured before calls existed, which only its leg addresses.
+   */
+  call_id?: VoiceSessionId | null;
+  /**
+   * Codec of the stored payload.
+   */
+  codec: string;
+  state: VoiceLegMediaState;
+  /**
+   * Length of the announcement that played before capture started. Zero when nothing was announced. It is not a position on a call clock.
+   */
+  offset_ms: number;
+  /**
+   * Length of the payload itself. This runs shorter than `ended_at - started_at` by the silence before the first packet, so use it for anything about the sound and the window for anything about the leg.
+   */
+  audio_ms: number;
+  /**
+   * The party this audio was captured from, which is what says whose voice it
+   * carries. `channel` only says which direction of the leg the stream came
+   * from. A recording view's `number` identifies a number associated with
+   * that view, which can be an outbound destination.
+   *
+   * `null` on a stream stored before the platform recorded a party for it.
+   *
+   */
+  source_party?: VoiceParty | null;
+  /**
+   * When capture started, which is after any announcement rather than at the answer.
+   */
+  started_at: string;
+  /**
+   * When capture ended, or null while capture is open or its end is unknown.
+   */
+  ended_at: string | null;
+};
+
+export type VoiceCallRecordingId = string;
+
+export type VoiceLegRecording = {
+  /**
+   * Unique identifier for this view.
+   */
+  id: VoiceCallRecordingId;
+  /**
+   * The leg this view belongs to.
+   */
+  leg_id: VoiceCallId;
+  /**
+   * `null` on a recording captured before calls existed.
+   */
+  call_id?: VoiceSessionId | null;
+  /**
+   * The number associated with this recording view, when one was recorded. It can be an outbound destination. Omitted for numberless calls.
+   */
+  number?: string;
+  /**
+   * It does not say whose voice it is.
+   */
+  channel: VoiceLegChannel;
+  /**
+   * The stream this view refers to. A stream captured on another leg or omitted by retention or truncation may be absent from `media` in this response.
+   */
+  media_id: VoiceCallMediaId;
+  /**
+   * When the referenced stream started, which a view captured from the far leg does not share with its own `started_at`.
+   */
+  media_started_at: string;
+  started_at: string;
+  /**
+   * When capture ended, or null while capture is open or its end is unknown.
+   */
+  ended_at: string | null;
+};
+
+/**
+ * What the times in `cues` are worth: `whole` for a pass that times nothing, `aligned` for offline forced alignment, `live` for a streaming producer.
+ */
+export type VoiceLegTranscriptSource =
+  "whole" | "aligned" | "live" | (string & {});
+
+export type VoiceLegTranscript = {
+  /**
+   * Unique identifier for this attempt.
+   */
+  id: VoiceCallTranscriptId;
+  /**
+   * The leg the transcribed stream was captured from.
+   */
+  leg_id: VoiceCallId;
+  /**
+   * `null` on a transcript of a stream captured before calls existed.
+   */
+  call_id?: VoiceSessionId | null;
+  /**
+   * The stream this attempt describes.
+   */
+  media_id: VoiceCallMediaId;
+  /**
+   * When that stream started. A transcript is retained with the stream it describes rather than on its own transcription lag.
+   */
+  media_started_at: string;
+  state: VoiceLegTranscriptState;
+  source: VoiceLegTranscriptSource;
+  /**
+   * The model that produced it.
+   */
+  model?: string;
+  /**
+   * The direction of the transcribed stream.
+   */
+  channel: VoiceLegChannel;
+  /**
+   * The transcript, in order. Concatenating cues across streams reads as prose nobody spoke, and a reader matching over it can match the wrong party's words.
+   */
+  cues: Array<VoiceLegTranscriptCue>;
+  /**
+   * The party this audio was captured from, which is what says whose voice it
+   * carries. `channel` only says which direction of the leg the stream came
+   * from. A recording view's `number` identifies a number associated with
+   * that view, which can be an outbound destination.
+   *
+   * `null` on a stream stored before the platform recorded a party for it.
+   *
+   */
+  source_party?: VoiceParty | null;
+  created_at: string;
+};
+
+export type VoiceLegRecordings = {
+  /**
+   * The stored audio this read covers, each stream once.
+   */
+  media: Array<VoiceLegRecordingMedia>;
+  /**
+   * Each leg's view of that audio.
+   */
+  recordings: Array<VoiceLegRecording>;
+  /**
+   * Every transcription attempt over that audio, including failed ones.
+   */
+  transcripts: Array<VoiceLegTranscript>;
+  /**
+   * Whether a collection above was cut at this read's per-collection limit of
+   * 500. When `true`, there is more than is shown here and this response is not
+   * the whole set.
+   *
+   * `false` means no collection hit that limit, and a collection that could
+   * not be read in full fails the request rather than returning a short
+   * answer. What `false` does not establish is that every recording made has
+   * arrived: delivery into this store is asynchronous, so a recording made
+   * moments ago can be absent from a complete read.
+   *
+   */
+  truncated: boolean;
+  /**
+   * The instant each collection's retention was decided at. Nothing here stays true because you are still holding the response. A recording can expire after it.
+   */
+  evaluated_at: string;
+};
+
+/**
+ * Whether a signed audio URL plays the recording or saves it. The signature carries this, so it cannot be changed after the URL is minted.
+ *
+ */
+export type VoiceRecordingDisposition = "inline" | "attachment";
+
+/**
  * Expression language used by explicitly marked values in a voice sequence definition.
  */
 export type VoiceSequenceExpressionEnvironment = "bird.cel.v1";
@@ -30577,6 +30798,52 @@ export type CreateVoiceCallRequest = {
    */
   ringing_timeout_seconds?: number;
   sequence: CreateVoiceCallSequenceRequest;
+};
+
+export type VoiceCallTranscriptCue = {
+  /**
+   * Index into the transcript's `parties` of the party who spoke this cue,
+   * the party its stream was captured from. `null` on a stream with no recorded
+   * party.
+   *
+   */
+  party: number | null;
+  /**
+   * When this cue began, measured on its stream. `null` on a transcript that timed nothing, whose cues are placed at their stream's start.
+   */
+  start_at: string | null;
+  /**
+   * When this cue ended. `null` on the same terms as `start_at`.
+   */
+  end_at: string | null;
+  /**
+   * What was transcribed for this cue.
+   */
+  text: string;
+};
+
+export type VoiceCallTranscript = {
+  call_id: VoiceSessionId;
+  /**
+   * Each distinct stored party heard in `cues`, once. A stream with no recorded party adds nothing here; its cues carry a `null` party.
+   */
+  parties: Array<VoiceParty>;
+  /**
+   * Every cue of the call in spoken order. A cue without times sits at the start of its stream.
+   */
+  cues: Array<VoiceCallTranscriptCue>;
+  /**
+   * `false` when a stream's every transcription failed, or the read was cut
+   * at its limit. `true` does not mean every stream has cues: a stream where
+   * nothing was heard, one never transcribed, or one whose transcript has not
+   * arrived yet contributes none and leaves this `true`.
+   *
+   */
+  complete: boolean;
+  /**
+   * The instant retention was decided at. A transcript can expire after it.
+   */
+  evaluated_at: string;
 };
 
 export type VoiceDestinationDailySpendLimit = {
@@ -37384,7 +37651,7 @@ export type AvailableNumberWritable = {
    */
   capabilities: Array<NumberCapability>;
   /**
-   * Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any `pricing.setup_price` is charged during purchase, plus any tax. The recurring charge, net of tax `pricing.recurring_price` multiplied by `pricing.intervals_per_charge`, is taken with any tax at assignment and at each renewal, even while approval is pending; assignment may follow completion of a pending supplier order.
+   * Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any `pricing.setup_price` is charged at assignment for Bird stock and usually on delivery for a carrier number, plus any tax. The recurring charge, net of tax `pricing.recurring_price` multiplied by `pricing.intervals_per_charge`, is taken with any tax at assignment and at each renewal, even while approval is pending; assignment may follow completion of a pending supplier order.
    */
   ownership_registration_required: boolean;
   /**
@@ -37764,11 +38031,197 @@ export type VoiceLegListWritable = {
   data: Array<VoiceLegWritable>;
 } & ListEnvelope;
 
+export type VoiceLegRecordingMediaWritable = {
+  /**
+   * Unique identifier for this stream.
+   */
+  id: VoiceCallMediaId;
+  /**
+   * The leg this stream was captured from.
+   */
+  leg_id: VoiceCallId;
+  /**
+   * `null` on a stream captured before calls existed, which only its leg addresses.
+   */
+  call_id?: VoiceSessionId | null;
+  /**
+   * Codec of the stored payload.
+   */
+  codec: string;
+  state: VoiceLegMediaState;
+  /**
+   * Length of the announcement that played before capture started. Zero when nothing was announced. It is not a position on a call clock.
+   */
+  offset_ms: number;
+  /**
+   * Length of the payload itself. This runs shorter than `ended_at - started_at` by the silence before the first packet, so use it for anything about the sound and the window for anything about the leg.
+   */
+  audio_ms: number;
+  /**
+   * The party this audio was captured from, which is what says whose voice it
+   * carries. `channel` only says which direction of the leg the stream came
+   * from. A recording view's `number` identifies a number associated with
+   * that view, which can be an outbound destination.
+   *
+   * `null` on a stream stored before the platform recorded a party for it.
+   *
+   */
+  source_party?: VoicePartyWritable | null;
+  /**
+   * When capture started, which is after any announcement rather than at the answer.
+   */
+  started_at: string;
+  /**
+   * When capture ended, or null while capture is open or its end is unknown.
+   */
+  ended_at: string | null;
+};
+
+export type VoiceLegRecordingWritable = {
+  /**
+   * Unique identifier for this view.
+   */
+  id: VoiceCallRecordingId;
+  /**
+   * The leg this view belongs to.
+   */
+  leg_id: VoiceCallId;
+  /**
+   * `null` on a recording captured before calls existed.
+   */
+  call_id?: VoiceSessionId | null;
+  /**
+   * The number associated with this recording view, when one was recorded. It can be an outbound destination. Omitted for numberless calls.
+   */
+  number?: string;
+  /**
+   * It does not say whose voice it is.
+   */
+  channel: VoiceLegChannel;
+  /**
+   * The stream this view refers to. A stream captured on another leg or omitted by retention or truncation may be absent from `media` in this response.
+   */
+  media_id: VoiceCallMediaId;
+  /**
+   * When the referenced stream started, which a view captured from the far leg does not share with its own `started_at`.
+   */
+  media_started_at: string;
+  started_at: string;
+  /**
+   * When capture ended, or null while capture is open or its end is unknown.
+   */
+  ended_at: string | null;
+};
+
+export type VoiceLegTranscriptWritable = {
+  /**
+   * Unique identifier for this attempt.
+   */
+  id: VoiceCallTranscriptId;
+  /**
+   * The leg the transcribed stream was captured from.
+   */
+  leg_id: VoiceCallId;
+  /**
+   * `null` on a transcript of a stream captured before calls existed.
+   */
+  call_id?: VoiceSessionId | null;
+  /**
+   * The stream this attempt describes.
+   */
+  media_id: VoiceCallMediaId;
+  /**
+   * When that stream started. A transcript is retained with the stream it describes rather than on its own transcription lag.
+   */
+  media_started_at: string;
+  state: VoiceLegTranscriptState;
+  source: VoiceLegTranscriptSource;
+  /**
+   * The model that produced it.
+   */
+  model?: string;
+  /**
+   * The direction of the transcribed stream.
+   */
+  channel: VoiceLegChannel;
+  /**
+   * The transcript, in order. Concatenating cues across streams reads as prose nobody spoke, and a reader matching over it can match the wrong party's words.
+   */
+  cues: Array<VoiceLegTranscriptCue>;
+  /**
+   * The party this audio was captured from, which is what says whose voice it
+   * carries. `channel` only says which direction of the leg the stream came
+   * from. A recording view's `number` identifies a number associated with
+   * that view, which can be an outbound destination.
+   *
+   * `null` on a stream stored before the platform recorded a party for it.
+   *
+   */
+  source_party?: VoicePartyWritable | null;
+  created_at: string;
+};
+
+export type VoiceLegRecordingsWritable = {
+  /**
+   * The stored audio this read covers, each stream once.
+   */
+  media: Array<VoiceLegRecordingMediaWritable>;
+  /**
+   * Each leg's view of that audio.
+   */
+  recordings: Array<VoiceLegRecordingWritable>;
+  /**
+   * Every transcription attempt over that audio, including failed ones.
+   */
+  transcripts: Array<VoiceLegTranscriptWritable>;
+  /**
+   * Whether a collection above was cut at this read's per-collection limit of
+   * 500. When `true`, there is more than is shown here and this response is not
+   * the whole set.
+   *
+   * `false` means no collection hit that limit, and a collection that could
+   * not be read in full fails the request rather than returning a short
+   * answer. What `false` does not establish is that every recording made has
+   * arrived: delivery into this store is asynchronous, so a recording made
+   * moments ago can be absent from a complete read.
+   *
+   */
+  truncated: boolean;
+  /**
+   * The instant each collection's retention was decided at. Nothing here stays true because you are still holding the response. A recording can expire after it.
+   */
+  evaluated_at: string;
+};
+
 /**
  * A call summary. Call reads report observed state. Call creation returns an immutable acceptance snapshot: `started_at` and `ended_at` are `null`, the boolean observation fields are `false`, and `parties` is empty. Replays return that same snapshot after the call progresses.
  */
 export type VoiceCallWritable = {
   [key: string]: never;
+};
+
+export type VoiceCallTranscriptWritable = {
+  call_id: VoiceSessionId;
+  /**
+   * Each distinct stored party heard in `cues`, once. A stream with no recorded party adds nothing here; its cues carry a `null` party.
+   */
+  parties: Array<VoicePartyWritable>;
+  /**
+   * Every cue of the call in spoken order. A cue without times sits at the start of its stream.
+   */
+  cues: Array<VoiceCallTranscriptCue>;
+  /**
+   * `false` when a stream's every transcription failed, or the read was cut
+   * at its limit. `true` does not mean every stream has cues: a stream where
+   * nothing was heard, one never transcribed, or one whose transcript has not
+   * arrived yet contributes none and leaves this `true`.
+   *
+   */
+  complete: boolean;
+  /**
+   * The instant retention was decided at. A transcript can expire after it.
+   */
+  evaluated_at: string;
 };
 
 export type VoiceDestinationWritable = {
@@ -76430,6 +76883,81 @@ export type GetVoiceLegResponses = {
 export type GetVoiceLegResponse =
   GetVoiceLegResponses[keyof GetVoiceLegResponses];
 
+export type GetVoiceLegRecordingAudioData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The leg the recording belongs to.
+     */
+    leg_id: VoiceCallId;
+    /**
+     * The `id` of an entry in `recordings` from [`listVoiceCallRecordings`](/docs/api/reference/list-voice-call-recordings).
+     */
+    recording_id: VoiceCallRecordingId;
+  };
+  query?: {
+    /**
+     * Whether the signed URL plays the audio or saves it. `inline`, the default, streams it in a browser. `attachment` asks the browser to save it under a filename naming the recording and when it started.
+     *
+     */
+    disposition?: VoiceRecordingDisposition;
+  };
+  url: "/v1/voice/legs/{leg_id}/recordings/{recording_id}/audio";
+};
+
+export type GetVoiceLegRecordingAudioErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * The resource is not available yet. Retry shortly.
+   */
+  425: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The operation is not supported
+   */
+  501: Error;
+};
+
+export type GetVoiceLegRecordingAudioError =
+  GetVoiceLegRecordingAudioErrors[keyof GetVoiceLegRecordingAudioErrors];
+
 export type CreateVoiceCallData = {
   body: CreateVoiceCallRequest;
   headers?: {
@@ -76524,6 +77052,140 @@ export type CreateVoiceCallResponses = {
 
 export type CreateVoiceCallResponse =
   CreateVoiceCallResponses[keyof CreateVoiceCallResponses];
+
+export type ListVoiceCallRecordingsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The call to read. Every leg carries its call's ID as `call_id`.
+     */
+    call_id: VoiceSessionId;
+  };
+  query?: never;
+  url: "/v1/voice/calls/{call_id}/recordings";
+};
+
+export type ListVoiceCallRecordingsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListVoiceCallRecordingsError =
+  ListVoiceCallRecordingsErrors[keyof ListVoiceCallRecordingsErrors];
+
+export type ListVoiceCallRecordingsResponses = {
+  /**
+   * The call's recordings and transcripts, with whether any collection was cut.
+   */
+  200: VoiceLegRecordings;
+};
+
+export type ListVoiceCallRecordingsResponse =
+  ListVoiceCallRecordingsResponses[keyof ListVoiceCallRecordingsResponses];
+
+export type GetVoiceCallTranscriptData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The call to read. Every leg carries its call's ID as `call_id`.
+     */
+    call_id: VoiceSessionId;
+  };
+  query?: never;
+  url: "/v1/voice/calls/{call_id}/transcript";
+};
+
+export type GetVoiceCallTranscriptErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetVoiceCallTranscriptError =
+  GetVoiceCallTranscriptErrors[keyof GetVoiceCallTranscriptErrors];
+
+export type GetVoiceCallTranscriptResponses = {
+  /**
+   * The call's cues in spoken order, untimed ones included, and whether a stream's every transcription failed or the read was cut.
+   */
+  200: VoiceCallTranscript;
+};
+
+export type GetVoiceCallTranscriptResponse =
+  GetVoiceCallTranscriptResponses[keyof GetVoiceCallTranscriptResponses];
 
 export type ListVoiceDestinationsData = {
   body?: never;

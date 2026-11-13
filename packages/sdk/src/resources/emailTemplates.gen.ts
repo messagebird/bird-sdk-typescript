@@ -29,7 +29,7 @@ export class EmailTemplatesResourceBase extends Resource {
   }
 
   /**
-   * Read one template's metadata: the state of every language it has, the languages it can send today, the draft revision, and its draft and published version IDs. The response omits content; read a version's language to retrieve it. Accepts a workspace template ID (`emt_…`) or a built-in `system` template's `bird_` slug. Workspace templates may include `editor_url` to open the saved draft in the browser editor, in its default language.
+   * Read one template's metadata: the state of every language it has, the languages it can send today, the draft revision, and its draft and published version IDs. The response omits content; read a version's language to retrieve it. Accepts a template ID (`emt_…`), whether workspace or built-in, or a built-in `system` template's `bird_` slug. Workspace templates may include `editor_url` to open the saved draft in the browser editor, in its default language.
    */
   get(templateRef: string, options?: RequestOptions): APIPromise<EmailTemplate> {
     return this.call<EmailTemplate>("GET", options, ({ signal, headers }) =>

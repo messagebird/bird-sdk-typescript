@@ -7,7 +7,7 @@ import type { APIPromise, PaginatedPromise, RequestOptions } from "../core/resul
 export type { VoiceLeg };
 export type VoiceLegsListQuery = NonNullable<ListVoiceLegsData["query"]>;
 
-export class VoiceLegsResource extends Resource {
+export class VoiceLegsResourceBase extends Resource {
   /**
    * List the workspace's legs, newest first. Filter to `ringing`/`in_progress` for the legs in progress right now, to final statuses for completed records, or to any mix of the two. Use `from`/`to` for one known party number in international form, `from` for an exact calling `usr_` ID, `to` for a SIP extension or an exact `usr_`, `vrg_` or `vsq_` ID for a browser's call to that user, ring group or sequence, and `number` to search either side by fragment. These are per-leg records and do not include aggregate rates or totals. Use `voice.legs.get` to follow one leg to settlement.
    *

@@ -68,7 +68,12 @@ export class WhatsappMessagesResource extends Resource {
         if (!location) {
           throw new BirdConnectionError("media redirect carried no Location header");
         }
-        const stored = await fetchStorage(this.client.getConfig().fetch ?? fetch, location, signal);
+        const stored = await fetchStorage(
+          this.client.getConfig().fetch ?? fetch,
+          location,
+          signal,
+          "media",
+        );
         return { data: mediaFrom(stored.response, stored.body), response: res };
       },
       undefined,
@@ -86,12 +91,14 @@ export class WhatsappMessagesResource extends Resource {
  *
  * It reuses the client's configured `fetch` (a proxy or edge adapter still
  * applies) but sends no headers at all, which is what keeps the credential off
- * the wire.
+ * the wire. `method` is the SDK method that mints a fresh link, named in those
+ * failures.
  */
-async function fetchStorage(
+export async function fetchStorage(
   fetchFn: typeof fetch,
   location: string,
   signal: AbortSignal,
+  method: string,
 ): Promise<{ response: Response; body: ArrayBuffer }> {
   let response: Response;
   try {
@@ -100,18 +107,18 @@ async function fetchStorage(
     if (signal.aborted) throw err;
     const detail = err instanceof Error ? err.message : String(err);
     throw new BirdConnectionError(
-      `downloading media failed: ${detail} — call media again for a fresh link`,
+      `downloading media failed: ${detail} — call ${method} again for a fresh link`,
     );
   }
   if (!response.ok) {
     throw new BirdConnectionError(
-      `storage refused the download link (status ${response.status}) — the link expired or was refused; call media again for a fresh link`,
+      `storage refused the download link (status ${response.status}) — the link expired or was refused; call ${method} again for a fresh link`,
     );
   }
   return { response, body: await response.arrayBuffer() };
 }
 
-function mediaFrom(response: Response, body: ArrayBuffer): WhatsappMedia {
+export function mediaFrom(response: Response, body: ArrayBuffer): WhatsappMedia {
   const data = new Uint8Array(body);
   return {
     data,

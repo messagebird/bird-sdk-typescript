@@ -296,6 +296,33 @@ export class BirdServiceUnavailableError extends BirdAPIError {
   }
 }
 
+/** 410 — the resource was permanently removed. */
+export class BirdGoneError extends BirdAPIError {
+  constructor(fields: BirdAPIErrorFields) {
+    super(fields);
+    this.name = "BirdGoneError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/** 425 — too early to process; wait briefly and retry. */
+export class BirdTooEarlyError extends BirdAPIError {
+  constructor(fields: BirdAPIErrorFields) {
+    super(fields);
+    this.name = "BirdTooEarlyError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
+/** 499 — the connection closed before the response was ready. */
+export class BirdClientClosedRequestError extends BirdAPIError {
+  constructor(fields: BirdAPIErrorFields) {
+    super(fields);
+    this.name = "BirdClientClosedRequestError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
+
 /** 422 — field validation failed; `details` carries the per-field errors. */
 export class BirdValidationError extends BirdAPIError {
   readonly details: ErrorDetail[];
@@ -367,6 +394,8 @@ function inferType(status: number): string {
       return "not_found_error";
     case 409:
       return "conflict_error";
+    case 410:
+      return "gone_error";
     case 412:
     case 428:
       return "precondition_error";
@@ -376,8 +405,12 @@ function inferType(status: number): string {
       return "misdirected_error";
     case 422:
       return "validation_error";
+    case 425:
+      return "too_early_error";
     case 429:
       return "rate_limit_error";
+    case 499:
+      return "client_closed_request_error";
     case 501:
       return "not_implemented_error";
     case 503:
@@ -444,6 +477,12 @@ export function mapResponseToError(
       return new BirdMisdirectedError(fields);
     case "service_unavailable_error":
       return new BirdServiceUnavailableError(fields);
+    case "gone_error":
+      return new BirdGoneError(fields);
+    case "too_early_error":
+      return new BirdTooEarlyError(fields);
+    case "client_closed_request_error":
+      return new BirdClientClosedRequestError(fields);
     case "rate_limit_error":
       return new BirdRateLimitError({
         ...fields,

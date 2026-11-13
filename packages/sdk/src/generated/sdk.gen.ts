@@ -775,8 +775,13 @@ import type {
   GetSuppressionData,
   GetSuppressionErrors,
   GetSuppressionResponses,
+  GetVoiceCallTranscriptData,
+  GetVoiceCallTranscriptErrors,
+  GetVoiceCallTranscriptResponses,
   GetVoiceLegData,
   GetVoiceLegErrors,
+  GetVoiceLegRecordingAudioData,
+  GetVoiceLegRecordingAudioErrors,
   GetVoiceLegResponses,
   GetVoiceNumberData,
   GetVoiceNumberErrors,
@@ -1083,6 +1088,9 @@ import type {
   ListSuppressionsData,
   ListSuppressionsErrors,
   ListSuppressionsResponses,
+  ListVoiceCallRecordingsData,
+  ListVoiceCallRecordingsErrors,
+  ListVoiceCallRecordingsResponses,
   ListVoiceDestinationsData,
   ListVoiceDestinationsErrors,
   ListVoiceDestinationsResponses,
@@ -2813,7 +2821,7 @@ export const cancelEmailBroadcast = <ThrowOnError extends boolean = false>(
  *
  * Continues a `paused` broadcast using its saved template references and recipient list, skipping recipients already sent to and applying current consent and suppression checks for its saved category. Marketing broadcasts skip newly unsubscribed recipients; transactional broadcasts retain their category exemptions. Resuming does not use another broadcast from your monthly allowance. A `202` returns `status: sending`; delivery continues asynchronously. Use [get the broadcast](/docs/api/reference/get-email-broadcast) to follow progress.
  *
- * If the broadcast first started sending at least 24 hours ago, review its message and set `confirm` to `true` to acknowledge late delivery. For older broadcasts without `started_at`, the threshold uses the send authorization time, or the creation time if neither timestamp was recorded. You can also send `confirm: true` before that threshold; it does not skip other checks. To review the message, use the broadcast's `template.id` and `template.version_id` with [get a template version](/docs/api/reference/get-email-template-version), then check `template.language` or the version's `default_language`. This requires `email_management:read`. Published workspace versions retain their original content and remain readable by ID after template deletion; a deleted or reused slug cannot identify the original message. A built-in template version lookup (`scope: system`) returns current catalogue content. Broadcasts with frozen content keep sending that content, but older broadcasts can read the catalogue again when resumed. Neither the current lookup nor a copy of an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Once the funding wait has ended, adding funds alone does not restart a paused broadcast: call this operation explicitly after reviewing its content.
+ * If the broadcast first started sending at least 24 hours ago, review its message and set `confirm` to `true` to acknowledge late delivery. For older broadcasts without `started_at`, the threshold uses the send authorization time, or the creation time if neither timestamp was recorded. You can also send `confirm: true` before that threshold; it does not skip other checks. To review the message, first [get the template](/docs/api/reference/get-email-template) with the broadcast's `template.id` and check its `scope`, which the version read does not return. A `scope` of `system` marks a built-in template, whose lookups return current catalogue content; a `404` means a deleted workspace template, whose pinned version stays readable by ID. For a workspace template, use `template.id` and `template.version_id` with [get a template version](/docs/api/reference/get-email-template-version), then check `template.language` or the version's `default_language`. Both reads require `email_management:read`. Published workspace versions retain their original content and remain readable by ID after template deletion; a deleted or reused slug cannot identify the original message. Broadcasts with frozen content keep sending that content, but older broadcasts can read the catalogue again when resumed. Neither the current lookup nor a copy of an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Once the funding wait has ended, adding funds alone does not restart a paused broadcast: call this operation explicitly after reviewing its content.
  *
  * Returns `403` if the workspace is suspended or has been suspended since the original send authorization. `E04102` means a later suspension revoked this broadcast's authorization; reactivation does not restore it, so cancel the broadcast instead of retrying. Do not resend to its full audience without excluding recipients already sent to. Returns `402` if the account is blocked for insufficient funds, or `409` if the broadcast is not paused or needs late-delivery confirmation. A `422` can mean the concurrent broadcast limit is reached or the sender or IP pool needs repair. Read the error details, then wait for a free slot or repair the sender or pool and retry. A `429` can mean a sending limit prevents resuming. These refusals leave the broadcast paused. A `503` means the balance or email limits could not be checked; the broadcast stays paused and you can retry.
  *
@@ -13213,7 +13221,7 @@ export const deleteEmailTemplate = <ThrowOnError extends boolean = false>(
  *
  * Returns a template's metadata, language states, sendable languages, draft revision, and draft and published version IDs. Read a version's language to retrieve content.
  *
- * Accepts a workspace template ID (`emt_…`) or a built-in `system` template's `bird_` slug. A `system` template has `null` for the workspace, draft, revision, and timestamp fields.
+ * Accepts a template ID (`emt_…`), whether workspace or built-in, or a built-in `system` template's `bird_` slug. A `system` template has `null` for the workspace, draft, revision, and timestamp fields.
  *
  */
 export const getEmailTemplate = <ThrowOnError extends boolean = false>(
@@ -15082,7 +15090,8 @@ export const listNumbersOrders = <ThrowOnError extends boolean = false>(
  *
  * Orders a number for your workspace and starts its recurring charge. The available number's
  * `pricing` is the current price, not a quote: the order resolves the price again when it
- * charges, so a price published in between applies. Pass a
+ * charges, so a price published in between applies; a carrier number's setup fee is usually the amount
+ * held when the order was placed, or is charged then. Pass a
  * number from `GET /v1/numbers/available`. Whether the number is already in
  * inventory or acquired from a supplier, the response contains an order.
  *
@@ -16505,6 +16514,60 @@ export const getVoiceLeg = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Get a leg recording's audio
+ *
+ * Redirects to a short-lived URL for this recording's audio.
+ *
+ * The bytes live in object storage and are served straight from there, so
+ * they never transit the API and no list response carries a link to them.
+ * Each request to this operation signs a fresh one.
+ *
+ * The response is a `302` whose `Location` is that pre-authorized storage
+ * URL, valid for 15 minutes, so your client must follow redirects. The
+ * `Authorization` header has to be absent from the request that fetches that
+ * URL. A client that attaches credentials centrally, at its transport,
+ * interceptor or middleware layer rather than per request, re-adds the header
+ * on every hop including the redirect, so the storage URL needs a client that
+ * carries none. With curl, use version 7.58.0 or later when following the
+ * redirect: earlier versions forward custom authorization headers to other hosts.
+ *
+ * Treat the URL as secret for as long as it lasts. Anyone holding one can
+ * hear the audio.
+ *
+ * Audio download is available for 30 days after the source audio starts.
+ * The API returns `404` after that cutoff without issuing a storage URL.
+ *
+ * An in-progress capture can appear in the inventory with its media stream
+ * listed as open. This operation answers `425` while its audio is not ready.
+ * If capture metadata is delayed, the recording may not appear immediately.
+ * A recording whose capture failed has no audio to serve and answers `404`.
+ * Its transcript, if one ran, stays readable.
+ *
+ * Answers `501` where the workspace's region has no voice media store
+ * configured. The audio has nowhere to be read from there.
+ *
+ */
+export const getVoiceLegRecordingAudio = <ThrowOnError extends boolean = false>(
+  options: Options<GetVoiceLegRecordingAudioData, ThrowOnError>,
+): RequestResult<unknown, GetVoiceLegRecordingAudioErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    unknown,
+    GetVoiceLegRecordingAudioErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/legs/{leg_id}/recordings/{recording_id}/audio",
+    ...options,
+  });
+
+/**
  * Create a call
  *
  * Accepts a real outbound call that runs a voice sequence after the
@@ -16513,7 +16576,8 @@ export const getVoiceLeg = <ThrowOnError extends boolean = false>(
  * `sequence.definition`, to run a complete definition once without saving
  * it. Production availability rules and normal calling charges apply.
  * Requires both voice management write and voice calling write permissions
- * and a permitted calling number. Browser users and API keys are supported.
+ * and a permitted calling number. Browser users, API keys and OAuth apps
+ * acting for a member are supported.
  * Draft and test selectors are not accepted. See the
  * [Create Call guide](https://bird.com/docs/guides/voice/create-calls).
  *
@@ -16572,6 +16636,99 @@ export const createVoiceCall = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * List a call's recordings and transcripts
+ *
+ * Returns everything captured across every leg of one call: its stored audio,
+ * each leg's view of it, and every transcription attempt over it. A stream heard on
+ * several legs appears once in `media`, with one view per leg in
+ * `recordings`.
+ *
+ * Audio streams, their recording views and transcripts leave the API 30 days
+ * after the source audio starts. Transcription does not restart that period.
+ * Read `truncated` before presenting the result as complete.
+ *
+ * The collections arrive independently. A stream can appear before its
+ * recording view, or without a view if delivery fails or the view expires.
+ * Download audio with [`getVoiceLegRecordingAudio`](/docs/api/reference/get-voice-leg-recording-audio), passing the recording
+ * view's `leg_id` and `id`. The download requires a recording view ID, so a
+ * stream cannot be downloaded until its view is available.
+ *
+ * A call this workspace never placed, or whose recordings have all expired,
+ * answers with empty collections rather than `404`.
+ *
+ */
+export const listVoiceCallRecordings = <ThrowOnError extends boolean = false>(
+  options: Options<ListVoiceCallRecordingsData, ThrowOnError>,
+): RequestResult<
+  ListVoiceCallRecordingsResponses,
+  ListVoiceCallRecordingsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListVoiceCallRecordingsResponses,
+    ListVoiceCallRecordingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/calls/{call_id}/recordings",
+    ...options,
+  });
+
+/**
+ * Get a call's transcript
+ *
+ * Returns one transcript for the whole call: the cues of every party's
+ * stream in spoken order, each pointing into `parties` at the party its
+ * stream was captured from.
+ *
+ * It is assembled on each read from the call's stored transcripts, one per
+ * stream: the latest whose every cue is timed, otherwise the latest that
+ * succeeded. When a live transcript exists, its cues take precedence; the
+ * selected transcript adds only timed cues that do not overlap them. Timed
+ * cues are placed by `start_at`. A transcript that timed
+ * nothing has `null` times, and its cues are placed at the start of their
+ * stream. A stream whose every transcription failed contributes nothing and
+ * sets `complete` to `false`. A stream where nothing was heard, one that was
+ * never transcribed, or one whose transcript has not arrived yet contributes
+ * no cues and leaves `complete` as it is.
+ *
+ * Transcripts leave the API 30 days after the source audio starts. A call this
+ * workspace never placed, or whose
+ * transcripts have all expired, answers with no cues rather than `404`.
+ *
+ */
+export const getVoiceCallTranscript = <ThrowOnError extends boolean = false>(
+  options: Options<GetVoiceCallTranscriptData, ThrowOnError>,
+): RequestResult<
+  GetVoiceCallTranscriptResponses,
+  GetVoiceCallTranscriptErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetVoiceCallTranscriptResponses,
+    GetVoiceCallTranscriptErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/voice/calls/{call_id}/transcript",
+    ...options,
   });
 
 /**

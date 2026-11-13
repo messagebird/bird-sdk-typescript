@@ -10385,7 +10385,7 @@ export const EmailBroadcastResumeSchema = {
     confirm: {
       type: "boolean",
       description:
-        "Acknowledgment that the message reaches the remaining recipients later than intended. It is required to resume a broadcast that started sending at least 24 hours ago. Before setting it, read the broadcast's `started_at` and have a reviewer with `email_management:read` check its pinned template version using `template.id` and `template.version_id`. Workspace versions retain the original content. Built-in template lookups (`scope: system`) show current catalogue content. Broadcasts with frozen content keep it, but older broadcasts can read the catalogue again when resumed. Neither a current lookup nor an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Ask an authorized teammate if you lack that permission. It does not skip the funds or concurrent-broadcast checks.",
+        "Acknowledgment that the message reaches the remaining recipients later than intended. It is required to resume a broadcast that started sending at least 24 hours ago. Before setting it, read the broadcast's `started_at` and have a reviewer with `email_management:read` read its template by `template.id` to check `scope`, then, for a workspace template or one the template read reports deleted (`404`), its pinned version using `template.id` and `template.version_id`. Workspace versions retain the original content. A built-in template (`scope: system`) shows current catalogue content, and only the template read returns `scope`. Broadcasts with frozen content keep it, but older broadcasts can read the catalogue again when resumed. Neither a current lookup nor an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Ask an authorized teammate if you lack that permission. It does not skip the funds or concurrent-broadcast checks.",
     },
   },
   example: {
@@ -50281,6 +50281,67 @@ export const VoicePartySchema = {
   },
 } as const;
 
+export const VoiceCallTranscriptIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^vct_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vct_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoiceCallMediaIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^vcm_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vcm_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoiceLegTranscriptStateSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["available", "failed"],
+  description:
+    "Whether the attempt produced a transcript. `failed` is an outcome, not evidence that a later attempt cannot succeed.",
+  example: "available",
+} as const;
+
+export const VoiceLegChannelSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["rx", "tx"],
+  description:
+    "Which direction of the leg the stream carries: `rx` for what the platform received, `tx` for what it sent.",
+  example: "rx",
+} as const;
+
+export const VoiceLegTranscriptCueSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["seq", "text"],
+  properties: {
+    seq: {
+      type: "integer",
+      description: "Position of this cue in the transcript.",
+    },
+    start_ms: {
+      type: ["integer", "null"],
+      description:
+        "Offset of this cue from the start of its stream, in milliseconds. Set on `aligned` cues; `null` when nothing measured it, because a zero would be a claim about timing that was never made.",
+    },
+    end_ms: {
+      type: ["integer", "null"],
+      description:
+        "Offset of the end of this cue from the start of its stream. `null` on the same terms as `start_ms`.",
+    },
+    text: {
+      type: "string",
+      minLength: 0,
+      description:
+        "What was transcribed for this cue. Empty on the single cue of a stream where nothing was heard.",
+    },
+  },
+} as const;
+
 export const VoiceSessionCredentialSchema = {
   type: "object",
   description:
@@ -51459,7 +51520,7 @@ export const AvailableNumberSchema = {
     ownership_registration_required: {
       type: "boolean",
       description:
-        "Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any `pricing.setup_price` is charged during purchase, plus any tax. The recurring charge, net of tax `pricing.recurring_price` multiplied by `pricing.intervals_per_charge`, is taken with any tax at assignment and at each renewal, even while approval is pending; assignment may follow completion of a pending supplier order.",
+        "Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any `pricing.setup_price` is charged at assignment for Bird stock and usually on delivery for a carrier number, plus any tax. The recurring charge, net of tax `pricing.recurring_price` multiplied by `pricing.intervals_per_charge`, is taken with any tax at assignment and at each renewal, even while approval is pending; assignment may follow completion of a pending supplier order.",
     },
     ownership_address_scope: {
       type: "string",
@@ -51516,7 +51577,7 @@ export const NumbersOrderStatusSchema = {
     "failed",
   ],
   description:
-    "Lifecycle state of a number purchase order:\n\n- `charging`: Securing funds.\n- `ordering`: Placing the order with the carrier.\n- `pending`: The carrier accepted the order and is provisioning the number. A carrier\n  number's first recurring charge is taken on delivery: keep funds available, because a\n  delivered number that still cannot be charged is released no sooner than 72 hours after the order\n  was placed: its order fails and its setup fee is refunded.\n- `completed`: Your workspace owns the number.\n- `failed`: The purchase did not complete.\n\nApart from that release, a setup fee already charged is non-refundable. Contact\nsupport about a failed order.",
+    "Lifecycle state of a number purchase order:\n\n- `charging`: Securing funds.\n- `ordering`: Placing the order with the carrier.\n- `pending`: The carrier accepted the order and is provisioning the number. A carrier number\n  is usually charged on delivery: keep funds available, because a delivered number that still cannot\n  be charged is released no sooner than 72 hours after the order was placed, and its order fails.\n- `completed`: Your workspace owns the number.\n- `failed`: The purchase did not complete.\n\nA number from a carrier is usually charged when the carrier delivers it. A setup fee\nalready charged, for an inventory number or a carrier number charged upfront, is not\nrefunded when its purchase fails, unless the deadline releases the delivered number.\nContact support about a failed order.",
 } as const;
 
 export const NumbersOrderIDSchema = {
@@ -54701,6 +54762,343 @@ export const VoiceLegListSchema = {
   ],
 } as const;
 
+export const VoiceLegMediaStateSchema = {
+  type: "string",
+  enum: ["open", "available", "failed", "purged"],
+  description:
+    "What became of this stored audio.\n\n`open` while capture is still running. `available` once the bytes are\nstored. `failed` when capture did not produce any. `purged` is reserved for\nfuture use. Recordings are removed from the response after their retention\nperiod.\n",
+  example: "available",
+} as const;
+
+export const VoiceLegRecordingMediaSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: [
+    "id",
+    "leg_id",
+    "codec",
+    "state",
+    "started_at",
+    "ended_at",
+    "offset_ms",
+    "audio_ms",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/VoiceCallMediaID",
+      description: "Unique identifier for this stream.",
+    },
+    leg_id: {
+      $ref: "#/components/schemas/VoiceCallID",
+      description: "The leg this stream was captured from.",
+    },
+    call_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceSessionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "`null` on a stream captured before calls existed, which only its leg addresses.",
+    },
+    codec: {
+      type: "string",
+      minLength: 1,
+      description: "Codec of the stored payload.",
+      example: "PCMU",
+    },
+    state: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegMediaState",
+        },
+      ],
+    },
+    offset_ms: {
+      type: "integer",
+      description:
+        "Length of the announcement that played before capture started. Zero when nothing was announced. It is not a position on a call clock.",
+    },
+    audio_ms: {
+      type: "integer",
+      description:
+        "Length of the payload itself. This runs shorter than `ended_at - started_at` by the silence before the first packet, so use it for anything about the sound and the window for anything about the leg.",
+    },
+    source_party: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceParty",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The party this audio was captured from, which is what says whose voice it\ncarries. `channel` only says which direction of the leg the stream came\nfrom. A recording view's `number` identifies a number associated with\nthat view, which can be an outbound destination.\n\n`null` on a stream stored before the platform recorded a party for it.\n",
+    },
+    started_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When capture started, which is after any announcement rather than at the answer.",
+    },
+    ended_at: {
+      type: ["string", "null"],
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When capture ended, or null while capture is open or its end is unknown.",
+    },
+  },
+} as const;
+
+export const VoiceCallRecordingIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^vrc_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vrc_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const VoiceLegRecordingSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: [
+    "id",
+    "leg_id",
+    "channel",
+    "media_id",
+    "media_started_at",
+    "started_at",
+    "ended_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/VoiceCallRecordingID",
+      description: "Unique identifier for this view.",
+    },
+    leg_id: {
+      $ref: "#/components/schemas/VoiceCallID",
+      description: "The leg this view belongs to.",
+    },
+    call_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceSessionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description: "`null` on a recording captured before calls existed.",
+    },
+    number: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The number associated with this recording view, when one was recorded. It can be an outbound destination. Omitted for numberless calls.",
+    },
+    channel: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegChannel",
+        },
+      ],
+      description: "It does not say whose voice it is.",
+    },
+    media_id: {
+      $ref: "#/components/schemas/VoiceCallMediaID",
+      description:
+        "The stream this view refers to. A stream captured on another leg or omitted by retention or truncation may be absent from `media` in this response.",
+    },
+    media_started_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When the referenced stream started, which a view captured from the far leg does not share with its own `started_at`.",
+    },
+    started_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+    },
+    ended_at: {
+      type: ["string", "null"],
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When capture ended, or null while capture is open or its end is unknown.",
+    },
+  },
+} as const;
+
+export const VoiceLegTranscriptSourceSchema = {
+  type: "string",
+  "x-extensible-enum": ["whole", "aligned", "live"],
+  description:
+    "What the times in `cues` are worth: `whole` for a pass that times nothing, `aligned` for offline forced alignment, `live` for a streaming producer.",
+  example: "whole",
+} as const;
+
+export const VoiceLegTranscriptSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: [
+    "id",
+    "leg_id",
+    "media_id",
+    "media_started_at",
+    "state",
+    "source",
+    "channel",
+    "cues",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/VoiceCallTranscriptID",
+      description: "Unique identifier for this attempt.",
+    },
+    leg_id: {
+      $ref: "#/components/schemas/VoiceCallID",
+      description: "The leg the transcribed stream was captured from.",
+    },
+    call_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceSessionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "`null` on a transcript of a stream captured before calls existed.",
+    },
+    media_id: {
+      $ref: "#/components/schemas/VoiceCallMediaID",
+      description: "The stream this attempt describes.",
+    },
+    media_started_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When that stream started. A transcript is retained with the stream it describes rather than on its own transcription lag.",
+    },
+    state: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegTranscriptState",
+        },
+      ],
+    },
+    source: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegTranscriptSource",
+        },
+      ],
+    },
+    model: {
+      type: "string",
+      description: "The model that produced it.",
+    },
+    channel: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegChannel",
+        },
+      ],
+      description: "The direction of the transcribed stream.",
+    },
+    cues: {
+      type: "array",
+      description:
+        "The transcript, in order. Concatenating cues across streams reads as prose nobody spoke, and a reader matching over it can match the wrong party's words.",
+      items: {
+        $ref: "#/components/schemas/VoiceLegTranscriptCue",
+      },
+    },
+    source_party: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceParty",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The party this audio was captured from, which is what says whose voice it\ncarries. `channel` only says which direction of the leg the stream came\nfrom. A recording view's `number` identifies a number associated with\nthat view, which can be an outbound destination.\n\n`null` on a stream stored before the platform recorded a party for it.\n",
+    },
+    created_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+    },
+  },
+} as const;
+
+export const VoiceLegRecordingsSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["media", "recordings", "transcripts", "truncated", "evaluated_at"],
+  properties: {
+    media: {
+      type: "array",
+      description: "The stored audio this read covers, each stream once.",
+      items: {
+        $ref: "#/components/schemas/VoiceLegRecordingMedia",
+      },
+    },
+    recordings: {
+      type: "array",
+      description: "Each leg's view of that audio.",
+      items: {
+        $ref: "#/components/schemas/VoiceLegRecording",
+      },
+    },
+    transcripts: {
+      type: "array",
+      description:
+        "Every transcription attempt over that audio, including failed ones.",
+      items: {
+        $ref: "#/components/schemas/VoiceLegTranscript",
+      },
+    },
+    truncated: {
+      type: "boolean",
+      description:
+        "Whether a collection above was cut at this read's per-collection limit of\n500. When `true`, there is more than is shown here and this response is not\nthe whole set.\n\n`false` means no collection hit that limit, and a collection that could\nnot be read in full fails the request rather than returning a short\nanswer. What `false` does not establish is that every recording made has\narrived: delivery into this store is asynchronous, so a recording made\nmoments ago can be absent from a complete read.\n",
+    },
+    evaluated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "The instant each collection's retention was decided at. Nothing here stays true because you are still holding the response. A recording can expire after it.",
+    },
+  },
+} as const;
+
+export const VoiceRecordingDispositionSchema = {
+  type: "string",
+  enum: ["inline", "attachment"],
+  default: "inline",
+  description:
+    "Whether a signed audio URL plays the recording or saves it. The signature carries this, so it cannot be changed after the URL is minted.\n",
+  example: "inline",
+} as const;
+
 export const VoiceSequenceExpressionEnvironmentSchema = {
   type: "string",
   minLength: 1,
@@ -55139,6 +55537,78 @@ export const CreateVoiceCallRequestSchema = {
     },
     sequence: {
       $ref: "#/components/schemas/CreateVoiceCallSequenceRequest",
+    },
+  },
+} as const;
+
+export const VoiceCallTranscriptCueSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["party", "start_at", "end_at", "text"],
+  properties: {
+    party: {
+      type: ["integer", "null"],
+      minimum: 0,
+      description:
+        "Index into the transcript's `parties` of the party who spoke this cue,\nthe party its stream was captured from. `null` on a stream with no recorded\nparty.\n",
+    },
+    start_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When this cue began, measured on its stream. `null` on a transcript that timed nothing, whose cues are placed at their stream's start.",
+    },
+    end_at: {
+      type: ["string", "null"],
+      format: "date-time",
+      description:
+        "When this cue ended. `null` on the same terms as `start_at`.",
+    },
+    text: {
+      type: "string",
+      minLength: 1,
+      description: "What was transcribed for this cue.",
+    },
+  },
+} as const;
+
+export const VoiceCallTranscriptSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["call_id", "parties", "cues", "complete", "evaluated_at"],
+  properties: {
+    call_id: {
+      $ref: "#/components/schemas/VoiceSessionID",
+    },
+    parties: {
+      type: "array",
+      description:
+        "Each distinct stored party heard in `cues`, once. A stream with no recorded party adds nothing here; its cues carry a `null` party.",
+      items: {
+        $ref: "#/components/schemas/VoiceParty",
+      },
+    },
+    cues: {
+      type: "array",
+      description:
+        "Every cue of the call in spoken order. A cue without times sits at the start of its stream.",
+      items: {
+        $ref: "#/components/schemas/VoiceCallTranscriptCue",
+      },
+    },
+    complete: {
+      type: "boolean",
+      description:
+        "`false` when a stream's every transcription failed, or the read was cut\nat its limit. `true` does not mean every stream has cues: a stream where\nnothing was heard, one never transcribed, or one whose transcript has not\narrived yet contributes none and leaves this `true`.\n",
+    },
+    evaluated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "The instant retention was decided at. A transcript can expire after it.",
     },
   },
 } as const;
@@ -68056,7 +68526,7 @@ export const AvailableNumberWritableSchema = {
     ownership_registration_required: {
       type: "boolean",
       description:
-        "Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any `pricing.setup_price` is charged during purchase, plus any tax. The recurring charge, net of tax `pricing.recurring_price` multiplied by `pricing.intervals_per_charge`, is taken with any tax at assignment and at each renewal, even while approval is pending; assignment may follow completion of a pending supplier order.",
+        "Whether ownership paperwork must be approved before outbound SMS and voice use. Customer availability accounts for organization exemptions; admin supplier searches report the general country and number-type requirement. You can acquire the number, including Bird stock, and submit paperwork afterward. Any `pricing.setup_price` is charged at assignment for Bird stock and usually on delivery for a carrier number, plus any tax. The recurring charge, net of tax `pricing.recurring_price` multiplied by `pricing.intervals_per_charge`, is taken with any tax at assignment and at each renewal, even while approval is pending; assignment may follow completion of a pending supplier order.",
     },
     ownership_address_scope: {
       type: "string",
@@ -68810,11 +69280,356 @@ export const VoiceLegListWritableSchema = {
   ],
 } as const;
 
+export const VoiceLegRecordingMediaWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: [
+    "id",
+    "leg_id",
+    "codec",
+    "state",
+    "started_at",
+    "ended_at",
+    "offset_ms",
+    "audio_ms",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/VoiceCallMediaID",
+      description: "Unique identifier for this stream.",
+    },
+    leg_id: {
+      $ref: "#/components/schemas/VoiceCallID",
+      description: "The leg this stream was captured from.",
+    },
+    call_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceSessionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "`null` on a stream captured before calls existed, which only its leg addresses.",
+    },
+    codec: {
+      type: "string",
+      minLength: 1,
+      description: "Codec of the stored payload.",
+      example: "PCMU",
+    },
+    state: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegMediaState",
+        },
+      ],
+    },
+    offset_ms: {
+      type: "integer",
+      description:
+        "Length of the announcement that played before capture started. Zero when nothing was announced. It is not a position on a call clock.",
+    },
+    audio_ms: {
+      type: "integer",
+      description:
+        "Length of the payload itself. This runs shorter than `ended_at - started_at` by the silence before the first packet, so use it for anything about the sound and the window for anything about the leg.",
+    },
+    source_party: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoicePartyWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The party this audio was captured from, which is what says whose voice it\ncarries. `channel` only says which direction of the leg the stream came\nfrom. A recording view's `number` identifies a number associated with\nthat view, which can be an outbound destination.\n\n`null` on a stream stored before the platform recorded a party for it.\n",
+    },
+    started_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When capture started, which is after any announcement rather than at the answer.",
+    },
+    ended_at: {
+      type: ["string", "null"],
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When capture ended, or null while capture is open or its end is unknown.",
+    },
+  },
+} as const;
+
+export const VoiceLegRecordingWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: [
+    "id",
+    "leg_id",
+    "channel",
+    "media_id",
+    "media_started_at",
+    "started_at",
+    "ended_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/VoiceCallRecordingID",
+      description: "Unique identifier for this view.",
+    },
+    leg_id: {
+      $ref: "#/components/schemas/VoiceCallID",
+      description: "The leg this view belongs to.",
+    },
+    call_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceSessionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description: "`null` on a recording captured before calls existed.",
+    },
+    number: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The number associated with this recording view, when one was recorded. It can be an outbound destination. Omitted for numberless calls.",
+    },
+    channel: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegChannel",
+        },
+      ],
+      description: "It does not say whose voice it is.",
+    },
+    media_id: {
+      $ref: "#/components/schemas/VoiceCallMediaID",
+      description:
+        "The stream this view refers to. A stream captured on another leg or omitted by retention or truncation may be absent from `media` in this response.",
+    },
+    media_started_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When the referenced stream started, which a view captured from the far leg does not share with its own `started_at`.",
+    },
+    started_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+    },
+    ended_at: {
+      type: ["string", "null"],
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When capture ended, or null while capture is open or its end is unknown.",
+    },
+  },
+} as const;
+
+export const VoiceLegTranscriptWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: [
+    "id",
+    "leg_id",
+    "media_id",
+    "media_started_at",
+    "state",
+    "source",
+    "channel",
+    "cues",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/VoiceCallTranscriptID",
+      description: "Unique identifier for this attempt.",
+    },
+    leg_id: {
+      $ref: "#/components/schemas/VoiceCallID",
+      description: "The leg the transcribed stream was captured from.",
+    },
+    call_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoiceSessionID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "`null` on a transcript of a stream captured before calls existed.",
+    },
+    media_id: {
+      $ref: "#/components/schemas/VoiceCallMediaID",
+      description: "The stream this attempt describes.",
+    },
+    media_started_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When that stream started. A transcript is retained with the stream it describes rather than on its own transcription lag.",
+    },
+    state: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegTranscriptState",
+        },
+      ],
+    },
+    source: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegTranscriptSource",
+        },
+      ],
+    },
+    model: {
+      type: "string",
+      description: "The model that produced it.",
+    },
+    channel: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/VoiceLegChannel",
+        },
+      ],
+      description: "The direction of the transcribed stream.",
+    },
+    cues: {
+      type: "array",
+      description:
+        "The transcript, in order. Concatenating cues across streams reads as prose nobody spoke, and a reader matching over it can match the wrong party's words.",
+      items: {
+        $ref: "#/components/schemas/VoiceLegTranscriptCue",
+      },
+    },
+    source_party: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/VoicePartyWritable",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The party this audio was captured from, which is what says whose voice it\ncarries. `channel` only says which direction of the leg the stream came\nfrom. A recording view's `number` identifies a number associated with\nthat view, which can be an outbound destination.\n\n`null` on a stream stored before the platform recorded a party for it.\n",
+    },
+    created_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+    },
+  },
+} as const;
+
+export const VoiceLegRecordingsWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["media", "recordings", "transcripts", "truncated", "evaluated_at"],
+  properties: {
+    media: {
+      type: "array",
+      description: "The stored audio this read covers, each stream once.",
+      items: {
+        $ref: "#/components/schemas/VoiceLegRecordingMediaWritable",
+      },
+    },
+    recordings: {
+      type: "array",
+      description: "Each leg's view of that audio.",
+      items: {
+        $ref: "#/components/schemas/VoiceLegRecordingWritable",
+      },
+    },
+    transcripts: {
+      type: "array",
+      description:
+        "Every transcription attempt over that audio, including failed ones.",
+      items: {
+        $ref: "#/components/schemas/VoiceLegTranscriptWritable",
+      },
+    },
+    truncated: {
+      type: "boolean",
+      description:
+        "Whether a collection above was cut at this read's per-collection limit of\n500. When `true`, there is more than is shown here and this response is not\nthe whole set.\n\n`false` means no collection hit that limit, and a collection that could\nnot be read in full fails the request rather than returning a short\nanswer. What `false` does not establish is that every recording made has\narrived: delivery into this store is asynchronous, so a recording made\nmoments ago can be absent from a complete read.\n",
+    },
+    evaluated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "The instant each collection's retention was decided at. Nothing here stays true because you are still holding the response. A recording can expire after it.",
+    },
+  },
+} as const;
+
 export const VoiceCallWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
     "A call summary. Call reads report observed state. Call creation returns an immutable acceptance snapshot: `started_at` and `ended_at` are `null`, the boolean observation fields are `false`, and `parties` is empty. Replays return that same snapshot after the call progresses.",
+} as const;
+
+export const VoiceCallTranscriptWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  required: ["call_id", "parties", "cues", "complete", "evaluated_at"],
+  properties: {
+    call_id: {
+      $ref: "#/components/schemas/VoiceSessionID",
+    },
+    parties: {
+      type: "array",
+      description:
+        "Each distinct stored party heard in `cues`, once. A stream with no recorded party adds nothing here; its cues carry a `null` party.",
+      items: {
+        $ref: "#/components/schemas/VoicePartyWritable",
+      },
+    },
+    cues: {
+      type: "array",
+      description:
+        "Every cue of the call in spoken order. A cue without times sits at the start of its stream.",
+      items: {
+        $ref: "#/components/schemas/VoiceCallTranscriptCue",
+      },
+    },
+    complete: {
+      type: "boolean",
+      description:
+        "`false` when a stream's every transcription failed, or the read was cut\nat its limit. `true` does not mean every stream has cues: a stream where\nnothing was heard, one never transcribed, or one whose transcript has not\narrived yet contributes none and leaves this `true`.\n",
+    },
+    evaluated_at: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "The instant retention was decided at. A transcript can expire after it.",
+    },
+  },
 } as const;
 
 export const VoiceDestinationWritableSchema = {

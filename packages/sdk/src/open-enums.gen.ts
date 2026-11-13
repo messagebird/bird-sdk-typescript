@@ -1199,6 +1199,20 @@ export const VoiceLegRejectionReason = {
 export type VoiceLegRejectionReasonValue = (typeof VoiceLegRejectionReason)[keyof typeof VoiceLegRejectionReason];
 
 /**
+ * Values of VoiceLegTranscriptSource known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const VoiceLegTranscriptSource = {
+  Aligned: "aligned",
+  Live: "live",
+  Whole: "whole",
+} as const;
+
+/** A known VoiceLegTranscriptSource value. */
+export type VoiceLegTranscriptSourceValue = (typeof VoiceLegTranscriptSource)[keyof typeof VoiceLegTranscriptSource];
+
+/**
  * Values of VoicePartyEndpointType known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.

@@ -1,8 +1,8 @@
 import { Resource } from "./base.js";
 import { VoiceVerifiedNumbersResource } from "./voiceVerifiedNumbers.gen.js";
 import { VoiceDestinationsResource } from "./voiceDestinations.gen.js";
-import { VoiceCallsResource } from "./voiceCalls.gen.js";
-import { VoiceLegsResource } from "./voiceLegs.gen.js";
+import { VoiceCallsResource } from "./voiceCalls.js";
+import { VoiceLegsResource } from "./voiceLegs.js";
 import { VoiceNumbersResource } from "./voiceNumbers.gen.js";
 import { VoiceSettingsResource } from "./voiceSettings.gen.js";
 import { VoiceRingGroupsResource } from "./voiceRingGroups.js";

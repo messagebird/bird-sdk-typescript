@@ -1,10 +1,14 @@
 import { describe, it, expect } from "vitest";
+import * as sdk from "../src/index.js";
 import { BirdError, BirdAPIError, BirdAuthError, BirdRateLimitError } from "../src/index.js";
 import {
   mapResponseToError,
   parseRetryAfter,
   BirdInternalError,
   BirdPreconditionError,
+  BirdGoneError,
+  BirdTooEarlyError,
+  BirdClientClosedRequestError,
   BirdValidationError,
   type NextAction,
 } from "../src/errors.js";
@@ -182,5 +186,27 @@ describe("parseRetryAfter", () => {
       headers({ "Retry-After": "-5" }),
     );
     expect((err as BirdRateLimitError).retryAfter).toBeUndefined();
+  });
+});
+
+describe("error type coverage", () => {
+  // The classes are hand-listed, so a type the spec adds would otherwise reach
+  // callers as the bare base class; too_early_error shipped that way.
+  it("maps every ErrorBody type to its own exported class", () => {
+    const seen = new Set<unknown>();
+    for (const type of ErrorBodySchema.properties.type.enum) {
+      const err = mapResponseToError(400, { type });
+      expect(err.constructor, type).not.toBe(BirdAPIError);
+      expect(seen.has(err.constructor), `${type} shares a class`).toBe(false);
+      seen.add(err.constructor);
+      expect((sdk as Record<string, unknown>)[err.constructor.name], `${err.constructor.name} export`).toBe(err.constructor);
+      expect(err.type).toBe(type);
+    }
+  });
+
+  it("infers the type of a bodyless 410, 425 and 499", () => {
+    expect(mapResponseToError(410, undefined, headers())).toBeInstanceOf(BirdGoneError);
+    expect(mapResponseToError(425, undefined, headers())).toBeInstanceOf(BirdTooEarlyError);
+    expect(mapResponseToError(499, undefined, headers())).toBeInstanceOf(BirdClientClosedRequestError);
   });
 });

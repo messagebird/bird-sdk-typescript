@@ -214,3 +214,17 @@ export async function voiceCreateCall() {
   });
   console.log(call.id, call.initial_leg_id, call.sequence?.run_id);
 }
+
+export async function voiceCallRecordings() {
+  const inventory = await bird.voice.calls.recordings.list("vcs_01krdgeqcxet5s7t44vh8rt9mg");
+  for (const recording of inventory.recordings) {
+    console.log(recording.leg_id, recording.id);
+  }
+}
+
+export async function voiceCallTranscript() {
+  const transcript = await bird.voice.calls.transcript("vcs_01krdgeqcxet5s7t44vh8rt9mg");
+  for (const cue of transcript.cues) {
+    console.log(cue.text);
+  }
+}

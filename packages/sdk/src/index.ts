@@ -22,6 +22,9 @@ export {
   BirdNotImplementedError,
   BirdMisdirectedError,
   BirdServiceUnavailableError,
+  BirdGoneError,
+  BirdTooEarlyError,
+  BirdClientClosedRequestError,
   BirdValidationError,
   BirdRateLimitError,
   BirdWebhookVerificationError,
@@ -122,8 +125,11 @@ export type {
 export type { SmsMessage, SmsListQuery } from "./resources/sms.gen.js";
 export type {
   VoiceCall,
+  VoiceCallTranscript,
   VoiceCallsCreateParams,
 } from "./resources/voiceCalls.gen.js";
+export type { VoiceLegRecordings } from "./resources/voiceCallsRecordings.gen.js";
+export type { VoiceRecordingAudio } from "./resources/voiceLegsRecordings.js";
 export type {
   VoiceLeg,
   VoiceLegsListQuery,
@@ -564,6 +570,7 @@ export {
   VerificationTerminalReason,
   VoiceLegMediaEncryption,
   VoiceLegRejectionReason,
+  VoiceLegTranscriptSource,
   VoicePartyEndpointType,
   WhatsAppBusinessAccountMarketingMessagesStatus,
   WhatsAppBusinessAccountReviewStatus,
@@ -673,6 +680,7 @@ export type {
   VerificationTerminalReasonValue,
   VoiceLegMediaEncryptionValue,
   VoiceLegRejectionReasonValue,
+  VoiceLegTranscriptSourceValue,
   VoicePartyEndpointTypeValue,
   WhatsAppBusinessAccountMarketingMessagesStatusValue,
   WhatsAppBusinessAccountReviewStatusValue,
