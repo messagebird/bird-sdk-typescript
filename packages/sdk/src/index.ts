@@ -509,6 +509,8 @@ export {
   AMBFormTextContentType,
   AMBSuppressionOrigin,
   AMBSuppressionReason,
+  AMBSuppressionCoverage,
+  AMBSuppressionEndReason,
   ComplianceItemState,
   ComplianceObligationReason,
   ComplianceObligationState,
@@ -596,6 +598,10 @@ export {
   WhatsAppNumberStatus,
   WhatsAppNumberThroughputLevel,
   WhatsAppStatsMessageCategory,
+  WhatsAppSuppressionReason,
+  WhatsAppSuppressionOrigin,
+  WhatsAppSuppressionCoverage,
+  WhatsAppSuppressionEndReason,
   WhatsAppTemplateBidStrategy,
   WhatsAppTemplateCategory,
   WhatsAppTemplateLanguageStatus,
@@ -619,6 +625,8 @@ export type {
   AMBFormTextContentTypeValue,
   AMBSuppressionOriginValue,
   AMBSuppressionReasonValue,
+  AMBSuppressionCoverageValue,
+  AMBSuppressionEndReasonValue,
   ComplianceItemStateValue,
   ComplianceObligationReasonValue,
   ComplianceObligationStateValue,
@@ -706,6 +714,10 @@ export type {
   WhatsAppNumberStatusValue,
   WhatsAppNumberThroughputLevelValue,
   WhatsAppStatsMessageCategoryValue,
+  WhatsAppSuppressionReasonValue,
+  WhatsAppSuppressionOriginValue,
+  WhatsAppSuppressionCoverageValue,
+  WhatsAppSuppressionEndReasonValue,
   WhatsAppTemplateBidStrategyValue,
   WhatsAppTemplateCategoryValue,
   WhatsAppTemplateLanguageStatusValue,
@@ -936,7 +948,7 @@ export type {
 } from "./resources/ambStatsInbound.gen.js";
 export type {
   AmbSuppressionsListQuery,
-  AmbSuppressionsCreateParams,
+  AmbSuppressionsAddParams,
   AmbSuppression,
 } from "./resources/ambSuppressions.gen.js";
 

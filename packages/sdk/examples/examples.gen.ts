@@ -295,7 +295,7 @@ console.log(result);
 }
 
 export async function _ex_43() {
-const result = await bird.amb.suppressions.create({
+const result = await bird.amb.suppressions.add({
   address: "opaque-customer",
   address_type: "opaque_user_id",
 });
@@ -303,24 +303,24 @@ console.log(result);
 }
 
 export async function _ex_44() {
-const result = await bird.amb.suppressions.delete(
-  "asp_01krdgeqcxet5s7t44vh8rt9mg",
-);
-console.log(result);
-}
-
-export async function _ex_45() {
 const result = await bird.amb.suppressions.get(
   "asp_01krdgeqcxet5s7t44vh8rt9mg",
 );
 console.log(result);
 }
 
-export async function _ex_46() {
+export async function _ex_45() {
 const result = await bird.amb.suppressions.list({
   business_account_id: "abz_01krdgeqcxet5s7t44vh8rt9mg",
   limit: 2,
 });
+console.log(result);
+}
+
+export async function _ex_46() {
+const result = await bird.amb.suppressions.remove(
+  "asp_01krdgeqcxet5s7t44vh8rt9mg",
+);
 console.log(result);
 }
 
@@ -2943,8 +2943,8 @@ console.log(suppression.reason, suppression.ended_at ?? "still in force");
 }
 
 export async function _ex_397() {
-// address is a prefix, so a partial value matches every address under it.
-const suppressions = await bird.whatsapp.suppressions.list({ address: "+1555" });
+// address matches one complete address exactly; a partial number returns nothing.
+const suppressions = await bird.whatsapp.suppressions.list({ address: "+15550001234" });
 for (const suppression of suppressions.data ?? []) {
   console.log(suppression.address, suppression.waba ?? "every account");
 }

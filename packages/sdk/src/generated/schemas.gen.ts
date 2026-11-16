@@ -13672,6 +13672,11 @@ export const SMSSuppressionSchema = {
     "effective_at",
     "created_at",
     "last_asserted_at",
+    "source_sms_id",
+    "ended_at",
+    "ended_reason",
+    "ended_effective_at",
+    "source_end_sms_id",
   ],
   properties: {
     id: {
@@ -26575,7 +26580,7 @@ export const AMBSuppressionReasonSchema = {
   minLength: 1,
   "x-extensible-enum": ["manual", "opted_out"],
   description:
-    "Why the handle is suppressed. `manual` means it was added directly through this API or the dashboard. `opted_out` covers every case where Apple or the customer signaled they should not be contacted: a close, a permanent delivery failure, a declined invitation, or a stop keyword. This list grows over time, so treat an unknown value as informational rather than rejecting the record.\n",
+    "Why messages are stopped. `manual` means your workspace added it through this API or the dashboard. `opted_out` means the customer or Apple signaled they should not be contacted, such as a close of the conversation. This list grows over time, so treat an unknown value as informational rather than rejecting the record.\n",
   example: "manual",
 } as const;
 
@@ -26584,8 +26589,16 @@ export const AMBSuppressionOriginSchema = {
   minLength: 1,
   "x-extensible-enum": ["user", "api_key", "close_session", "gone"],
   description:
-    "Who created the episode. user and api_key identify manual blocks. close_session and gone are protected automatic conversation facts. Phone invitation opt-outs are recorded as preferences.",
+    "How the suppression came to exist:\n\n- `user`: someone acting in the dashboard.\n- `api_key`: an API call.\n- `close_session`: Apple reporting that the customer closed the conversation.\n- `gone`: Apple refusing a send because the customer had closed the conversation.\n\n`user` and `api_key` are the manual suppressions, the ones you can end. The two closes are\nthe customer's own statement and end when they return. A customer declining or opting out of\ninvitations by phone number is recorded as a preference rather than here.\n",
   example: "user",
+} as const;
+
+export const AMBSuppressionCoverageSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["all", "invitations"],
+  description:
+    "What this stops. `all` stops every outbound path to the address: operator and automated replies, API sends, typing indicators and invitations. `invitations` stops invitations to the phone number and leaves an open conversation reachable. Treat unrecognized values as stopping everything.\n",
 } as const;
 
 export const AMBMessageIDSchema = {
@@ -26602,11 +26615,19 @@ export const AMBEventIDSchema = {
   example: "aev_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const AMBSuppressionEndReasonSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["user", "api_key", "reinitiated"],
+  description:
+    "What ended it:\n\n- `user`: someone acting in the dashboard.\n- `api_key`: an API call.\n- `reinitiated`: the customer returning to the conversation they had closed.\n\nA user or an API call can end a `manual` suppression and nothing else; a close is the\ncustomer's own statement and ends when they return.\n\nNull while the suppression is in force.\n",
+} as const;
+
 export const AMBSuppressionSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "One retained suppression episode for an address. A null account scope covers the same address in every account in the workspace; it does not link different opaque identities.",
+    "One period during which messages to an address are stopped: when it started, what started it, and what ended it. The address is a phone number or the opaque identifier Apple assigns to a customer's conversation with a business. A customer who closes a conversation, returns, and closes it again has two of these on record rather than one current state, the first ended and the second in force, and each keeps its own dates once it ends. The list returns the periods in force; fetch one by ID to read an ended one.\n",
   required: [
     "id",
     "business_account_id",
@@ -26615,6 +26636,7 @@ export const AMBSuppressionSchema = {
     "reason",
     "origin",
     "applies_to",
+    "blocking",
     "effective_at",
     "created_at",
     "ended_at",
@@ -26636,13 +26658,15 @@ export const AMBSuppressionSchema = {
         },
       ],
       readOnly: true,
+      description:
+        "The business account this stops. Null when it stops the address for every account in the workspace. A workspace-wide suppression covers the same address everywhere; it does not link the different opaque identifiers one person holds with different accounts.\n",
     },
     address: {
       type: "string",
       minLength: 1,
       maxLength: 1024,
       description:
-        "Canonical E.164 phone number, or the exact opaque identifier Apple supplied.",
+        "The customer: a phone number in E.164 format, or the exact opaque identifier Apple supplied. `address_type` says which.\n",
       example: "+15551234567",
     },
     address_type: {
@@ -26657,63 +26681,93 @@ export const AMBSuppressionSchema = {
       readOnly: true,
     },
     applies_to: {
-      type: "string",
-      minLength: 1,
+      $ref: "#/components/schemas/AMBSuppressionCoverage",
       readOnly: true,
-      "x-extensible-enum": ["all", "invitations"],
+    },
+    blocking: {
+      type: "boolean",
+      readOnly: true,
       description:
-        "Paths blocked by this episode. Treat unknown values as blocking.",
+        "Whether this is stopping messages right now; `applies_to` says what it stops. Always true in a list, which carries only the suppressions in force; false when you fetch one by ID that has since ended, which is also when `ended_at` is set.\n",
     },
     source_message_id: {
-      $ref: "#/components/schemas/AMBMessageID",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBMessageID",
+        },
+        {
+          type: "null",
+        },
+      ],
       readOnly: true,
       description:
-        "Message whose permanent delivery failure opened the episode, when applicable.",
+        "The outbound message Apple refused because the customer had closed the conversation, when that is what opened this. Null for a close Apple reported and for a manual suppression.\n",
     },
     source_event_id: {
-      $ref: "#/components/schemas/AMBEventID",
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBEventID",
+        },
+        {
+          type: "null",
+        },
+      ],
       readOnly: true,
       description:
-        "Conversation event that opened the episode, when applicable.",
-    },
-    source_end_message_id: {
-      $ref: "#/components/schemas/AMBMessageID",
-      readOnly: true,
-      description:
-        "Inbound message that ended an eligible automatic episode, when applicable.",
+        "The conversation event recording the close Apple reported, when that is what opened this. Null for a refused send and for a manual suppression.\n",
     },
     effective_at: {
       type: "string",
       format: "date-time",
       minLength: 1,
       readOnly: true,
-      description: "When the blocking state took effect.",
+      description:
+        "When the customer closed the conversation, as reported by Apple; when Apple refused a send because the conversation was closed; or when a manual suppression was added. This is what orders the list, and it can differ from `created_at`: earlier when a close reached us late, later when the customer closed the conversation again while this was in force, which moves it to that later close.\n",
     },
     created_at: {
       type: "string",
       format: "date-time",
       minLength: 1,
       readOnly: true,
-      description: "When Bird recorded this episode.",
+      description: "When we recorded it.",
     },
     ended_at: {
       type: ["string", "null"],
       format: "date-time",
       readOnly: true,
-      description: "When Bird recorded the end, or null while active.",
+      description:
+        "When this stopped applying. Null while it is still stopping messages.",
     },
     ended_reason: {
-      type: ["string", "null"],
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBSuppressionEndReason",
+        },
+        {
+          type: "null",
+        },
+      ],
       readOnly: true,
-      "x-extensible-enum": ["user", "api_key", "reinitiated"],
-      description:
-        "What ended the episode, or null while active. Customers can end only manual episodes.",
     },
     ended_effective_at: {
       type: ["string", "null"],
       format: "date-time",
       readOnly: true,
-      description: "When the end took effect, or null while active.",
+      description:
+        "When the customer returned to the conversation, as reported by Apple, or when your workspace ended it. Null while it is still stopping messages.\n",
+    },
+    source_end_message_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBMessageID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The message the customer returned with, when there was one. Null while it is still stopping messages, and when something other than a customer message ended it: your workspace ending it, or the customer returning by accepting an invitation.\n",
     },
   },
 } as const;
@@ -30762,6 +30816,11 @@ export const AMBConversationTypingRequestSchema = {
   },
 } as const;
 
+export const AMBSuppressionReasonFilterSchema = {
+  type: "string",
+  enum: ["manual", "opted_out"],
+} as const;
+
 export const AMBSuppressionListSchema = {
   allOf: [
     {
@@ -30771,7 +30830,7 @@ export const AMBSuppressionListSchema = {
         data: {
           type: "array",
           description:
-            "Active suppression episodes for the workspace, most recently effective first. Episodes that have ended are left out; fetch one by ID to read it.\n",
+            "Page of suppressions in force, most recent first by `effective_at`. Ended suppressions are left out; fetch one by ID to read it.\n",
           items: {
             $ref: "#/components/schemas/AMBSuppression",
           },
@@ -30787,18 +30846,20 @@ export const AMBSuppressionListSchema = {
 export const AMBSuppressionCreateSchema = {
   type: "object",
   additionalProperties: false,
+  description:
+    "Stops messages to one address, for one business account or for every account in the workspace.\n",
   required: ["address", "address_type"],
   properties: {
     business_account_id: {
       $ref: "#/components/schemas/AMBBusinessID",
       description:
-        "Limit this manual block to one account. Omit to cover the same address across the workspace.",
+        "The business account to stop. Omit to stop the address for every account in the workspace. An account in another workspace returns `404`.\n",
     },
     address: {
       type: "string",
       minLength: 1,
       description:
-        "The phone number or opaque identifier to suppress. For a phone number, supply canonical E.164 with a leading plus sign.\n",
+        "The customer to stop messaging: a phone number in E.164 format with a leading plus sign, or the exact opaque identifier Apple supplied. `address_type` says which.\n",
       example: "+15551234567",
       maxLength: 1024,
     },
@@ -32777,12 +32838,59 @@ export const WhatsAppSuppressionIDSchema = {
   example: "was_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const WhatsAppSuppressionReasonSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["manual"],
+  description:
+    "Why the address cannot be messaged:\n\n- `manual`: Your workspace added the suppression through the API or the dashboard, and can end it.\n",
+  example: "manual",
+} as const;
+
+export const WhatsAppSuppressionOriginSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["api_key", "user"],
+  description:
+    "How the suppression came to exist:\n\n- `api_key`: an API call.\n- `user`: someone acting in the dashboard.\n\nKept beside the reason because one reason can arrive by more than one route.\n",
+  example: "user",
+} as const;
+
+export const WhatsAppSuppressionCoverageSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["all"],
+  description:
+    "Message categories blocked for this address. `all` blocks every category, including authentication and transactional messages, and is the only value in use. Treat unrecognized values as blocking every category.\n",
+} as const;
+
+export const WhatsAppSuppressionEndReasonSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["api_key", "user"],
+  description:
+    "What ended it:\n\n- `api_key`: an API call.\n- `user`: someone acting in the dashboard.\n\nNull while the suppression is still stopping messages.\n",
+} as const;
+
 export const WhatsAppSuppressionSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "One period during which an address is suppressed: when it started and, once it is over, what ended it. An address suppressed, ended and suppressed again has two of these on record rather than one current state. The list returns the periods in force; fetch one by ID to read one that has ended.\n",
-  required: ["id", "address", "reason", "origin", "applies_to", "created_at"],
+    "One period during which messages to a WhatsApp address are stopped: when it started, what started it, and what ended it. An address suppressed, ended and suppressed again has two of these on record rather than one current state, the first ended and the second in force, and each keeps its own dates once it ends. The list returns the periods in force; fetch one by ID to read an ended one.\n",
+  required: [
+    "id",
+    "address",
+    "waba",
+    "reason",
+    "origin",
+    "applies_to",
+    "blocking",
+    "effective_at",
+    "ended_at",
+    "ended_reason",
+    "ended_effective_at",
+    "created_at",
+  ],
   properties: {
     id: {
       readOnly: true,
@@ -32800,59 +32908,79 @@ export const WhatsAppSuppressionSchema = {
       type: ["string", "null"],
       readOnly: true,
       description:
-        "The WhatsApp Business Account the suppression is limited to, identified by its WhatsApp-issued account ID, or null when it covers the whole workspace.\n",
+        "The WhatsApp Business Account this stops, identified by its WhatsApp-issued account ID. Null when it stops the address for every account in the workspace, whichever one sends.\n",
       example: null,
     },
     reason: {
-      type: "string",
-      minLength: 1,
-      "x-extensible-enum": ["manual"],
-      description:
-        "Why the address is suppressed. `manual` means it was added directly rather than created automatically from a delivery outcome. This list grows over time, so treat an unknown value as informational rather than rejecting the record.\n",
+      $ref: "#/components/schemas/WhatsAppSuppressionReason",
+      readOnly: true,
     },
     origin: {
-      type: "string",
-      minLength: 1,
-      "x-extensible-enum": ["api_key", "user"],
-      description:
-        "How the suppression came to exist: `api_key` (added through the API with an API key) or `user` (added by a user in the dashboard). This list grows over time, so treat an unknown value as informational rather than rejecting the record.\n",
+      $ref: "#/components/schemas/WhatsAppSuppressionOrigin",
+      readOnly: true,
     },
     applies_to: {
-      type: "string",
-      minLength: 1,
-      "x-extensible-enum": ["all"],
+      $ref: "#/components/schemas/WhatsAppSuppressionCoverage",
+      readOnly: true,
+    },
+    blocking: {
+      type: "boolean",
+      readOnly: true,
       description:
-        "Blocking policy. `all` blocks every message category. Treat an unrecognized value as blocking.\n",
+        "Whether this is stopping messages right now. Always true in a list, which carries only the suppressions in force; false when you fetch one by ID that has since ended, which is also when `ended_at` is set.\n",
     },
     source_whatsapp_id: {
-      description:
-        "ID of the WhatsApp message that caused this address to be suppressed, when the suppression was created automatically. Omitted for addresses added manually.",
-      allOf: [
+      oneOf: [
         {
           $ref: "#/components/schemas/WhatsAppMessageID",
         },
+        {
+          type: "null",
+        },
       ],
+      readOnly: true,
+      description:
+        "The WhatsApp message a suppression was opened from. Null for a manual suppression, and Bird records no other kind today, so this is null on every record.\n",
+    },
+    effective_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When the suppression took effect. For one added through the API or the dashboard this is when it was added, so it matches `created_at`. This is what orders the list.\n",
     },
     ended_at: {
       type: ["string", "null"],
       format: "date-time",
       readOnly: true,
       description:
-        "When this stopped applying. Null while it is still stopping messages, which is the case for every record in the list.\n",
+        "When this stopped applying. Null while it is still stopping messages.",
     },
     ended_reason: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/WhatsAppSuppressionEndReason",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+    },
+    ended_effective_at: {
       type: ["string", "null"],
-      "x-extensible-enum": ["api_key", "user"],
+      format: "date-time",
       readOnly: true,
       description:
-        "What ended it: `api_key` (deleted through the API with an API key) or `user` (deleted by a user in the dashboard). Null while it is still stopping messages. This list grows over time, so treat an unknown value as informational rather than rejecting the record.\n",
+        "When the end took effect. For one ended through the API or the dashboard this matches `ended_at`. Null while it is still stopping messages.\n",
     },
     created_at: {
       type: "string",
       format: "date-time",
       minLength: 1,
       readOnly: true,
-      description: "When the suppression was created.",
+      description: "When we recorded it.",
     },
   },
 } as const;
@@ -32865,6 +32993,8 @@ export const WhatsAppSuppressionListSchema = {
       properties: {
         data: {
           type: "array",
+          description:
+            "Page of suppressions in force, most recent first by `effective_at`. Ended suppressions are left out; fetch one by ID to read it.\n",
           items: {
             $ref: "#/components/schemas/WhatsAppSuppression",
           },
@@ -32880,13 +33010,15 @@ export const WhatsAppSuppressionListSchema = {
 export const WhatsAppSuppressionCreateSchema = {
   type: "object",
   additionalProperties: false,
+  description:
+    "Stops messages to one WhatsApp address, for one business account or for every account in the workspace.\n",
   required: ["address"],
   properties: {
     address: {
       type: "string",
       minLength: 1,
       description:
-        "WhatsApp address to suppress. For a phone number, supply canonical E.164 with a leading plus sign, such as `+5511977670804`. A value that is not a valid phone number returns a `422`.\n",
+        "The WhatsApp address to stop messaging. For a phone number, supply canonical E.164 with a leading plus sign, such as `+5511977670804`. A value that is not a valid phone number or business-scoped user ID returns `422`.\n",
       example: "+5511977670804",
     },
     waba: {
@@ -32894,7 +33026,7 @@ export const WhatsAppSuppressionCreateSchema = {
       minLength: 1,
       maxLength: 64,
       description:
-        "Limit the suppression to messages sent from this WhatsApp Business Account, identified by its WhatsApp-issued account ID. Omit it to block the address for the whole workspace, whichever account sends.\n",
+        "The WhatsApp Business Account to stop, identified by its WhatsApp-issued account ID or by the `waa_` ID Bird gives it. Either form resolves to the same account, and the suppression stores and returns the WhatsApp-issued one. Omit it to stop the address for the whole workspace, whichever account sends. An account that is not one of yours returns `404` on a single create, and its row reports `error` in a bulk create.\n",
       example: "102290129340398",
     },
   },
@@ -49591,11 +49723,7 @@ export const EventWhatsAppSuppressionCreatedDataSchema = {
       example: null,
     },
     reason: {
-      type: "string",
-      minLength: 1,
-      "x-extensible-enum": ["manual"],
-      description:
-        "Why the address is suppressed. `manual` means it was added directly rather than created automatically from a delivery outcome. This list grows over time, so treat an unknown value as informational rather than rejecting the record.",
+      $ref: "#/components/schemas/WhatsAppSuppressionReason",
     },
     workspace_id: {
       $ref: "#/components/schemas/WorkspaceID",
@@ -53799,7 +53927,7 @@ export const EsimStatusSchema = {
     "failed",
   ],
   description:
-    "Lifecycle state of an eSIM. A pending state always settles: to its target on\nsuccess, or back to the prior status when the network definitively rejects\nthe change, reported by the `esim.operation_failed` event.\n\n- `provisioning`: the initial data package is being applied; install credentials may already be available.\n- `ready`: installable and usable, waiting for first network use; allows top-up orders and release. Activate before `ready_until` or the eSIM expires.\n- `activating`: an activation is being applied.\n- `active`: in service; the service period ends at `active_until`. Allows top-up orders, suspend, resync, and release.\n- `suspending`: a suspension was requested and is being applied.\n- `suspended`: data service is paused; allows resume and release.\n- `resuming`: a resume was requested and is being applied.\n- `releasing`: a permanent release is in progress.\n- `released`: permanently released; terminal.\n- `expired`: dormant. No data package has been live (each one depleted, expired, removed, or failed) for the expiry window. Not terminal: a completed top-up returns the eSIM to `active`, and release remains available. Balances and the installed profile are untouched.\n- `failed`: provisioning failed; any charge on the owning order is credited back automatically, reported by that order. Terminal.\n",
+    "Lifecycle state of an eSIM. A pending state always settles: to its target on\nsuccess, or back to the prior status when the network definitively rejects\nthe change, reported by the `esim.operation_failed` event.\n\n- `provisioning`: the initial data package is being applied; install credentials may already be available.\n- `ready`: installable and usable, waiting for first network use; allows top-up orders and release. Activate before `ready_until`, when known, to stay within the guaranteed activation window.\n- `activating`: an activation is being applied.\n- `active`: in service; the service period ends at `active_until`. Allows top-up orders, suspend, resync, and release.\n- `suspending`: a suspension was requested and is being applied.\n- `suspended`: data service is paused; allows resume and release.\n- `resuming`: a resume was requested and is being applied.\n- `releasing`: a permanent release is in progress.\n- `released`: permanently released; terminal.\n- `expired`: dormant. No data package has been live (each one depleted, expired, removed, or failed) for the expiry window. Not terminal: a completed top-up returns the eSIM to `active`, and release remains available. Balances and the installed profile are untouched.\n- `failed`: provisioning failed; any charge on the owning order is credited back automatically, reported by that order. Terminal.\n",
 } as const;
 
 export const EsimModeSchema = {
@@ -54453,7 +54581,7 @@ export const EsimSchema = {
           format: "date-time",
           readOnly: true,
           description:
-            "Activate (first network use) before this moment or the eSIM expires. Null once activated.",
+            "Guaranteed deadline for first network use, derived from the initial purchase's accepted activation window. The activation window is separate from package validity. Null when the window is unconfirmed, first use has been reported, or the eSIM has been released. Top-ups do not restart this deadline.",
         },
         activated_at: {
           type: ["string", "null"],
@@ -56125,6 +56253,7 @@ export const EsimOfferSummarySchema = {
   description:
     "Compact offer row for lists: the full offer minus the embedded zone. Fetch the offer or its zone for the country list.\n",
   required: [
+    "activation_window_days",
     "id",
     "name",
     "revision",
@@ -56138,6 +56267,14 @@ export const EsimOfferSummarySchema = {
     "created_at",
   ],
   properties: {
+    activation_window_days: {
+      type: ["integer", "null"],
+      minimum: 1,
+      maximum: 3650,
+      readOnly: true,
+      description:
+        "Guaranteed days from purchase (order acceptance) to first network use for a new eSIM. The activation window is separate from package validity. Null means the activation window is unconfirmed, not unlimited. This window does not restart when topping up an existing eSIM.\n",
+    },
     id: {
       readOnly: true,
       allOf: [
@@ -56263,6 +56400,7 @@ export const EsimOfferSchema = {
   description:
     "A purchasable offer from the curated catalog: the commercial terms for prepaid data in one coverage zone, priced as your workspace is billed. The coverage itself lives on the referenced zone, shared by every offer selling the same footprint.\n",
   required: [
+    "activation_window_days",
     "id",
     "name",
     "revision",
@@ -56277,6 +56415,14 @@ export const EsimOfferSchema = {
     "created_at",
   ],
   properties: {
+    activation_window_days: {
+      type: ["integer", "null"],
+      minimum: 1,
+      maximum: 3650,
+      readOnly: true,
+      description:
+        "Guaranteed days from purchase (order acceptance) to first network use for a new eSIM. The activation window is separate from package validity. Null means the activation window is unconfirmed, not unlimited. This window does not restart when topping up an existing eSIM.\n",
+    },
     id: {
       readOnly: true,
       allOf: [
@@ -62553,7 +62699,7 @@ export const AMBSuppressionWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "One retained suppression episode for an address. A null account scope covers the same address in every account in the workspace; it does not link different opaque identities.",
+    "One period during which messages to an address are stopped: when it started, what started it, and what ended it. The address is a phone number or the opaque identifier Apple assigns to a customer's conversation with a business. A customer who closes a conversation, returns, and closes it again has two of these on record rather than one current state, the first ended and the second in force, and each keeps its own dates once it ends. The list returns the periods in force; fetch one by ID to read an ended one.\n",
   required: ["address", "address_type"],
   properties: {
     address: {
@@ -62561,7 +62707,7 @@ export const AMBSuppressionWritableSchema = {
       minLength: 1,
       maxLength: 1024,
       description:
-        "Canonical E.164 phone number, or the exact opaque identifier Apple supplied.",
+        "The customer: a phone number in E.164 format, or the exact opaque identifier Apple supplied. `address_type` says which.\n",
       example: "+15551234567",
     },
     address_type: {
@@ -63744,7 +63890,7 @@ export const AMBSuppressionListWritableSchema = {
         data: {
           type: "array",
           description:
-            "Active suppression episodes for the workspace, most recently effective first. Episodes that have ended are left out; fetch one by ID to read it.\n",
+            "Page of suppressions in force, most recent first by `effective_at`. Ended suppressions are left out; fetch one by ID to read it.\n",
           items: {
             $ref: "#/components/schemas/AMBSuppressionWritable",
           },
@@ -64005,8 +64151,8 @@ export const WhatsAppSuppressionWritableSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "One period during which an address is suppressed: when it started and, once it is over, what ended it. An address suppressed, ended and suppressed again has two of these on record rather than one current state. The list returns the periods in force; fetch one by ID to read one that has ended.\n",
-  required: ["address", "reason", "origin", "applies_to"],
+    "One period during which messages to a WhatsApp address are stopped: when it started, what started it, and what ended it. An address suppressed, ended and suppressed again has two of these on record rather than one current state, the first ended and the second in force, and each keeps its own dates once it ends. The list returns the periods in force; fetch one by ID to read an ended one.\n",
+  required: ["address"],
   properties: {
     address: {
       type: "string",
@@ -64014,36 +64160,6 @@ export const WhatsAppSuppressionWritableSchema = {
       description:
         "The suppressed WhatsApp address. For a phone number this is canonical E.164 with a leading plus sign, such as `+5511977670804`.\n",
       example: "+5511977670804",
-    },
-    reason: {
-      type: "string",
-      minLength: 1,
-      "x-extensible-enum": ["manual"],
-      description:
-        "Why the address is suppressed. `manual` means it was added directly rather than created automatically from a delivery outcome. This list grows over time, so treat an unknown value as informational rather than rejecting the record.\n",
-    },
-    origin: {
-      type: "string",
-      minLength: 1,
-      "x-extensible-enum": ["api_key", "user"],
-      description:
-        "How the suppression came to exist: `api_key` (added through the API with an API key) or `user` (added by a user in the dashboard). This list grows over time, so treat an unknown value as informational rather than rejecting the record.\n",
-    },
-    applies_to: {
-      type: "string",
-      minLength: 1,
-      "x-extensible-enum": ["all"],
-      description:
-        "Blocking policy. `all` blocks every message category. Treat an unrecognized value as blocking.\n",
-    },
-    source_whatsapp_id: {
-      description:
-        "ID of the WhatsApp message that caused this address to be suppressed, when the suppression was created automatically. Omitted for addresses added manually.",
-      allOf: [
-        {
-          $ref: "#/components/schemas/WhatsAppMessageID",
-        },
-      ],
     },
   },
 } as const;
@@ -64056,6 +64172,8 @@ export const WhatsAppSuppressionListWritableSchema = {
       properties: {
         data: {
           type: "array",
+          description:
+            "Page of suppressions in force, most recent first by `effective_at`. Ended suppressions are left out; fetch one by ID to read it.\n",
           items: {
             $ref: "#/components/schemas/WhatsAppSuppressionWritable",
           },

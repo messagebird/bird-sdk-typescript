@@ -103,6 +103,33 @@ export const AMBMessageEventType = {
 export type AMBMessageEventTypeValue = (typeof AMBMessageEventType)[keyof typeof AMBMessageEventType];
 
 /**
+ * Values of AMBSuppressionCoverage known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const AMBSuppressionCoverage = {
+  All: "all",
+  Invitations: "invitations",
+} as const;
+
+/** A known AMBSuppressionCoverage value. */
+export type AMBSuppressionCoverageValue = (typeof AMBSuppressionCoverage)[keyof typeof AMBSuppressionCoverage];
+
+/**
+ * Values of AMBSuppressionEndReason known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const AMBSuppressionEndReason = {
+  ApiKey: "api_key",
+  Reinitiated: "reinitiated",
+  User: "user",
+} as const;
+
+/** A known AMBSuppressionEndReason value. */
+export type AMBSuppressionEndReasonValue = (typeof AMBSuppressionEndReason)[keyof typeof AMBSuppressionEndReason];
+
+/**
  * Values of AMBSuppressionOrigin known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -1643,6 +1670,56 @@ export const WhatsAppStatsMessageCategory = {
 
 /** A known WhatsAppStatsMessageCategory value. */
 export type WhatsAppStatsMessageCategoryValue = (typeof WhatsAppStatsMessageCategory)[keyof typeof WhatsAppStatsMessageCategory];
+
+/**
+ * Values of WhatsAppSuppressionCoverage known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppSuppressionCoverage = {
+  All: "all",
+} as const;
+
+/** A known WhatsAppSuppressionCoverage value. */
+export type WhatsAppSuppressionCoverageValue = (typeof WhatsAppSuppressionCoverage)[keyof typeof WhatsAppSuppressionCoverage];
+
+/**
+ * Values of WhatsAppSuppressionEndReason known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppSuppressionEndReason = {
+  ApiKey: "api_key",
+  User: "user",
+} as const;
+
+/** A known WhatsAppSuppressionEndReason value. */
+export type WhatsAppSuppressionEndReasonValue = (typeof WhatsAppSuppressionEndReason)[keyof typeof WhatsAppSuppressionEndReason];
+
+/**
+ * Values of WhatsAppSuppressionOrigin known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppSuppressionOrigin = {
+  ApiKey: "api_key",
+  User: "user",
+} as const;
+
+/** A known WhatsAppSuppressionOrigin value. */
+export type WhatsAppSuppressionOriginValue = (typeof WhatsAppSuppressionOrigin)[keyof typeof WhatsAppSuppressionOrigin];
+
+/**
+ * Values of WhatsAppSuppressionReason known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const WhatsAppSuppressionReason = {
+  Manual: "manual",
+} as const;
+
+/** A known WhatsAppSuppressionReason value. */
+export type WhatsAppSuppressionReasonValue = (typeof WhatsAppSuppressionReason)[keyof typeof WhatsAppSuppressionReason];
 
 /**
  * Values of WhatsAppTemplateBidStrategy known at this SDK version. The wire value is an open

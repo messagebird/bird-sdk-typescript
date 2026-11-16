@@ -4169,7 +4169,7 @@ export const createSmsSuppression = <ThrowOnError extends boolean = false>(
   });
 
 /**
- * Delete an SMS suppression
+ * End an SMS suppression
  *
  * Ends a suppression, so the sender reaches the subscriber again. The record stays with the ending noted on it. This history helps answer later complaints or carrier audits.
  *
@@ -9821,7 +9821,11 @@ export const createAmbConversationTyping = <
 /**
  * List Apple Messages for Business suppressions
  *
- * Returns a paginated list of the workspace's active Apple Messages for Business suppressions: customers who have opted out of one brand, or of the whole workspace. Episodes that have ended are left out; fetch one by ID to read it. Filter by `business_account_id` to see one brand's suppressions, including the workspace-wide ones that block it too.
+ * Returns the suppressions currently stopping your messages, most recent first by `effective_at`. Pass `address` to look up one customer before messaging them, and `business_account_id` to narrow to one account.
+ *
+ * A suppression covers one address for one business account, or for every account in the workspace when `business_account_id` is null. Filtering by `business_account_id` returns that account's suppressions together with the workspace-wide ones that stop it too.
+ *
+ * Ended suppressions are excluded. A customer who returned to a conversation they had closed is reachable again and does not appear in this list.
  *
  */
 export const listAmbSuppressions = <ThrowOnError extends boolean = false>(
@@ -9851,7 +9855,9 @@ export const listAmbSuppressions = <ThrowOnError extends boolean = false>(
 /**
  * Create an Apple Messages for Business suppression
  *
- * Manually opens a suppression episode for a address, blocking every outbound path to it: operator and automated replies, API sends, typing indicators, and invitations. Set `business_account_id` to block the address for one brand only, or omit it to block the address for every brand in the workspace. If the address already has an active episode with reason `manual`, the API returns `200` with the existing episode instead of creating a second one.
+ * Stops messages to an address, with reason `manual`, blocking every outbound path to it: operator and automated replies, API sends, typing indicators and invitations. Set `business_account_id` to stop the address for one account, or omit it to stop the address for every account in the workspace. The account must belong to the workspace; another workspace's account returns `404`.
+ *
+ * Adding is idempotent. A `201` means a new suppression was recorded, and a `200` means a `manual` one for that address and scope was already in place and is returned unchanged. An address already stopped for another reason, such as the customer having closed the conversation, still gets its own `manual` record, and messages stay stopped until every one of them has ended.
  *
  */
 export const createAmbSuppression = <ThrowOnError extends boolean = false>(
@@ -9885,7 +9891,11 @@ export const createAmbSuppression = <ThrowOnError extends boolean = false>(
 /**
  * End an Apple Messages for Business suppression
  *
- * Ends a manual suppression created by a user or API caller, retaining the episode and the time it ended. Repeated requests for an already-ended manual episode succeed. Recipient opt-outs and automatic conversation facts remain protected, including after they have ended. Fresh invitation consent is recorded through preferences.
+ * Ends a manual suppression. The record stays with the ending noted on it. This history helps answer later complaints or audits.
+ *
+ * **Only the `manual` reason can be ended here.** An `opted_out` suppression is the customer's own statement: one opened by a close ends when the customer returns to the conversation. Attempts to end it return `422` with `E28039`, whether or not it has already ended. Fresh consent to invite a phone number is recorded through preferences, not here.
+ *
+ * Ending a `manual` suppression does not resume messages while another suppression for the same address is still open, whether for that business account or workspace-wide, including an `opted_out` one; while the conversation is closed, since Apple refuses sends into a closed conversation; or while the phone number's invitation consent is revoked in preferences. Ending one resumes messaging to someone your own records say did not want it, so do it only when you know why the `manual` record exists. An ID that does not exist in the workspace returns `404`, and a `manual` one that has already ended returns `204`.
  *
  */
 export const deleteAmbSuppression = <ThrowOnError extends boolean = false>(
@@ -9915,7 +9925,9 @@ export const deleteAmbSuppression = <ThrowOnError extends boolean = false>(
 /**
  * Get an Apple Messages for Business suppression
  *
- * Returns the suppression episode for the given ID, including one that has already ended. An ended episode keeps its dates and reports when and how it ended.
+ * Returns one suppression: the address and business account it covers, why messages are stopped, how the record came to exist, what it stops, and whether it is still in force.
+ *
+ * This operation also returns a suppression that has already ended. The `blocking` field is `false`, and the `ended_*` fields say when and why. An ID you kept from a create or a list therefore stays readable. To find one when you only know the address, use `GET /v1/amb/suppressions` with the `address` parameter. An ID that does not exist in the workspace returns `404`.
  *
  */
 export const getAmbSuppression = <ThrowOnError extends boolean = false>(
@@ -10831,7 +10843,11 @@ export const getWhatsAppBusinessAccount = <
 /**
  * List WhatsApp suppressions
  *
- * Returns a paginated list of the WhatsApp addresses the workspace is currently suppressing. Records that have ended are left out; fetch one by ID to read it. Use the address parameter for prefix lookup.
+ * Returns the suppressions currently stopping your messages, most recent first by `effective_at`. Pass `address` to look up one recipient before messaging them, and `waba` to narrow to one business account.
+ *
+ * A suppression covers one address for one business account, or for every account in the workspace when `waba` is null. Filtering by `waba` returns that account's suppressions together with the workspace-wide ones that stop it too.
+ *
+ * Ended suppressions are excluded; fetch one by ID to read it. An empty result does not mean the address is reachable: another suppression scope, a newer suppression, or the recipient's WhatsApp preferences (such as a STOP) can still refuse a send.
  *
  */
 export const listWhatsAppSuppressions = <ThrowOnError extends boolean = false>(
@@ -10861,7 +10877,9 @@ export const listWhatsAppSuppressions = <ThrowOnError extends boolean = false>(
 /**
  * Create a WhatsApp suppression
  *
- * Manually adds a WhatsApp address to the suppression list with reason `manual`. If the address is already suppressed, the API returns `200` with the existing record.
+ * Stops messages to a WhatsApp address, with reason `manual`, blocking every message category. Set `waba` to stop the address for one business account, or omit it to stop the address for every account in the workspace. The account must be one of yours; another workspace's account returns `404`.
+ *
+ * Adding is idempotent. A `201` means a new suppression was recorded, and a `200` means a `manual` one for that address and scope was already in place and is returned unchanged. The same address stopped for one account and for the whole workspace is two records.
  *
  */
 export const createWhatsAppSuppression = <ThrowOnError extends boolean = false>(

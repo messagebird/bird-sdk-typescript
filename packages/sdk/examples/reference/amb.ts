@@ -295,8 +295,8 @@ export async function ambSuppressionsGet() {
   console.log(result);
 }
 
-export async function ambSuppressionsDelete() {
-  const result = await bird.amb.suppressions.delete(
+export async function ambSuppressionsRemove() {
+  const result = await bird.amb.suppressions.remove(
     "asp_01krdgeqcxet5s7t44vh8rt9mg",
   );
   console.log(result);
@@ -310,8 +310,8 @@ export async function ambSuppressionsList() {
   console.log(result);
 }
 
-export async function ambSuppressionsCreate() {
-  const result = await bird.amb.suppressions.create({
+export async function ambSuppressionsAdd() {
+  const result = await bird.amb.suppressions.add({
     address: "opaque-customer",
     address_type: "opaque_user_id",
   });

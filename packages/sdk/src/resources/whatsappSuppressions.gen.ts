@@ -10,11 +10,11 @@ export type WhatsappSuppressionsAddParams = NonNullable<CreateWhatsAppSuppressio
 
 export class WhatsappSuppressionsResource extends Resource {
   /**
-   * List the workspace's recorded WhatsApp suppression addresses as a cursor page.
+   * List the workspace's WhatsApp suppressions (addresses blocked for one business account or for the whole workspace) as a cursor page.
    *
    * @example See who you will not message
-   * // address is a prefix, so a partial value matches every address under it.
-   * const suppressions = await bird.whatsapp.suppressions.list({ address: "+1555" });
+   * // address matches one complete address exactly; a partial number returns nothing.
+   * const suppressions = await bird.whatsapp.suppressions.list({ address: "+15550001234" });
    * for (const suppression of suppressions.data ?? []) {
    *   console.log(suppression.address, suppression.waba ?? "every account");
    * }
@@ -38,7 +38,7 @@ export class WhatsappSuppressionsResource extends Resource {
   }
 
   /**
-   * Record a WhatsApp address on the workspace suppression list.
+   * Stop messages to one WhatsApp address, for one business account or for the whole workspace.
    *
    * @example Stop messaging an address
    * // Omit waba to block the address for the whole workspace, whichever account

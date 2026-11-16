@@ -7715,7 +7715,7 @@ export type SmsSuppression = {
    * The inbound message the subscriber opted out with, or the outbound message whose delivery report reported the opt-out. Null when neither applies.
    *
    */
-  readonly source_sms_id?: SmsMessageId | null;
+  readonly source_sms_id: SmsMessageId | null;
   /**
    * When the subscriber opted out, as reported by whoever reported it. This is what orders one subscriber's history, and it can be earlier than `created_at` when a message reached us late.
    *
@@ -7724,20 +7724,20 @@ export type SmsSuppression = {
   /**
    * When this stopped applying. Null while it is still stopping messages.
    */
-  readonly ended_at?: string | null;
+  readonly ended_at: string | null;
   /**
    * What ended it. Null while it is still stopping messages.
    */
-  readonly ended_reason?: SmsSuppressionEndReason | null;
+  readonly ended_reason: SmsSuppressionEndReason | null;
   /**
    * When the subscriber opted back in, as reported. Null while it is still stopping messages.
    */
-  readonly ended_effective_at?: string | null;
+  readonly ended_effective_at: string | null;
   /**
    * The inbound message the subscriber opted back in with, when there was one. Null while it is still stopping messages, and when something other than a start keyword ended it.
    *
    */
-  readonly source_end_sms_id?: SmsMessageId | null;
+  readonly source_end_sms_id: SmsMessageId | null;
   /**
    * When we recorded it.
    */
@@ -14800,70 +14800,112 @@ export type AmbSuppressionId = string;
 export type AmbSuppressionAddressType = "phone_number" | "opaque_user_id";
 
 /**
- * Why the handle is suppressed. `manual` means it was added directly through this API or the dashboard. `opted_out` covers every case where Apple or the customer signaled they should not be contacted: a close, a permanent delivery failure, a declined invitation, or a stop keyword. This list grows over time, so treat an unknown value as informational rather than rejecting the record.
+ * Why messages are stopped. `manual` means your workspace added it through this API or the dashboard. `opted_out` means the customer or Apple signaled they should not be contacted, such as a close of the conversation. This list grows over time, so treat an unknown value as informational rather than rejecting the record.
  *
  */
 export type AmbSuppressionReason = "manual" | "opted_out" | (string & {});
 
 /**
- * Who created the episode. user and api_key identify manual blocks. close_session and gone are protected automatic conversation facts. Phone invitation opt-outs are recorded as preferences.
+ * How the suppression came to exist:
+ *
+ * - `user`: someone acting in the dashboard.
+ * - `api_key`: an API call.
+ * - `close_session`: Apple reporting that the customer closed the conversation.
+ * - `gone`: Apple refusing a send because the customer had closed the conversation.
+ *
+ * `user` and `api_key` are the manual suppressions, the ones you can end. The two closes are
+ * the customer's own statement and end when they return. A customer declining or opting out of
+ * invitations by phone number is recorded as a preference rather than here.
+ *
  */
 export type AmbSuppressionOrigin =
   "user" | "api_key" | "close_session" | "gone" | (string & {});
+
+/**
+ * What this stops. `all` stops every outbound path to the address: operator and automated replies, API sends, typing indicators and invitations. `invitations` stops invitations to the phone number and leaves an open conversation reachable. Treat unrecognized values as stopping everything.
+ *
+ */
+export type AmbSuppressionCoverage = "all" | "invitations" | (string & {});
 
 export type AmbMessageId = string;
 
 export type AmbEventId = string;
 
 /**
- * One retained suppression episode for an address. A null account scope covers the same address in every account in the workspace; it does not link different opaque identities.
+ * What ended it:
+ *
+ * - `user`: someone acting in the dashboard.
+ * - `api_key`: an API call.
+ * - `reinitiated`: the customer returning to the conversation they had closed.
+ *
+ * A user or an API call can end a `manual` suppression and nothing else; a close is the
+ * customer's own statement and ends when they return.
+ *
+ * Null while the suppression is in force.
+ *
+ */
+export type AmbSuppressionEndReason =
+  "user" | "api_key" | "reinitiated" | (string & {});
+
+/**
+ * One period during which messages to an address are stopped: when it started, what started it, and what ended it. The address is a phone number or the opaque identifier Apple assigns to a customer's conversation with a business. A customer who closes a conversation, returns, and closes it again has two of these on record rather than one current state, the first ended and the second in force, and each keeps its own dates once it ends. The list returns the periods in force; fetch one by ID to read an ended one.
+ *
  */
 export type AmbSuppression = {
   readonly id: AmbSuppressionId;
+  /**
+   * The business account this stops. Null when it stops the address for every account in the workspace. A workspace-wide suppression covers the same address everywhere; it does not link the different opaque identifiers one person holds with different accounts.
+   *
+   */
   readonly business_account_id: AmbBusinessId | null;
   /**
-   * Canonical E.164 phone number, or the exact opaque identifier Apple supplied.
+   * The customer: a phone number in E.164 format, or the exact opaque identifier Apple supplied. `address_type` says which.
+   *
    */
   address: string;
   address_type: AmbSuppressionAddressType;
   readonly reason: AmbSuppressionReason;
   readonly origin: AmbSuppressionOrigin;
+  readonly applies_to: AmbSuppressionCoverage;
   /**
-   * Paths blocked by this episode. Treat unknown values as blocking.
+   * Whether this is stopping messages right now; `applies_to` says what it stops. Always true in a list, which carries only the suppressions in force; false when you fetch one by ID that has since ended, which is also when `ended_at` is set.
+   *
    */
-  readonly applies_to: string;
+  readonly blocking: boolean;
   /**
-   * Message whose permanent delivery failure opened the episode, when applicable.
+   * The outbound message Apple refused because the customer had closed the conversation, when that is what opened this. Null for a close Apple reported and for a manual suppression.
+   *
    */
-  readonly source_message_id?: AmbMessageId;
+  readonly source_message_id?: AmbMessageId | null;
   /**
-   * Conversation event that opened the episode, when applicable.
+   * The conversation event recording the close Apple reported, when that is what opened this. Null for a refused send and for a manual suppression.
+   *
    */
-  readonly source_event_id?: AmbEventId;
+  readonly source_event_id?: AmbEventId | null;
   /**
-   * Inbound message that ended an eligible automatic episode, when applicable.
-   */
-  readonly source_end_message_id?: AmbMessageId;
-  /**
-   * When the blocking state took effect.
+   * When the customer closed the conversation, as reported by Apple; when Apple refused a send because the conversation was closed; or when a manual suppression was added. This is what orders the list, and it can differ from `created_at`: earlier when a close reached us late, later when the customer closed the conversation again while this was in force, which moves it to that later close.
+   *
    */
   readonly effective_at: string;
   /**
-   * When Bird recorded this episode.
+   * When we recorded it.
    */
   readonly created_at: string;
   /**
-   * When Bird recorded the end, or null while active.
+   * When this stopped applying. Null while it is still stopping messages.
    */
   readonly ended_at: string | null;
+  readonly ended_reason: AmbSuppressionEndReason | null;
   /**
-   * What ended the episode, or null while active. Customers can end only manual episodes.
-   */
-  readonly ended_reason: string | null;
-  /**
-   * When the end took effect, or null while active.
+   * When the customer returned to the conversation, as reported by Apple, or when your workspace ended it. Null while it is still stopping messages.
+   *
    */
   readonly ended_effective_at: string | null;
+  /**
+   * The message the customer returned with, when there was one. Null while it is still stopping messages, and when something other than a customer message ended it: your workspace ending it, or the customer returning by accepting an invitation.
+   *
+   */
+  readonly source_end_message_id?: AmbMessageId | null;
 };
 
 /**
@@ -16717,21 +16759,28 @@ export type AmbConversationTypingRequest = {
   event: AmbConversationTypingEvent;
 };
 
+export type AmbSuppressionReasonFilter = "manual" | "opted_out";
+
 export type AmbSuppressionList = {
   /**
-   * Active suppression episodes for the workspace, most recently effective first. Episodes that have ended are left out; fetch one by ID to read it.
+   * Page of suppressions in force, most recent first by `effective_at`. Ended suppressions are left out; fetch one by ID to read it.
    *
    */
   data: Array<AmbSuppression>;
 } & ListEnvelope;
 
+/**
+ * Stops messages to one address, for one business account or for every account in the workspace.
+ *
+ */
 export type AmbSuppressionCreate = {
   /**
-   * Limit this manual block to one account. Omit to cover the same address across the workspace.
+   * The business account to stop. Omit to stop the address for every account in the workspace. An account in another workspace returns `404`.
+   *
    */
   business_account_id?: AmbBusinessId;
   /**
-   * The phone number or opaque identifier to suppress. For a phone number, supply canonical E.164 with a leading plus sign.
+   * The customer to stop messaging: a phone number in E.164 format with a leading plus sign, or the exact opaque identifier Apple supplied. `address_type` says which.
    *
    */
   address: string;
@@ -17699,7 +17748,43 @@ export type WhatsAppSuppressionReasonFilter = "manual";
 export type WhatsAppSuppressionId = string;
 
 /**
- * One period during which an address is suppressed: when it started and, once it is over, what ended it. An address suppressed, ended and suppressed again has two of these on record rather than one current state. The list returns the periods in force; fetch one by ID to read one that has ended.
+ * Why the address cannot be messaged:
+ *
+ * - `manual`: Your workspace added the suppression through the API or the dashboard, and can end it.
+ *
+ */
+export type WhatsAppSuppressionReason = "manual" | (string & {});
+
+/**
+ * How the suppression came to exist:
+ *
+ * - `api_key`: an API call.
+ * - `user`: someone acting in the dashboard.
+ *
+ * Kept beside the reason because one reason can arrive by more than one route.
+ *
+ */
+export type WhatsAppSuppressionOrigin = "api_key" | "user" | (string & {});
+
+/**
+ * Message categories blocked for this address. `all` blocks every category, including authentication and transactional messages, and is the only value in use. Treat unrecognized values as blocking every category.
+ *
+ */
+export type WhatsAppSuppressionCoverage = "all" | (string & {});
+
+/**
+ * What ended it:
+ *
+ * - `api_key`: an API call.
+ * - `user`: someone acting in the dashboard.
+ *
+ * Null while the suppression is still stopping messages.
+ *
+ */
+export type WhatsAppSuppressionEndReason = "api_key" | "user" | (string & {});
+
+/**
+ * One period during which messages to a WhatsApp address are stopped: when it started, what started it, and what ended it. An address suppressed, ended and suppressed again has two of these on record rather than one current state, the first ended and the second in force, and each keeps its own dates once it ends. The list returns the periods in force; fetch one by ID to read an ended one.
  *
  */
 export type WhatsAppSuppression = {
@@ -17713,57 +17798,64 @@ export type WhatsAppSuppression = {
    */
   address: string;
   /**
-   * The WhatsApp Business Account the suppression is limited to, identified by its WhatsApp-issued account ID, or null when it covers the whole workspace.
+   * The WhatsApp Business Account this stops, identified by its WhatsApp-issued account ID. Null when it stops the address for every account in the workspace, whichever one sends.
    *
    */
-  readonly waba?: string | null;
+  readonly waba: string | null;
+  readonly reason: WhatsAppSuppressionReason;
+  readonly origin: WhatsAppSuppressionOrigin;
+  readonly applies_to: WhatsAppSuppressionCoverage;
   /**
-   * Why the address is suppressed. `manual` means it was added directly rather than created automatically from a delivery outcome. This list grows over time, so treat an unknown value as informational rather than rejecting the record.
+   * Whether this is stopping messages right now. Always true in a list, which carries only the suppressions in force; false when you fetch one by ID that has since ended, which is also when `ended_at` is set.
    *
    */
-  reason: string;
+  readonly blocking: boolean;
   /**
-   * How the suppression came to exist: `api_key` (added through the API with an API key) or `user` (added by a user in the dashboard). This list grows over time, so treat an unknown value as informational rather than rejecting the record.
+   * The WhatsApp message a suppression was opened from. Null for a manual suppression, and Bird records no other kind today, so this is null on every record.
    *
    */
-  origin: string;
+  readonly source_whatsapp_id?: WhatsAppMessageId | null;
   /**
-   * Blocking policy. `all` blocks every message category. Treat an unrecognized value as blocking.
+   * When the suppression took effect. For one added through the API or the dashboard this is when it was added, so it matches `created_at`. This is what orders the list.
    *
    */
-  applies_to: string;
+  readonly effective_at: string;
   /**
-   * ID of the WhatsApp message that caused this address to be suppressed, when the suppression was created automatically. Omitted for addresses added manually.
+   * When this stopped applying. Null while it is still stopping messages.
    */
-  source_whatsapp_id?: WhatsAppMessageId;
+  readonly ended_at: string | null;
+  readonly ended_reason: WhatsAppSuppressionEndReason | null;
   /**
-   * When this stopped applying. Null while it is still stopping messages, which is the case for every record in the list.
+   * When the end took effect. For one ended through the API or the dashboard this matches `ended_at`. Null while it is still stopping messages.
    *
    */
-  readonly ended_at?: string | null;
+  readonly ended_effective_at: string | null;
   /**
-   * What ended it: `api_key` (deleted through the API with an API key) or `user` (deleted by a user in the dashboard). Null while it is still stopping messages. This list grows over time, so treat an unknown value as informational rather than rejecting the record.
-   *
-   */
-  readonly ended_reason?: string | null;
-  /**
-   * When the suppression was created.
+   * When we recorded it.
    */
   readonly created_at: string;
 };
 
 export type WhatsAppSuppressionList = {
+  /**
+   * Page of suppressions in force, most recent first by `effective_at`. Ended suppressions are left out; fetch one by ID to read it.
+   *
+   */
   data: Array<WhatsAppSuppression>;
 } & ListEnvelope;
 
+/**
+ * Stops messages to one WhatsApp address, for one business account or for every account in the workspace.
+ *
+ */
 export type WhatsAppSuppressionCreate = {
   /**
-   * WhatsApp address to suppress. For a phone number, supply canonical E.164 with a leading plus sign, such as `+5511977670804`. A value that is not a valid phone number returns a `422`.
+   * The WhatsApp address to stop messaging. For a phone number, supply canonical E.164 with a leading plus sign, such as `+5511977670804`. A value that is not a valid phone number or business-scoped user ID returns `422`.
    *
    */
   address: string;
   /**
-   * Limit the suppression to messages sent from this WhatsApp Business Account, identified by its WhatsApp-issued account ID. Omit it to block the address for the whole workspace, whichever account sends.
+   * The WhatsApp Business Account to stop, identified by its WhatsApp-issued account ID or by the `waa_` ID Bird gives it. Either form resolves to the same account, and the suppression stores and returns the WhatsApp-issued one. Omit it to stop the address for the whole workspace, whichever account sends. An account that is not one of yours returns `404` on a single create, and its row reports `error` in a bulk create.
    *
    */
   waba?: string;
@@ -27486,10 +27578,7 @@ export type EventWhatsAppSuppressionCreatedData = {
    * The WhatsApp Business Account the suppression is limited to, identified by its WhatsApp-issued account ID, or null when it covers the whole workspace.
    */
   waba: string | null;
-  /**
-   * Why the address is suppressed. `manual` means it was added directly rather than created automatically from a delivery outcome. This list grows over time, so treat an unknown value as informational rather than rejecting the record.
-   */
-  reason: string;
+  reason: WhatsAppSuppressionReason;
   /**
    * The workspace the suppression belongs to.
    */
@@ -29902,7 +29991,7 @@ export type EsimZone = {
  * the change, reported by the `esim.operation_failed` event.
  *
  * - `provisioning`: the initial data package is being applied; install credentials may already be available.
- * - `ready`: installable and usable, waiting for first network use; allows top-up orders and release. Activate before `ready_until` or the eSIM expires.
+ * - `ready`: installable and usable, waiting for first network use; allows top-up orders and release. Activate before `ready_until`, when known, to stay within the guaranteed activation window.
  * - `activating`: an activation is being applied.
  * - `active`: in service; the service period ends at `active_until`. Allows top-up orders, suspend, resync, and release.
  * - `suspending`: a suspension was requested and is being applied.
@@ -30262,7 +30351,7 @@ export type Esim = {
    */
   readonly balance_reporting: EsimBalanceReporting;
   /**
-   * Activate (first network use) before this moment or the eSIM expires. Null once activated.
+   * Guaranteed deadline for first network use, derived from the initial purchase's accepted activation window. The activation window is separate from package validity. Null when the window is unconfirmed, first use has been reported, or the eSIM has been released. Top-ups do not restart this deadline.
    */
   readonly ready_until?: string | null;
   /**
@@ -31084,6 +31173,11 @@ export type EsimOfferBundlePricing = {
  *
  */
 export type EsimOfferSummary = {
+  /**
+   * Guaranteed days from purchase (order acceptance) to first network use for a new eSIM. The activation window is separate from package validity. Null means the activation window is unconfirmed, not unlimited. This window does not restart when topping up an existing eSIM.
+   *
+   */
+  readonly activation_window_days: number | null;
   readonly id: EsimOfferId;
   /**
    * Display name of the offer.
@@ -31135,6 +31229,11 @@ export type EsimOfferList = {
  *
  */
 export type EsimOffer = {
+  /**
+   * Guaranteed days from purchase (order acceptance) to first network use for a new eSIM. The activation window is separate from package validity. Null means the activation window is unconfirmed, not unlimited. This window does not restart when topping up an existing eSIM.
+   *
+   */
+  readonly activation_window_days: number | null;
   readonly id: EsimOfferId;
   /**
    * Display name of the offer.
@@ -34600,11 +34699,13 @@ export type AmbBusinessAccountEventListWritable = {
 } & ListEnvelopeWithTotal;
 
 /**
- * One retained suppression episode for an address. A null account scope covers the same address in every account in the workspace; it does not link different opaque identities.
+ * One period during which messages to an address are stopped: when it started, what started it, and what ended it. The address is a phone number or the opaque identifier Apple assigns to a customer's conversation with a business. A customer who closes a conversation, returns, and closes it again has two of these on record rather than one current state, the first ended and the second in force, and each keeps its own dates once it ends. The list returns the periods in force; fetch one by ID to read an ended one.
+ *
  */
 export type AmbSuppressionWritable = {
   /**
-   * Canonical E.164 phone number, or the exact opaque identifier Apple supplied.
+   * The customer: a phone number in E.164 format, or the exact opaque identifier Apple supplied. `address_type` says which.
+   *
    */
   address: string;
   address_type: AmbSuppressionAddressType;
@@ -35018,7 +35119,7 @@ export type AmbConversationListWritable = {
 
 export type AmbSuppressionListWritable = {
   /**
-   * Active suppression episodes for the workspace, most recently effective first. Episodes that have ended are left out; fetch one by ID to read it.
+   * Page of suppressions in force, most recent first by `effective_at`. Ended suppressions are left out; fetch one by ID to read it.
    *
    */
   data: Array<AmbSuppressionWritable>;
@@ -35160,7 +35261,7 @@ export type WhatsAppBusinessAccountListWritable = {
 } & ListEnvelope;
 
 /**
- * One period during which an address is suppressed: when it started and, once it is over, what ended it. An address suppressed, ended and suppressed again has two of these on record rather than one current state. The list returns the periods in force; fetch one by ID to read one that has ended.
+ * One period during which messages to a WhatsApp address are stopped: when it started, what started it, and what ended it. An address suppressed, ended and suppressed again has two of these on record rather than one current state, the first ended and the second in force, and each keeps its own dates once it ends. The list returns the periods in force; fetch one by ID to read an ended one.
  *
  */
 export type WhatsAppSuppressionWritable = {
@@ -35169,28 +35270,13 @@ export type WhatsAppSuppressionWritable = {
    *
    */
   address: string;
-  /**
-   * Why the address is suppressed. `manual` means it was added directly rather than created automatically from a delivery outcome. This list grows over time, so treat an unknown value as informational rather than rejecting the record.
-   *
-   */
-  reason: string;
-  /**
-   * How the suppression came to exist: `api_key` (added through the API with an API key) or `user` (added by a user in the dashboard). This list grows over time, so treat an unknown value as informational rather than rejecting the record.
-   *
-   */
-  origin: string;
-  /**
-   * Blocking policy. `all` blocks every message category. Treat an unrecognized value as blocking.
-   *
-   */
-  applies_to: string;
-  /**
-   * ID of the WhatsApp message that caused this address to be suppressed, when the suppression was created automatically. Omitted for addresses added manually.
-   */
-  source_whatsapp_id?: WhatsAppMessageId;
 };
 
 export type WhatsAppSuppressionListWritable = {
+  /**
+   * Page of suppressions in force, most recent first by `effective_at`. Ended suppressions are left out; fetch one by ID to read it.
+   *
+   */
   data: Array<WhatsAppSuppressionWritable>;
 } & ListEnvelope;
 
@@ -60194,23 +60280,27 @@ export type ListAmbSuppressionsData = {
   path?: never;
   query?: {
     /**
-     * Keep only suppressions for this brand, including the workspace-wide ones that block it too. Omit to see suppressions for every brand in the workspace.
+     * Return only suppressions covering this business account, including the workspace-wide ones that stop it too. Omit for every account in the workspace.
      *
      */
     business_account_id?: AmbBusinessId;
     /**
-     * Prefix filter on the suppressed phone number or opaque identifier (case-insensitive). A complete value returns only that address; a partial value returns every match.
+     * Return only suppressions for this exact address: a complete phone number, which is normalized to E.164 first, or an opaque identifier exactly as Apple supplied it. Prefix matching is unsupported, so a partial value returns an empty page.
      *
      */
     address?: string;
     /**
-     * Keep only suppressions of this kind.
+     * Return only suppressions whose address is of this kind.
      */
     address_type?: AmbSuppressionAddressType;
     /**
-     * Keep only suppressions with this reason.
+     * Return only suppressions with this reason:
+     *
+     * - `manual`: Added through the API or dashboard.
+     * - `opted_out`: The customer or Apple signaled they should not be contacted.
+     *
      */
-    reason?: AmbSuppressionReason;
+    reason?: AmbSuppressionReasonFilter;
     /**
      * Maximum number of items to return per page.
      */
@@ -60264,7 +60354,7 @@ export type ListAmbSuppressionsError =
 
 export type ListAmbSuppressionsResponses = {
   /**
-   * Paginated list of suppressions.
+   * Paginated list of Apple Messages for Business suppressions.
    */
   200: AmbSuppressionList;
 };
@@ -60359,11 +60449,11 @@ export type CreateAmbSuppressionError =
 
 export type CreateAmbSuppressionResponses = {
   /**
-   * Handle was already suppressed for this reason. Existing episode returned.
+   * A manual suppression for this address and scope was already in place. The existing one is returned.
    */
   200: AmbSuppression;
   /**
-   * Suppression created.
+   * Suppression recorded.
    */
   201: AmbSuppression;
 };
@@ -60409,7 +60499,8 @@ export type DeleteAmbSuppressionData = {
   };
   path: {
     /**
-     * ID of the suppression episode to retrieve or end.
+     * ID of the suppression, as returned when it was created or listed.
+     *
      */
     suppression_id: AmbSuppressionId;
   };
@@ -60485,7 +60576,8 @@ export type GetAmbSuppressionData = {
   };
   path: {
     /**
-     * ID of the suppression episode to retrieve or end.
+     * ID of the suppression, as returned when it was created or listed.
+     *
      */
     suppression_id: AmbSuppressionId;
   };
@@ -60530,7 +60622,7 @@ export type GetAmbSuppressionError =
 
 export type GetAmbSuppressionResponses = {
   /**
-   * The requested suppression episode.
+   * Apple Messages for Business suppression.
    */
   200: AmbSuppression;
 };
@@ -62792,10 +62884,15 @@ export type ListWhatsAppSuppressionsData = {
   path?: never;
   query?: {
     /**
-     * Address prefix filter (case-insensitive). A complete address returns only that address; a partial value returns all matches.
+     * Return only suppressions for this exact address: a phone number in E.164 form or a business-scoped user ID. A phone number is matched in its canonical form, so spacing and punctuation do not matter. Prefix matching is unsupported.
      *
      */
     address?: string;
+    /**
+     * Return only suppressions covering this WhatsApp Business Account, identified by its WhatsApp-issued account ID or by the `waa_` ID Bird gives it, including the workspace-wide ones that stop it too. Omit for every account in the workspace.
+     *
+     */
+    waba?: string;
     /**
      * Return only suppressions with this reason:
      *
@@ -62947,7 +63044,7 @@ export type CreateWhatsAppSuppressionError =
 
 export type CreateWhatsAppSuppressionResponses = {
   /**
-   * Address was already suppressed. Existing record returned.
+   * A manual suppression for this address and scope was already in place. The existing one is returned.
    */
   200: WhatsAppSuppression;
   /**
@@ -63047,7 +63144,7 @@ export type DeleteWhatsAppSuppressionError =
 
 export type DeleteWhatsAppSuppressionResponses = {
   /**
-   * Suppression deleted.
+   * Suppression ended.
    */
   204: void;
 };

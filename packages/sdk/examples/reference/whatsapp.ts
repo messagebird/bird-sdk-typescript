@@ -445,8 +445,8 @@ export async function whatsappKeywordRulesDelete() {
 }
 
 export async function whatsappSuppressionsList() {
-  // address is a prefix, so a partial value matches every address under it.
-  const suppressions = await bird.whatsapp.suppressions.list({ address: "+1555" });
+  // address matches one complete address exactly; a partial number returns nothing.
+  const suppressions = await bird.whatsapp.suppressions.list({ address: "+15550001234" });
   for (const suppression of suppressions.data ?? []) {
     console.log(suppression.address, suppression.waba ?? "every account");
   }

@@ -6,11 +6,11 @@ import type { APIPromise, PaginatedPromise, RequestOptions } from "../core/resul
 
 export type { AmbSuppression };
 export type AmbSuppressionsListQuery = NonNullable<ListAmbSuppressionsData["query"]>;
-export type AmbSuppressionsCreateParams = NonNullable<CreateAmbSuppressionData["body"]>;
+export type AmbSuppressionsAddParams = NonNullable<CreateAmbSuppressionData["body"]>;
 
 export class AmbSuppressionsResource extends Resource {
   /**
-   * Returns the suppression episode for the given ID, including one that has already ended. An ended episode keeps its dates and reports when and how it ended.
+   * Read one Apple Messages for Business suppression: the address and account it covers, why messages are stopped, what it stops, and whether it is still in force. To check whether you may message someone, list suppressions filtered by their address instead.
    *
    * @example 
    * const result = await bird.amb.suppressions.get(
@@ -24,21 +24,21 @@ export class AmbSuppressionsResource extends Resource {
   }
 
   /**
-   * Ends a manual suppression while retaining its history. Recipient opt-outs and automatic conversation facts cannot be ended through this endpoint.
+   * End a manual Apple Messages for Business suppression. Only reason `manual` can be ended this way: a customer's own close is refused. Messages stay blocked while another suppression covers the address, while the conversation is closed, or while phone invitation consent is revoked in preferences.
    *
    * @example 
-   * const result = await bird.amb.suppressions.delete(
+   * const result = await bird.amb.suppressions.remove(
    *   "asp_01krdgeqcxet5s7t44vh8rt9mg",
    * );
    * console.log(result);
    */
-  delete(suppressionId: string, options?: RequestOptions): APIPromise<void> {
+  remove(suppressionId: string, options?: RequestOptions): APIPromise<void> {
     return this.call<void>("DELETE", options, ({ signal, headers }) =>
       deleteAmbSuppression({ client: this.client, path: { suppression_id: suppressionId }, headers, signal }));
   }
 
   /**
-   * Returns a paginated list of the workspace's active Apple Messages for Business suppressions: customers who have opted out of one brand, or of the whole workspace. Episodes that have ended are left out; fetch one by ID to read it. Filter by `business_account_id` to see one brand's suppressions, including the workspace-wide ones that block it too.
+   * List the workspace's Apple Messages for Business suppressions (addresses blocked for one business account or for the whole workspace) as a cursor page.
    *
    * @example 
    * const result = await bird.amb.suppressions.list({
@@ -53,16 +53,16 @@ export class AmbSuppressionsResource extends Resource {
   }
 
   /**
-   * Manually opens a suppression episode for a address, blocking every outbound path to it: operator and automated replies, API sends, typing indicators, and invitations. Set `business_account_id` to block the address for one brand only, or omit it to block the address for every brand in the workspace. If the address already has an active episode with reason `manual`, the API returns `200` with the existing episode instead of creating a second one.
+   * Stop messages to one address, for one business account or for the whole workspace. Blocks every outbound path to it: replies, API sends, typing indicators and invitations.
    *
    * @example 
-   * const result = await bird.amb.suppressions.create({
+   * const result = await bird.amb.suppressions.add({
    *   address: "opaque-customer",
    *   address_type: "opaque_user_id",
    * });
    * console.log(result);
    */
-  create(params: AmbSuppressionsCreateParams, options?: RequestOptions): APIPromise<AmbSuppression> {
+  add(params: AmbSuppressionsAddParams, options?: RequestOptions): APIPromise<AmbSuppression> {
     return this.call<AmbSuppression>("POST", options, ({ signal, headers }) =>
       createAmbSuppression({ client: this.client, body: params, headers, signal }));
   }
