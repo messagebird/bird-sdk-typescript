@@ -109,6 +109,7 @@ export type {
   ComplianceSubmissionsCreateParams,
   ComplianceSubmissionsResupplyParams,
 } from "./resources/complianceSubmissions.gen.js";
+export type { ComplianceDomainProof } from "./generated/types.gen.js";
 export type {
   Attachment,
   ComplianceAttachment,
@@ -505,6 +506,7 @@ export {
   AMBBusinessAccountReviewStatus,
   AMBBusinessAccountSubmissionDecider,
   AMBMessageEventType,
+  AMBMessagePartKind,
   AMBFormKeyboardType,
   AMBFormTextContentType,
   AMBSuppressionOrigin,
@@ -514,6 +516,7 @@ export {
   ComplianceItemState,
   ComplianceObligationReason,
   ComplianceObligationState,
+  ComplianceDomainProofMethod,
   ComplianceProgram,
   SMSSenderProgramEntry,
   SMSRegistrationStatus,
@@ -621,6 +624,7 @@ export type {
   AMBBusinessAccountReviewStatusValue,
   AMBBusinessAccountSubmissionDeciderValue,
   AMBMessageEventTypeValue,
+  AMBMessagePartKindValue,
   AMBFormKeyboardTypeValue,
   AMBFormTextContentTypeValue,
   AMBSuppressionOriginValue,
@@ -630,6 +634,7 @@ export type {
   ComplianceItemStateValue,
   ComplianceObligationReasonValue,
   ComplianceObligationStateValue,
+  ComplianceDomainProofMethodValue,
   ComplianceProgramValue,
   SMSSenderProgramEntryValue,
   SMSRegistrationStatusValue,

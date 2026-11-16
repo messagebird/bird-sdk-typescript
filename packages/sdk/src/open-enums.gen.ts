@@ -103,6 +103,21 @@ export const AMBMessageEventType = {
 export type AMBMessageEventTypeValue = (typeof AMBMessageEventType)[keyof typeof AMBMessageEventType];
 
 /**
+ * Values of AMBMessagePartKind known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const AMBMessagePartKind = {
+  Interactive: "interactive",
+  LinkPreview: "link_preview",
+  RichLink: "rich_link",
+  Text: "text",
+} as const;
+
+/** A known AMBMessagePartKind value. */
+export type AMBMessagePartKindValue = (typeof AMBMessagePartKind)[keyof typeof AMBMessagePartKind];
+
+/**
  * Values of AMBSuppressionCoverage known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -185,6 +200,19 @@ export const AssetReferenceUsage = {
 
 /** A known AssetReferenceUsage value. */
 export type AssetReferenceUsageValue = (typeof AssetReferenceUsage)[keyof typeof AssetReferenceUsage];
+
+/**
+ * Values of ComplianceDomainProofMethod known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const ComplianceDomainProofMethod = {
+  MemberLogin: "member_login",
+  SsoDomain: "sso_domain",
+} as const;
+
+/** A known ComplianceDomainProofMethod value. */
+export type ComplianceDomainProofMethodValue = (typeof ComplianceDomainProofMethod)[keyof typeof ComplianceDomainProofMethod];
 
 /**
  * Values of ComplianceItemState known at this SDK version. The wire value is an open

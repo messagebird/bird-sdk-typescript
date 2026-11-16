@@ -9857,7 +9857,7 @@ export const listAmbSuppressions = <ThrowOnError extends boolean = false>(
  *
  * Stops messages to an address, with reason `manual`, blocking every outbound path to it: operator and automated replies, API sends, typing indicators and invitations. Set `business_account_id` to stop the address for one account, or omit it to stop the address for every account in the workspace. The account must belong to the workspace; another workspace's account returns `404`.
  *
- * Adding is idempotent. A `201` means a new suppression was recorded, and a `200` means a `manual` one for that address and scope was already in place and is returned unchanged. An address already stopped for another reason, such as the customer having closed the conversation, still gets its own `manual` record, and messages stay stopped until every one of them has ended.
+ * Adding is idempotent. A `201` means a new suppression was recorded, and a `200` means a `manual` one for that address and scope was already in place and is returned with `last_asserted_at` moved to this call, nothing else changed. An address already stopped for another reason, such as the customer having closed the conversation, still gets its own `manual` record, and messages stay stopped until every one of them has ended.
  *
  */
 export const createAmbSuppression = <ThrowOnError extends boolean = false>(
@@ -10879,7 +10879,7 @@ export const listWhatsAppSuppressions = <ThrowOnError extends boolean = false>(
  *
  * Stops messages to a WhatsApp address, with reason `manual`, blocking every message category. Set `waba` to stop the address for one business account, or omit it to stop the address for every account in the workspace. The account must be one of yours; another workspace's account returns `404`.
  *
- * Adding is idempotent. A `201` means a new suppression was recorded, and a `200` means a `manual` one for that address and scope was already in place and is returned unchanged. The same address stopped for one account and for the whole workspace is two records.
+ * Adding is idempotent. A `201` means a new suppression was recorded, and a `200` means a `manual` one for that address and scope was already in place and is returned with `last_asserted_at` moved to this call, nothing else changed. The same address stopped for one account and for the whole workspace is two records.
  *
  */
 export const createWhatsAppSuppression = <ThrowOnError extends boolean = false>(

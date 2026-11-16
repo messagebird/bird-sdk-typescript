@@ -847,7 +847,7 @@ export type WorkspaceQuotaUsage = {
    */
   observed_at: string;
   /**
-   * The organization limit requests were checked against when usage was read.
+   * The organization limit requests were checked against when usage was read. The value `9223372036854775807` represents no limit.
    */
   organization_limit: number;
   /**
@@ -895,7 +895,7 @@ export type WorkspaceQuota = {
    */
   maximum_value: number;
   /**
-   * The organization's limit, shared by all its workspaces.
+   * The organization's limit, shared by all its workspaces. The value `9223372036854775807` represents no limit.
    */
   organization_limit: number;
   organization_source: QuotaSource;
@@ -904,7 +904,7 @@ export type WorkspaceQuota = {
    */
   workspace_limit: WorkspaceQuotaCeiling | null;
   /**
-   * The lower of the organization limit currently applied to requests and the workspace's active limit or automatic share. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.
+   * The lower of the organization limit currently applied to requests and the workspace's active limit or automatic share. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit. The value `9223372036854775807` represents no limit.
    */
   limit: number;
   limit_source: WorkspaceQuotaLimitSource;
@@ -9272,15 +9272,36 @@ export type ComplianceSubmissionCreate = {
   program: ComplianceProgram;
   country_code: CountryCode;
   /**
-   * An existing party this registration is for. It fills in the business details you left out from what that party already holds, and each single-value answer you file about the party is written back onto it for next time, whatever the verdict. Documents and multi-value answers are asked fresh each time. Send this or `identity`, never both. An id belonging to another organization is rejected; nothing is created here. When `subject_kind` is `identity`, send neither: `subject_id` already names the party.
+   * An existing party this registration is for. It fills in the business details you left out from what that party already holds (except `business_website` on a business verification), and each single-value answer you file about the party is written back onto it for next time, whatever the verdict. Documents and multi-value answers are asked fresh each time. Send this or `identity`, never both. An id belonging to another organization is rejected; nothing is created here. When `subject_kind` is `identity`, send neither: `subject_id` already names the party.
    */
   identity_id?: ComplianceIdentityId;
   identity?: ComplianceSubmissionIdentity;
   /**
-   * Every answer at once. Because submissions have no multi-call draft, send a complete set. Anything missing or malformed comes back named. A requirement the named party already answers may be left out; one you send anyway wins over what the party holds.
+   * Every answer at once. Because submissions have no multi-call draft, send a complete set. Anything missing or malformed comes back named. A requirement the named party already answers may be left out; one you send anyway wins over what the party holds. A business verification never fills in `business_website`: when you send it, its domain is the one your organization proves and `contact_email` must be on, so leave it out if the business's website is on another domain.
    *
    */
   answers: Array<ComplianceAnswer>;
+};
+
+/**
+ * How the domain was proven.
+ *
+ * - `member_login`: a member of this workspace signs in with a verified address at the domain.
+ * - `sso_domain`: the domain is your organization's verified single sign-on domain.
+ *
+ */
+export type ComplianceDomainProofMethod =
+  "member_login" | "sso_domain" | (string & {});
+
+/**
+ * How your organization proved it controls the business's domain, for a business verification.
+ */
+export type ComplianceDomainProof = {
+  method: ComplianceDomainProofMethod;
+  /**
+   * The business's registrable domain, such as `acme.com`.
+   */
+  domain: string;
 };
 
 export type ComplianceItemId = string;
@@ -9352,6 +9373,14 @@ export type ComplianceSubmission = {
    * The party this registration was filed for, or `null` if none was named.
    */
   readonly identity_id: ComplianceIdentityId | null;
+  /**
+   * For a business verification, how your organization proved it controls the business's domain. Absent otherwise.
+   */
+  readonly domain_proof?: ComplianceDomainProof;
+  /**
+   * For a business verification, the member who acts for the business. Absent otherwise.
+   */
+  readonly verifying_user_id?: UserId;
   /**
    * Whether this country's requirements are met. `true` once the submission is approved and every required requirement is approved or marked not applicable. This can remain true when an external verifier requests a correction. Once you submit that correction, it must pass review before this becomes true again, including any optional answers you change.
    *
@@ -14595,6 +14624,8 @@ export type WhatsAppNumberEventList = {
   data: Array<WhatsAppNumberEvent>;
 } & ListEnvelope;
 
+export type VoiceNumberId = string;
+
 /**
  * Where WhatsApp's review of the display name stands. `available_without_review` means WhatsApp accepted the name without reviewing it; `approved` means the name passed review. `none` means no display name has been submitted yet.
  */
@@ -14876,12 +14907,12 @@ export type AmbSuppression = {
    * The outbound message Apple refused because the customer had closed the conversation, when that is what opened this. Null for a close Apple reported and for a manual suppression.
    *
    */
-  readonly source_message_id?: AmbMessageId | null;
+  readonly source_message_id: AmbMessageId | null;
   /**
    * The conversation event recording the close Apple reported, when that is what opened this. Null for a refused send and for a manual suppression.
    *
    */
-  readonly source_event_id?: AmbEventId | null;
+  readonly source_event_id: AmbEventId | null;
   /**
    * When the customer closed the conversation, as reported by Apple; when Apple refused a send because the conversation was closed; or when a manual suppression was added. This is what orders the list, and it can differ from `created_at`: earlier when a close reached us late, later when the customer closed the conversation again while this was in force, which moves it to that later close.
    *
@@ -14891,6 +14922,11 @@ export type AmbSuppression = {
    * When we recorded it.
    */
   readonly created_at: string;
+  /**
+   * When we last recorded this suppression being stated. Later than `created_at` when your workspace added it again while it was already in force; a repeat adds no new record.
+   *
+   */
+  readonly last_asserted_at?: string;
   /**
    * When this stopped applying. Null while it is still stopping messages.
    */
@@ -14905,7 +14941,7 @@ export type AmbSuppression = {
    * The message the customer returned with, when there was one. Null while it is still stopping messages, and when something other than a customer message ended it: your workspace ending it, or the customer returning by accepting an invitation.
    *
    */
-  readonly source_end_message_id?: AmbMessageId | null;
+  readonly source_end_message_id: AmbMessageId | null;
 };
 
 /**
@@ -16243,6 +16279,57 @@ export type AmbInteractiveReply = {
 };
 
 /**
+ * What one part of an outbound message was:
+ *
+ * - `text`: Part of the message's text, with the attachments placed in it.
+ * - `link_preview`: A link from the text, sent as a preview Bird built from the page.
+ * - `rich_link`: The message's own `rich_link`.
+ * - `interactive`: The message's own `interactive`.
+ *
+ */
+export type AmbMessagePartKind =
+  "text" | "link_preview" | "rich_link" | "interactive" | (string & {});
+
+/**
+ * One part of the split an outbound message was sent in. `title`, `image_url` and `layout` record what a card showed, as measured when the part was sent, not what a request chose. They are absent when an earlier attempt of a retried send sent the part.
+ */
+export type AmbMessagePart = {
+  kind: AmbMessagePartKind;
+  /**
+   * The text this part sent. U+FFFC marks an attachment's place, as in `text.body`.
+   */
+  body?: string;
+  /**
+   * The message's subject, on the part that had it.
+   */
+  subject?: string;
+  /**
+   * Positions in `text.attachments` of the attachments this part sent.
+   */
+  attachments?: Array<number>;
+  /**
+   * The link a `link_preview` part previewed, as Bird sent it.
+   */
+  url?: string;
+  /**
+   * The title a `link_preview` part showed, read from the page when the part was sent. A title longer than 512 bytes is cut to that length. Absent when an earlier attempt of a retried send sent the part.
+   */
+  title?: string;
+  /**
+   * The page image a `link_preview` part showed, as the address it was fetched from when the part was sent. Absent when the address is longer than 2,048 bytes, and when an earlier attempt of a retried send sent the part.
+   */
+  image_url?: string;
+  /**
+   * How the device displayed the image of a `link_preview` or `rich_link` part, measured from the width and shape of the image as it was sent. A `large` image keeps its own proportions unless `large` was the chosen layout. Absent when an earlier attempt of a retried send sent the part, and on a `rich_link` Apple built from its URL.
+   */
+  layout?: AmbRichLinkLayout;
+  /**
+   * Whether Bird saw Apple accept this part. After a failed send, the part that failed and every part after it are `false`, but a `false` part may still have arrived if Apple's answer was lost, so do not resend it on that alone.
+   */
+  sent: boolean;
+};
+
+/**
  * Failure detail for a message or invitation that could not be sent or was rejected.
  */
 export type AmbError = {
@@ -16314,6 +16401,10 @@ export type AmbMessage = {
    * What the customer answered, on an inbound message replying to an interactive message.
    */
   readonly interactive_reply?: AmbInteractiveReply;
+  /**
+   * The parts an outbound message was sent as, in the order Bird sent them, so one message can arrive as several. Each link in the text goes as its own preview. A `rich_link` takes the place of the first copy of its URL in the text, which splits the text around it, and goes last when the text does not contain it. An `interactive` goes after the text. A card part that the finishing attempt sent also says what it showed. A message can also go out as one `rich_link` or `interactive` part that has its text. Set when the send finishes as `sent` or `send_failed`. Absent on inbound messages, when the text could not be split so nothing was sent, such as a text with more than 20 links, and on older messages, so treat a missing `parts` as unknown.
+   */
+  readonly parts?: Array<AmbMessagePart>;
   /**
    * Original message matched through Apple’s request identifier within the same workspace, business, and conversation. Omitted when no verified match exists, including when more than one sent message in the conversation uses the reply's request identifier.
    */
@@ -17814,7 +17905,7 @@ export type WhatsAppSuppression = {
    * The WhatsApp message a suppression was opened from. Null for a manual suppression, and Bird records no other kind today, so this is null on every record.
    *
    */
-  readonly source_whatsapp_id?: WhatsAppMessageId | null;
+  readonly source_whatsapp_id: WhatsAppMessageId | null;
   /**
    * When the suppression took effect. For one added through the API or the dashboard this is when it was added, so it matches `created_at`. This is what orders the list.
    *
@@ -17834,6 +17925,11 @@ export type WhatsAppSuppression = {
    * When we recorded it.
    */
   readonly created_at: string;
+  /**
+   * When we last recorded this suppression being stated. Later than `created_at` when your workspace added it again while it was already in force; a repeat adds no new record.
+   *
+   */
+  readonly last_asserted_at?: string;
 };
 
 export type WhatsAppSuppressionList = {
@@ -28865,8 +28961,6 @@ export type NumberUpdate = {
  */
 export type AutomationPortKey = string;
 
-export type VoiceNumberId = string;
-
 export type BillingResolvedPrice = {
   /**
    * Whether a published price matched. True includes an explicitly published zero price. False means no price matched and the zero amounts are placeholders, not a quote.
@@ -30813,11 +30907,6 @@ export type VoiceSequenceDefinition = {
   presentation?: VoiceSequencePresentation;
 };
 
-/**
- * Canonical E.164 phone number, with a leading plus sign and four to fifteen digits.
- */
-export type VoiceSequencePhoneNumber = string;
-
 export type VoiceSequenceRunId = string;
 
 export type VoiceCallSequence = {
@@ -30877,6 +30966,11 @@ export type VoiceCall = {
    */
   readonly sequence?: VoiceCallSequence;
 };
+
+/**
+ * Canonical E.164 phone number, with a leading plus sign and four to fifteen digits.
+ */
+export type VoiceSequencePhoneNumber = string;
 
 export type CreateVoiceCallSequenceRequest = unknown & {
   /**
@@ -32277,7 +32371,7 @@ export type WorkspaceQuotaUsageWritable = {
    */
   observed_at: string;
   /**
-   * The organization limit requests were checked against when usage was read.
+   * The organization limit requests were checked against when usage was read. The value `9223372036854775807` represents no limit.
    */
   organization_limit: number;
   /**
@@ -32325,7 +32419,7 @@ export type WorkspaceQuotaWritable = {
    */
   maximum_value: number;
   /**
-   * The organization's limit, shared by all its workspaces.
+   * The organization's limit, shared by all its workspaces. The value `9223372036854775807` represents no limit.
    */
   organization_limit: number;
   organization_source: QuotaSource;
@@ -32334,7 +32428,7 @@ export type WorkspaceQuotaWritable = {
    */
   workspace_limit: WorkspaceQuotaCeilingWritable | null;
   /**
-   * The lower of the organization limit currently applied to requests and the workspace's active limit or automatic share. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.
+   * The lower of the organization limit currently applied to requests and the workspace's active limit or automatic share. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit. The value `9223372036854775807` represents no limit.
    */
   limit: number;
   limit_source: WorkspaceQuotaLimitSource;
@@ -33844,6 +33938,17 @@ export type AssetFolderListWritable = {
 
 export type ComplianceRequirementWritable = {
   [key: string]: never;
+};
+
+/**
+ * How your organization proved it controls the business's domain, for a business verification.
+ */
+export type ComplianceDomainProofWritable = {
+  method: ComplianceDomainProofMethod;
+  /**
+   * The business's registrable domain, such as `acme.com`.
+   */
+  domain: string;
 };
 
 export type ComplianceSubmissionWritable = {
@@ -60449,7 +60554,7 @@ export type CreateAmbSuppressionError =
 
 export type CreateAmbSuppressionResponses = {
   /**
-   * A manual suppression for this address and scope was already in place. The existing one is returned.
+   * A manual suppression for this address and scope was already in place. It is returned with `last_asserted_at` moved to this call; nothing else changes.
    */
   200: AmbSuppression;
   /**
@@ -63044,7 +63149,7 @@ export type CreateWhatsAppSuppressionError =
 
 export type CreateWhatsAppSuppressionResponses = {
   /**
-   * A manual suppression for this address and scope was already in place. The existing one is returned.
+   * A manual suppression for this address and scope was already in place. It is returned with `last_asserted_at` moved to this call; nothing else changes.
    */
   200: WhatsAppSuppression;
   /**

@@ -1329,7 +1329,7 @@ export const WorkspaceQuotaUsageSchema = {
       format: "int64",
       minimum: 0,
       description:
-        "The organization limit requests were checked against when usage was read.",
+        "The organization limit requests were checked against when usage was read. The value `9223372036854775807` represents no limit.",
     },
     organization_used: {
       type: ["integer", "null"],
@@ -1437,7 +1437,8 @@ export const WorkspaceQuotaSchema = {
       type: "integer",
       format: "int64",
       minimum: 0,
-      description: "The organization's limit, shared by all its workspaces.",
+      description:
+        "The organization's limit, shared by all its workspaces. The value `9223372036854775807` represents no limit.",
     },
     organization_source: {
       $ref: "#/components/schemas/QuotaSource",
@@ -1459,7 +1460,7 @@ export const WorkspaceQuotaSchema = {
       format: "int64",
       minimum: 0,
       description:
-        "The lower of the organization limit currently applied to requests and the workspace's active limit or automatic share. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.",
+        "The lower of the organization limit currently applied to requests and the workspace's active limit or automatic share. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit. The value `9223372036854775807` represents no limit.",
     },
     limit_source: {
       $ref: "#/components/schemas/WorkspaceQuotaLimitSource",
@@ -16624,7 +16625,7 @@ export const ComplianceSubmissionCreateSchema = {
         },
       ],
       description:
-        "An existing party this registration is for. It fills in the business details you left out from what that party already holds, and each single-value answer you file about the party is written back onto it for next time, whatever the verdict. Documents and multi-value answers are asked fresh each time. Send this or `identity`, never both. An id belonging to another organization is rejected; nothing is created here. When `subject_kind` is `identity`, send neither: `subject_id` already names the party.",
+        "An existing party this registration is for. It fills in the business details you left out from what that party already holds (except `business_website` on a business verification), and each single-value answer you file about the party is written back onto it for next time, whatever the verdict. Documents and multi-value answers are asked fresh each time. Send this or `identity`, never both. An id belonging to another organization is rejected; nothing is created here. When `subject_kind` is `identity`, send neither: `subject_id` already names the party.",
     },
     identity: {
       $ref: "#/components/schemas/ComplianceSubmissionIdentity",
@@ -16633,10 +16634,38 @@ export const ComplianceSubmissionCreateSchema = {
       type: "array",
       minItems: 1,
       description:
-        "Every answer at once. Because submissions have no multi-call draft, send a complete set. Anything missing or malformed comes back named. A requirement the named party already answers may be left out; one you send anyway wins over what the party holds.\n",
+        "Every answer at once. Because submissions have no multi-call draft, send a complete set. Anything missing or malformed comes back named. A requirement the named party already answers may be left out; one you send anyway wins over what the party holds. A business verification never fills in `business_website`: when you send it, its domain is the one your organization proves and `contact_email` must be on, so leave it out if the business's website is on another domain.\n",
       items: {
         $ref: "#/components/schemas/ComplianceAnswer",
       },
+    },
+  },
+} as const;
+
+export const ComplianceDomainProofMethodSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["member_login", "sso_domain"],
+  description:
+    "How the domain was proven.\n\n- `member_login`: a member of this workspace signs in with a verified address at the domain.\n- `sso_domain`: the domain is your organization's verified single sign-on domain.\n",
+} as const;
+
+export const ComplianceDomainProofSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "How your organization proved it controls the business's domain, for a business verification.",
+  required: ["method", "domain"],
+  properties: {
+    method: {
+      $ref: "#/components/schemas/ComplianceDomainProofMethod",
+    },
+    domain: {
+      type: "string",
+      minLength: 1,
+      description: "The business's registrable domain, such as `acme.com`.",
+      example: "acme.com",
     },
   },
 } as const;
@@ -16830,6 +16859,26 @@ export const ComplianceSubmissionSchema = {
       readOnly: true,
       description:
         "The party this registration was filed for, or `null` if none was named.",
+    },
+    domain_proof: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/ComplianceDomainProof",
+        },
+      ],
+      readOnly: true,
+      description:
+        "For a business verification, how your organization proved it controls the business's domain. Absent otherwise.",
+    },
+    verifying_user_id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/UserID",
+        },
+      ],
+      readOnly: true,
+      description:
+        "For a business verification, the member who acts for the business. Absent otherwise.",
     },
     satisfied: {
       type: "boolean",
@@ -26206,6 +26255,13 @@ export const WhatsAppNumberEventListSchema = {
   ],
 } as const;
 
+export const VoiceNumberIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^vnu_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "vnu_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const WhatsAppDisplayNameStatusSchema = {
   type: "string",
   description:
@@ -26636,6 +26692,9 @@ export const AMBSuppressionSchema = {
     "reason",
     "origin",
     "applies_to",
+    "source_message_id",
+    "source_event_id",
+    "source_end_message_id",
     "blocking",
     "effective_at",
     "created_at",
@@ -26730,6 +26789,14 @@ export const AMBSuppressionSchema = {
       minLength: 1,
       readOnly: true,
       description: "When we recorded it.",
+    },
+    last_asserted_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When we last recorded this suppression being stated. Later than `created_at` when your workspace added it again while it was already in force; a repeat adds no new record.\n",
     },
     ended_at: {
       type: ["string", "null"],
@@ -29753,6 +29820,132 @@ export const AMBInteractiveReplySchema = {
   },
 } as const;
 
+export const AMBMessagePartKindSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["text", "link_preview", "rich_link", "interactive"],
+  description:
+    "What one part of an outbound message was:\n\n- `text`: Part of the message's text, with the attachments placed in it.\n- `link_preview`: A link from the text, sent as a preview Bird built from the page.\n- `rich_link`: The message's own `rich_link`.\n- `interactive`: The message's own `interactive`.\n",
+} as const;
+
+export const AMBMessagePartSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "One part of the split an outbound message was sent in. `title`, `image_url` and `layout` record what a card showed, as measured when the part was sent, not what a request chose. They are absent when an earlier attempt of a retried send sent the part.",
+  required: ["kind", "sent"],
+  properties: {
+    kind: {
+      $ref: "#/components/schemas/AMBMessagePartKind",
+    },
+    body: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The text this part sent. U+FFFC marks an attachment's place, as in `text.body`.",
+      example: "Track your order:",
+      "x-sensitive": true,
+    },
+    subject: {
+      type: "string",
+      minLength: 1,
+      description: "The message's subject, on the part that had it.",
+      example: "Your order",
+      "x-sensitive": true,
+    },
+    attachments: {
+      type: "array",
+      items: {
+        type: "integer",
+        minimum: 0,
+      },
+      description:
+        "Positions in `text.attachments` of the attachments this part sent.",
+      example: [0],
+    },
+    url: {
+      type: "string",
+      minLength: 1,
+      format: "uri",
+      description: "The link a `link_preview` part previewed, as Bird sent it.",
+      example: "https://example.com/orders/123",
+      "x-sensitive": true,
+    },
+    title: {
+      type: "string",
+      minLength: 1,
+      description:
+        "The title a `link_preview` part showed, read from the page when the part was sent. A title longer than 512 bytes is cut to that length. Absent when an earlier attempt of a retried send sent the part.",
+      example: "Your order",
+      "x-sensitive": true,
+    },
+    image_url: {
+      type: "string",
+      minLength: 1,
+      format: "uri",
+      description:
+        "The page image a `link_preview` part showed, as the address it was fetched from when the part was sent. Absent when the address is longer than 2,048 bytes, and when an earlier attempt of a retried send sent the part.",
+      example: "https://example.com/orders/123/cover.png",
+      "x-sensitive": true,
+    },
+    layout: {
+      $ref: "#/components/schemas/AMBRichLinkLayout",
+      description:
+        "How the device displayed the image of a `link_preview` or `rich_link` part, measured from the width and shape of the image as it was sent. A `large` image keeps its own proportions unless `large` was the chosen layout. Absent when an earlier attempt of a retried send sent the part, and on a `rich_link` Apple built from its URL.",
+    },
+    sent: {
+      type: "boolean",
+      description:
+        "Whether Bird saw Apple accept this part. After a failed send, the part that failed and every part after it are `false`, but a `false` part may still have arrived if Apple's answer was lost, so do not resend it on that alone.",
+      example: true,
+    },
+  },
+  if: {
+    properties: {
+      kind: {
+        const: "link_preview",
+      },
+    },
+  },
+  then: {
+    required: ["url"],
+    properties: {
+      kind: {},
+      subject: {},
+      sent: {},
+      url: {},
+      title: {},
+      image_url: {},
+      layout: {},
+      body: {
+        not: {},
+      },
+      attachments: {
+        not: {},
+      },
+    },
+  },
+  else: {
+    properties: {
+      kind: {},
+      body: {},
+      subject: {},
+      attachments: {},
+      sent: {},
+      layout: {},
+      url: {
+        not: {},
+      },
+      title: {
+        not: {},
+      },
+      image_url: {
+        not: {},
+      },
+    },
+  },
+} as const;
+
 export const AMBErrorSchema = {
   type: ["object", "null"],
   additionalProperties: false,
@@ -29920,6 +30113,30 @@ export const AMBMessageSchema = {
       ],
       description:
         "What the customer answered, on an inbound message replying to an interactive message.",
+    },
+    parts: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/AMBMessagePart",
+      },
+      description:
+        "The parts an outbound message was sent as, in the order Bird sent them, so one message can arrive as several. Each link in the text goes as its own preview. A `rich_link` takes the place of the first copy of its URL in the text, which splits the text around it, and goes last when the text does not contain it. An `interactive` goes after the text. A card part that the finishing attempt sent also says what it showed. A message can also go out as one `rich_link` or `interactive` part that has its text. Set when the send finishes as `sent` or `send_failed`. Absent on inbound messages, when the text could not be split so nothing was sent, such as a text with more than 20 links, and on older messages, so treat a missing `parts` as unknown.",
+      example: [
+        {
+          kind: "text",
+          body: "Track your order:",
+          sent: true,
+        },
+        {
+          kind: "link_preview",
+          url: "https://example.com/orders/123",
+          title: "Your order",
+          image_url: "https://example.com/orders/123/cover.png",
+          layout: "large",
+          sent: true,
+        },
+      ],
     },
     in_reply_to_message_id: {
       readOnly: true,
@@ -32884,6 +33101,7 @@ export const WhatsAppSuppressionSchema = {
     "reason",
     "origin",
     "applies_to",
+    "source_whatsapp_id",
     "blocking",
     "effective_at",
     "ended_at",
@@ -32981,6 +33199,14 @@ export const WhatsAppSuppressionSchema = {
       minLength: 1,
       readOnly: true,
       description: "When we recorded it.",
+    },
+    last_asserted_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "When we last recorded this suppression being stated. Later than `created_at` when your workspace added it again while it was already in force; a repeat adds no new record.\n",
     },
   },
 } as const;
@@ -51986,13 +52212,6 @@ export const AutomationPortKeySchema = {
   example: "success",
 } as const;
 
-export const VoiceNumberIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^vnu_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "vnu_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
 export const BillingResolvedPriceSchema = {
   type: "object",
   additionalProperties: false,
@@ -55522,15 +55741,6 @@ export const VoiceSequenceDefinitionSchema = {
   },
 } as const;
 
-export const VoiceSequencePhoneNumberSchema = {
-  type: "string",
-  minLength: 5,
-  maxLength: 16,
-  pattern: "^\\+[1-9][0-9]{3,14}$",
-  description:
-    "Canonical E.164 phone number, with a leading plus sign and four to fifteen digits.",
-} as const;
-
 export const VoiceSequenceRunIDSchema = {
   type: "string",
   minLength: 1,
@@ -55660,6 +55870,15 @@ export const VoiceCallSchema = {
         "Sequence and run accepted for this outbound call. Present in the immutable acceptance snapshot returned by call creation. Current call detail and list reads omit this property, including for calls created from a sequence.",
     },
   },
+} as const;
+
+export const VoiceSequencePhoneNumberSchema = {
+  type: "string",
+  minLength: 5,
+  maxLength: 16,
+  pattern: "^\\+[1-9][0-9]{3,14}$",
+  description:
+    "Canonical E.164 phone number, with a leading plus sign and four to fifteen digits.",
 } as const;
 
 export const CreateVoiceCallSequenceRequestSchema = {
@@ -58566,7 +58785,7 @@ export const WorkspaceQuotaUsageWritableSchema = {
       format: "int64",
       minimum: 0,
       description:
-        "The organization limit requests were checked against when usage was read.",
+        "The organization limit requests were checked against when usage was read. The value `9223372036854775807` represents no limit.",
     },
     organization_used: {
       type: ["integer", "null"],
@@ -58674,7 +58893,8 @@ export const WorkspaceQuotaWritableSchema = {
       type: "integer",
       format: "int64",
       minimum: 0,
-      description: "The organization's limit, shared by all its workspaces.",
+      description:
+        "The organization's limit, shared by all its workspaces. The value `9223372036854775807` represents no limit.",
     },
     organization_source: {
       $ref: "#/components/schemas/QuotaSource",
@@ -58696,7 +58916,7 @@ export const WorkspaceQuotaWritableSchema = {
       format: "int64",
       minimum: 0,
       description:
-        "The lower of the organization limit currently applied to requests and the workspace's active limit or automatic share. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit.",
+        "The lower of the organization limit currently applied to requests and the workspace's active limit or automatic share. The applied organization limit can briefly differ from the configured `organization_limit` after a change. A request can still be refused below this value when other workspaces use the shared organization limit. The value `9223372036854775807` represents no limit.",
     },
     limit_source: {
       $ref: "#/components/schemas/WorkspaceQuotaLimitSource",
@@ -61210,6 +61430,26 @@ export const AssetFolderListWritableSchema = {
 export const ComplianceRequirementWritableSchema = {
   type: "object",
   additionalProperties: false,
+} as const;
+
+export const ComplianceDomainProofWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description:
+    "How your organization proved it controls the business's domain, for a business verification.",
+  required: ["method", "domain"],
+  properties: {
+    method: {
+      $ref: "#/components/schemas/ComplianceDomainProofMethod",
+    },
+    domain: {
+      type: "string",
+      minLength: 1,
+      description: "The business's registrable domain, such as `acme.com`.",
+      example: "acme.com",
+    },
+  },
 } as const;
 
 export const ComplianceSubmissionWritableSchema = {
