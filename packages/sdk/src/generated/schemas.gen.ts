@@ -300,6 +300,13 @@ export const SortOrderSchema = {
   description: "Sort direction, ascending or descending.",
 } as const;
 
+export const BrandIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^bnd_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "bnd_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const TimestampsSchema = {
   type: "object",
   required: ["created_at", "updated_at"],
@@ -7650,6 +7657,7 @@ export const EmailMessageSchema = {
     track_opens: false,
     track_clicks: false,
     created_at: "2026-07-01T12:00:00Z",
+    brand_id: null,
   },
   properties: {
     id: {
@@ -7944,6 +7952,19 @@ export const EmailMessageSchema = {
       description:
         "When this message is scheduled to send, for a send created with a future send time. Absent for an immediate send. Stays set after the scheduled send fires.",
     },
+    brand_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.\n",
+    },
   },
 } as const;
 
@@ -8234,18 +8255,22 @@ export const EmailMessageSendRequestSchema = {
       description:
         "Send at this future time instead of immediately, at least 30 seconds and at most 30 days ahead; outside that range returns `422`. The message returns `accepted` and reads as `scheduled` until it sends, and the message cancel endpoint cancels it before then. Scheduled sends count against your plan's monthly scheduled-email allowance, and a send over it returns `422`. A stored template's published version, language and parameter values are pinned at acceptance, so a later publication does not change what sends; deleting the template before the message is due rejects it with `generation_failure`. Sender eligibility and send-volume allowance are checked again when it is due. Batch items take this field too, so one batch can mix scheduled and immediate messages.",
     },
+    brand_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Preview: selects the business whose email preferences and unsubscribe page apply; explicit input returns `422` when selection is unavailable. When selection is available, omission or null selects the workspace's default Brand. The selection stays fixed for scheduled sends and retries. An explicit ID must belong to this workspace and must not be archived. An unknown, foreign or archived Brand returns `422`. Omitted or null values preserve existing sending behavior while selection is unavailable.",
+    },
   },
   example: {
-    from: {
-      email: "noreply@acme.com",
-      name: "Acme Support",
-    },
-    to: [
-      {
-        email: "delivered@messagebird.dev",
-        name: "Jane Doe",
-      },
-    ],
+    from: "Acme Support <noreply@acme.com>",
+    to: ["Jane Doe <delivered@messagebird.dev>"],
     cc: ["manager@acme.com"],
     reply_to: ["support@acme.com"],
     subject: "Welcome aboard",
@@ -8400,6 +8425,19 @@ export const EmailMessageBatchItemSchema = {
       readOnly: true,
       description:
         "When this item is scheduled to send, for an item created with a future send time. Absent for an item that sends immediately.\n",
+    },
+    brand_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.\n",
     },
   },
 } as const;
@@ -45737,6 +45775,19 @@ export const EventEmailBaseSchema = {
         "The broadcast this send went out as part of, echoed on every per-recipient event for the send so you can attribute engagement to the broadcast without an extra lookup. Null when the send was not part of a broadcast. On `email.unsubscribed` and `email.list_unsubscribed`, null can also mean the recipient used an unsubscribe link that names no broadcast, so on those two events null does not rule a broadcast out.\n",
       example: "eb_01krdgeqcxet5s7t44vh8rt9mg",
     },
+    brand_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.\n",
+    },
   },
 } as const;
 
@@ -45903,6 +45954,19 @@ export const EventEmailMessageBaseSchema = {
       ],
       description:
         "The `reference` from the send request. Absent when the send set none.\n",
+    },
+    brand_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.\n",
     },
   },
 } as const;
@@ -57869,49 +57933,49 @@ export const WebhookEventWritableSchema = {
       $ref: "#/components/schemas/EventDomainVerified",
     },
     {
-      $ref: "#/components/schemas/EventEmailAccepted",
+      $ref: "#/components/schemas/EventEmailAcceptedWritable",
     },
     {
-      $ref: "#/components/schemas/EventEmailBounced",
+      $ref: "#/components/schemas/EventEmailBouncedWritable",
     },
     {
-      $ref: "#/components/schemas/EventEmailCanceled",
+      $ref: "#/components/schemas/EventEmailCanceledWritable",
     },
     {
-      $ref: "#/components/schemas/EventEmailClicked",
+      $ref: "#/components/schemas/EventEmailClickedWritable",
     },
     {
-      $ref: "#/components/schemas/EventEmailComplained",
+      $ref: "#/components/schemas/EventEmailComplainedWritable",
     },
     {
-      $ref: "#/components/schemas/EventEmailDeferred",
+      $ref: "#/components/schemas/EventEmailDeferredWritable",
     },
     {
-      $ref: "#/components/schemas/EventEmailDelivered",
+      $ref: "#/components/schemas/EventEmailDeliveredWritable",
     },
     {
-      $ref: "#/components/schemas/EventEmailListUnsubscribed",
+      $ref: "#/components/schemas/EventEmailListUnsubscribedWritable",
     },
     {
-      $ref: "#/components/schemas/EventEmailOpened",
+      $ref: "#/components/schemas/EventEmailOpenedWritable",
     },
     {
-      $ref: "#/components/schemas/EventEmailOutOfBandBounce",
+      $ref: "#/components/schemas/EventEmailOutOfBandBounceWritable",
     },
     {
-      $ref: "#/components/schemas/EventEmailProcessed",
+      $ref: "#/components/schemas/EventEmailProcessedWritable",
     },
     {
       $ref: "#/components/schemas/EventEmailReceived",
     },
     {
-      $ref: "#/components/schemas/EventEmailRejected",
+      $ref: "#/components/schemas/EventEmailRejectedWritable",
     },
     {
-      $ref: "#/components/schemas/EventEmailScheduled",
+      $ref: "#/components/schemas/EventEmailScheduledWritable",
     },
     {
-      $ref: "#/components/schemas/EventEmailUnsubscribed",
+      $ref: "#/components/schemas/EventEmailUnsubscribedWritable",
     },
     {
       $ref: "#/components/schemas/EventEmailMailboxMessageDelivered",
@@ -58049,23 +58113,24 @@ export const WebhookEventWritableSchema = {
         "#/components/schemas/EventAMBSuppressionCreated",
       "domain.failed": "#/components/schemas/EventDomainFailed",
       "domain.verified": "#/components/schemas/EventDomainVerified",
-      "email.accepted": "#/components/schemas/EventEmailAccepted",
-      "email.bounced": "#/components/schemas/EventEmailBounced",
-      "email.canceled": "#/components/schemas/EventEmailCanceled",
-      "email.clicked": "#/components/schemas/EventEmailClicked",
-      "email.complained": "#/components/schemas/EventEmailComplained",
-      "email.deferred": "#/components/schemas/EventEmailDeferred",
-      "email.delivered": "#/components/schemas/EventEmailDelivered",
+      "email.accepted": "#/components/schemas/EventEmailAcceptedWritable",
+      "email.bounced": "#/components/schemas/EventEmailBouncedWritable",
+      "email.canceled": "#/components/schemas/EventEmailCanceledWritable",
+      "email.clicked": "#/components/schemas/EventEmailClickedWritable",
+      "email.complained": "#/components/schemas/EventEmailComplainedWritable",
+      "email.deferred": "#/components/schemas/EventEmailDeferredWritable",
+      "email.delivered": "#/components/schemas/EventEmailDeliveredWritable",
       "email.list_unsubscribed":
-        "#/components/schemas/EventEmailListUnsubscribed",
-      "email.opened": "#/components/schemas/EventEmailOpened",
+        "#/components/schemas/EventEmailListUnsubscribedWritable",
+      "email.opened": "#/components/schemas/EventEmailOpenedWritable",
       "email.out_of_band_bounce":
-        "#/components/schemas/EventEmailOutOfBandBounce",
-      "email.processed": "#/components/schemas/EventEmailProcessed",
+        "#/components/schemas/EventEmailOutOfBandBounceWritable",
+      "email.processed": "#/components/schemas/EventEmailProcessedWritable",
       "email.received": "#/components/schemas/EventEmailReceived",
-      "email.rejected": "#/components/schemas/EventEmailRejected",
-      "email.scheduled": "#/components/schemas/EventEmailScheduled",
-      "email.unsubscribed": "#/components/schemas/EventEmailUnsubscribed",
+      "email.rejected": "#/components/schemas/EventEmailRejectedWritable",
+      "email.scheduled": "#/components/schemas/EventEmailScheduledWritable",
+      "email.unsubscribed":
+        "#/components/schemas/EventEmailUnsubscribedWritable",
       "email_mailbox.message_delivered":
         "#/components/schemas/EventEmailMailboxMessageDelivered",
       "email_mailbox.message_failed":
@@ -59280,6 +59345,7 @@ export const EmailMessageWritableSchema = {
     track_opens: false,
     track_clicks: false,
     created_at: "2026-07-01T12:00:00Z",
+    brand_id: null,
   },
   properties: {
     from: {
@@ -66862,6 +66928,833 @@ export const EventAMBSentWritableSchema = {
           sent_at: "2026-09-25T12:00:00Z",
         },
       },
+    },
+  },
+} as const;
+
+export const EventEmailBaseWritableSchema = {
+  type: "object",
+  description: "Identity fields shared by every email lifecycle event payload.",
+  required: [
+    "email_id",
+    "recipient_id",
+    "workspace_id",
+    "recipient",
+    "recipient_role",
+    "tags",
+    "metadata",
+    "broadcast_id",
+  ],
+  properties: {
+    email_id: {
+      $ref: "#/components/schemas/EmailID",
+      description: "ID of the email send.",
+    },
+    recipient_id: {
+      $ref: "#/components/schemas/RecipientID",
+      description: "ID of the recipient.",
+    },
+    workspace_id: {
+      $ref: "#/components/schemas/WorkspaceID",
+      description: "ID of the workspace that owns this event.",
+    },
+    recipient: {
+      type: "string",
+      minLength: 1,
+      format: "email",
+      description: "Recipient address as it appeared on the envelope.",
+      example: "alice@bird.com",
+    },
+    recipient_role: {
+      $ref: "#/components/schemas/RecipientRole",
+      description: "Envelope position of the recipient.",
+    },
+    tags: {
+      type: ["array", "null"],
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      description:
+        "Tags provided on the send request, echoed on every event for the send so you can route and correlate without an extra lookup. Null when the send carried no tags.\n",
+    },
+    metadata: {
+      type: ["object", "null"],
+      additionalProperties: true,
+      description:
+        "The metadata object provided on the send request, echoed on every event for the send so you can correlate events with your own records. Null when the send carried no metadata.\n",
+      example: {
+        order_id: "ord_123",
+      },
+    },
+    reference: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "The `reference` from the send request, echoed on the message's events. Absent when the send set none, and on `email.unsubscribed` and `email.list_unsubscribed` events Bird records from its own unsubscribe links, which carry no send fields.\n",
+    },
+    broadcast_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/EmailBroadcastID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The broadcast this send went out as part of, echoed on every per-recipient event for the send so you can attribute engagement to the broadcast without an extra lookup. Null when the send was not part of a broadcast. On `email.unsubscribed` and `email.list_unsubscribed`, null can also mean the recipient used an unsubscribe link that names no broadcast, so on those two events null does not rule a broadcast out.\n",
+      example: "eb_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+  },
+} as const;
+
+export const EventEmailAcceptedDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.accepted event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailBaseWritable",
+    },
+  ],
+} as const;
+
+export const EventEmailAcceptedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The API accepted the email send and is preparing it for delivery. Fires once per requested recipient.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.accepted"],
+      description: "Event type.",
+      example: "email.accepted",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the API accepted the send.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailAcceptedDataWritable",
+    },
+  },
+} as const;
+
+export const EventEmailBouncedDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.bounced event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailBaseWritable",
+    },
+    {
+      type: "object",
+      required: [
+        "bounce_type",
+        "bounce_class",
+        "bounce_code",
+        "bounce_description",
+        "sending_ip",
+      ],
+      properties: {
+        bounce_type: {
+          $ref: "#/components/schemas/EmailBounceType",
+        },
+        bounce_class: {
+          type: ["integer", "null"],
+          minimum: 1,
+          maximum: 255,
+          description:
+            "Numeric bounce classification for fine-grained deliverability triage, or null when the receiving server's response could not be classified. Lets you distinguish, for example, a DNS failure from a spam block when both would be `bounce_type: soft` or `bounce_type: block`.\n",
+          example: 10,
+        },
+        bounce_code: {
+          type: ["string", "null"],
+          description:
+            "SMTP reply code returned by the receiving mail server, or null when none was provided.",
+          example: "550",
+        },
+        bounce_description: {
+          type: ["string", "null"],
+          description:
+            "Human-readable reason the receiving mail server gave for the bounce, or null when none was provided.",
+          example: "5.1.1 Unknown user",
+        },
+        sending_ip: {
+          type: ["string", "null"],
+          description:
+            "The IP address used to send this message, or null when it is not known.",
+          example: "192.0.2.10",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EventEmailBouncedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An outbound email permanently failed at the recipient's mail server. Fires once per recipient.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.bounced"],
+      description: "Event type.",
+      example: "email.bounced",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the bounce was recorded.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailBouncedDataWritable",
+    },
+  },
+} as const;
+
+export const EventEmailMessageBaseWritableSchema = {
+  type: "object",
+  description:
+    "Identity fields shared by the message-level email lifecycle events (scheduled, canceled), which are not tied to a single recipient.",
+  required: ["email_id", "workspace_id", "tags", "metadata"],
+  properties: {
+    email_id: {
+      $ref: "#/components/schemas/EmailID",
+      description: "ID of the email send.",
+    },
+    workspace_id: {
+      $ref: "#/components/schemas/WorkspaceID",
+      description: "ID of the workspace that owns this event.",
+    },
+    tags: {
+      type: ["array", "null"],
+      items: {
+        $ref: "#/components/schemas/Tag",
+      },
+      description:
+        "Tags provided on the send request, echoed on the event so you can route and correlate without an extra lookup. Null when the send carried no tags.\n",
+    },
+    metadata: {
+      type: ["object", "null"],
+      additionalProperties: true,
+      description:
+        "The metadata object provided on the send request, echoed on the event so you can correlate events with your own records. Null when the send carried no metadata.\n",
+      example: {
+        order_id: "ord_123",
+      },
+    },
+    reference: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/MessageReference",
+        },
+      ],
+      description:
+        "The `reference` from the send request. Absent when the send set none.\n",
+    },
+  },
+} as const;
+
+export const EventEmailCanceledDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.canceled event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailMessageBaseWritable",
+    },
+  ],
+} as const;
+
+export const EventEmailCanceledWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A scheduled send was canceled before it fired. Fires once for each message regardless of its recipient count.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.canceled"],
+      description: "Event type.",
+      example: "email.canceled",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the scheduled send was canceled.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailCanceledDataWritable",
+    },
+  },
+} as const;
+
+export const EventEmailClickedDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.clicked event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailBaseWritable",
+    },
+    {
+      type: "object",
+      required: ["url", "ip_address", "user_agent"],
+      properties: {
+        url: {
+          type: "string",
+          minLength: 1,
+          description: "The URL the recipient clicked.",
+          example: "https://bird.com/welcome",
+        },
+        ip_address: {
+          type: ["string", "null"],
+          description:
+            "IP address of the client that clicked the link, or null when it is not known.",
+          example: "203.0.113.9",
+        },
+        user_agent: {
+          type: ["string", "null"],
+          description:
+            "User-agent string of the client that clicked the link, or null when it is not known.",
+          example: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EventEmailClickedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The recipient clicked a tracked link in the email. May fire more than once per recipient.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.clicked"],
+      description: "Event type.",
+      example: "email.clicked",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the click was recorded.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailClickedDataWritable",
+    },
+  },
+} as const;
+
+export const EventEmailComplainedDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.complained event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailBaseWritable",
+    },
+    {
+      type: "object",
+      required: ["feedback_type"],
+      properties: {
+        feedback_type: {
+          type: ["string", "null"],
+          description:
+            "The kind of feedback the mailbox provider reported (such as `abuse` or `fraud`), or null when the provider did not specify one.",
+          example: "abuse",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EventEmailComplainedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The recipient marked the email as spam through their mailbox provider's feedback loop. Fires once per recipient.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.complained"],
+      description: "Event type.",
+      example: "email.complained",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the complaint was recorded.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailComplainedDataWritable",
+    },
+  },
+} as const;
+
+export const EventEmailDeferredDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.deferred event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailBaseWritable",
+    },
+    {
+      type: "object",
+      required: ["bounce_type", "bounce_class", "defer_reason", "sending_ip"],
+      properties: {
+        bounce_type: {
+          $ref: "#/components/schemas/EmailBounceType",
+        },
+        bounce_class: {
+          type: ["integer", "null"],
+          minimum: 1,
+          maximum: 255,
+          description:
+            "Numeric bounce classification for fine-grained deliverability triage, or null when the receiving server's response could not be classified. Distinguishes, for example, a greylisting deferral from a full mailbox.\n",
+          example: 21,
+        },
+        defer_reason: {
+          type: ["string", "null"],
+          description:
+            "Human-readable reason the receiving mail server gave for the deferral, or null when none was provided.",
+          example: "4.2.1 Mailbox temporarily unavailable, will retry",
+        },
+        sending_ip: {
+          type: ["string", "null"],
+          description:
+            "The IP address used to send this message, or null when it is not known.",
+          example: "192.0.2.10",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EventEmailDeferredWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The recipient's mail server temporarily refused the email. Delivery remains pending and is retried. May fire more than once per recipient.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.deferred"],
+      description: "Event type.",
+      example: "email.deferred",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the deferral was recorded.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailDeferredDataWritable",
+    },
+  },
+} as const;
+
+export const EventEmailDeliveredDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.delivered event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailBaseWritable",
+    },
+  ],
+} as const;
+
+export const EventEmailDeliveredWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An outbound email reached the recipient's mail server and was accepted.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.delivered"],
+      description: "Event type.",
+      example: "email.delivered",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the recipient's mail server accepted the message.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailDeliveredDataWritable",
+    },
+  },
+} as const;
+
+export const EventEmailListUnsubscribedDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.list_unsubscribed event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailBaseWritable",
+    },
+  ],
+} as const;
+
+export const EventEmailListUnsubscribedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Recipient unsubscribed via the RFC 8058 one-click List-Unsubscribe mechanism. Fires once per recipient.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.list_unsubscribed"],
+      description: "Event type.",
+      example: "email.list_unsubscribed",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the unsubscribe was recorded.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailListUnsubscribedDataWritable",
+    },
+  },
+} as const;
+
+export const EventEmailOpenedDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.opened event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailBaseWritable",
+    },
+    {
+      type: "object",
+      required: ["ip_address", "user_agent"],
+      properties: {
+        ip_address: {
+          type: ["string", "null"],
+          description:
+            "IP address of the client that opened the email, or null when it is not known.",
+          example: "203.0.113.9",
+        },
+        user_agent: {
+          type: ["string", "null"],
+          description:
+            "User-agent string of the client that opened the email, or null when it is not known.",
+          example: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EventEmailOpenedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The recipient opened the email (the tracking pixel was loaded). May fire more than once per recipient.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.opened"],
+      description: "Event type.",
+      example: "email.opened",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the open was recorded.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailOpenedDataWritable",
+    },
+  },
+} as const;
+
+export const EventEmailOutOfBandBounceDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.out_of_band_bounce event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailBaseWritable",
+    },
+    {
+      type: "object",
+      required: [
+        "bounce_type",
+        "bounce_class",
+        "bounce_code",
+        "bounce_description",
+        "sending_ip",
+      ],
+      properties: {
+        bounce_type: {
+          $ref: "#/components/schemas/EmailBounceType",
+        },
+        bounce_class: {
+          type: ["integer", "null"],
+          minimum: 1,
+          maximum: 255,
+          description:
+            "Numeric bounce classification for fine-grained deliverability triage, or null when the receiving server's response could not be classified.\n",
+          example: 10,
+        },
+        bounce_code: {
+          type: ["string", "null"],
+          description:
+            "SMTP reply code returned by the receiving mail server, or null when none was provided.",
+          example: "550",
+        },
+        bounce_description: {
+          type: ["string", "null"],
+          description:
+            "Human-readable reason the receiving mail server gave for the bounce, or null when none was provided.",
+          example: "5.1.1 Unknown user",
+        },
+        sending_ip: {
+          type: ["string", "null"],
+          description:
+            "The IP address used to send this message, or null when it is not known.",
+          example: "192.0.2.10",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EventEmailOutOfBandBounceWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A bounce notification arrived after the message had already been accepted for delivery. Fires once per recipient.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.out_of_band_bounce"],
+      description: "Event type.",
+      example: "email.out_of_band_bounce",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the bounce notification was recorded.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailOutOfBandBounceDataWritable",
+    },
+  },
+} as const;
+
+export const EventEmailProcessedDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.processed event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailBaseWritable",
+    },
+  ],
+} as const;
+
+export const EventEmailProcessedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The API prepared the message for delivery to the recipient's mail server. Fires once per recipient.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.processed"],
+      description: "Event type.",
+      example: "email.processed",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the message was prepared for delivery.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailProcessedDataWritable",
+    },
+  },
+} as const;
+
+export const EventEmailRejectedDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.rejected event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailBaseWritable",
+    },
+    {
+      type: "object",
+      required: ["rejection_reason"],
+      properties: {
+        rejection_reason: {
+          $ref: "#/components/schemas/EmailRejectionReason",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EventEmailRejectedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The API rejected the email before delivery because of suppression, transmission failure, content, or policy. Fires once per recipient.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.rejected"],
+      description: "Event type.",
+      example: "email.rejected",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the rejection was recorded.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailRejectedDataWritable",
+    },
+  },
+} as const;
+
+export const EventEmailScheduledDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.scheduled event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailMessageBaseWritable",
+    },
+    {
+      type: "object",
+      required: ["scheduled_at"],
+      properties: {
+        scheduled_at: {
+          type: "string",
+          minLength: 1,
+          format: "date-time",
+          description: "When the message is scheduled to send.",
+          example: "2026-05-22T09:00:00Z",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const EventEmailScheduledWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "The API accepted an email scheduled for a future time. Fires once per message when the schedule is created.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.scheduled"],
+      description: "Event type.",
+      example: "email.scheduled",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the send was scheduled.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailScheduledDataWritable",
+    },
+  },
+} as const;
+
+export const EventEmailUnsubscribedDataWritableSchema = {
+  type: "object",
+  description: "Payload of the email.unsubscribed event.",
+  allOf: [
+    {
+      $ref: "#/components/schemas/EventEmailBaseWritable",
+    },
+  ],
+} as const;
+
+export const EventEmailUnsubscribedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Recipient unsubscribed by clicking a tracked unsubscribe link in the email. Fires once per recipient.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      enum: ["email.unsubscribed"],
+      description: "Event type.",
+      example: "email.unsubscribed",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description: "Time the unsubscribe was recorded.",
+      example: "2026-05-21T12:00:00Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventEmailUnsubscribedDataWritable",
     },
   },
 } as const;

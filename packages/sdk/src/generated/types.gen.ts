@@ -214,6 +214,8 @@ export type WebhookEvent =
  */
 export type SortOrder = "asc" | "desc";
 
+export type BrandId = string;
+
 export type Timestamps = {
   readonly created_at: string;
   readonly updated_at: string;
@@ -4419,6 +4421,11 @@ export type EmailMessage = {
    * When this message is scheduled to send, for a send created with a future send time. Absent for an immediate send. Stays set after the scheduled send fires.
    */
   readonly scheduled_at?: string;
+  /**
+   * The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.
+   *
+   */
+  readonly brand_id?: BrandId | null;
 };
 
 export type EmailMessageList = {
@@ -4593,6 +4600,10 @@ export type EmailMessageSendRequest = {
    * Send at this future time instead of immediately, at least 30 seconds and at most 30 days ahead; outside that range returns `422`. The message returns `accepted` and reads as `scheduled` until it sends, and the message cancel endpoint cancels it before then. Scheduled sends count against your plan's monthly scheduled-email allowance, and a send over it returns `422`. A stored template's published version, language and parameter values are pinned at acceptance, so a later publication does not change what sends; deleting the template before the message is due rejects it with `generation_failure`. Sender eligibility and send-volume allowance are checked again when it is due. Batch items take this field too, so one batch can mix scheduled and immediate messages.
    */
   scheduled_at?: string;
+  /**
+   * Preview: selects the business whose email preferences and unsubscribe page apply; explicit input returns `422` when selection is unavailable. When selection is available, omission or null selects the workspace's default Brand. The selection stays fixed for scheduled sends and retries. An explicit ID must belong to this workspace and must not be archived. An unknown, foreign or archived Brand returns `422`. Omitted or null values preserve existing sending behavior while selection is unavailable.
+   */
+  brand_id?: BrandId | null;
 };
 
 /**
@@ -4644,6 +4655,11 @@ export type EmailMessageBatchItem = {
    *
    */
   readonly scheduled_at?: string;
+  /**
+   * The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.
+   *
+   */
+  readonly brand_id?: BrandId | null;
 };
 
 export type EmailMessageBatchResponse = {
@@ -25282,6 +25298,11 @@ export type EventEmailBase = {
    *
    */
   broadcast_id: EmailBroadcastId | null;
+  /**
+   * The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.
+   *
+   */
+  readonly brand_id?: BrandId | null;
 };
 
 /**
@@ -25385,6 +25406,11 @@ export type EventEmailMessageBase = {
    *
    */
   reference?: MessageReference;
+  /**
+   * The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.
+   *
+   */
+  readonly brand_id?: BrandId | null;
 };
 
 /**
@@ -31890,49 +31916,49 @@ export type WebhookEventWritable =
     } & EventDomainVerified)
   | ({
       type: "email.accepted";
-    } & EventEmailAccepted)
+    } & EventEmailAcceptedWritable)
   | ({
       type: "email.bounced";
-    } & EventEmailBounced)
+    } & EventEmailBouncedWritable)
   | ({
       type: "email.canceled";
-    } & EventEmailCanceled)
+    } & EventEmailCanceledWritable)
   | ({
       type: "email.clicked";
-    } & EventEmailClicked)
+    } & EventEmailClickedWritable)
   | ({
       type: "email.complained";
-    } & EventEmailComplained)
+    } & EventEmailComplainedWritable)
   | ({
       type: "email.deferred";
-    } & EventEmailDeferred)
+    } & EventEmailDeferredWritable)
   | ({
       type: "email.delivered";
-    } & EventEmailDelivered)
+    } & EventEmailDeliveredWritable)
   | ({
       type: "email.list_unsubscribed";
-    } & EventEmailListUnsubscribed)
+    } & EventEmailListUnsubscribedWritable)
   | ({
       type: "email.opened";
-    } & EventEmailOpened)
+    } & EventEmailOpenedWritable)
   | ({
       type: "email.out_of_band_bounce";
-    } & EventEmailOutOfBandBounce)
+    } & EventEmailOutOfBandBounceWritable)
   | ({
       type: "email.processed";
-    } & EventEmailProcessed)
+    } & EventEmailProcessedWritable)
   | ({
       type: "email.received";
     } & EventEmailReceived)
   | ({
       type: "email.rejected";
-    } & EventEmailRejected)
+    } & EventEmailRejectedWritable)
   | ({
       type: "email.scheduled";
-    } & EventEmailScheduled)
+    } & EventEmailScheduledWritable)
   | ({
       type: "email.unsubscribed";
-    } & EventEmailUnsubscribed)
+    } & EventEmailUnsubscribedWritable)
   | ({
       type: "email_mailbox.message_delivered";
     } & EventEmailMailboxMessageDelivered)
@@ -36762,6 +36788,452 @@ export type EventAmbSentWritable = {
 };
 
 /**
+ * Identity fields shared by every email lifecycle event payload.
+ */
+export type EventEmailBaseWritable = {
+  /**
+   * ID of the email send.
+   */
+  email_id: EmailId;
+  /**
+   * ID of the recipient.
+   */
+  recipient_id: RecipientId;
+  /**
+   * ID of the workspace that owns this event.
+   */
+  workspace_id: WorkspaceId;
+  /**
+   * Recipient address as it appeared on the envelope.
+   */
+  recipient: string;
+  /**
+   * Envelope position of the recipient.
+   */
+  recipient_role: RecipientRole;
+  /**
+   * Tags provided on the send request, echoed on every event for the send so you can route and correlate without an extra lookup. Null when the send carried no tags.
+   *
+   */
+  tags: Array<Tag> | null;
+  /**
+   * The metadata object provided on the send request, echoed on every event for the send so you can correlate events with your own records. Null when the send carried no metadata.
+   *
+   */
+  metadata: {
+    [key: string]: unknown;
+  } | null;
+  /**
+   * The `reference` from the send request, echoed on the message's events. Absent when the send set none, and on `email.unsubscribed` and `email.list_unsubscribed` events Bird records from its own unsubscribe links, which carry no send fields.
+   *
+   */
+  reference?: MessageReference;
+  /**
+   * The broadcast this send went out as part of, echoed on every per-recipient event for the send so you can attribute engagement to the broadcast without an extra lookup. Null when the send was not part of a broadcast. On `email.unsubscribed` and `email.list_unsubscribed`, null can also mean the recipient used an unsubscribe link that names no broadcast, so on those two events null does not rule a broadcast out.
+   *
+   */
+  broadcast_id: EmailBroadcastId | null;
+};
+
+/**
+ * Payload of the email.accepted event.
+ */
+export type EventEmailAcceptedDataWritable = EventEmailBaseWritable;
+
+/**
+ * The API accepted the email send and is preparing it for delivery. Fires once per requested recipient.
+ */
+export type EventEmailAcceptedWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.accepted";
+  /**
+   * Time the API accepted the send.
+   */
+  timestamp: string;
+  data: EventEmailAcceptedDataWritable;
+};
+
+/**
+ * Payload of the email.bounced event.
+ */
+export type EventEmailBouncedDataWritable = EventEmailBaseWritable & {
+  bounce_type: EmailBounceType;
+  /**
+   * Numeric bounce classification for fine-grained deliverability triage, or null when the receiving server's response could not be classified. Lets you distinguish, for example, a DNS failure from a spam block when both would be `bounce_type: soft` or `bounce_type: block`.
+   *
+   */
+  bounce_class: number | null;
+  /**
+   * SMTP reply code returned by the receiving mail server, or null when none was provided.
+   */
+  bounce_code: string | null;
+  /**
+   * Human-readable reason the receiving mail server gave for the bounce, or null when none was provided.
+   */
+  bounce_description: string | null;
+  /**
+   * The IP address used to send this message, or null when it is not known.
+   */
+  sending_ip: string | null;
+};
+
+/**
+ * An outbound email permanently failed at the recipient's mail server. Fires once per recipient.
+ */
+export type EventEmailBouncedWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.bounced";
+  /**
+   * Time the bounce was recorded.
+   */
+  timestamp: string;
+  data: EventEmailBouncedDataWritable;
+};
+
+/**
+ * Identity fields shared by the message-level email lifecycle events (scheduled, canceled), which are not tied to a single recipient.
+ */
+export type EventEmailMessageBaseWritable = {
+  /**
+   * ID of the email send.
+   */
+  email_id: EmailId;
+  /**
+   * ID of the workspace that owns this event.
+   */
+  workspace_id: WorkspaceId;
+  /**
+   * Tags provided on the send request, echoed on the event so you can route and correlate without an extra lookup. Null when the send carried no tags.
+   *
+   */
+  tags: Array<Tag> | null;
+  /**
+   * The metadata object provided on the send request, echoed on the event so you can correlate events with your own records. Null when the send carried no metadata.
+   *
+   */
+  metadata: {
+    [key: string]: unknown;
+  } | null;
+  /**
+   * The `reference` from the send request. Absent when the send set none.
+   *
+   */
+  reference?: MessageReference;
+};
+
+/**
+ * Payload of the email.canceled event.
+ */
+export type EventEmailCanceledDataWritable = EventEmailMessageBaseWritable;
+
+/**
+ * A scheduled send was canceled before it fired. Fires once for each message regardless of its recipient count.
+ */
+export type EventEmailCanceledWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.canceled";
+  /**
+   * Time the scheduled send was canceled.
+   */
+  timestamp: string;
+  data: EventEmailCanceledDataWritable;
+};
+
+/**
+ * Payload of the email.clicked event.
+ */
+export type EventEmailClickedDataWritable = EventEmailBaseWritable & {
+  /**
+   * The URL the recipient clicked.
+   */
+  url: string;
+  /**
+   * IP address of the client that clicked the link, or null when it is not known.
+   */
+  ip_address: string | null;
+  /**
+   * User-agent string of the client that clicked the link, or null when it is not known.
+   */
+  user_agent: string | null;
+};
+
+/**
+ * The recipient clicked a tracked link in the email. May fire more than once per recipient.
+ */
+export type EventEmailClickedWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.clicked";
+  /**
+   * Time the click was recorded.
+   */
+  timestamp: string;
+  data: EventEmailClickedDataWritable;
+};
+
+/**
+ * Payload of the email.complained event.
+ */
+export type EventEmailComplainedDataWritable = EventEmailBaseWritable & {
+  /**
+   * The kind of feedback the mailbox provider reported (such as `abuse` or `fraud`), or null when the provider did not specify one.
+   */
+  feedback_type: string | null;
+};
+
+/**
+ * The recipient marked the email as spam through their mailbox provider's feedback loop. Fires once per recipient.
+ */
+export type EventEmailComplainedWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.complained";
+  /**
+   * Time the complaint was recorded.
+   */
+  timestamp: string;
+  data: EventEmailComplainedDataWritable;
+};
+
+/**
+ * Payload of the email.deferred event.
+ */
+export type EventEmailDeferredDataWritable = EventEmailBaseWritable & {
+  bounce_type: EmailBounceType;
+  /**
+   * Numeric bounce classification for fine-grained deliverability triage, or null when the receiving server's response could not be classified. Distinguishes, for example, a greylisting deferral from a full mailbox.
+   *
+   */
+  bounce_class: number | null;
+  /**
+   * Human-readable reason the receiving mail server gave for the deferral, or null when none was provided.
+   */
+  defer_reason: string | null;
+  /**
+   * The IP address used to send this message, or null when it is not known.
+   */
+  sending_ip: string | null;
+};
+
+/**
+ * The recipient's mail server temporarily refused the email. Delivery remains pending and is retried. May fire more than once per recipient.
+ */
+export type EventEmailDeferredWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.deferred";
+  /**
+   * Time the deferral was recorded.
+   */
+  timestamp: string;
+  data: EventEmailDeferredDataWritable;
+};
+
+/**
+ * Payload of the email.delivered event.
+ */
+export type EventEmailDeliveredDataWritable = EventEmailBaseWritable;
+
+/**
+ * An outbound email reached the recipient's mail server and was accepted.
+ */
+export type EventEmailDeliveredWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.delivered";
+  /**
+   * Time the recipient's mail server accepted the message.
+   */
+  timestamp: string;
+  data: EventEmailDeliveredDataWritable;
+};
+
+/**
+ * Payload of the email.list_unsubscribed event.
+ */
+export type EventEmailListUnsubscribedDataWritable = EventEmailBaseWritable;
+
+/**
+ * Recipient unsubscribed via the RFC 8058 one-click List-Unsubscribe mechanism. Fires once per recipient.
+ */
+export type EventEmailListUnsubscribedWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.list_unsubscribed";
+  /**
+   * Time the unsubscribe was recorded.
+   */
+  timestamp: string;
+  data: EventEmailListUnsubscribedDataWritable;
+};
+
+/**
+ * Payload of the email.opened event.
+ */
+export type EventEmailOpenedDataWritable = EventEmailBaseWritable & {
+  /**
+   * IP address of the client that opened the email, or null when it is not known.
+   */
+  ip_address: string | null;
+  /**
+   * User-agent string of the client that opened the email, or null when it is not known.
+   */
+  user_agent: string | null;
+};
+
+/**
+ * The recipient opened the email (the tracking pixel was loaded). May fire more than once per recipient.
+ */
+export type EventEmailOpenedWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.opened";
+  /**
+   * Time the open was recorded.
+   */
+  timestamp: string;
+  data: EventEmailOpenedDataWritable;
+};
+
+/**
+ * Payload of the email.out_of_band_bounce event.
+ */
+export type EventEmailOutOfBandBounceDataWritable = EventEmailBaseWritable & {
+  bounce_type: EmailBounceType;
+  /**
+   * Numeric bounce classification for fine-grained deliverability triage, or null when the receiving server's response could not be classified.
+   *
+   */
+  bounce_class: number | null;
+  /**
+   * SMTP reply code returned by the receiving mail server, or null when none was provided.
+   */
+  bounce_code: string | null;
+  /**
+   * Human-readable reason the receiving mail server gave for the bounce, or null when none was provided.
+   */
+  bounce_description: string | null;
+  /**
+   * The IP address used to send this message, or null when it is not known.
+   */
+  sending_ip: string | null;
+};
+
+/**
+ * A bounce notification arrived after the message had already been accepted for delivery. Fires once per recipient.
+ */
+export type EventEmailOutOfBandBounceWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.out_of_band_bounce";
+  /**
+   * Time the bounce notification was recorded.
+   */
+  timestamp: string;
+  data: EventEmailOutOfBandBounceDataWritable;
+};
+
+/**
+ * Payload of the email.processed event.
+ */
+export type EventEmailProcessedDataWritable = EventEmailBaseWritable;
+
+/**
+ * The API prepared the message for delivery to the recipient's mail server. Fires once per recipient.
+ */
+export type EventEmailProcessedWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.processed";
+  /**
+   * Time the message was prepared for delivery.
+   */
+  timestamp: string;
+  data: EventEmailProcessedDataWritable;
+};
+
+/**
+ * Payload of the email.rejected event.
+ */
+export type EventEmailRejectedDataWritable = EventEmailBaseWritable & {
+  rejection_reason: EmailRejectionReason;
+};
+
+/**
+ * The API rejected the email before delivery because of suppression, transmission failure, content, or policy. Fires once per recipient.
+ */
+export type EventEmailRejectedWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.rejected";
+  /**
+   * Time the rejection was recorded.
+   */
+  timestamp: string;
+  data: EventEmailRejectedDataWritable;
+};
+
+/**
+ * Payload of the email.scheduled event.
+ */
+export type EventEmailScheduledDataWritable = EventEmailMessageBaseWritable & {
+  /**
+   * When the message is scheduled to send.
+   */
+  scheduled_at: string;
+};
+
+/**
+ * The API accepted an email scheduled for a future time. Fires once per message when the schedule is created.
+ */
+export type EventEmailScheduledWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.scheduled";
+  /**
+   * Time the send was scheduled.
+   */
+  timestamp: string;
+  data: EventEmailScheduledDataWritable;
+};
+
+/**
+ * Payload of the email.unsubscribed event.
+ */
+export type EventEmailUnsubscribedDataWritable = EventEmailBaseWritable;
+
+/**
+ * Recipient unsubscribed by clicking a tracked unsubscribe link in the email. Fires once per recipient.
+ */
+export type EventEmailUnsubscribedWritable = {
+  /**
+   * Event type.
+   */
+  type: "email.unsubscribed";
+  /**
+   * Time the unsubscribe was recorded.
+   */
+  timestamp: string;
+  data: EventEmailUnsubscribedDataWritable;
+};
+
+/**
  * Fields shared by every outbound SMS lifecycle event payload.
  */
 export type EventSmsBaseWritable = {
@@ -40146,6 +40618,10 @@ export type CreateEmailMessageErrors = {
    */
   404: Error;
   /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
    * Request body or message size exceeds the allowed limit
    */
   413: Error;
@@ -40244,6 +40720,10 @@ export type CreateEmailMessageBatchErrors = {
    * Resource not found
    */
   404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
   /**
    * Request body or message size exceeds the allowed limit
    */

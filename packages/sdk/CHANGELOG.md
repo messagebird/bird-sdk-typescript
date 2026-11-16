@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.139.0
+
+- Add optional `brand_id` to individual and batch email requests. Brand selection is in preview. Explicit input returns `422` when selection is unavailable; omitted or null input preserves existing behavior.
+- Expose `brand_id` on email message responses and outbound lifecycle events. Brand attribution is in preview.
+
 ## 0.138.0
 
 - Add BirdTooEarlyError, BirdGoneError and BirdClientClosedRequestError, thrown for `too_early_error` (425), `gone_error` (410) and `client_closed_request_error` (499) instead of the base BirdAPIError, including when an error response carries no body.
