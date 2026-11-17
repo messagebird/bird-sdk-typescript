@@ -17,6 +17,9 @@ export type WebhookEvent =
       type: "amb.accepted";
     } & EventAmbAccepted)
   | ({
+      type: "amb.authentication.updated";
+    } & EventAmbAuthenticationUpdated)
+  | ({
       type: "amb.conversation_closed";
     } & EventAmbConversationClosed)
   | ({
@@ -5346,7 +5349,10 @@ export type EmailBroadcast = {
    */
   readonly recipient_count: number;
   /**
-   * How many recipients the broadcast has been sent to, counting every recipient whose status is `processed` or later. The number rises while the broadcast is `sending` and stops changing once the broadcast has finished. These counters are exact. The email stats endpoints report on the same sending but are approximate, so use these numbers when you need the precise count. Absent when the broadcast comes back from creating, updating, sending, resuming or canceling it, none of which read the counters. List and single-broadcast reads return 0 when no delivery events are recorded. When counters are unavailable, those reads still return 200 and omit the counters. Read the broadcast again for the numbers.
+   * Saved count of recipients whose status is `processed` or later. Counters refresh periodically and can change after the broadcast reaches `sent`. Read the broadcast again to get the latest saved totals. These counts use exact retained delivery and engagement records; the email stats endpoints report approximate totals.
+   *
+   * List and single-broadcast reads return the last saved values during refresh delays or failures. A new broadcast starts with saved zero counters, which remain until its first refresh. Counters are absent while historical totals have not been calculated or their retained history is incomplete. A failure to read saved counters fails the request. Creating, updating, sending, resuming, and canceling a broadcast return no counters.
+   *
    */
   readonly sent_count?: number;
   /**
@@ -5370,7 +5376,7 @@ export type EmailBroadcast = {
    */
   readonly click_count?: number;
   /**
-   * The IP addresses this broadcast's messages went out from, up to 100 of them. A broadcast is spread across every address in its pool, so more than one can appear. The receiving mail systems name the address when they deliver, bounce or defer a message, so this stays absent until the first of those comes back. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending, resuming or canceling one returns, none of which read them. For delivery and latency broken down per address, read the sending-IP stats.
+   * The saved IP addresses this broadcast's messages went out from, up to 100 of them. These refresh with the counters and stay absent when the saved counters are unavailable or incomplete. A broadcast is spread across every address in its pool, so more than one can appear. The receiving mail systems name the address when they deliver, bounce or defer a message, so this stays absent until the first of those comes back. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending, resuming or canceling one returns, none of which read them. For delivery and latency broken down per address, read the sending-IP stats.
    *
    */
   readonly sending_ips?: Array<string>;
@@ -6631,6 +6637,11 @@ export type MessageDirection = "outbound" | "inbound";
 export type SmsMessageCategory =
   "transactional" | "marketing" | "authentication" | "service";
 
+/**
+ * Message content type. A nonempty subject or media list selects MMS.
+ */
+export type SmsContentType = "sms" | "mms";
+
 export type SmsMessageId = string;
 
 /**
@@ -6691,11 +6702,11 @@ export type SmsTemplateContentHash = string;
 export type SmsMessagingProfileId = string;
 
 /**
- * Segment breakdown for the message body. Segment count drives billing.
+ * Billable SMS segments, or one unit for MMS.
  */
 export type SmsSegments = {
   /**
-   * Number of segments the body is split into. Each segment is a billable unit.
+   * Number of billable units. MMS always has one unit and is not split into SMS segments.
    */
   readonly count: number;
   /**
@@ -6712,10 +6723,12 @@ export type SmsSegments = {
    * outside the Basic Multilingual Plane is a surrogate pair costing two code
    * units, so 35 of those fill a single segment.
    *
+   * `MMS` marks a multimedia message billed as one unit; `characters` counts text code points.
+   *
    * `BINARY` marks an 8-bit binary payload, sent as one segment, where `characters` counts its octets. Only a binary send produces it.
    *
    */
-  readonly encoding: "GSM_7BIT" | "UCS2" | "BINARY";
+  readonly encoding: "GSM_7BIT" | "UCS2" | "BINARY" | "MMS";
   /**
    * Character count of the body, counted in Unicode code points under `GSM_7BIT` and `UCS2`; under `BINARY` it is the payload's octets, header included. This is not the segment measure: a `GSM_7BIT` extended-table character counts once here but costs two septets, and a `UCS2` emoji outside the Basic Multilingual Plane counts once here but costs two of the segment's 70 code units.
    *
@@ -6815,7 +6828,34 @@ export type SmsInReplyToMessage = {
   sent_at?: string;
 };
 
+export type SmsFileId = string;
+
+/**
+ * A media attachment on an MMS. Inbound attachments include carrier metadata even when their contents could not be retrieved. Outbound attachments retain the submitted URL.
+ *
+ */
+export type SmsMedia = {
+  /**
+   * ID of the stored attachment. Absent for outbound URLs and inbound attachments that were not stored.
+   */
+  readonly id?: SmsFileId;
+  /**
+   * Carrier-reported media type for inbound attachments; application/octet-stream when unknown or outbound.
+   */
+  readonly mime_type: string;
+  /**
+   * Filename the sender's device supplied, when it supplied one.
+   */
+  readonly filename?: string | null;
+  /**
+   * Where to download the attachment, kept for 30 days after the message is received. Null when the attachment was not stored, for example because Bird could not retrieve it from the carrier. For outbound MMS this is the submitted URL, whose availability the caller controls.
+   *
+   */
+  readonly url?: string | null;
+};
+
 export type SmsMessage = {
+  content_type?: SmsContentType;
   /**
    * ID of the message, assigned when the send is accepted. Pass it as `message_id` to the get-message endpoint.
    *
@@ -6837,7 +6877,7 @@ export type SmsMessage = {
    */
   from: string;
   /**
-   * The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text, and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. System template messages preserve the surrounding text and mask sensitive codes with one asterisk per digit. Authentication messages without declared sensitive variables return `**REDACTED**`. The recipient receives the real code; message history retains only its masked representation.
+   * The message body. Absent on media-only or subject-only MMS and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. System template messages preserve the surrounding text and mask sensitive codes with one asterisk per digit. Authentication messages without declared sensitive variables return `**REDACTED**`. The recipient receives the real code; message history retains only its masked representation.
    *
    */
   text?: string;
@@ -6934,6 +6974,15 @@ export type SmsMessage = {
    */
   readonly in_reply_to_message?: SmsInReplyToMessage;
   /**
+   * MMS subject. Absent on any message that carries none.
+   */
+  readonly subject?: string;
+  /**
+   * MMS attachments. Omitted when absent or redacted for an authentication send. Outbound entries retain submitted URLs; inbound entries describe stored attachments.
+   *
+   */
+  readonly media?: Array<SmsMedia>;
+  /**
    * When the message was accepted (outbound) or received (inbound).
    */
   readonly created_at: string;
@@ -7012,7 +7061,12 @@ export type SmsTemplateSend = unknown & {
   };
 };
 
-export type SmsMessageSendRequest = unknown & {
+export type SmsMessageSendRequest = (
+  | unknown
+  | {
+      media_urls: unknown;
+    }
+) & {
   /**
    * Recipient phone number in E.164 format (for example `+14155550100`), or in national format when you also pass `to_country_code`. One recipient per message. The number is stored and returned in canonical E.164; a recipient that cannot be routed returns a `422` `SMSInvalidRecipient`.
    *
@@ -7028,7 +7082,7 @@ export type SmsMessageSendRequest = unknown & {
    */
   from?: string;
   /**
-   * Free-text message body, required unless `template` is set; the two are mutually exclusive. From 1 character up to 12 segments, roughly 1836 GSM-7 or 804 UCS-2 characters, since the two encodings fit different numbers of characters in a segment. Bird does not truncate: a longer body returns `422`.
+   * Message body. Required for direct content unless `media_urls` is nonempty. Text-only SMS allows up to 12 segments; longer SMS returns `422`. MMS text is sent without SMS segmentation or smart encoding.
    */
   text?: string;
   /**
@@ -7072,9 +7126,14 @@ export type SmsMessageSendRequest = unknown & {
    */
   options?: SmsSendOptions;
   /**
-   * Preview feature: multimedia (MMS) attachments. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.
+   * Absolute HTTP(S) attachment URLs accessible without authentication. A nonempty list selects MMS. Keep URLs accessible through delivery retries. The carrier checks downloads after acceptance: each file may be at most 600 KiB and the total at most 900 KiB. Unreachable, nonpublic or oversized media fails asynchronously through delivery status.
+   *
    */
   media_urls?: Array<string>;
+  /**
+   * MMS subject. A nonempty subject selects MMS and requires text or media. Cannot accompany a template or binary payload.
+   */
+  subject?: string;
   /**
    * The messaging profile that supplies this message's sender and defaults. Without `from`, Bird sends from the profile's sender for the destination country, or its default sender. An omitted `category` on a free-text send, `smart_encoding`, `cost_center`, `validity_period`, `options.callback_url` and `options.ignore_suppression` take the profile's settings, and values set on the message take precedence. A built-in template sends from Bird's system sender and ignores the profile's senders. A profile that does not exist in this workspace returns `422` `SMSMessagingProfileNotFound`, and a `from` bound to a different profile returns `422` `SMSMessagingProfileSenderBound`.
    */
@@ -7084,7 +7143,7 @@ export type SmsMessageSendRequest = unknown & {
    */
   scheduled_at?: string;
   /**
-   * Send using a stored template instead of free text. The category is derived from the template, so `category` and `media_urls` are rejected. A workspace template requires `from`; a built-in template selects its sender and rejects `from`.
+   * Send using a stored template instead of free text. The category is derived from the template, so `category`, `subject` and `media_urls` are rejected. A workspace template requires `from`; a built-in template selects its sender and rejects `from`.
    *
    */
   template?: SmsTemplateSend;
@@ -8354,7 +8413,9 @@ export type AttachmentId = string;
  * `approved` and `rejected` states are decisions. You can replace a rejected
  * item without refiling the rest. The `not_applicable` state means this
  * requirement does not apply to you. The `expired` state means the value was
- * accepted but has since gone stale.
+ * accepted but has since gone stale. The `awaiting_confirmation` state is a
+ * business contact we emailed a confirmation link to: nothing is reviewed until
+ * they confirm, and you can resend the link or give another address.
  *
  * An item only ever reports its state. Treat this as an open set because review
  * can gain stages. A value you do not recognise is a valid state that this
@@ -8369,6 +8430,7 @@ export type ComplianceItemState =
   | "rejected"
   | "not_applicable"
   | "expired"
+  | "awaiting_confirmation"
   | (string & {});
 
 export type ComplianceRequirementField = {
@@ -9196,7 +9258,7 @@ export type ComplianceRequirement = {
    */
   readonly satisfied: boolean;
   /**
-   * Whether anything is waiting on you. True when a required requirement has no answer, its answer was refused or has gone stale, the registration needs correction as described by `reason`, or a closed submission accepts corrected details (`resubmission_allowed`). False does not imply that review is pending: a closed verifier correction can leave the requirements unsatisfied with no editable answers. Read `review_pending` to determine whether an answer is awaiting review. Read this independently of `satisfied`, which reports whether your paperwork is accepted. An unresolved verifier correction also sets it while the matching grant is live and the correction deadline has not passed, until you supply updated details. At the deadline or after grant withdrawal, an unresolved rejection alone does not set it because accepted answers can no longer be replaced. A corrected optional answer that is rejected or expires still needs your input through ordinary resupply, including after that deadline.
+   * Whether anything is waiting on you. True when a required requirement has no answer, its answer was refused or has gone stale, a business contact has not yet confirmed its emailed link (`awaiting_confirmation`), the registration needs correction as described by `reason`, or a closed submission accepts corrected details (`resubmission_allowed`). False does not imply that review is pending: a closed verifier correction can leave the requirements unsatisfied with no editable answers. Read `review_pending` to determine whether an answer is awaiting review. Read this independently of `satisfied`, which reports whether your paperwork is accepted. An unresolved verifier correction also sets it while the matching grant is live and the correction deadline has not passed, until you supply updated details. At the deadline or after grant withdrawal, an unresolved rejection alone does not set it because accepted answers can no longer be replaced. A corrected optional answer that is rejected or expires still needs your input through ordinary resupply, including after that deadline.
    *
    */
   readonly needs_input: boolean;
@@ -9206,7 +9268,7 @@ export type ComplianceRequirement = {
    */
   readonly review_pending: boolean;
   /**
-   * Whether you may change any answer, not only one that was refused or has gone stale. True for a number, emergency calling service, business identity or SMS sender registration whose submission has not been approved yet, including answers awaiting review or already accepted, and for a closed submission when `resubmission_allowed` is true. An SMS sender registration goes to the carrier or registry when it is approved, so it stays editable only until then. A changed answer loses its verdict and is reviewed again. Send only the answers you change. False once the submission is approved: replace only answers in `fields` whose state is `not_supplied`, `rejected` or `expired`, or those marked `editable_for_verifier_repair`.
+   * Whether you may change any answer, not only one that was refused or has gone stale. True for a number, emergency calling service, business identity or SMS sender registration whose submission has not been approved yet, including answers awaiting review or already accepted, and for a closed submission when `resubmission_allowed` is true. An SMS sender registration goes to the carrier or registry when it is approved, so it stays editable only until then. A changed answer loses its verdict and is reviewed again. Send only the answers you change. False once the submission is approved: replace only answers in `fields` whose state is `not_supplied`, `rejected`, `expired` or `awaiting_confirmation`, or those marked `editable_for_verifier_repair`.
    *
    */
   readonly answers_editable: boolean;
@@ -9314,10 +9376,11 @@ export type ComplianceSubmissionCreate = {
  *
  * - `member_login`: a member of this workspace signs in with a verified address at the domain.
  * - `sso_domain`: the domain is your organization's verified single sign-on domain.
+ * - `contact_confirmation`: the business contact confirmed a link we emailed to their address at the domain.
  *
  */
 export type ComplianceDomainProofMethod =
-  "member_login" | "sso_domain" | (string & {});
+  "member_login" | "sso_domain" | "contact_confirmation" | (string & {});
 
 /**
  * How your organization proved it controls the business's domain, for a business verification.
@@ -14949,7 +15012,7 @@ export type AmbSuppression = {
    */
   readonly created_at: string;
   /**
-   * When we last recorded this suppression being stated. Later than `created_at` when your workspace added it again while it was already in force; a repeat adds no new record.
+   * When we last recorded this suppression being stated. Later than `created_at` when it was stated again while already in force: your workspace adding it again, or the customer closing the conversation again. A repeat adds no new record.
    *
    */
   readonly last_asserted_at?: string;
@@ -15085,6 +15148,8 @@ export type AmbBusinessAccountAttachmentUpload = {
    */
   file: Blob | File;
 };
+
+export type AmbAuthenticationProviderId = string;
 
 export type AmbEntryPoint = {
   /**
@@ -16317,7 +16382,7 @@ export type AmbMessagePartKind =
   "text" | "link_preview" | "rich_link" | "interactive" | (string & {});
 
 /**
- * One part of the split an outbound message was sent in. `title`, `image_url` and `layout` record what a card showed, as measured when the part was sent, not what a request chose. They are absent when an earlier attempt of a retried send sent the part.
+ * One part of the split an outbound message was sent in. `title`, `image_url` and `layout` record what a card showed, not what a request chose. Bird reads them when it sends the part, except on a `rich_link` Apple built from its URL, where it reads the linked page around the time Apple accepts the part. They can be absent, as each field says.
  */
 export type AmbMessagePart = {
   kind: AmbMessagePartKind;
@@ -16338,15 +16403,15 @@ export type AmbMessagePart = {
    */
   url?: string;
   /**
-   * The title a `link_preview` part showed, read from the page when the part was sent. A title longer than 512 bytes is cut to that length. Absent when an earlier attempt of a retried send sent the part.
+   * The title a card showed. On a `link_preview` part it is the page's title, read when the part was sent. On a `rich_link` part Apple built from its URL it is the title Apple returned for the card, or the linked page's title when Apple returned none. A title longer than 512 bytes is cut to that length. Absent on other parts, on a part Apple did not accept, and on a `rich_link` Apple built when neither Apple nor a page Bird could read supplied a title. On a `link_preview` part it is also absent when Bird sent the part in an earlier attempt of a retried send, or had to save the send's result again.
    */
   title?: string;
   /**
-   * The page image a `link_preview` part showed, as the address it was fetched from when the part was sent. Absent when the address is longer than 2,048 bytes, and when an earlier attempt of a retried send sent the part.
+   * The address of the image a card showed. On a `link_preview` part it is the page image Bird fetched and sent. On a `rich_link` part Apple built from its URL it is the image the linked page offers, read around the time Apple accepted the part. Apple builds that card on the device, so the image it shows can differ. On both kinds the address is the page's own. Bird keeps no copy of the image, and the address can stop serving it later. Absent on other parts, on a part Apple did not accept, when the address is longer than 2,048 bytes, and when Bird could not read the page or the page offers no image. On a `link_preview` part it is also absent when Bird sent the part in an earlier attempt of a retried send, or had to save the send's result again.
    */
   image_url?: string;
   /**
-   * How the device displayed the image of a `link_preview` or `rich_link` part, measured from the width and shape of the image as it was sent. A `large` image keeps its own proportions unless `large` was the chosen layout. Absent when an earlier attempt of a retried send sent the part, and on a `rich_link` Apple built from its URL.
+   * The layout Apple's sizing rules give the image Bird sent for a `link_preview` or `rich_link` part, measured from that image's width and shape. Bird does not see the device. A `large` image keeps its own proportions unless `large` was the chosen layout. Absent on other parts, on a part Apple did not accept, on a `rich_link` Apple built from its URL, because Bird sends no image for it, and when Bird sent the part in an earlier attempt of a retried send, or had to save the send's result again.
    */
   layout?: AmbRichLinkLayout;
   /**
@@ -16428,7 +16493,7 @@ export type AmbMessage = {
    */
   readonly interactive_reply?: AmbInteractiveReply;
   /**
-   * The parts an outbound message was sent as, in the order Bird sent them, so one message can arrive as several. Each link in the text goes as its own preview. A `rich_link` takes the place of the first copy of its URL in the text, which splits the text around it, and goes last when the text does not contain it. An `interactive` goes after the text. A card part that the finishing attempt sent also says what it showed. A message can also go out as one `rich_link` or `interactive` part that has its text. Set when the send finishes as `sent` or `send_failed`. Absent on inbound messages, when the text could not be split so nothing was sent, such as a text with more than 20 links, and on older messages, so treat a missing `parts` as unknown.
+   * The parts an outbound message was sent as, in the order Bird sent them, so one message can arrive as several. Each link in the text goes as its own preview. A `rich_link` takes the place of the first copy of its URL in the text, which splits the text around it, and goes last when the text does not contain it. An `interactive` goes after the text. A card part also says what it showed, when Bird still has that when the send finishes. A message can also go out as one `rich_link` or `interactive` part that has its text. Set when the send finishes as `sent` or `send_failed`. Absent on inbound messages, when the text could not be split so nothing was sent, such as a text with more than 20 links, and on older messages, so treat a missing `parts` as unknown.
    */
   readonly parts?: Array<AmbMessagePart>;
   /**
@@ -16679,6 +16744,10 @@ export type AmbConversationRecipient = {
    * Customer phone number, or null when unknown. An invitation's destination remains on the invitation's `to` field.
    */
   phone_number: string | null;
+  /**
+   * Name from the last successful identity verification, or null when none was collected. It can refer to a previous verification and does not establish a current login session.
+   */
+  display_name?: string | null;
 };
 
 /**
@@ -16761,6 +16830,135 @@ export type AmbConversationOrigin = "entry_point" | "invitation";
 export type AmbConversationClosedReason = "user_close" | "gone";
 
 /**
+ * Progress of an authentication request. Every value except `pending` and `processing` is terminal.
+ *
+ * - `pending`: the sign-in message was accepted and the customer has not finished.
+ * - `processing`: the authorization code is being exchanged or Bird is waiting for confirmation from the originating Messages device.
+ * - `succeeded`: the identity was validated and the originating Messages device confirmed sign-in.
+ * - `failed`: delivery, identity verification or device confirmation failed, or the provider callback was replayed.
+ * - `cancelled`: the customer or the provider declined authorization.
+ * - `expired`: the request passed its ten-minute lifetime.
+ * - `superseded`: a newer request, or a change to the conversation, business or provider, replaced the request.
+ *
+ */
+export type AmbAuthenticationStatus =
+  | "pending"
+  | "processing"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "expired"
+  | "superseded";
+
+/**
+ * Validated identity claims. Verification does not create a persistent login session or grant access to customer systems.
+ */
+export type AmbVerifiedIdentity = {
+  /**
+   * Issuer that verified the identity.
+   */
+  readonly issuer: string;
+  /**
+   * Provider-issued user identifier. Not necessarily your CRM customer ID.
+   */
+  readonly subject: string;
+  /**
+   * Name supplied by the provider when name collection is enabled.
+   */
+  readonly name?: string;
+  /**
+   * Email supplied by the provider when email collection is enabled.
+   */
+  readonly email?: string;
+  /**
+   * Whether the provider verified this email address.
+   */
+  readonly email_verified?: boolean;
+  /**
+   * When the provider says the user authenticated. May precede this verification.
+   */
+  readonly authenticated_at?: string;
+  /**
+   * When Bird completed identity validation and confirmed the originating Messages conversation.
+   */
+  readonly verified_at: string;
+};
+
+/**
+ * A single attempt to verify the identity associated with an Apple Messages for Business conversation.
+ */
+export type AmbAuthentication = {
+  readonly id: AmbAuthenticationId;
+  readonly conversation_id: AmbConversationId;
+  readonly provider_id: AmbAuthenticationProviderId;
+  /**
+   * Provider revision used by this attempt.
+   */
+  readonly provider_revision: number;
+  /**
+   * Authentication message reference, or null before acceptance.
+   */
+  readonly message_id: AmbMessageId | null;
+  readonly status: AmbAuthenticationStatus;
+  /**
+   * When the attempt was created.
+   */
+  readonly created_at: string;
+  /**
+   * When this attempt expires.
+   */
+  readonly expires_at: string;
+  /**
+   * When the attempt reached a terminal outcome.
+   */
+  readonly completed_at?: string;
+  /**
+   * Why the request did not succeed. Contains no provider response or credentials.
+   *
+   * - `authentication_expired`: ten minutes passed. Request a new sign-in.
+   * - `new_authentication`: a newer request replaced this one.
+   * - `conversation_closed` and `conversation_changed`: the conversation closed or reopened. Wait for the customer to write again.
+   * - `configuration_changed`: the provider settings changed or the business was disconnected.
+   * - `user_cancelled`, `apple_authentication_cancel`: the customer declined.
+   * - `provider_rejected`, `token_exchange_failed`, `identity_verification_failed`: the provider response could not be accepted. Check the provider settings, then request a new sign-in.
+   * - `processing_interrupted`: the exchange or device confirmation did not finish within one minute. Ask the customer to sign in again and return to Messages.
+   * - `apple_authentication_failure`: the Messages device reported a failed sign-in. Request a new sign-in.
+   * - `authentication_replayed`: the provider callback was used more than once. Request a new sign-in.
+   * - `message_submission_failed`, `message_failed`: the sign-in message could not be sent.
+   *
+   * Other values are message delivery reasons passed through unchanged.
+   *
+   */
+  readonly failure_code?: string;
+  readonly identity?: AmbVerifiedIdentity;
+};
+
+/**
+ * Most recent successful identity verification for this conversation.
+ */
+export type AmbConversationVerifiedIdentity = {
+  readonly authentication_id: AmbAuthenticationId;
+  readonly provider_id: AmbAuthenticationProviderId;
+  /**
+   * Provider revision used for verification.
+   */
+  readonly provider_revision: number;
+  readonly identity: AmbVerifiedIdentity;
+  /**
+   * The conversation or provider changed after verification. This result is retained as history.
+   */
+  readonly historical: boolean;
+};
+
+/**
+ * Latest attempt and last successful verification. A new pending attempt does not erase an earlier success.
+ */
+export type AmbConversationAuthentication = {
+  readonly latest_attempt?: AmbAuthentication;
+  readonly last_verified?: AmbConversationVerifiedIdentity;
+};
+
+/**
  * A conversation between your business and one customer on Apple Messages for Business. It holds the customer's device capabilities, the console's read state, assignment, and labels, and the routing queue the conversation is in.
  *
  */
@@ -16828,6 +17026,10 @@ export type AmbConversation = {
    * When this conversation last changed.
    */
   updated_at: string;
+  /**
+   * Latest authentication request and the last verified identity. Included when you read one conversation, not in list results.
+   */
+  authentication?: AmbConversationAuthentication;
 };
 
 export type AmbConversationList = {
@@ -24812,6 +25014,7 @@ export type WebhookFilter = {
  */
 export type WebhookEventType =
   | "amb.accepted"
+  | "amb.authentication.updated"
   | "amb.conversation_closed"
   | "amb.conversation_reopened"
   | "amb.conversation_started"
@@ -25195,6 +25398,41 @@ export type EventAmbAccepted = {
    */
   timestamp: string;
   data: EventAmbMessageData;
+};
+
+/**
+ * Always `amb.authentication.updated` for this event.
+ */
+export type AmbAuthenticationUpdatedEventType = "amb.authentication.updated";
+
+/**
+ * Business routing context and the authentication request at its terminal status.
+ */
+export type EventAmbAuthenticationData = {
+  /**
+   * Workspace that owns this authentication request.
+   */
+  workspace_id: WorkspaceId;
+  /**
+   * Apple Messages business that owns this authentication request.
+   */
+  business_account_id: AmbBusinessId;
+  /**
+   * The completed authentication request, in the same format as a single-request read.
+   */
+  authentication: AmbAuthentication;
+};
+
+/**
+ * An Apple Messages for Business authentication request reached a terminal status. A request produces at most one event, and none when its business is disconnected. Read the request to recover a missing outcome. The event never contains the customer's tokens or authorization code.
+ */
+export type EventAmbAuthenticationUpdated = {
+  type: AmbAuthenticationUpdatedEventType;
+  /**
+   * When the request reached its terminal status, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbAuthenticationData;
 };
 
 /**
@@ -26471,6 +26709,7 @@ export type EventPreferenceRevoked = {
  * Fields shared by every outbound SMS lifecycle event payload.
  */
 export type EventSmsBase = {
+  content_type?: SmsContentType;
   /**
    * ID of the SMS message.
    */
@@ -26685,6 +26924,7 @@ export type SmsReceivedEventType = "sms.received";
  * Payload of the sms.received event.
  */
 export type EventSmsReceivedData = unknown & {
+  content_type?: SmsContentType;
   /**
    * ID of the SMS message.
    */
@@ -26750,6 +26990,10 @@ export type EventSmsReceivedData = unknown & {
    * Subject line. Absent when the message carried none.
    */
   subject?: string;
+  /**
+   * Attachments on the message. Omitted when the message carried none.
+   */
+  media?: Array<SmsMedia>;
 };
 
 /**
@@ -32108,6 +32352,9 @@ export type WebhookEventWritable =
       type: "amb.accepted";
     } & EventAmbAcceptedWritable)
   | ({
+      type: "amb.authentication.updated";
+    } & EventAmbAuthenticationUpdatedWritable)
+  | ({
       type: "amb.conversation_closed";
     } & EventAmbConversationClosed)
   | ({
@@ -33635,6 +33882,7 @@ export type SmsInReplyToMessageWritable = {
 };
 
 export type SmsMessageWritable = {
+  content_type?: SmsContentType;
   /**
    * Where the message went. On an outbound message this is the recipient's phone number in E.164 format; on an inbound one it is your own number that received it.
    *
@@ -33646,7 +33894,7 @@ export type SmsMessageWritable = {
    */
   from: string;
   /**
-   * The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text, and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. System template messages preserve the surrounding text and mask sensitive codes with one asterisk per digit. Authentication messages without declared sensitive variables return `**REDACTED**`. The recipient receives the real code; message history retains only its masked representation.
+   * The message body. Absent on media-only or subject-only MMS and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. System template messages preserve the surrounding text and mask sensitive codes with one asterisk per digit. Authentication messages without declared sensitive variables return `**REDACTED**`. The recipient receives the real code; message history retains only its masked representation.
    *
    */
   text?: string;
@@ -35243,6 +35491,10 @@ export type AmbConversationWritable = {
    * When this conversation last changed.
    */
   updated_at: string;
+  /**
+   * Latest authentication request and the last verified identity. Included when you read one conversation, not in list results.
+   */
+  authentication?: unknown;
 };
 
 export type AmbConversationListWritable = {
@@ -36961,6 +37213,32 @@ export type EventAmbAcceptedWritable = {
 };
 
 /**
+ * Business routing context and the authentication request at its terminal status.
+ */
+export type EventAmbAuthenticationDataWritable = {
+  /**
+   * Workspace that owns this authentication request.
+   */
+  workspace_id: WorkspaceId;
+  /**
+   * Apple Messages business that owns this authentication request.
+   */
+  business_account_id: AmbBusinessId;
+};
+
+/**
+ * An Apple Messages for Business authentication request reached a terminal status. A request produces at most one event, and none when its business is disconnected. Read the request to recover a missing outcome. The event never contains the customer's tokens or authorization code.
+ */
+export type EventAmbAuthenticationUpdatedWritable = {
+  type: AmbAuthenticationUpdatedEventType;
+  /**
+   * When the request reached its terminal status, independent of webhook delivery time.
+   */
+  timestamp: string;
+  data: EventAmbAuthenticationDataWritable;
+};
+
+/**
  * Bird received an ordinary customer message from Apple. Invitation responses are excluded.
  */
 export type EventAmbReceivedWritable = {
@@ -37458,6 +37736,7 @@ export type EventEmailUnsubscribedWritable = {
  * Fields shared by every outbound SMS lifecycle event payload.
  */
 export type EventSmsBaseWritable = {
+  content_type?: SmsContentType;
   /**
    * ID of the SMS message.
    */
@@ -37651,6 +37930,7 @@ export type EventSmsFailedWritable = {
  * Payload of the sms.received event.
  */
 export type EventSmsReceivedDataWritable = unknown & {
+  content_type?: SmsContentType;
   /**
    * ID of the SMS message.
    */
@@ -37695,6 +37975,10 @@ export type EventSmsReceivedDataWritable = unknown & {
    * Subject line. Absent when the message carried none.
    */
   subject?: string;
+  /**
+   * Attachments on the message. Omitted when the message carried none.
+   */
+  media?: Array<unknown>;
 };
 
 /**
@@ -45745,6 +46029,76 @@ export type ListSmsMessageEventsResponses = {
 export type ListSmsMessageEventsResponse =
   ListSmsMessageEventsResponses[keyof ListSmsMessageEventsResponses];
 
+export type GetSmsMessageMediaData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * SMS message ID.
+     */
+    message_id: SmsMessageId;
+    /**
+     * Media ID, as returned in `id` on the message's `media` entry.
+     */
+    media_id: SmsFileId;
+  };
+  query?: never;
+  url: "/v1/sms/messages/{message_id}/media/{media_id}";
+};
+
+export type GetSmsMessageMediaErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The resource existed but is no longer available.
+   */
+  410: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetSmsMessageMediaError =
+  GetSmsMessageMediaErrors[keyof GetSmsMessageMediaErrors];
+
 export type ListSmsTemplatesData = {
   body?: never;
   headers?: {
@@ -49769,6 +50123,106 @@ export type UpdateWorkspaceComplianceSubmissionResponses = {
 
 export type UpdateWorkspaceComplianceSubmissionResponse =
   UpdateWorkspaceComplianceSubmissionResponses[keyof UpdateWorkspaceComplianceSubmissionResponses];
+
+export type SendWorkspaceComplianceSubmissionContactConfirmationData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Submission ID.
+     */
+    submission_id: ComplianceSubmissionId;
+  };
+  query?: never;
+  url: "/v1/compliance/submissions/{submission_id}/contact-confirmation";
+};
+
+export type SendWorkspaceComplianceSubmissionContactConfirmationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type SendWorkspaceComplianceSubmissionContactConfirmationError =
+  SendWorkspaceComplianceSubmissionContactConfirmationErrors[keyof SendWorkspaceComplianceSubmissionContactConfirmationErrors];
+
+export type SendWorkspaceComplianceSubmissionContactConfirmationResponses = {
+  /**
+   * The submission, still waiting for its contact to confirm.
+   */
+  200: ComplianceSubmission;
+};
+
+export type SendWorkspaceComplianceSubmissionContactConfirmationResponse =
+  SendWorkspaceComplianceSubmissionContactConfirmationResponses[keyof SendWorkspaceComplianceSubmissionContactConfirmationResponses];
 
 export type GetSmsStatsSummaryData = {
   body?: never;
@@ -60239,6 +60693,181 @@ export type UpdateAmbConversationResponses = {
 export type UpdateAmbConversationResponse =
   UpdateAmbConversationResponses[keyof UpdateAmbConversationResponses];
 
+export type CreateAmbAuthenticationData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Conversation identifier. Starts with `acv_`.
+     */
+    conversation_id: AmbConversationId;
+  };
+  query?: never;
+  url: "/v1/amb/conversations/{conversation_id}/authentications";
+};
+
+export type CreateAmbAuthenticationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient balance
+   */
+  402: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateAmbAuthenticationError =
+  CreateAmbAuthenticationErrors[keyof CreateAmbAuthenticationErrors];
+
+export type CreateAmbAuthenticationResponses = {
+  /**
+   * The authentication request was accepted.
+   */
+  202: AmbAuthentication;
+};
+
+export type CreateAmbAuthenticationResponse =
+  CreateAmbAuthenticationResponses[keyof CreateAmbAuthenticationResponses];
+
+export type GetAmbAuthenticationData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Conversation identifier. Starts with `acv_`.
+     */
+    conversation_id: AmbConversationId;
+    /**
+     * Authentication request identifier. Starts with `amauth_`.
+     */
+    authentication_id: AmbAuthenticationId;
+  };
+  query?: never;
+  url: "/v1/amb/conversations/{conversation_id}/authentications/{authentication_id}";
+};
+
+export type GetAmbAuthenticationErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetAmbAuthenticationError =
+  GetAmbAuthenticationErrors[keyof GetAmbAuthenticationErrors];
+
+export type GetAmbAuthenticationResponses = {
+  /**
+   * The authentication request.
+   */
+  200: AmbAuthentication;
+};
+
+export type GetAmbAuthenticationResponse =
+  GetAmbAuthenticationResponses[keyof GetAmbAuthenticationResponses];
+
 export type ListAmbConversationMessagesData = {
   body?: never;
   headers?: {
@@ -68663,6 +69292,10 @@ export type ListEmailTemplatesData = {
      * Filter by the visual theme a built-in template is designed in. Only our built-in templates have a theme, so naming one returns built-ins alone.
      */
     theme?: EmailTemplateThemeFilter;
+    /**
+     * Return templates with this lifecycle status. Use `active` to list only the templates you can send now, which includes every built-in template. Use `draft` for your workspace's templates that have never been published.
+     */
+    status?: TemplateStatus;
     /**
      * A case-insensitive substring search across the template's slug, name, and description.
      */

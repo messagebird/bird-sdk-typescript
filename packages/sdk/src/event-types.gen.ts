@@ -7,6 +7,7 @@
  */
 export const WebhookEventType = {
   AmbAccepted: "amb.accepted",
+  AmbAuthenticationUpdated: "amb.authentication.updated",
   AmbConversationClosed: "amb.conversation_closed",
   AmbConversationReopened: "amb.conversation_reopened",
   AmbConversationStarted: "amb.conversation_started",

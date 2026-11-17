@@ -8,6 +8,9 @@ export const WebhookEventSchema = {
       $ref: "#/components/schemas/EventAMBAccepted",
     },
     {
+      $ref: "#/components/schemas/EventAMBAuthenticationUpdated",
+    },
+    {
       $ref: "#/components/schemas/EventAMBConversationClosed",
     },
     {
@@ -204,6 +207,8 @@ export const WebhookEventSchema = {
     propertyName: "type",
     mapping: {
       "amb.accepted": "#/components/schemas/EventAMBAccepted",
+      "amb.authentication.updated":
+        "#/components/schemas/EventAMBAuthenticationUpdated",
       "amb.conversation_closed":
         "#/components/schemas/EventAMBConversationClosed",
       "amb.conversation_reopened":
@@ -9334,7 +9339,7 @@ export const EmailBroadcastSchema = {
       readOnly: true,
       example: 4820,
       description:
-        "How many recipients the broadcast has been sent to, counting every recipient whose status is `processed` or later. The number rises while the broadcast is `sending` and stops changing once the broadcast has finished. These counters are exact. The email stats endpoints report on the same sending but are approximate, so use these numbers when you need the precise count. Absent when the broadcast comes back from creating, updating, sending, resuming or canceling it, none of which read the counters. List and single-broadcast reads return 0 when no delivery events are recorded. When counters are unavailable, those reads still return 200 and omit the counters. Read the broadcast again for the numbers.",
+        "Saved count of recipients whose status is `processed` or later. Counters refresh periodically and can change after the broadcast reaches `sent`. Read the broadcast again to get the latest saved totals. These counts use exact retained delivery and engagement records; the email stats endpoints report approximate totals.\n\nList and single-broadcast reads return the last saved values during refresh delays or failures. A new broadcast starts with saved zero counters, which remain until its first refresh. Counters are absent while historical totals have not been calculated or their retained history is incomplete. A failure to read saved counters fails the request. Creating, updating, sending, resuming, and canceling a broadcast return no counters.\n",
     },
     delivered_count: {
       type: "integer",
@@ -9390,7 +9395,7 @@ export const EmailBroadcastSchema = {
       },
       example: ["198.51.100.42"],
       description:
-        "The IP addresses this broadcast's messages went out from, up to 100 of them. A broadcast is spread across every address in its pool, so more than one can appear. The receiving mail systems name the address when they deliver, bounce or defer a message, so this stays absent until the first of those comes back. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending, resuming or canceling one returns, none of which read them. For delivery and latency broken down per address, read the sending-IP stats.\n",
+        "The saved IP addresses this broadcast's messages went out from, up to 100 of them. These refresh with the counters and stay absent when the saved counters are unavailable or incomplete. A broadcast is spread across every address in its pool, so more than one can appear. The receiving mail systems name the address when they deliver, bounce or defer a message, so this stays absent until the first of those comes back. Returned on a single broadcast read, and absent from the list and from the broadcast that creating, updating, sending, resuming or canceling one returns, none of which read them. For delivery and latency broken down per address, read the sending-IP stats.\n",
     },
     unique_opens_non_prefetched: {
       type: "integer",
@@ -11746,6 +11751,13 @@ export const SMSMessageCategorySchema = {
     "Content classification: why you are sending. Carriers see it, and where a destination country requires the sender to be registered, that registration is approved for a category: a send outside what it covers returns a `422` `SenderCategoryNotPermitted`. A registration approved for `marketing` covers all four values; one approved for `transactional`, `authentication`, or `service` covers those three and not `marketing`. Use `authentication` for a one-time passcode and `marketing` for a promotion; otherwise pick the value matching the message's purpose.",
 } as const;
 
+export const SMSContentTypeSchema = {
+  type: "string",
+  enum: ["sms", "mms"],
+  description:
+    "Message content type. A nonempty subject or media list selects MMS.",
+} as const;
+
 export const SMSMessageIDSchema = {
   type: "string",
   minLength: 1,
@@ -11835,24 +11847,23 @@ export const SMSSegmentsSchema = {
   type: "object",
   additionalProperties: false,
   required: ["count", "encoding", "characters"],
-  description:
-    "Segment breakdown for the message body. Segment count drives billing.",
+  description: "Billable SMS segments, or one unit for MMS.",
   properties: {
     count: {
       type: "integer",
       minimum: 1,
       readOnly: true,
       description:
-        "Number of segments the body is split into. Each segment is a billable unit.",
+        "Number of billable units. MMS always has one unit and is not split into SMS segments.",
       example: 1,
     },
     encoding: {
       type: "string",
       minLength: 1,
       readOnly: true,
-      enum: ["GSM_7BIT", "UCS2", "BINARY"],
+      enum: ["GSM_7BIT", "UCS2", "BINARY", "MMS"],
       description:
-        "Encoding used for the body. The `GSM_7BIT` encoding fits 160 septets\n(seven-bit units) in one segment, or 153 per part in a multi-segment\nmessage. The `UCS2` encoding applies when the body contains a character\noutside the GSM 03.38 alphabet, including emoji, CJK, and some accented\ncharacters. It fits 70 UTF-16 code units in one segment, or 67 per part.\n\nNeither limit counts characters, and both alphabets have characters that\ncost two units. Under `GSM_7BIT` there are ten such entries, and they are\nthe whole set: `^`, `{`, `}`, `\\`, `[`, `]`, `~`, `|`, `€`, and the form\nfeed control. Eighty of those fill a single segment. Under `UCS2` an emoji\noutside the Basic Multilingual Plane is a surrogate pair costing two code\nunits, so 35 of those fill a single segment.\n\n`BINARY` marks an 8-bit binary payload, sent as one segment, where `characters` counts its octets. Only a binary send produces it.\n",
+        "Encoding used for the body. The `GSM_7BIT` encoding fits 160 septets\n(seven-bit units) in one segment, or 153 per part in a multi-segment\nmessage. The `UCS2` encoding applies when the body contains a character\noutside the GSM 03.38 alphabet, including emoji, CJK, and some accented\ncharacters. It fits 70 UTF-16 code units in one segment, or 67 per part.\n\nNeither limit counts characters, and both alphabets have characters that\ncost two units. Under `GSM_7BIT` there are ten such entries, and they are\nthe whole set: `^`, `{`, `}`, `\\`, `[`, `]`, `~`, `|`, `€`, and the form\nfeed control. Eighty of those fill a single segment. Under `UCS2` an emoji\noutside the Basic Multilingual Plane is a surrogate pair costing two code\nunits, so 35 of those fill a single segment.\n\n`MMS` marks a multimedia message billed as one unit; `characters` counts text code points.\n\n`BINARY` marks an 8-bit binary payload, sent as one segment, where `characters` counts its octets. Only a binary send produces it.\n",
     },
     characters: {
       type: "integer",
@@ -12002,6 +12013,54 @@ export const SMSInReplyToMessageSchema = {
   },
 } as const;
 
+export const SMSFileIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^smf_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "smf_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const SMSMediaSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A media attachment on an MMS. Inbound attachments include carrier metadata even when their contents could not be retrieved. Outbound attachments retain the submitted URL.\n",
+  required: ["mime_type"],
+  properties: {
+    id: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSFileID",
+        },
+      ],
+      readOnly: true,
+      description:
+        "ID of the stored attachment. Absent for outbound URLs and inbound attachments that were not stored.",
+    },
+    mime_type: {
+      type: "string",
+      minLength: 1,
+      readOnly: true,
+      description:
+        "Carrier-reported media type for inbound attachments; application/octet-stream when unknown or outbound.",
+      example: "image/jpeg",
+    },
+    filename: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "Filename the sender's device supplied, when it supplied one.",
+      example: "photo.jpg",
+    },
+    url: {
+      type: ["string", "null"],
+      readOnly: true,
+      description:
+        "Where to download the attachment, kept for 30 days after the message is received. Null when the attachment was not stored, for example because Bird could not retrieve it from the carrier. For outbound MMS this is the submitted URL, whose availability the caller controls.\n",
+    },
+  },
+} as const;
+
 export const SMSMessageSchema = {
   type: "object",
   additionalProperties: false,
@@ -12020,6 +12079,9 @@ export const SMSMessageSchema = {
     "created_at",
   ],
   properties: {
+    content_type: {
+      $ref: "#/components/schemas/SMSContentType",
+    },
     id: {
       readOnly: true,
       $ref: "#/components/schemas/SMSMessageID",
@@ -12060,7 +12122,7 @@ export const SMSMessageSchema = {
       type: "string",
       minLength: 1,
       description:
-        "The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text, and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. System template messages preserve the surrounding text and mask sensitive codes with one asterisk per digit. Authentication messages without declared sensitive variables return `**REDACTED**`. The recipient receives the real code; message history retains only its masked representation.\n",
+        "The message body. Absent on media-only or subject-only MMS and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. System template messages preserve the surrounding text and mask sensitive codes with one asterisk per digit. Authentication messages without declared sensitive variables return `**REDACTED**`. The recipient receives the real code; message history retains only its masked representation.\n",
       example: "Your order has shipped and is on its way.",
     },
     binary: {
@@ -12251,6 +12313,20 @@ export const SMSMessageSchema = {
       description:
         "On a received message, the outbound message it was paired with through its messaging profile's outbound matching. Absent on outbound messages and on received messages that were not paired.\n",
     },
+    subject: {
+      type: "string",
+      readOnly: true,
+      description: "MMS subject. Absent on any message that carries none.",
+    },
+    media: {
+      type: "array",
+      readOnly: true,
+      items: {
+        $ref: "#/components/schemas/SMSMedia",
+      },
+      description:
+        "MMS attachments. Omitted when absent or redacted for an authentication send. Outbound entries retain submitted URLs; inbound entries describe stored attachments.\n",
+    },
     created_at: {
       type: "string",
       format: "date-time",
@@ -12273,6 +12349,34 @@ export const SMSMessageSchema = {
       readOnly: true,
       description: "When delivery was confirmed. Null until then.",
     },
+  },
+  example: {
+    id: "sms_01krdgeqcxet5s7t44vh8rt9mg",
+    direction: "outbound",
+    content_type: "mms",
+    status: "accepted",
+    from: "+12025550123",
+    to: "+12025550199",
+    text: "Order ready",
+    subject: "Order update",
+    category: "transactional",
+    media: [
+      {
+        mime_type: "application/octet-stream",
+        url: "https://example.com/order.jpg",
+      },
+    ],
+    segments: {
+      count: 1,
+      encoding: "MMS",
+      characters: 11,
+    },
+    requested_language: null,
+    resolved_language: null,
+    template_id: null,
+    template_version_id: null,
+    template_content_hash: null,
+    created_at: "2026-05-21T12:00:00Z",
   },
 } as const;
 
@@ -12404,7 +12508,7 @@ export const SMSMessageSendRequestSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "A message to send. Supply exactly one of `text` (free-text, which also requires `category` unless a messaging profile supplies a default), `template` (a stored template, whose category is derived), or `binary` (which also requires `category`). Supplying more than one, or none, is rejected.\n",
+    "A message to send. Supply direct content (`text` and/or `media_urls`, with an optional `subject`), a stored `template`, or `binary`. A nonempty subject or media list selects MMS, which requires a recipient with calling code +1 and is charged as one message. Direct content requires `category` unless a messaging profile supplies a default. A subject alone is rejected.\n",
   required: ["to"],
   anyOf: [
     {
@@ -12415,6 +12519,14 @@ export const SMSMessageSendRequestSchema = {
     },
     {
       required: ["binary"],
+    },
+    {
+      required: ["media_urls"],
+      properties: {
+        media_urls: {
+          minItems: 1,
+        },
+      },
     },
   ],
   not: {
@@ -12454,6 +12566,27 @@ export const SMSMessageSendRequestSchema = {
           media_urls: {},
         },
       },
+      {
+        required: ["template", "subject"],
+        properties: {
+          template: {},
+          subject: {},
+        },
+      },
+      {
+        required: ["binary", "subject"],
+        properties: {
+          binary: {},
+          subject: {},
+        },
+      },
+      {
+        required: ["binary", "media_urls"],
+        properties: {
+          binary: {},
+          media_urls: {},
+        },
+      },
     ],
   },
   properties: {
@@ -12482,7 +12615,7 @@ export const SMSMessageSendRequestSchema = {
       type: "string",
       minLength: 1,
       description:
-        "Free-text message body, required unless `template` is set; the two are mutually exclusive. From 1 character up to 12 segments, roughly 1836 GSM-7 or 804 UCS-2 characters, since the two encodings fit different numbers of characters in a segment. Bird does not truncate: a longer body returns `422`.",
+        "Message body. Required for direct content unless `media_urls` is nonempty. Text-only SMS allows up to 12 segments; longer SMS returns `422`. MMS text is sent without SMS segmentation or smart encoding.",
       example: "Your verification code is 123456.",
     },
     binary: {
@@ -12555,9 +12688,15 @@ export const SMSMessageSendRequestSchema = {
       type: "array",
       items: {
         type: "string",
+        format: "uri",
       },
       description:
-        "Preview feature: multimedia (MMS) attachments. Currently unavailable; supplying this field returns `422 SMSUnsupportedFeature`.",
+        "Absolute HTTP(S) attachment URLs accessible without authentication. A nonempty list selects MMS. Keep URLs accessible through delivery retries. The carrier checks downloads after acceptance: each file may be at most 600 KiB and the total at most 900 KiB. Unreachable, nonpublic or oversized media fails asynchronously through delivery status.\n",
+    },
+    subject: {
+      type: "string",
+      description:
+        "MMS subject. A nonempty subject selects MMS and requires text or media. Cannot accompany a template or binary payload.",
     },
     messaging_profile_id: {
       type: "string",
@@ -12577,7 +12716,7 @@ export const SMSMessageSendRequestSchema = {
         },
       ],
       description:
-        "Send using a stored template instead of free text. The category is derived from the template, so `category` and `media_urls` are rejected. A workspace template requires `from`; a built-in template selects its sender and rejects `from`.\n",
+        "Send using a stored template instead of free text. The category is derived from the template, so `category`, `subject` and `media_urls` are rejected. A workspace template requires `from`; a built-in template selects its sender and rejects `from`.\n",
     },
     broadcast_id: {
       type: "string",
@@ -14882,9 +15021,10 @@ export const ComplianceItemStateSchema = {
     "rejected",
     "not_applicable",
     "expired",
+    "awaiting_confirmation",
   ],
   description:
-    "Where one requirement stands. The `not_supplied` state means nothing has been\ngiven for it yet. The `supplied` state means we have your answer and review\nhas not started. The `in_review` state means someone is looking at it. The\n`approved` and `rejected` states are decisions. You can replace a rejected\nitem without refiling the rest. The `not_applicable` state means this\nrequirement does not apply to you. The `expired` state means the value was\naccepted but has since gone stale.\n\nAn item only ever reports its state. Treat this as an open set because review\ncan gain stages. A value you do not recognise is a valid state that this\nserver added.\n",
+    "Where one requirement stands. The `not_supplied` state means nothing has been\ngiven for it yet. The `supplied` state means we have your answer and review\nhas not started. The `in_review` state means someone is looking at it. The\n`approved` and `rejected` states are decisions. You can replace a rejected\nitem without refiling the rest. The `not_applicable` state means this\nrequirement does not apply to you. The `expired` state means the value was\naccepted but has since gone stale. The `awaiting_confirmation` state is a\nbusiness contact we emailed a confirmation link to: nothing is reviewed until\nthey confirm, and you can resend the link or give another address.\n\nAn item only ever reports its state. Treat this as an open set because review\ncan gain stages. A value you do not recognise is a valid state that this\nserver added.\n",
 } as const;
 
 export const ComplianceRequirementFieldSchema = {
@@ -16506,7 +16646,7 @@ export const ComplianceRequirementSchema = {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether anything is waiting on you. True when a required requirement has no answer, its answer was refused or has gone stale, the registration needs correction as described by `reason`, or a closed submission accepts corrected details (`resubmission_allowed`). False does not imply that review is pending: a closed verifier correction can leave the requirements unsatisfied with no editable answers. Read `review_pending` to determine whether an answer is awaiting review. Read this independently of `satisfied`, which reports whether your paperwork is accepted. An unresolved verifier correction also sets it while the matching grant is live and the correction deadline has not passed, until you supply updated details. At the deadline or after grant withdrawal, an unresolved rejection alone does not set it because accepted answers can no longer be replaced. A corrected optional answer that is rejected or expires still needs your input through ordinary resupply, including after that deadline.\n",
+        "Whether anything is waiting on you. True when a required requirement has no answer, its answer was refused or has gone stale, a business contact has not yet confirmed its emailed link (`awaiting_confirmation`), the registration needs correction as described by `reason`, or a closed submission accepts corrected details (`resubmission_allowed`). False does not imply that review is pending: a closed verifier correction can leave the requirements unsatisfied with no editable answers. Read `review_pending` to determine whether an answer is awaiting review. Read this independently of `satisfied`, which reports whether your paperwork is accepted. An unresolved verifier correction also sets it while the matching grant is live and the correction deadline has not passed, until you supply updated details. At the deadline or after grant withdrawal, an unresolved rejection alone does not set it because accepted answers can no longer be replaced. A corrected optional answer that is rejected or expires still needs your input through ordinary resupply, including after that deadline.\n",
     },
     review_pending: {
       type: "boolean",
@@ -16518,7 +16658,7 @@ export const ComplianceRequirementSchema = {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether you may change any answer, not only one that was refused or has gone stale. True for a number, emergency calling service, business identity or SMS sender registration whose submission has not been approved yet, including answers awaiting review or already accepted, and for a closed submission when `resubmission_allowed` is true. An SMS sender registration goes to the carrier or registry when it is approved, so it stays editable only until then. A changed answer loses its verdict and is reviewed again. Send only the answers you change. False once the submission is approved: replace only answers in `fields` whose state is `not_supplied`, `rejected` or `expired`, or those marked `editable_for_verifier_repair`.\n",
+        "Whether you may change any answer, not only one that was refused or has gone stale. True for a number, emergency calling service, business identity or SMS sender registration whose submission has not been approved yet, including answers awaiting review or already accepted, and for a closed submission when `resubmission_allowed` is true. An SMS sender registration goes to the carrier or registry when it is approved, so it stays editable only until then. A changed answer loses its verdict and is reviewed again. Send only the answers you change. False once the submission is approved: replace only answers in `fields` whose state is `not_supplied`, `rejected`, `expired` or `awaiting_confirmation`, or those marked `editable_for_verifier_repair`.\n",
     },
     resubmission_allowed: {
       type: "boolean",
@@ -16734,9 +16874,9 @@ export const ComplianceSubmissionCreateSchema = {
 export const ComplianceDomainProofMethodSchema = {
   type: "string",
   minLength: 1,
-  "x-extensible-enum": ["member_login", "sso_domain"],
+  "x-extensible-enum": ["member_login", "sso_domain", "contact_confirmation"],
   description:
-    "How the domain was proven.\n\n- `member_login`: a member of this workspace signs in with a verified address at the domain.\n- `sso_domain`: the domain is your organization's verified single sign-on domain.\n",
+    "How the domain was proven.\n\n- `member_login`: a member of this workspace signs in with a verified address at the domain.\n- `sso_domain`: the domain is your organization's verified single sign-on domain.\n- `contact_confirmation`: the business contact confirmed a link we emailed to their address at the domain.\n",
 } as const;
 
 export const ComplianceDomainProofSchema = {
@@ -26885,7 +27025,7 @@ export const AMBSuppressionSchema = {
       minLength: 1,
       readOnly: true,
       description:
-        "When we last recorded this suppression being stated. Later than `created_at` when your workspace added it again while it was already in force; a repeat adds no new record.\n",
+        "When we last recorded this suppression being stated. Later than `created_at` when it was stated again while already in force: your workspace adding it again, or the customer closing the conversation again. A repeat adds no new record.\n",
     },
     ended_at: {
       type: ["string", "null"],
@@ -27224,6 +27364,13 @@ export const AMBBusinessAccountAttachmentUploadSchema = {
         "A PDF up to 10 MiB or an MP4 video up to 25,000,000 bytes. Bird determines the type from the file contents.",
     },
   },
+} as const;
+
+export const AMBAuthenticationProviderIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^aauthp_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "aauthp_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const AMBEntryPointSchema = {
@@ -29921,7 +30068,7 @@ export const AMBMessagePartSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "One part of the split an outbound message was sent in. `title`, `image_url` and `layout` record what a card showed, as measured when the part was sent, not what a request chose. They are absent when an earlier attempt of a retried send sent the part.",
+    "One part of the split an outbound message was sent in. `title`, `image_url` and `layout` record what a card showed, not what a request chose. Bird reads them when it sends the part, except on a `rich_link` Apple built from its URL, where it reads the linked page around the time Apple accepts the part. They can be absent, as each field says.",
   required: ["kind", "sent"],
   properties: {
     kind: {
@@ -29964,7 +30111,7 @@ export const AMBMessagePartSchema = {
       type: "string",
       minLength: 1,
       description:
-        "The title a `link_preview` part showed, read from the page when the part was sent. A title longer than 512 bytes is cut to that length. Absent when an earlier attempt of a retried send sent the part.",
+        "The title a card showed. On a `link_preview` part it is the page's title, read when the part was sent. On a `rich_link` part Apple built from its URL it is the title Apple returned for the card, or the linked page's title when Apple returned none. A title longer than 512 bytes is cut to that length. Absent on other parts, on a part Apple did not accept, and on a `rich_link` Apple built when neither Apple nor a page Bird could read supplied a title. On a `link_preview` part it is also absent when Bird sent the part in an earlier attempt of a retried send, or had to save the send's result again.",
       example: "Your order",
       "x-sensitive": true,
     },
@@ -29973,14 +30120,14 @@ export const AMBMessagePartSchema = {
       minLength: 1,
       format: "uri",
       description:
-        "The page image a `link_preview` part showed, as the address it was fetched from when the part was sent. Absent when the address is longer than 2,048 bytes, and when an earlier attempt of a retried send sent the part.",
+        "The address of the image a card showed. On a `link_preview` part it is the page image Bird fetched and sent. On a `rich_link` part Apple built from its URL it is the image the linked page offers, read around the time Apple accepted the part. Apple builds that card on the device, so the image it shows can differ. On both kinds the address is the page's own. Bird keeps no copy of the image, and the address can stop serving it later. Absent on other parts, on a part Apple did not accept, when the address is longer than 2,048 bytes, and when Bird could not read the page or the page offers no image. On a `link_preview` part it is also absent when Bird sent the part in an earlier attempt of a retried send, or had to save the send's result again.",
       example: "https://example.com/orders/123/cover.png",
       "x-sensitive": true,
     },
     layout: {
       $ref: "#/components/schemas/AMBRichLinkLayout",
       description:
-        "How the device displayed the image of a `link_preview` or `rich_link` part, measured from the width and shape of the image as it was sent. A `large` image keeps its own proportions unless `large` was the chosen layout. Absent when an earlier attempt of a retried send sent the part, and on a `rich_link` Apple built from its URL.",
+        "The layout Apple's sizing rules give the image Bird sent for a `link_preview` or `rich_link` part, measured from that image's width and shape. Bird does not see the device. A `large` image keeps its own proportions unless `large` was the chosen layout. Absent on other parts, on a part Apple did not accept, on a `rich_link` Apple built from its URL, because Bird sends no image for it, and when Bird sent the part in an earlier attempt of a retried send, or had to save the send's result again.",
     },
     sent: {
       type: "boolean",
@@ -30022,13 +30169,9 @@ export const AMBMessagePartSchema = {
       attachments: {},
       sent: {},
       layout: {},
+      title: {},
+      image_url: {},
       url: {
-        not: {},
-      },
-      title: {
-        not: {},
-      },
-      image_url: {
         not: {},
       },
     },
@@ -30210,7 +30353,7 @@ export const AMBMessageSchema = {
         $ref: "#/components/schemas/AMBMessagePart",
       },
       description:
-        "The parts an outbound message was sent as, in the order Bird sent them, so one message can arrive as several. Each link in the text goes as its own preview. A `rich_link` takes the place of the first copy of its URL in the text, which splits the text around it, and goes last when the text does not contain it. An `interactive` goes after the text. A card part that the finishing attempt sent also says what it showed. A message can also go out as one `rich_link` or `interactive` part that has its text. Set when the send finishes as `sent` or `send_failed`. Absent on inbound messages, when the text could not be split so nothing was sent, such as a text with more than 20 links, and on older messages, so treat a missing `parts` as unknown.",
+        "The parts an outbound message was sent as, in the order Bird sent them, so one message can arrive as several. Each link in the text goes as its own preview. A `rich_link` takes the place of the first copy of its URL in the text, which splits the text around it, and goes last when the text does not contain it. An `interactive` goes after the text. A card part also says what it showed, when Bird still has that when the send finishes. A message can also go out as one `rich_link` or `interactive` part that has its text. Set when the send finishes as `sent` or `send_failed`. Absent on inbound messages, when the text could not be split so nothing was sent, such as a text with more than 20 links, and on older messages, so treat a missing `parts` as unknown.",
       example: [
         {
           kind: "text",
@@ -30719,6 +30862,12 @@ export const AMBConversationRecipientSchema = {
       description:
         "Customer phone number, or null when unknown. An invitation's destination remains on the invitation's `to` field.",
     },
+    display_name: {
+      type: ["string", "null"],
+      minLength: 1,
+      description:
+        "Name from the last successful identity verification, or null when none was collected. It can refer to a previous verification and does not establish a current login session.",
+    },
   },
 } as const;
 
@@ -30851,6 +31000,230 @@ export const AMBConversationClosedReasonSchema = {
   enum: ["user_close", "gone"],
   description:
     "Why a closed conversation was closed. `user_close` means the customer sent a close message from their device. `gone` means Apple returned a 410 for the conversation. The console renders this as a banner on a closed conversation.\n",
+} as const;
+
+export const AMBAuthenticationStatusSchema = {
+  type: "string",
+  description:
+    "Progress of an authentication request. Every value except `pending` and `processing` is terminal.\n\n- `pending`: the sign-in message was accepted and the customer has not finished.\n- `processing`: the authorization code is being exchanged or Bird is waiting for confirmation from the originating Messages device.\n- `succeeded`: the identity was validated and the originating Messages device confirmed sign-in.\n- `failed`: delivery, identity verification or device confirmation failed, or the provider callback was replayed.\n- `cancelled`: the customer or the provider declined authorization.\n- `expired`: the request passed its ten-minute lifetime.\n- `superseded`: a newer request, or a change to the conversation, business or provider, replaced the request.\n",
+  enum: [
+    "pending",
+    "processing",
+    "succeeded",
+    "failed",
+    "cancelled",
+    "expired",
+    "superseded",
+  ],
+  minLength: 1,
+} as const;
+
+export const AMBVerifiedIdentitySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Validated identity claims. Verification does not create a persistent login session or grant access to customer systems.",
+  required: ["issuer", "subject", "verified_at"],
+  properties: {
+    issuer: {
+      type: "string",
+      minLength: 1,
+      description: "Issuer that verified the identity.",
+      format: "uri",
+      readOnly: true,
+    },
+    subject: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Provider-issued user identifier. Not necessarily your CRM customer ID.",
+      maxLength: 255,
+      readOnly: true,
+    },
+    name: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Name supplied by the provider when name collection is enabled.",
+      maxLength: 512,
+      readOnly: true,
+    },
+    email: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Email supplied by the provider when email collection is enabled.",
+      maxLength: 320,
+      readOnly: true,
+    },
+    email_verified: {
+      type: "boolean",
+      description: "Whether the provider verified this email address.",
+      readOnly: true,
+    },
+    authenticated_at: {
+      type: "string",
+      minLength: 1,
+      description:
+        "When the provider says the user authenticated. May precede this verification.",
+      format: "date-time",
+      readOnly: true,
+    },
+    verified_at: {
+      type: "string",
+      minLength: 1,
+      description:
+        "When Bird completed identity validation and confirmed the originating Messages conversation.",
+      format: "date-time",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const AMBAuthenticationSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A single attempt to verify the identity associated with an Apple Messages for Business conversation.",
+  required: [
+    "id",
+    "conversation_id",
+    "provider_id",
+    "provider_revision",
+    "message_id",
+    "status",
+    "created_at",
+    "expires_at",
+  ],
+  properties: {
+    id: {
+      $ref: "#/components/schemas/AMBAuthenticationID",
+      readOnly: true,
+    },
+    conversation_id: {
+      $ref: "#/components/schemas/AMBConversationID",
+      readOnly: true,
+    },
+    provider_id: {
+      $ref: "#/components/schemas/AMBAuthenticationProviderID",
+      readOnly: true,
+    },
+    provider_revision: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description: "Provider revision used by this attempt.",
+      readOnly: true,
+    },
+    message_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/AMBMessageID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Authentication message reference, or null before acceptance.",
+      readOnly: true,
+    },
+    status: {
+      $ref: "#/components/schemas/AMBAuthenticationStatus",
+      readOnly: true,
+    },
+    created_at: {
+      type: "string",
+      minLength: 1,
+      description: "When the attempt was created.",
+      format: "date-time",
+      readOnly: true,
+    },
+    expires_at: {
+      type: "string",
+      minLength: 1,
+      description: "When this attempt expires.",
+      format: "date-time",
+      readOnly: true,
+    },
+    completed_at: {
+      type: "string",
+      minLength: 1,
+      description: "When the attempt reached a terminal outcome.",
+      format: "date-time",
+      readOnly: true,
+    },
+    failure_code: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Why the request did not succeed. Contains no provider response or credentials.\n\n- `authentication_expired`: ten minutes passed. Request a new sign-in.\n- `new_authentication`: a newer request replaced this one.\n- `conversation_closed` and `conversation_changed`: the conversation closed or reopened. Wait for the customer to write again.\n- `configuration_changed`: the provider settings changed or the business was disconnected.\n- `user_cancelled`, `apple_authentication_cancel`: the customer declined.\n- `provider_rejected`, `token_exchange_failed`, `identity_verification_failed`: the provider response could not be accepted. Check the provider settings, then request a new sign-in.\n- `processing_interrupted`: the exchange or device confirmation did not finish within one minute. Ask the customer to sign in again and return to Messages.\n- `apple_authentication_failure`: the Messages device reported a failed sign-in. Request a new sign-in.\n- `authentication_replayed`: the provider callback was used more than once. Request a new sign-in.\n- `message_submission_failed`, `message_failed`: the sign-in message could not be sent.\n\nOther values are message delivery reasons passed through unchanged.\n",
+      maxLength: 128,
+      readOnly: true,
+    },
+    identity: {
+      $ref: "#/components/schemas/AMBVerifiedIdentity",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const AMBConversationVerifiedIdentitySchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Most recent successful identity verification for this conversation.",
+  required: [
+    "authentication_id",
+    "provider_id",
+    "provider_revision",
+    "identity",
+    "historical",
+  ],
+  properties: {
+    authentication_id: {
+      $ref: "#/components/schemas/AMBAuthenticationID",
+      readOnly: true,
+    },
+    provider_id: {
+      $ref: "#/components/schemas/AMBAuthenticationProviderID",
+      readOnly: true,
+    },
+    provider_revision: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+      description: "Provider revision used for verification.",
+      readOnly: true,
+    },
+    identity: {
+      $ref: "#/components/schemas/AMBVerifiedIdentity",
+      readOnly: true,
+    },
+    historical: {
+      type: "boolean",
+      description:
+        "The conversation or provider changed after verification. This result is retained as history.",
+      readOnly: true,
+    },
+  },
+} as const;
+
+export const AMBConversationAuthenticationSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Latest attempt and last successful verification. A new pending attempt does not erase an earlier success.",
+  properties: {
+    latest_attempt: {
+      $ref: "#/components/schemas/AMBAuthentication",
+      readOnly: true,
+    },
+    last_verified: {
+      $ref: "#/components/schemas/AMBConversationVerifiedIdentity",
+      readOnly: true,
+    },
+  },
 } as const;
 
 export const AMBConversationSchema = {
@@ -31003,6 +31376,15 @@ export const AMBConversationSchema = {
       format: "date-time",
       minLength: 1,
       description: "When this conversation last changed.",
+    },
+    authentication: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBConversationAuthentication",
+        },
+      ],
+      description:
+        "Latest authentication request and the last verified identity. Included when you read one conversation, not in list results.",
     },
   },
 } as const;
@@ -44853,6 +45235,7 @@ export const WebhookEventTypeSchema = {
     "Webhook event type. This is an open enum, so accept unrecognized values in deliveries. Subscribing to a type outside the event catalog returns a `422`.\n",
   "x-extensible-enum": [
     "amb.accepted",
+    "amb.authentication.updated",
     "amb.conversation_closed",
     "amb.conversation_reopened",
     "amb.conversation_started",
@@ -45564,6 +45947,62 @@ export const EventAMBAcceptedSchema = {
           created_at: "2026-09-25T11:59:59Z",
         },
       },
+    },
+  },
+} as const;
+
+export const AMBAuthenticationUpdatedEventTypeSchema = {
+  type: "string",
+  minLength: 1,
+  enum: ["amb.authentication.updated"],
+  description: "Always `amb.authentication.updated` for this event.",
+  example: "amb.authentication.updated",
+} as const;
+
+export const EventAMBAuthenticationDataSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Business routing context and the authentication request at its terminal status.",
+  required: ["workspace_id", "business_account_id", "authentication"],
+  properties: {
+    workspace_id: {
+      $ref: "#/components/schemas/WorkspaceID",
+      description: "Workspace that owns this authentication request.",
+    },
+    business_account_id: {
+      $ref: "#/components/schemas/AMBBusinessID",
+      description:
+        "Apple Messages business that owns this authentication request.",
+    },
+    authentication: {
+      $ref: "#/components/schemas/AMBAuthentication",
+      description:
+        "The completed authentication request, in the same format as a single-request read.",
+    },
+  },
+} as const;
+
+export const EventAMBAuthenticationUpdatedSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An Apple Messages for Business authentication request reached a terminal status. A request produces at most one event, and none when its business is disconnected. Read the request to recover a missing outcome. The event never contains the customer's tokens or authorization code.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBAuthenticationUpdatedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When the request reached its terminal status, independent of webhook delivery time.",
+      example: "2026-11-11T09:14:27Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBAuthenticationData",
     },
   },
 } as const;
@@ -47882,6 +48321,9 @@ export const EventSMSBaseSchema = {
     "segments",
   ],
   properties: {
+    content_type: {
+      $ref: "#/components/schemas/SMSContentType",
+    },
     sms_id: {
       $ref: "#/components/schemas/SMSMessageID",
       description: "ID of the SMS message.",
@@ -48251,10 +48693,16 @@ export const EventSMSReceivedDataSchema = {
           required: ["text"],
         },
         {
+          required: ["subject"],
+        },
+        {
           required: ["media"],
         },
       ],
       properties: {
+        content_type: {
+          $ref: "#/components/schemas/SMSContentType",
+        },
         sms_id: {
           $ref: "#/components/schemas/SMSMessageID",
           description: "ID of the SMS message.",
@@ -48332,6 +48780,14 @@ export const EventSMSReceivedDataSchema = {
         subject: {
           type: "string",
           description: "Subject line. Absent when the message carried none.",
+        },
+        media: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/SMSMedia",
+          },
+          description:
+            "Attachments on the message. Omitted when the message carried none.",
         },
       },
     },
@@ -58370,6 +58826,9 @@ export const WebhookEventWritableSchema = {
       $ref: "#/components/schemas/EventAMBAcceptedWritable",
     },
     {
+      $ref: "#/components/schemas/EventAMBAuthenticationUpdatedWritable",
+    },
+    {
       $ref: "#/components/schemas/EventAMBConversationClosed",
     },
     {
@@ -58566,6 +59025,8 @@ export const WebhookEventWritableSchema = {
     propertyName: "type",
     mapping: {
       "amb.accepted": "#/components/schemas/EventAMBAcceptedWritable",
+      "amb.authentication.updated":
+        "#/components/schemas/EventAMBAuthenticationUpdatedWritable",
       "amb.conversation_closed":
         "#/components/schemas/EventAMBConversationClosed",
       "amb.conversation_reopened":
@@ -60762,6 +61223,9 @@ export const SMSMessageWritableSchema = {
   additionalProperties: false,
   required: ["to", "from"],
   properties: {
+    content_type: {
+      $ref: "#/components/schemas/SMSContentType",
+    },
     to: {
       type: "string",
       minLength: 1,
@@ -60780,7 +61244,7 @@ export const SMSMessageWritableSchema = {
       type: "string",
       minLength: 1,
       description:
-        "The message body. Every message carries body text, attachments, or both, so this is absent only on a received message that carried attachments and no text, and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. System template messages preserve the surrounding text and mask sensitive codes with one asterisk per digit. Authentication messages without declared sensitive variables return `**REDACTED**`. The recipient receives the real code; message history retains only its masked representation.\n",
+        "The message body. Absent on media-only or subject-only MMS and on a binary message, which returns `binary` instead. For a template send, this is the rendered text after parameter substitution. System template messages preserve the surrounding text and mask sensitive codes with one asterisk per digit. Authentication messages without declared sensitive variables return `**REDACTED**`. The recipient receives the real code; message history retains only its masked representation.\n",
       example: "Your order has shipped and is on its way.",
     },
     category: {
@@ -60814,6 +61278,34 @@ export const SMSMessageWritableSchema = {
       description:
         "Failure detail on a message that failed, was rejected, was not delivered, or expired. Absent otherwise.",
     },
+  },
+  example: {
+    id: "sms_01krdgeqcxet5s7t44vh8rt9mg",
+    direction: "outbound",
+    content_type: "mms",
+    status: "accepted",
+    from: "+12025550123",
+    to: "+12025550199",
+    text: "Order ready",
+    subject: "Order update",
+    category: "transactional",
+    media: [
+      {
+        mime_type: "application/octet-stream",
+        url: "https://example.com/order.jpg",
+      },
+    ],
+    segments: {
+      count: 1,
+      encoding: "MMS",
+      characters: 11,
+    },
+    requested_language: null,
+    resolved_language: null,
+    template_id: null,
+    template_version_id: null,
+    template_content_hash: null,
+    created_at: "2026-05-21T12:00:00Z",
   },
 } as const;
 
@@ -64199,6 +64691,10 @@ export const AMBConversationWritableSchema = {
       minLength: 1,
       description: "When this conversation last changed.",
     },
+    authentication: {
+      description:
+        "Latest authentication request and the last verified identity. Included when you read one conversation, not in list results.",
+    },
   },
 } as const;
 
@@ -67192,6 +67688,49 @@ export const EventAMBAcceptedWritableSchema = {
   },
 } as const;
 
+export const EventAMBAuthenticationDataWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Business routing context and the authentication request at its terminal status.",
+  required: ["workspace_id", "business_account_id"],
+  properties: {
+    workspace_id: {
+      $ref: "#/components/schemas/WorkspaceID",
+      description: "Workspace that owns this authentication request.",
+    },
+    business_account_id: {
+      $ref: "#/components/schemas/AMBBusinessID",
+      description:
+        "Apple Messages business that owns this authentication request.",
+    },
+  },
+} as const;
+
+export const EventAMBAuthenticationUpdatedWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "An Apple Messages for Business authentication request reached a terminal status. A request produces at most one event, and none when its business is disconnected. Read the request to recover a missing outcome. The event never contains the customer's tokens or authorization code.",
+  required: ["type", "timestamp", "data"],
+  properties: {
+    type: {
+      $ref: "#/components/schemas/AMBAuthenticationUpdatedEventType",
+    },
+    timestamp: {
+      type: "string",
+      minLength: 1,
+      format: "date-time",
+      description:
+        "When the request reached its terminal status, independent of webhook delivery time.",
+      example: "2026-11-11T09:14:27Z",
+    },
+    data: {
+      $ref: "#/components/schemas/EventAMBAuthenticationDataWritable",
+    },
+  },
+} as const;
+
 export const EventAMBReceivedWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -68236,6 +68775,9 @@ export const EventSMSBaseWritableSchema = {
     "template_content_hash",
   ],
   properties: {
+    content_type: {
+      $ref: "#/components/schemas/SMSContentType",
+    },
     sms_id: {
       $ref: "#/components/schemas/SMSMessageID",
       description: "ID of the SMS message.",
@@ -68585,10 +69127,16 @@ export const EventSMSReceivedDataWritableSchema = {
           required: ["text"],
         },
         {
+          required: ["subject"],
+        },
+        {
           required: ["media"],
         },
       ],
       properties: {
+        content_type: {
+          $ref: "#/components/schemas/SMSContentType",
+        },
         sms_id: {
           $ref: "#/components/schemas/SMSMessageID",
           description: "ID of the SMS message.",
@@ -68647,6 +69195,11 @@ export const EventSMSReceivedDataWritableSchema = {
         subject: {
           type: "string",
           description: "Subject line. Absent when the message carried none.",
+        },
+        media: {
+          type: "array",
+          description:
+            "Attachments on the message. Omitted when the message carried none.",
         },
       },
     },

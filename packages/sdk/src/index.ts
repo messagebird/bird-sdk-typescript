@@ -245,6 +245,7 @@ export type {
   EmailLookupBatchResponse,
 } from "./resources/lookup.gen.js";
 export type { WhatsappSendParams } from "./resources/whatsapp.js";
+export type { SmsMediaDownload } from "./resources/smsMessages.js";
 export type { WhatsappMedia } from "./resources/whatsappMessages.js";
 export type {
   WhatsAppMessage,

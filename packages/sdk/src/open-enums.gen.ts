@@ -207,6 +207,7 @@ export type AssetReferenceUsageValue = (typeof AssetReferenceUsage)[keyof typeof
  * these with a `default` branch rather than treating the set as closed.
  */
 export const ComplianceDomainProofMethod = {
+  ContactConfirmation: "contact_confirmation",
   MemberLogin: "member_login",
   SsoDomain: "sso_domain",
 } as const;
@@ -221,6 +222,7 @@ export type ComplianceDomainProofMethodValue = (typeof ComplianceDomainProofMeth
  */
 export const ComplianceItemState = {
   Approved: "approved",
+  AwaitingConfirmation: "awaiting_confirmation",
   Expired: "expired",
   InReview: "in_review",
   NotApplicable: "not_applicable",

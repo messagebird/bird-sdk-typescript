@@ -16,7 +16,7 @@ export type EmailTemplatesPreviewParams = NonNullable<GetEmailTemplatePreviewDat
 
 export class EmailTemplatesResourceBase extends Resource {
   /**
-   * List email templates as a cursor page. The list covers both the workspace's own templates and our built-in `system` templates. Filter to one tier with `scope`, and filter further by category, source, theme, or a search across slug, name, and description. A theme narrows the built-in catalog to one of its five visual themes, so naming one returns built-ins alone.
+   * List email templates as a cursor page. The list covers both the workspace's own templates and our built-in `system` templates. Filter to one tier with `scope`, and filter further by category, source, theme, status, or a search across slug, name, and description. `status=active` returns only sendable templates, built-ins included. A theme narrows the built-in catalog to one of its five visual themes, so naming one returns built-ins alone.
    *
    * @example Find the templates a send can name
    * for await (const tpl of bird.email.templates.list({ scope: "workspace" })) {

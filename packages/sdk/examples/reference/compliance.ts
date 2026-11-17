@@ -54,6 +54,13 @@ export async function complianceSubmissionsResupply() {
   console.log(submission.satisfied);
 }
 
+export async function complianceSubmissionsSendContactConfirmation() {
+  const submission = await bird.complianceSubmissions.sendContactConfirmation(
+    "csb_01krdgeqcxet5s7t44vh8rt9mg",
+  );
+  console.log(submission.id);
+}
+
 export async function complianceAttachmentsList() {
   for await (const attachment of bird.complianceAttachments.list()) {
     console.log(attachment.id, attachment.filename, attachment.status);

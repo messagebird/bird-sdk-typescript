@@ -40,6 +40,9 @@ import type {
   CancelWorkspaceNumberData,
   CancelWorkspaceNumberErrors,
   CancelWorkspaceNumberResponses,
+  CreateAmbAuthenticationData,
+  CreateAmbAuthenticationErrors,
+  CreateAmbAuthenticationResponses,
   CreateAmbBusinessAccountData,
   CreateAmbBusinessAccountErrors,
   CreateAmbBusinessAccountResponses,
@@ -376,6 +379,9 @@ import type {
   DuplicateWhatsAppTemplateData,
   DuplicateWhatsAppTemplateErrors,
   DuplicateWhatsAppTemplateResponses,
+  GetAmbAuthenticationData,
+  GetAmbAuthenticationErrors,
+  GetAmbAuthenticationResponses,
   GetAmbBusinessAccountData,
   GetAmbBusinessAccountErrors,
   GetAmbBusinessAccountResponses,
@@ -726,6 +732,8 @@ import type {
   GetSmsKeywordRuleResponses,
   GetSmsMessageData,
   GetSmsMessageErrors,
+  GetSmsMessageMediaData,
+  GetSmsMessageMediaErrors,
   GetSmsMessageResponses,
   GetSmsStatsByCarrierData,
   GetSmsStatsByCarrierErrors,
@@ -1256,6 +1264,9 @@ import type {
   SendWhatsAppReadReceiptData,
   SendWhatsAppReadReceiptErrors,
   SendWhatsAppReadReceiptResponses,
+  SendWorkspaceComplianceSubmissionContactConfirmationData,
+  SendWorkspaceComplianceSubmissionContactConfirmationErrors,
+  SendWorkspaceComplianceSubmissionContactConfirmationResponses,
   SubmitEmailTemplateVersionData,
   SubmitEmailTemplateVersionErrors,
   SubmitEmailTemplateVersionResponses,
@@ -3781,21 +3792,23 @@ export const listSmsMessages = <ThrowOnError extends boolean = false>(
 /**
  * Create an SMS message
  *
- * Sends one SMS to one recipient with exactly one content form: `text`, which
- * requires `category` and `from`, or a stored `template`, which supplies its
- * category. A workspace template requires `from`, while a built-in template
- * selects its sender. To submit up to 100 independent messages in one request, use
- * [Send a batch of SMS messages](/docs/api/reference/create-sms-message-batch)
- * instead.
+ * Sends one SMS or MMS to one recipient. Direct sends require `text` or
+ * `media_urls`, plus `category` and `from`. A nonempty `subject` or `media_urls`
+ * selects MMS, which requires a recipient with calling code `+1` and an
+ * MMS-capable number held by the workspace. A subject alone is invalid.
+ * Stored templates remain text-only: they supply the category; workspace
+ * templates require `from`, while built-in templates select their sender.
+ * For up to 100 messages, use [Send a batch](/docs/api/reference/create-sms-message-batch).
  *
- * The `202 Accepted` response means the API durably accepted the message for
- * asynchronous delivery. Delivery remains pending; follow it with
- * [Get an SMS message](/docs/api/reference/get-sms-message) or by subscribing
- * to `sms.*` webhook events.
+ * The `202 Accepted` response confirms acceptance for asynchronous delivery.
+ * Follow [Get an SMS message](/docs/api/reference/get-sms-message) or `sms.*`
+ * webhook events for delivery status. SMS is billed per segment; MMS uses one
+ * message unit and separate MMS rates. Media must remain publicly fetchable;
+ * the carrier's 600 KiB per-file and 900 KiB total limits are checked during delivery.
  *
- * An invalid field, more than 12 segments, a disabled destination country, or
- * a sender not permitted for the destination returns `422`. Insufficient
- * wallet balance returns `402`.
+ * Invalid content, SMS exceeding 12 segments, a disabled destination country,
+ * or a sender not permitted for the destination returns `422`.
+ * Insufficient wallet balance returns `402`.
  *
  */
 export const createSmsMessage = <ThrowOnError extends boolean = false>(
@@ -3829,10 +3842,14 @@ export const createSmsMessage = <ThrowOnError extends boolean = false>(
 /**
  * Create a batch of SMS messages
  *
- * Sends up to 100 independent SMS messages in one request. Each item is a
+ * Sends up to 100 independent SMS or MMS messages in one request. Each item is a
  * complete send request with its own recipient, content, ID, status, and
  * cost. For a single message, use
  * [Send an SMS message](/docs/api/reference/create-sms-message) instead.
+ *
+ * A nonempty `subject` or `media_urls` selects MMS for that item. MMS requires
+ * text or media, a `+1` recipient and an MMS-capable number held by the workspace;
+ * it uses one message unit at MMS rates. Templates remain text-only.
  *
  * Acceptance is all-or-nothing: every item is validated before any is queued,
  * and one invalid item rejects the whole batch with a `422` (nothing is
@@ -3921,6 +3938,51 @@ export const listSmsMessageEvents = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/sms/messages/{message_id}/events",
+    ...options,
+  });
+
+/**
+ * Get an SMS message's media
+ *
+ * Redirects to a short-lived URL for one attachment on a received MMS. This
+ * endpoint is what the `url` on an entry of the message's `media` points at.
+ * The bytes live in object storage and are served straight from there, so they
+ * never transit the API.
+ *
+ * The response is a `302` whose `Location` is that pre-authorized storage URL,
+ * valid for 15 minutes; your client must follow redirects. The `Authorization`
+ * header must be absent from the request that fetches that URL.
+ *
+ * The `sms.received` webhook can arrive before the message is readable. If
+ * this operation returns `404` immediately after that event, retry the same
+ * message and media IDs with exponential backoff and a retry deadline. Retain
+ * the event for later investigation if the deadline is reached; a `404` alone
+ * does not distinguish a delayed message from a missing one.
+ *
+ * An attachment is kept for 30 days after the message is received. A `410`
+ * means the stored file is gone while the message is still readable: the
+ * message still lists the attachment's `mime_type` and `filename`, but the
+ * bytes cannot be served. Once the message itself expires this operation
+ * returns `404`.
+ *
+ */
+export const getSmsMessageMedia = <ThrowOnError extends boolean = false>(
+  options: Options<GetSmsMessageMediaData, ThrowOnError>,
+): RequestResult<unknown, GetSmsMessageMediaErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    unknown,
+    GetSmsMessageMediaErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/sms/messages/{message_id}/media/{media_id}",
     ...options,
   });
 
@@ -5387,8 +5449,9 @@ export const getWorkspaceComplianceSubmission = <
 /**
  * Update compliance answers
  *
- * Replaces rejected, expired, or missing answers on an existing submission. Accepted answers
- * normally cannot be changed and should be omitted.
+ * Replaces rejected, expired, or missing answers on an existing submission, and a business
+ * contact still `awaiting_confirmation`. Accepted answers normally cannot be changed and should
+ * be omitted.
  *
  * A number, emergency calling service, business identity or SMS sender registration accepts changes to any answer until its submission is approved, including
  * answers awaiting review or already accepted; read `answers_editable` on the requirements. Each
@@ -5437,6 +5500,46 @@ export const updateWorkspaceComplianceSubmission = <
       "Content-Type": "application/json",
       ...options.headers,
     },
+  });
+
+/**
+ * Send the contact's confirmation link again
+ *
+ * Emails the business contact of a business verification a new confirmation link, for a
+ * submission whose `contact_email` is `awaiting_confirmation`. The previous link stops working.
+ * To use another address, resupply `contact_email` instead; that sends a link to the new
+ * address.
+ *
+ * Returns `409 Conflict` when the submission is not waiting for its contact to confirm.
+ *
+ */
+export const sendWorkspaceComplianceSubmissionContactConfirmation = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<
+    SendWorkspaceComplianceSubmissionContactConfirmationData,
+    ThrowOnError
+  >,
+): RequestResult<
+  SendWorkspaceComplianceSubmissionContactConfirmationResponses,
+  SendWorkspaceComplianceSubmissionContactConfirmationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    SendWorkspaceComplianceSubmissionContactConfirmationResponses,
+    SendWorkspaceComplianceSubmissionContactConfirmationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/compliance/submissions/{submission_id}/contact-confirmation",
+    ...options,
   });
 
 /**
@@ -9760,6 +9863,66 @@ export const updateAmbConversation = <ThrowOnError extends boolean = false>(
   });
 
 /**
+ * Request conversation authentication
+ *
+ * Sends a native sign-in request to an open conversation whose device advertises `AUTH2`. The business needs an enabled authentication provider. The request expires after ten minutes. Bird validates the provider's response and waits for confirmation from the originating Messages device before storing the verified identity with the conversation. The customer's tokens are never stored or returned. A new request supersedes an unfinished one in the same conversation, including when the new request then fails to send. Reusing an idempotency key returns the original request. The outcome arrives as a webhook event. Read the request to recover a missing event.
+ *
+ */
+export const createAmbAuthentication = <ThrowOnError extends boolean = false>(
+  options: Options<CreateAmbAuthenticationData, ThrowOnError>,
+): RequestResult<
+  CreateAmbAuthenticationResponses,
+  CreateAmbAuthenticationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CreateAmbAuthenticationResponses,
+    CreateAmbAuthenticationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/conversations/{conversation_id}/authentications",
+    ...options,
+  });
+
+/**
+ * Get an authentication request
+ *
+ * Returns one authentication request with its current status. A request that succeeded includes the verified identity. Read it to recover the outcome when the webhook event for the request was not received.
+ *
+ */
+export const getAmbAuthentication = <ThrowOnError extends boolean = false>(
+  options: Options<GetAmbAuthenticationData, ThrowOnError>,
+): RequestResult<
+  GetAmbAuthenticationResponses,
+  GetAmbAuthenticationErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAmbAuthenticationResponses,
+    GetAmbAuthenticationErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/amb/conversations/{conversation_id}/authentications/{authentication_id}",
+    ...options,
+  });
+
+/**
  * List messages in a conversation
  *
  * Returns the messages in a conversation, newest first, both received and
@@ -13137,8 +13300,9 @@ export const getEmailCompetitiveVolumeSeries = <
  * workspace's own templates come first, newest first, and our built-in templates fill the rest of
  * the list once the workspace's templates run out.
  *
- * Filter further by category or authoring format, or search with `q`, a case-insensitive substring
- * match against the template's slug, name, and description.
+ * Filter further by category, authoring format or `status`, or search with `q`, a case-insensitive
+ * substring match against the template's slug, name, and description. Use `status=active` to list
+ * only the templates a send can use.
  *
  * Our built-in templates come in five visual themes. Each theme ships its own set of eight
  * emails, and the sets overlap only partly. Use `theme` to see one of them. A template your
