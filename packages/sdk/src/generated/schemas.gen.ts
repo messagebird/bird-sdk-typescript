@@ -9024,7 +9024,7 @@ export const EmailBroadcastParameterProblemCodeSchema = {
   type: "string",
   minLength: 1,
   description:
-    "What a broadcast input diagnostic found.\n\n- `parameter_json_invalid`: the request body or an input map is not valid JSON.\n- `parameter_map_invalid`: `template.parameters` or `template.parameter_overrides` is not a JSON object of input names.\n- `parameter_name_invalid`: an input name is not a bare name outside the `bird` namespace.\n- `parameter_value_unsupported`: an input value is an object or a list. Values must be a string, number, boolean or null.\n- `parameter_duplicate_key`: an input name, or two spellings of one language tag, appears twice.\n- `parameter_bytes_exceeded`: an input map is larger than 16384 UTF-8 bytes.\n- `parameter_names_exceeded`: `template.parameters` and every language together hold more than 128 distinct names.\n- `parameter_depth_exceeded`: an input value is nested too deeply.\n- `parameter_language_invalid`: a `template.parameter_overrides` key is not a valid BCP-47 language tag.\n- `parameter_required`: the template or envelope uses an input that has no value.\n- `sensitive_input_unsupported`: the template uses an input it marks sensitive, which a broadcast cannot supply.\n- `render_profile_unsupported`: the template uses a Liquid operation that rendering with broadcast inputs does not support.\n- `rendered_envelope_invalid`: the rendered subject, sender name, reply-to addresses or a header is not valid for an email, for example because it contains a line break.\n- `contact_property_unknown`: the template reads a contact property this workspace has not defined.\n- `template_unavailable`: the broadcast has no template, or its template no longer exists or has no published version.\n- `language_unavailable`: the published version has no content in the selected language.\n- `sender_unavailable`: the broadcast cannot send from its `from` address or IP pool.\n- `audience_unavailable`: the broadcast's audience cannot be used for this send.\n- `recipient_render_failed`: content could not be rendered for a recipient while the broadcast was sending.\n- `render_budget_exceeded`: rendering went over a limit, named by `budget` with its `limit`.\n- `transport_missing`: the saved content of a prepared broadcast is unavailable. Contact Bird support.\n- `transport_invalid`: the saved content of a prepared broadcast no longer matches what was prepared. Contact Bird support.\n",
+    "What a broadcast input diagnostic found.\n\n- `parameter_json_invalid`: the request body or an input map is not valid JSON.\n- `parameter_map_invalid`: `template.parameters` or `template.parameter_overrides` is not a JSON object of input names.\n- `parameter_name_invalid`: an input name is not a bare name outside the `bird` namespace.\n- `parameter_value_unsupported`: an input value is an object or a list. Values must be a string, number, boolean or null.\n- `parameter_duplicate_key`: an input name, or two spellings of one language tag, appears twice.\n- `parameter_bytes_exceeded`: an input map is larger than 16384 UTF-8 bytes.\n- `parameter_names_exceeded`: `template.parameters` and every language together hold more than 128 distinct names.\n- `parameter_depth_exceeded`: an input value is nested too deeply.\n- `parameter_language_invalid`: a `template.parameter_overrides` key is not a valid BCP-47 language tag.\n- `parameter_required`: the template or envelope uses an input that has no value.\n- `sensitive_input_unsupported`: the template uses an input it marks sensitive, which a broadcast cannot supply.\n- `render_profile_unsupported`: the template uses a Liquid operation that rendering with broadcast inputs does not support.\n- `rendered_envelope_invalid`: the rendered subject, sender name, reply-to addresses or a header is not valid for an email, for example because it contains a line break.\n- `contact_property_unknown`: the template reads a contact property this workspace has not defined.\n- `template_unavailable`: the broadcast has no template, or its template no longer exists or has no published version.\n- `language_unavailable`: the published version has no content in the selected language.\n- `sender_unavailable`: the broadcast cannot send from its `from` address or IP pool.\n- `brand_unavailable`: the saved Brand is archived or unavailable for selection. Preview with an available Brand override before sending a test.\n- `audience_unavailable`: the broadcast's audience cannot be used for this send.\n- `recipient_render_failed`: content could not be rendered for a recipient while the broadcast was sending.\n- `render_budget_exceeded`: rendering went over a limit, named by `budget` with its `limit`.\n- `transport_missing`: the saved content of a prepared broadcast is unavailable. Contact Bird support.\n- `transport_invalid`: the saved content of a prepared broadcast no longer matches what was prepared. Contact Bird support.\n",
   "x-extensible-enum": [
     "parameter_json_invalid",
     "parameter_map_invalid",
@@ -9044,6 +9044,7 @@ export const EmailBroadcastParameterProblemCodeSchema = {
     "language_unavailable",
     "sender_unavailable",
     "audience_unavailable",
+    "brand_unavailable",
     "recipient_render_failed",
     "render_budget_exceeded",
     "transport_missing",
@@ -9496,6 +9497,19 @@ export const EmailBroadcastSchema = {
       description:
         "Why the broadcast failed, when it could not prepare or render its template inputs. A failed broadcast cannot be updated or sent again. Correct the input or template that `pointer` and `problems` name, then create a new broadcast with the corrected inputs and send it. When `code` is `transport_missing` or `transport_invalid`, the broadcast's saved content cannot be used and changing an input does not fix it, so contact Bird support.\n\nAbsent when the broadcast did not fail this way. Returned on a single broadcast read and on the broadcast that creating, updating, sending, resuming or canceling one returns, and absent from the list.\n",
     },
+    brand_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      readOnly: true,
+      description:
+        "The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.",
+    },
   },
   example: {
     id: "eb_01krdgeqcxet5s7t44vh8rt9mg",
@@ -9666,6 +9680,18 @@ export const EmailBroadcastCreateRequestSchema = {
       description:
         "When to send the broadcast. It has to be at least 30 seconds and at most 365 days from now. It requires `send` to be true, so a `scheduled_at` on its own is refused rather than saved on the draft.\n",
     },
+    brand_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Preview: selects the business whose email preferences and unsubscribe page apply. Explicit selection returns `422` when unavailable. When available, omission or null selects the workspace's default Brand when the broadcast is first scheduled or sent. An explicit ID must belong to this workspace and be active; unknown, foreign or archived IDs return `422`. The selected Brand stays fixed through delivery and retries. Omitted or null input preserves existing sending behavior while selection is unavailable.",
+    },
   },
   example: {
     from: "newsletter@acme.com",
@@ -9800,6 +9826,18 @@ export const EmailBroadcastUpdateRequestSchema = {
       enum: ["marketing", "transactional"],
       description:
         "What kind of email this is. It decides two things: which suppressions apply, and whether we add an unsubscribe header.\n\n`marketing` is held back from every suppressed address and has the one-click unsubscribe headers. `transactional` still goes to addresses suppressed for a complaint or an unsubscribe, and has no unsubscribe header. Only use `transactional` for genuine operational mail such as a terms-of-service update or a service outage notice. Marketing content sent this way reaches people who have already unsubscribed from you.\n",
+    },
+    brand_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Preview: changes the business whose email preferences and unsubscribe page apply while this broadcast is a draft. Omission keeps the selection; null clears it so the workspace's default Brand is selected at first scheduling or sending. Explicit selection returns `422` when unavailable or when the ID is unknown, belongs to another workspace or is archived. Changing the Brand on a scheduled broadcast returns `422`. Broadcasts that are no longer editable retain the existing `409` conflict response.",
     },
   },
   example: {
@@ -10138,6 +10176,18 @@ export const EmailBroadcastInputOverridesSchema = {
       description:
         "Replaces the custom headers for this request rather than adding to them. Up to 25 of them, each value up to 998 characters. The header rules for updating a broadcast apply.\n",
     },
+    brand_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Preview Brand selection. An explicit ID is unavailable until selection is enabled. Changes the Brand for this validation, preview or test only, without changing the saved broadcast. Null resolves the workspace default when selection is enabled; otherwise it clears the request's Brand to unbranded. Omission keeps a historical broadcast's saved identity. An unavailable saved Brand remains renderable with a brand_unavailable diagnostic. Before sending a test, preview again with an available ID or null, then send the same override and fresh preview_fingerprint. Explicit unavailable overrides return 422.",
+    },
   },
 } as const;
 
@@ -10151,6 +10201,9 @@ export const EmailBroadcastValidationRequestSchema = {
     },
   ],
   unevaluatedProperties: false,
+  example: {
+    from: "newsletter@acme.com",
+  },
 } as const;
 
 export const EmailBroadcastResolutionSchema = {
@@ -10206,7 +10259,7 @@ export const EmailBroadcastValidationResultSchema = {
     ready_for_admission: {
       type: "boolean",
       description:
-        "Whether the current template and supplied broadcast inputs pass validation, including checks that the sender and audience can be used. Sending also checks permissions, limits, the audience's recipients and their values, so `true` does not guarantee the broadcast sends.",
+        "Whether the current template and supplied broadcast inputs pass validation, including checks that the sender, audience and selected Brand can be used. Sending also checks permissions, limits, the audience's recipients and their values, so `true` does not guarantee the broadcast sends.",
     },
     resolution: {
       $ref: "#/components/schemas/EmailBroadcastResolution",
@@ -10272,6 +10325,9 @@ export const EmailBroadcastPreviewRequestSchema = {
     },
   ],
   unevaluatedProperties: false,
+  example: {
+    contact_id: "con_01krdgeqcxet5s7t44vh8rt9mg",
+  },
 } as const;
 
 export const EmailBroadcastResolvedParametersSchema = {
@@ -10389,6 +10445,11 @@ export const EmailBroadcastTestRequestSchema = {
     },
   ],
   unevaluatedProperties: false,
+  example: {
+    contact_id: "con_01krdgeqcxet5s7t44vh8rt9mg",
+    to: "member@example.com",
+    preview_fingerprint: "fingerprint_from_matching_preview",
+  },
 } as const;
 
 export const EmailBroadcastTestResultSchema = {
@@ -10967,7 +11028,7 @@ export const PreferenceOriginSchema = {
   type: "string",
   minLength: 1,
   description:
-    "How the statement was made. Statements the person made themselves (`unsubscribe_link`, `unsubscribe_event`, `keyword`, `preference_page`) carry more weight than ones asserted on their behalf (`api_key`, `user`, `import`): a person's own opt-out cannot be overridden or deleted through this API. New origins can be added over time, so a value outside this list can be returned.",
+    "How the statement was made. Statements the person made themselves (`unsubscribe_link`, `unsubscribe_event`, `keyword`, `preference_page`, `complaint`) carry more weight than ones asserted on their behalf (`api_key`, `user`, `import`): deletion cannot remove a person's own opt-out. A Brand complaint can be cleared only by a newer opt-in through the individual-recipient preference operation. New origins can be added over time, so a value outside this list can be returned.",
   "x-extensible-enum": [
     "unsubscribe_link",
     "unsubscribe_event",
@@ -10976,13 +11037,14 @@ export const PreferenceOriginSchema = {
     "api_key",
     "user",
     "import",
+    "complaint",
   ],
   example: "api_key",
 } as const;
 
 export const PreferenceSchema = {
   description:
-    "One person's current stated preference for one channel: whether they have consented to or opted out of receiving messages at a handle, and how much traffic the statement covers. A key holds one current statement (a newer statement replaces it, an older one is refused), and the full history behind the current state is kept internally. `sender_scope` and `topic_id` are part of the key: a preference with both null applies channel-wide.\n",
+    "One person's current stated preference for one channel: whether they have consented to or opted out of receiving messages at a handle, and how much traffic the statement covers. A key holds one current statement (a newer statement replaces it, an older one is refused), and the full history behind the current state is kept internally. `sender_scope` and `topic_id` are part of the key: a preference with both null applies to the selected email Brand, or channel-wide for other channels.\n",
   allOf: [
     {
       type: "object",
@@ -11023,7 +11085,7 @@ export const PreferenceSchema = {
           type: ["string", "null"],
           readOnly: true,
           description:
-            "The sender the statement is limited to, or null when it covers the whole channel. On SMS this is the originator the person replied to; on WhatsApp it identifies the business account that messaged them; on Apple Messages for Business it is the Apple business ID used for invitations. Email preferences are always channel-wide, so it is always null there.",
+            "The sender the statement is limited to, or null when it covers the whole channel. On SMS this is the originator the person replied to; on WhatsApp it identifies the business account that messaged them; on Apple Messages for Business it is the Apple business ID used for invitations. Email preferences use brand_id instead, so sender_scope is always null there.",
           example: "+15557654321",
         },
         topic_id: {
@@ -11093,6 +11155,20 @@ export const PreferenceSchema = {
           description:
             "The contact whose handle matched when the statement was recorded. Null when no contact matched at that moment; it is not updated when contacts change later.",
         },
+        brand_id: {
+          oneOf: [
+            {
+              $ref: "#/components/schemas/BrandID",
+            },
+            {
+              type: "null",
+            },
+          ],
+          readOnly: true,
+          example: null,
+          description:
+            "The business this email preference belongs to. Brand attribution is in preview.",
+        },
       },
     },
     {
@@ -11147,7 +11223,7 @@ export const PreferenceStatementSchema = {
       minLength: 1,
       maxLength: 255,
       description:
-        "Limit the statement to one sender instead of the whole channel. On SMS this is the originator; on WhatsApp it identifies the business account; on Apple Messages for Business it is the Apple business ID used for invitations. Not supported on email, where preferences are always channel-wide.",
+        "Limit the statement to one sender instead of the whole channel. On SMS this is the originator; on WhatsApp it identifies the business account; on Apple Messages for Business it is the Apple business ID used for invitations. Not supported on email, where preferences belong to the selected Brand.",
       example: "+15557654321",
     },
     source: {
@@ -11155,7 +11231,7 @@ export const PreferenceStatementSchema = {
       minLength: 1,
       maxLength: 255,
       description:
-        "Free-form note on where the statement came from: a form name, an import batch, a campaign. Stored verbatim and returned on the preference.",
+        "Free-form note on where the statement came from: a form name, an import batch, a campaign. For a grant, it can describe how you collected consent. Stored verbatim and returned on the preference; Bird does not verify this note. It does not grant permission to clear a complaint.",
       example: "signup-form-v2",
     },
     consented_at: {
@@ -11164,12 +11240,24 @@ export const PreferenceStatementSchema = {
       description:
         "When the person consented, on a `granted` statement. Required evidence when granting over a stored opt-out: the grant applies only if this is later than the opt-out it reverses. May not be in the future.",
     },
+    brand_id: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "Brand selection is in preview. Select the business for an email preference. Omitted or null selects the original business. Unsupported on other channels. An additional Brand supports non_transactional coverage only. Explicit selection returns 422 when unavailable. Existing opt-outs can be recorded for archived Brands; grants to archived Brands return 422. Consent grants for active additional Brands return 422 when unavailable. A Brand not found in this workspace returns 404.",
+    },
   },
 } as const;
 
-export const PreferenceCreateSchema = {
+export const PreferenceIndividualCreateSchema = {
   description:
-    "Records one preference statement for a handle. Writing is an upsert by key (channel, handle, sender scope, and topic), and statements are causally ordered: a statement dated older than the key's current one is refused and returned with `applied: false` rather than applied out of order.\n",
+    "Records one recipient's preference. For email, a granted statement with consented_at strictly later than a Brand complaint can clear that complaint. Bulk writes and imports cannot clear complaints. Other applicable opt-outs and delivery blocks still apply.",
   allOf: [
     {
       type: "object",
@@ -11189,6 +11277,7 @@ export const PreferenceCreateSchema = {
       $ref: "#/components/schemas/PreferenceStatement",
     },
   ],
+  unevaluatedProperties: false,
 } as const;
 
 export const PreferenceTransitionIDSchema = {
@@ -11202,14 +11291,14 @@ export const PreferenceWriteResultSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "The outcome of one preference write or delete. `applied: true` means the request took effect: either it changed the record, or an identical statement already had. `applied: false` means it was refused as older than the key's current statement; `preference` then carries the statement that survived, and `transition_id` identifies the refusal on the key's record.\n",
+    "The outcome of one preference write or delete. `applied: true` means the request took effect, including an identical repeat. `applied: false` means it was refused because a newer statement or protected complaint survives; `preference` carries the statement that survived, and `transition_id` identifies the operation on the key's record.\n",
   required: ["applied", "transition_id", "preference"],
   properties: {
     applied: {
       type: "boolean",
       readOnly: true,
       description:
-        "Whether the request took effect. False only when it was refused as out of order; the surviving, newer statement is returned in `preference`.",
+        "Whether the request took effect. False when causal ordering or protected complaint rules refuse the request; the surviving statement is returned in `preference`. A grant returns false when a newer opt-out or deletion survives, even if its consent history is retained.",
     },
     transition_id: {
       oneOf: [
@@ -11235,7 +11324,7 @@ export const PreferenceWriteResultSchema = {
       ],
       readOnly: true,
       description:
-        "The key's surviving statement. Null after an applied delete, when the key is back to having no record.",
+        "The key's surviving statement. Null after an applied delete, when the key is back to having no record. It is also null after a refused grant when a later deletion remains in force.",
     },
   },
 } as const;
@@ -47640,6 +47729,19 @@ export const EventPreferenceBaseSchema = {
       ],
       description:
         "The contact whose handle matched when the statement was recorded. Null when no contact matched at that moment.",
+    },
+    brand_id: {
+      example: null,
+      oneOf: [
+        {
+          $ref: "#/components/schemas/BrandID",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description:
+        "The business this email preference belongs to. Brand attribution is in preview.",
     },
   },
 } as const;

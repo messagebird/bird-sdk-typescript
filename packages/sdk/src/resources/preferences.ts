@@ -7,7 +7,7 @@
 
 import { createPreference, deletePreference } from "../generated/sdk.gen.js";
 import type {
-  PreferenceCreate,
+  PreferenceIndividualCreate,
   PreferenceWriteResult,
 } from "../generated/types.gen.js";
 import { PreferencesResourceBase } from "./preferences.gen.js";
@@ -21,7 +21,7 @@ export type { PreferenceWriteResult };
  * relaxation, accepting a `Date` (serialized with `toISOString()`) alongside
  * the wire's RFC 3339 string.
  */
-export type PreferenceCreateParams = Omit<PreferenceCreate, "consented_at"> & {
+export type PreferenceCreateParams = Omit<PreferenceIndividualCreate, "consented_at"> & {
   /**
    * When the person consented, on a `granted` statement. Required evidence
    * when granting over a stored opt-out: the grant applies only if this is
@@ -36,8 +36,13 @@ export class PreferencesResource extends PreferencesResourceBase {
    * one channel. Writing is an upsert by key (channel, handle, and optional
    * sender scope): statements are causally ordered, so one dated older than
    * the key's current statement is refused and returned with `applied:
-   * false` rather than applied out of order. A `201` (the key had no record)
-   * and a `200` (the key already had one) return the same shape either way.
+   * false` rather than applied out of order. Complaint protection can also
+   * refuse a grant. A `201` creates a live record; `200` covers updates and
+   * refusals. A newer opt-out or deletion returns `applied: false` with the
+   * revoked `preference` or null, even when consent history is retained.
+   * Only this individual operation can clear an email Brand complaint with
+   * newer consented_at; bulk writes and imports cannot. Other opt-outs and
+   * delivery blocks still apply. source can describe how you collected consent.
    *
    * @example Record a stated opt-out
    * const result = await bird.preferences.create({
@@ -52,7 +57,7 @@ export class PreferencesResource extends PreferencesResourceBase {
     options?: RequestOptions,
   ): APIPromise<PreferenceWriteResult> {
     const { consented_at, ...rest } = params;
-    const body: PreferenceCreate =
+    const body: PreferenceIndividualCreate =
       consented_at === undefined
         ? rest
         : {
@@ -70,10 +75,9 @@ export class PreferencesResource extends PreferencesResourceBase {
    * Delete a preference, returning its key to having no record. Never void:
    * the delete is ordered like any statement, so a `200` with `applied:
    * false` means a newer statement survived and is returned in `preference`
-   * rather than deleted. A statement the person made themselves — an
-   * unsubscribe link, a stop keyword — cannot be deleted this way; record a
-   * `granted` statement with `consented_at` evidence to restore messaging
-   * instead.
+   * rather than deleted. Recipient-origin opt-outs and active Brand complaints
+   * cannot be deleted (`422 E25005`). Only individual opt-in with newer
+   * `consented_at` can clear a Brand complaint; other blocks still apply.
    *
    * @example Delete a preference
    * const result = await bird.preferences.delete("prf_01krdgeqcxet5s7t44vh8rt9mg");

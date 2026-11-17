@@ -5125,6 +5125,7 @@ export type EmailBroadcastFundingHold = {
  * - `template_unavailable`: the broadcast has no template, or its template no longer exists or has no published version.
  * - `language_unavailable`: the published version has no content in the selected language.
  * - `sender_unavailable`: the broadcast cannot send from its `from` address or IP pool.
+ * - `brand_unavailable`: the saved Brand is archived or unavailable for selection. Preview with an available Brand override before sending a test.
  * - `audience_unavailable`: the broadcast's audience cannot be used for this send.
  * - `recipient_render_failed`: content could not be rendered for a recipient while the broadcast was sending.
  * - `render_budget_exceeded`: rendering went over a limit, named by `budget` with its `limit`.
@@ -5151,6 +5152,7 @@ export type EmailBroadcastParameterProblemCode =
   | "language_unavailable"
   | "sender_unavailable"
   | "audience_unavailable"
+  | "brand_unavailable"
   | "recipient_render_failed"
   | "render_budget_exceeded"
   | "transport_missing"
@@ -5433,6 +5435,10 @@ export type EmailBroadcast = {
    *
    */
   readonly failure_parameters?: EmailBroadcastFailureParameters;
+  /**
+   * The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.
+   */
+  readonly brand_id?: BrandId | null;
 };
 
 export type EmailBroadcastList = {
@@ -5534,6 +5540,10 @@ export type EmailBroadcastCreateRequest = {
    *
    */
   scheduled_at?: string;
+  /**
+   * Preview: selects the business whose email preferences and unsubscribe page apply. Explicit selection returns `422` when unavailable. When available, omission or null selects the workspace's default Brand when the broadcast is first scheduled or sent. An explicit ID must belong to this workspace and be active; unknown, foreign or archived IDs return `422`. The selected Brand stays fixed through delivery and retries. Omitted or null input preserves existing sending behavior while selection is unavailable.
+   */
+  brand_id?: BrandId | null;
 };
 
 /**
@@ -5611,6 +5621,10 @@ export type EmailBroadcastUpdateRequest = {
    *
    */
   category?: "marketing" | "transactional";
+  /**
+   * Preview: changes the business whose email preferences and unsubscribe page apply while this broadcast is a draft. Omission keeps the selection; null clears it so the workspace's default Brand is selected at first scheduling or sending. Explicit selection returns `422` when unavailable or when the ID is unknown, belongs to another workspace or is archived. Changing the Brand on a scheduled broadcast returns `422`. Broadcasts that are no longer editable retain the existing `409` conflict response.
+   */
+  brand_id?: BrandId | null;
 };
 
 /**
@@ -5829,6 +5843,10 @@ export type EmailBroadcastInputOverrides = {
    *
    */
   headers?: EmailBroadcastHeaders;
+  /**
+   * Preview Brand selection. An explicit ID is unavailable until selection is enabled. Changes the Brand for this validation, preview or test only, without changing the saved broadcast. Null resolves the workspace default when selection is enabled; otherwise it clears the request's Brand to unbranded. Omission keeps a historical broadcast's saved identity. An unavailable saved Brand remains renderable with a brand_unavailable diagnostic. Before sending a test, preview again with an available ID or null, then send the same override and fresh preview_fingerprint. Explicit unavailable overrides return 422.
+   */
+  brand_id?: BrandId | null;
 };
 
 /**
@@ -5873,7 +5891,7 @@ export type EmailBroadcastResolution = {
  */
 export type EmailBroadcastValidationResult = {
   /**
-   * Whether the current template and supplied broadcast inputs pass validation, including checks that the sender and audience can be used. Sending also checks permissions, limits, the audience's recipients and their values, so `true` does not guarantee the broadcast sends.
+   * Whether the current template and supplied broadcast inputs pass validation, including checks that the sender, audience and selected Brand can be used. Sending also checks permissions, limits, the audience's recipients and their values, so `true` does not guarantee the broadcast sends.
    */
   ready_for_admission: boolean;
   /**
@@ -6296,7 +6314,7 @@ export type PreferenceStatus = "granted" | "revoked";
 export type PreferenceCoverage = "all" | "non_transactional";
 
 /**
- * How the statement was made. Statements the person made themselves (`unsubscribe_link`, `unsubscribe_event`, `keyword`, `preference_page`) carry more weight than ones asserted on their behalf (`api_key`, `user`, `import`): a person's own opt-out cannot be overridden or deleted through this API. New origins can be added over time, so a value outside this list can be returned.
+ * How the statement was made. Statements the person made themselves (`unsubscribe_link`, `unsubscribe_event`, `keyword`, `preference_page`, `complaint`) carry more weight than ones asserted on their behalf (`api_key`, `user`, `import`): deletion cannot remove a person's own opt-out. A Brand complaint can be cleared only by a newer opt-in through the individual-recipient preference operation. New origins can be added over time, so a value outside this list can be returned.
  */
 export type PreferenceOrigin =
   | "unsubscribe_link"
@@ -6306,10 +6324,11 @@ export type PreferenceOrigin =
   | "api_key"
   | "user"
   | "import"
+  | "complaint"
   | (string & {});
 
 /**
- * One person's current stated preference for one channel: whether they have consented to or opted out of receiving messages at a handle, and how much traffic the statement covers. A key holds one current statement (a newer statement replaces it, an older one is refused), and the full history behind the current state is kept internally. `sender_scope` and `topic_id` are part of the key: a preference with both null applies channel-wide.
+ * One person's current stated preference for one channel: whether they have consented to or opted out of receiving messages at a handle, and how much traffic the statement covers. A key holds one current statement (a newer statement replaces it, an older one is refused), and the full history behind the current state is kept internally. `sender_scope` and `topic_id` are part of the key: a preference with both null applies to the selected email Brand, or channel-wide for other channels.
  *
  */
 export type Preference = {
@@ -6320,7 +6339,7 @@ export type Preference = {
    */
   readonly handle: string;
   /**
-   * The sender the statement is limited to, or null when it covers the whole channel. On SMS this is the originator the person replied to; on WhatsApp it identifies the business account that messaged them; on Apple Messages for Business it is the Apple business ID used for invitations. Email preferences are always channel-wide, so it is always null there.
+   * The sender the statement is limited to, or null when it covers the whole channel. On SMS this is the originator the person replied to; on WhatsApp it identifies the business account that messaged them; on Apple Messages for Business it is the Apple business ID used for invitations. Email preferences use brand_id instead, so sender_scope is always null there.
    */
   readonly sender_scope: string | null;
   /**
@@ -6346,6 +6365,10 @@ export type Preference = {
    * The contact whose handle matched when the statement was recorded. Null when no contact matched at that moment; it is not updated when contacts change later.
    */
   readonly contact_id?: ContactId | null;
+  /**
+   * The business this email preference belongs to. Brand attribution is in preview.
+   */
+  readonly brand_id?: BrandId | null;
 } & Timestamps;
 
 export type PreferenceList = {
@@ -6363,24 +6386,27 @@ export type PreferenceStatement = {
    */
   coverage?: PreferenceCoverage;
   /**
-   * Limit the statement to one sender instead of the whole channel. On SMS this is the originator; on WhatsApp it identifies the business account; on Apple Messages for Business it is the Apple business ID used for invitations. Not supported on email, where preferences are always channel-wide.
+   * Limit the statement to one sender instead of the whole channel. On SMS this is the originator; on WhatsApp it identifies the business account; on Apple Messages for Business it is the Apple business ID used for invitations. Not supported on email, where preferences belong to the selected Brand.
    */
   sender_scope?: string;
   /**
-   * Free-form note on where the statement came from: a form name, an import batch, a campaign. Stored verbatim and returned on the preference.
+   * Free-form note on where the statement came from: a form name, an import batch, a campaign. For a grant, it can describe how you collected consent. Stored verbatim and returned on the preference; Bird does not verify this note. It does not grant permission to clear a complaint.
    */
   source?: string;
   /**
    * When the person consented, on a `granted` statement. Required evidence when granting over a stored opt-out: the grant applies only if this is later than the opt-out it reverses. May not be in the future.
    */
   consented_at?: string;
+  /**
+   * Brand selection is in preview. Select the business for an email preference. Omitted or null selects the original business. Unsupported on other channels. An additional Brand supports non_transactional coverage only. Explicit selection returns 422 when unavailable. Existing opt-outs can be recorded for archived Brands; grants to archived Brands return 422. Consent grants for active additional Brands return 422 when unavailable. A Brand not found in this workspace returns 404.
+   */
+  brand_id?: BrandId | null;
 };
 
 /**
- * Records one preference statement for a handle. Writing is an upsert by key (channel, handle, sender scope, and topic), and statements are causally ordered: a statement dated older than the key's current one is refused and returned with `applied: false` rather than applied out of order.
- *
+ * Records one recipient's preference. For email, a granted statement with consented_at strictly later than a Brand complaint can clear that complaint. Bulk writes and imports cannot clear complaints. Other applicable opt-outs and delivery blocks still apply.
  */
-export type PreferenceCreate = {
+export type PreferenceIndividualCreate = {
   /**
    * Who the statement is about: an email address on the email channel, a phone number in E.164 format on SMS, WhatsApp, and Apple Messages for Business.
    */
@@ -6390,12 +6416,12 @@ export type PreferenceCreate = {
 export type PreferenceTransitionId = string;
 
 /**
- * The outcome of one preference write or delete. `applied: true` means the request took effect: either it changed the record, or an identical statement already had. `applied: false` means it was refused as older than the key's current statement; `preference` then carries the statement that survived, and `transition_id` identifies the refusal on the key's record.
+ * The outcome of one preference write or delete. `applied: true` means the request took effect, including an identical repeat. `applied: false` means it was refused because a newer statement or protected complaint survives; `preference` carries the statement that survived, and `transition_id` identifies the operation on the key's record.
  *
  */
 export type PreferenceWriteResult = {
   /**
-   * Whether the request took effect. False only when it was refused as out of order; the surviving, newer statement is returned in `preference`.
+   * Whether the request took effect. False when causal ordering or protected complaint rules refuse the request; the surviving statement is returned in `preference`. A grant returns false when a newer opt-out or deletion survives, even if its consent history is retained.
    */
   readonly applied: boolean;
   /**
@@ -6403,7 +6429,7 @@ export type PreferenceWriteResult = {
    */
   readonly transition_id: PreferenceTransitionId | null;
   /**
-   * The key's surviving statement. Null after an applied delete, when the key is back to having no record.
+   * The key's surviving statement. Null after an applied delete, when the key is back to having no record. It is also null after a refused grant when a later deletion remains in force.
    */
   readonly preference: Preference | null;
 };
@@ -26374,6 +26400,10 @@ export type EventPreferenceBase = {
    * The contact whose handle matched when the statement was recorded. Null when no contact matched at that moment.
    */
   contact_id: ContactId | null;
+  /**
+   * The business this email preference belongs to. Brand attribution is in preview.
+   */
+  brand_id?: BrandId | null;
 };
 
 /**
@@ -39223,6 +39253,11 @@ export type EmailBroadcastSearchFilter = string;
 export type BroadcastTestIdempotencyKey = string;
 
 /**
+ * Preview: return only this Brand's email preferences, including older preferences belonging to the original business. Explicit selection returns 422 where unavailable. Omit to return all matching preferences. Empty, repeated or malformed values return 422. Where the endpoint also accepts a channel filter, it must be email. A Brand not found in this workspace returns 404.
+ */
+export type PreferenceBrandId = BrandId;
+
+/**
  * ID of the media-library upload session.
  */
 export type AssetUploadSessionId2 = AssetUploadSessionId;
@@ -43314,6 +43349,10 @@ export type ListContactPreferencesData = {
   };
   query?: {
     /**
+     * Preview: return only this Brand's email preferences, including older preferences belonging to the original business. Explicit selection returns 422 where unavailable. Omit to return all matching preferences. Empty, repeated or malformed values return 422. Where the endpoint also accepts a channel filter, it must be email. A Brand not found in this workspace returns 404.
+     */
+    brand_id?: BrandId;
+    /**
      * Maximum number of items to return per page.
      */
     limit?: number;
@@ -43359,6 +43398,11 @@ export type ListContactPreferencesErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type ListContactPreferencesError =
@@ -43397,6 +43441,10 @@ export type ListPreferencesData = {
      *
      */
     handle?: string;
+    /**
+     * Preview: return only this Brand's email preferences, including older preferences belonging to the original business. Explicit selection returns 422 where unavailable. Omit to return all matching preferences. Empty, repeated or malformed values return 422. Where the endpoint also accepts a channel filter, it must be email. A Brand not found in this workspace returns 404.
+     */
+    brand_id?: BrandId;
     /**
      * Maximum number of items to return per page.
      */
@@ -43443,6 +43491,11 @@ export type ListPreferencesErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type ListPreferencesError =
@@ -43459,7 +43512,7 @@ export type ListPreferencesResponse =
   ListPreferencesResponses[keyof ListPreferencesResponses];
 
 export type CreatePreferenceData = {
-  body: PreferenceCreate;
+  body: PreferenceIndividualCreate;
   headers?: {
     /**
      * Client-supplied key. On operations supporting request deduplication, a retained
@@ -43541,7 +43594,7 @@ export type CreatePreferenceError =
 
 export type CreatePreferenceResponses = {
   /**
-   * The key already had a record. The result says whether this statement replaced it, repeated it, or was refused as out of order.
+   * No new live record was created. The result says whether this statement replaced a record, repeated it, or was refused. Consent history may still be recorded for a refused grant. The preference is null when a later deletion remains in force.
    */
   200: PreferenceWriteResult;
   /**
@@ -43703,6 +43756,11 @@ export type GetPreferenceErrors = {
    * Internal server error
    */
   500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
 };
 
 export type GetPreferenceError = GetPreferenceErrors[keyof GetPreferenceErrors];

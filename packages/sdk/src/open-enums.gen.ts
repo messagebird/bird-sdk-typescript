@@ -328,6 +328,7 @@ export type DestinationSuperRegionValue = (typeof DestinationSuperRegion)[keyof 
  */
 export const EmailBroadcastParameterProblemCode = {
   AudienceUnavailable: "audience_unavailable",
+  BrandUnavailable: "brand_unavailable",
   ContactPropertyUnknown: "contact_property_unknown",
   LanguageUnavailable: "language_unavailable",
   ParameterBytesExceeded: "parameter_bytes_exceeded",
@@ -908,6 +909,7 @@ export type PreferenceChannelValue = (typeof PreferenceChannel)[keyof typeof Pre
  */
 export const PreferenceOrigin = {
   ApiKey: "api_key",
+  Complaint: "complaint",
   Import: "import",
   Keyword: "keyword",
   PreferencePage: "preference_page",

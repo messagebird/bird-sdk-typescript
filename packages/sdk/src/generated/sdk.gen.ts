@@ -2319,11 +2319,17 @@ export const listEmailBroadcasts = <ThrowOnError extends boolean = false>(
  * [List recipients of a broadcast](/docs/api/reference/list-email-broadcast-recipients).
  * With `send`, the request returns `422` if any of these are true:
  *
+ * - A Brand is selected while selection is disabled, or the selected Brand does not exist in this workspace or is archived.
  * - The sender domain is not verified.
  * - No audience is selected, or the selected audience no longer exists.
  * - The audience has no contact with an email address, or every contact is suppressed for the broadcast's category.
  * - No template is set, or the set template has no published version.
  * - The organization has used its broadcast allowance for the current billing period, or (for an immediate send) is already at its concurrent-broadcast limit; schedule the send instead to wait for a free slot.
+ *
+ * Brand selection is in preview and unavailable until enabled. When enabled,
+ * the first send or schedule fixes the selected Brand, or the workspace default
+ * if no Brand was selected. Preferences are evaluated for that Brand; retries
+ * keep the same identity.
  *
  * If the audience is empty when a scheduled send starts, the broadcast becomes
  * `failed` with a readable reason instead of silently dropping it.
@@ -2704,7 +2710,7 @@ export const previewEmailBroadcast = <ThrowOnError extends boolean = false>(
 /**
  * Send a rendered broadcast test
  *
- * Supply the same changes, contact and fingerprint as a new preview to send the exact rendered content to an authorized current organization member with workspace access. Requires template read and emails write permission. Alternate-member and machine destinations also require members read. A change to template content, envelope fields, parameters or contact values returns E04089 (BroadcastPreviewChanged), a conflict_error. This does not send the campaign audience. A confirmed response replays unchanged for the same key and request within the configured idempotency window, with fresh authorization and member access checks. A replay sends no other test.
+ * Supply the same changes, contact and fingerprint as a new preview to send the exact rendered content to an authorized current organization member with workspace access. Requires template read and emails write permission. Alternate-member and machine destinations also require members read. A change to template content, envelope fields, parameters or contact values returns E04089 (BroadcastPreviewChanged), a conflict_error. This does not send the campaign audience. Brand overrides must match the preview too. If the preview reports `brand_unavailable`, preview again with an available `brand_id` or `null`, then use the same override and new fingerprint here. Null uses the workspace default when selection is enabled, otherwise it sends an unbranded test. Omitting the override keeps a historical broadcast's saved identity. A confirmed response replays unchanged for the same key and request within the configured idempotency window, with fresh authorization and member access checks. A replay sends no other test.
  */
 export const sendEmailBroadcastTest = <ThrowOnError extends boolean = false>(
   options: Options<SendEmailBroadcastTestData, ThrowOnError>,
@@ -2746,11 +2752,17 @@ export const sendEmailBroadcastTest = <ThrowOnError extends boolean = false>(
  * The audience's contacts at send time become the recipients after suppressions.
  * The request returns `422` if any of these are true:
  *
+ * - A Brand is selected while selection is disabled, or the selected Brand does not exist in this workspace or is archived.
  * - The sender domain is not verified.
  * - No audience is selected, or the selected audience no longer exists.
  * - The audience has no contact with an email address, or every contact is suppressed for the broadcast's category.
  * - No template is set, or the set template has no published version.
  * - The organization has used its broadcast allowance for the current billing period, or (for an immediate send) is already at its concurrent-broadcast limit; schedule the send instead to wait for a free slot.
+ *
+ * Brand selection is in preview and unavailable until enabled. When enabled,
+ * the first send or schedule fixes the selected Brand, or the workspace default
+ * if no Brand was selected. Preferences are evaluated for that Brand; retries
+ * keep the same identity.
  *
  * If the audience is empty when a scheduled send starts, the broadcast becomes
  * `failed` with a readable reason instead of silently dropping it.
@@ -2819,11 +2831,11 @@ export const cancelEmailBroadcast = <ThrowOnError extends boolean = false>(
 /**
  * Resume a broadcast
  *
- * Continues a `paused` broadcast using its saved template references and recipient list, skipping recipients already sent to and applying current consent and suppression checks for its saved category. Marketing broadcasts skip newly unsubscribed recipients; transactional broadcasts retain their category exemptions. Resuming does not use another broadcast from your monthly allowance. A `202` returns `status: sending`; delivery continues asynchronously. Use [get the broadcast](/docs/api/reference/get-email-broadcast) to follow progress.
+ * Continues a `paused` broadcast using its saved template references and recipient list, skipping recipients already sent to and applying current consent and suppression checks for its saved category and Brand. Brand selection is in preview. If the broadcast has a `brand_id`, resuming keeps that ID; it does not select the current default. Legacy broadcasts with `brand_id: null` keep their original consent scope. Workspace-wide protections still apply. The selected Brand stays in use while the broadcast waits for funds, is paused, or resumes, even if Brand selection is later disabled. It cannot be archived until the broadcast finishes or cancellation completes. Marketing broadcasts skip newly unsubscribed recipients; transactional broadcasts retain their category exemptions. Resuming does not use another broadcast from your monthly allowance. A `202` returns `status: sending`; delivery continues asynchronously. Use [get the broadcast](/docs/api/reference/get-email-broadcast) to follow progress.
  *
  * If the broadcast first started sending at least 24 hours ago, review its message and set `confirm` to `true` to acknowledge late delivery. For older broadcasts without `started_at`, the threshold uses the send authorization time, or the creation time if neither timestamp was recorded. You can also send `confirm: true` before that threshold; it does not skip other checks. To review the message, first [get the template](/docs/api/reference/get-email-template) with the broadcast's `template.id` and check its `scope`, which the version read does not return. A `scope` of `system` marks a built-in template, whose lookups return current catalogue content; a `404` means a deleted workspace template, whose pinned version stays readable by ID. For a workspace template, use `template.id` and `template.version_id` with [get a template version](/docs/api/reference/get-email-template-version), then check `template.language` or the version's `default_language`. Both reads require `email_management:read`. Published workspace versions retain their original content and remain readable by ID after template deletion; a deleted or reused slug cannot identify the original message. Broadcasts with frozen content keep sending that content, but older broadcasts can read the catalogue again when resumed. Neither the current lookup nor a copy of an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Once the funding wait has ended, adding funds alone does not restart a paused broadcast: call this operation explicitly after reviewing its content.
  *
- * Returns `403` if the workspace is suspended or has been suspended since the original send authorization. `E04102` means a later suspension revoked this broadcast's authorization; reactivation does not restore it, so cancel the broadcast instead of retrying. Do not resend to its full audience without excluding recipients already sent to. Returns `402` if the account is blocked for insufficient funds, or `409` if the broadcast is not paused or needs late-delivery confirmation. A `422` can mean the concurrent broadcast limit is reached or the sender or IP pool needs repair. Read the error details, then wait for a free slot or repair the sender or pool and retry. A `429` can mean a sending limit prevents resuming. These refusals leave the broadcast paused. A `503` means the balance or email limits could not be checked; the broadcast stays paused and you can retry.
+ * Returns `403` if the workspace is suspended or has been suspended since the original send authorization. `E04102` means a later suspension revoked this broadcast's authorization; reactivation does not restore it, so cancel the broadcast instead of retrying. Do not resend to its full audience without excluding recipients already sent to. Returns `402` if the account is blocked for insufficient funds, or `409` if the broadcast is not paused or needs late-delivery confirmation. A `422` can mean the concurrent broadcast limit is reached or the sender or IP pool needs repair. Read the error details, then wait for a free slot or repair the sender or pool and retry. A `429` can mean a sending limit prevents resuming. These refusals leave the broadcast paused. A `503` means the balance or email limits could not be checked, or Brand unsubscribe links are temporarily unavailable; the broadcast stays paused and you can retry.
  *
  */
 export const resumeEmailBroadcast = <ThrowOnError extends boolean = false>(
@@ -3101,11 +3113,11 @@ export const listPreferences = <ThrowOnError extends boolean = false>(
 /**
  * Record a preference
  *
- * Records one statement, a grant or an opt-out, for a handle on one channel. Writing is an upsert: the key is the channel, handle, and optional sender scope, and a new statement replaces the key's current one.
+ * Records one statement, a grant or an opt-out, for a handle on one channel. Writing is an upsert: the key is the channel, handle, optional sender scope, and email Brand, and a new statement replaces the key's current one.
  *
- * Statements are ordered by when they were made, not when they arrive. A statement older than the key's current one is refused and returned with `applied: false` alongside the statement that survived; refusals are recorded on the key's history. Granting over a stored opt-out needs `consented_at` later than the opt-out, and a person's own opt-out (an unsubscribe, a stop keyword) cannot be overridden by a grant asserted on their behalf.
+ * Statements are ordered by when they were made, not when they arrive. A statement older than the key's current one is refused and returned with `applied: false` alongside the statement that survived; refusals are recorded on the key's history. Granting over a stored opt-out needs `consented_at` later than the opt-out. For an email Brand complaint, only this individual-recipient operation can record the newer consent that clears complaint protection. Bulk writes and imports cannot clear it. Bird accepts your assertion that the recipient has consented; optional `source` describes where consent came from, without verification. Other applicable opt-outs and workspace-wide delivery blocks still apply. Consent history can still be retained when a later ordinary opt-out or deletion remains in force. Such a grant returns `applied: false` with the surviving preference, or null after deletion.
  *
- * A `201` means this key had no record and one was created; a `200` returns the key's surviving record, whether this statement replaced it, repeated it, or was refused.
+ * A `201` means this key had no record and one was created; a `200` returns the key's surviving record, or `preference: null` when a later deletion remains in force. The result distinguishes an effective preference write, repeat, or refusal.
  *
  */
 export const createPreference = <ThrowOnError extends boolean = false>(
@@ -3141,7 +3153,7 @@ export const createPreference = <ThrowOnError extends boolean = false>(
  *
  * Deletes a preference, returning its key to having no record, as if nothing had ever been stated. The deletion itself is kept on the key's history, so a later statement is still ordered against what was deleted.
  *
- * **A statement the person made themselves cannot be deleted.** An unsubscribe or a stop keyword is their statement to reverse: it ends when they opt back in, and attempts to delete it return `422`. To restore messaging with the person's consent, record a `granted` statement with `consented_at` evidence instead; that records the change of mind rather than erasing the opt-out.
+ * **Person-stated opt-outs and active email Brand complaints cannot be deleted.** Attempts return `422 E25005`. To record renewed consent, use the individual `POST /v1/preferences` operation with `status: granted` and `consented_at` strictly later than the opt-out or complaint. Bulk writes and imports cannot clear complaints. Other applicable opt-outs and delivery blocks still apply.
  *
  * A delete is ordered like any statement, using the time it is received: if the record carries a statement made after that moment, the delete is refused and returned with `applied: false` alongside the surviving record. An ID that does not exist in the workspace returns `404`.
  *
