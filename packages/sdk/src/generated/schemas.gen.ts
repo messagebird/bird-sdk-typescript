@@ -3250,6 +3250,13 @@ export const EmailStatsByComplaintTypeResponseSchema = {
   },
 } as const;
 
+export const SMSContentTypeSchema = {
+  type: "string",
+  enum: ["sms", "mms"],
+  description:
+    "Message content type. A nonempty subject or media list selects MMS.",
+} as const;
+
 export const SMSStatsSummaryPeriodSchema = {
   type: "object",
   additionalProperties: false,
@@ -3940,6 +3947,84 @@ export const SMSStatsByCategoryResponseSchema = {
   },
 } as const;
 
+export const SMSContentTypeStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Aggregate delivery and latency stats for a single message type over the requested period.",
+  required: ["content_type", "delivery", "latency"],
+  properties: {
+    content_type: {
+      readOnly: true,
+      description:
+        "Message type used for reporting. Previously recorded statistics remain attributed to SMS. New activity uses the message type.",
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSContentType",
+        },
+      ],
+    },
+    delivery: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSDeliveryStats",
+        },
+      ],
+    },
+    latency: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSLatencyStats",
+        },
+      ],
+    },
+    trend: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Per-bucket lifecycle counts for this message type, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.",
+      items: {
+        $ref: "#/components/schemas/SMSStatsPoint",
+      },
+    },
+  },
+} as const;
+
+export const SMSStatsByContentTypeResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-message-type breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).",
+  required: ["period", "data", "total"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/SMSStatsSummaryPeriod",
+      description:
+        "The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description:
+        "Message-type breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no messages were sent in the period.",
+      items: {
+        $ref: "#/components/schemas/SMSContentTypeStatsPoint",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total number of distinct message types with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.\n",
+      example: 2,
+    },
+  },
+} as const;
+
 export const SMSTagStatsPointSchema = {
   type: "object",
   additionalProperties: false,
@@ -4288,6 +4373,65 @@ export const SMSInboundStatsByCountryResponseSchema = {
       description:
         "Total number of distinct countries the messages arrived in with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.",
       example: 12,
+    },
+  },
+} as const;
+
+export const SMSInboundContentTypeStatsPointSchema = {
+  type: "object",
+  additionalProperties: false,
+  readOnly: true,
+  description: "Received-message volume for one message type.\n",
+  required: ["content_type", "received"],
+  properties: {
+    content_type: {
+      readOnly: true,
+      description:
+        "Message type used for reporting. Previously recorded statistics remain attributed to SMS. New activity uses the message type.",
+      allOf: [
+        {
+          $ref: "#/components/schemas/SMSContentType",
+        },
+      ],
+    },
+    received: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Distinct messages received on numbers in this message type during the period.",
+      example: 1840,
+    },
+  },
+} as const;
+
+export const SMSInboundStatsByContentTypeResponseSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Received-message volume broken down by message type, ranked by volume.\n",
+  required: ["period", "data", "total"],
+  properties: {
+    period: {
+      readOnly: true,
+      $ref: "#/components/schemas/SMSStatsSummaryPeriod",
+    },
+    data: {
+      type: "array",
+      readOnly: true,
+      description:
+        "One row per message type with activity in the period, most messages first, capped at the requested `limit`. A message type with no messages in the period is absent rather than zero-filled, because unlike a time bucket it is not part of a continuous axis.\n",
+      items: {
+        $ref: "#/components/schemas/SMSInboundContentTypeStatsPoint",
+      },
+    },
+    total: {
+      type: "integer",
+      minimum: 0,
+      readOnly: true,
+      description:
+        "Total number of distinct message types with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.",
+      example: 2,
     },
   },
 } as const;
@@ -11749,13 +11893,6 @@ export const SMSMessageCategorySchema = {
   enum: ["transactional", "marketing", "authentication", "service"],
   description:
     "Content classification: why you are sending. Carriers see it, and where a destination country requires the sender to be registered, that registration is approved for a category: a send outside what it covers returns a `422` `SenderCategoryNotPermitted`. A registration approved for `marketing` covers all four values; one approved for `transactional`, `authentication`, or `service` covers those three and not `marketing`. Use `authentication` for a one-time passcode and `marketing` for a promotion; otherwise pick the value matching the message's purpose.",
-} as const;
-
-export const SMSContentTypeSchema = {
-  type: "string",
-  enum: ["sms", "mms"],
-  description:
-    "Message content type. A nonempty subject or media list selects MMS.",
 } as const;
 
 export const SMSMessageIDSchema = {
@@ -26930,6 +27067,7 @@ export const AMBSuppressionSchema = {
     "ended_at",
     "ended_reason",
     "ended_effective_at",
+    "last_asserted_at",
   ],
   properties: {
     id: {
@@ -33579,6 +33717,7 @@ export const WhatsAppSuppressionSchema = {
     "ended_reason",
     "ended_effective_at",
     "created_at",
+    "last_asserted_at",
   ],
   properties: {
     id: {
@@ -33763,6 +33902,7 @@ export const WhatsAppKeywordRuleSchema = {
     "scope",
     "operation",
     "keywords",
+    "excluded_keywords",
     "effective_keywords",
     "created_at",
     "updated_at",
@@ -33794,17 +33934,27 @@ export const WhatsAppKeywordRuleSchema = {
     keywords: {
       type: "array",
       description:
-        "The keywords this rule adds. For one of Bird's own rules this is the full set Bird ships. For a rule you created it is only what you added on top: it never restates or removes Bird's keywords, so `effective_keywords` is what actually matches.\n",
+        "The keywords this rule adds. For one of Bird's own rules this is the full set Bird ships. For a rule you created it is only what you added on top: it never restates Bird's keywords, so `effective_keywords` is what actually matches.\n",
       items: {
         type: "string",
         minLength: 1,
       },
       example: ["no more texts", "remove me"],
     },
+    excluded_keywords: {
+      type: "array",
+      description:
+        "Bird's keywords this rule removes from the set it inherits. A message that is exactly one of them opts no one in or out and gets no reply for the people the rule covers, and Bird's own rule does not act on it instead. Excluding every one of Bird's keywords switches them off, though a keyword Bird adds later still matches. It removes only from the Bird rule this rule inherits from: a keyword another rule of yours adds, or one Bird ships only in another country's rule, is unaffected. Always empty on one of Bird's own rules.\n",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      example: [],
+    },
     effective_keywords: {
       type: "array",
       description:
-        "Every keyword that matches this rule: Bird's keywords for the same operation and country, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.\n\nFor a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.\n",
+        "Every keyword that matches this rule: Bird's keywords for the same operation and country, minus `excluded_keywords`, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.\n\nFor a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.\n",
       items: {
         type: "string",
         minLength: 1,
@@ -33892,12 +34042,21 @@ export const WhatsAppKeywordRuleCreateSchema = {
     keywords: {
       type: "array",
       description:
-        "Extra keywords to match, on top of the ones Bird already ships for this operation. Omit to keep Bird's keywords and change only the reply, including keywords Bird adds later. You cannot remove one of Bird's keywords, and a keyword Bird has bound to the other operation cannot be reused here.\n",
+        "Extra keywords to match, on top of the ones Bird already ships for this operation. Omit to keep Bird's keywords and change only the reply, including keywords Bird adds later. Use `excluded_keywords` to remove one of Bird's. A keyword Bird has bound to the other operation cannot be reused here.\n",
       items: {
         type: "string",
         minLength: 1,
       },
       example: ["no more texts", "remove me"],
+    },
+    excluded_keywords: {
+      type: "array",
+      description:
+        "Bird's keywords to remove for the people this rule covers. A message that is exactly one of them then opts no one in or out and gets no reply, and you must honour opt-outs it carries yourself. Exclude every one of Bird's keywords to switch them off; a keyword Bird adds later still matches. It removes only from the Bird rule this one inherits from, not from your other rules. A keyword cannot be both added and excluded.\n",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
     },
     reply: {
       type: "string",
@@ -33913,7 +34072,7 @@ export const WhatsAppKeywordRuleUpdateSchema = {
   type: "object",
   additionalProperties: false,
   description:
-    "Changes the reply and the added keywords. What a rule applies to (its operation, country and WhatsApp Business Account) is fixed once created: those decide which inbound messages reach it, so changing one would make it a different rule. Delete it and create the one you want.\n",
+    "Changes the reply, the added keywords and the excluded ones. What a rule applies to (its operation, country and WhatsApp Business Account) is fixed once created: those decide which inbound messages reach it, so changing one would make it a different rule. Delete it and create the one you want.\n",
   properties: {
     keywords: {
       type: "array",
@@ -33924,6 +34083,15 @@ export const WhatsAppKeywordRuleUpdateSchema = {
         minLength: 1,
       },
       example: ["no more texts"],
+    },
+    excluded_keywords: {
+      type: "array",
+      description:
+        "Replaces the Bird keywords this rule removes. Send an empty array to remove none. Omit to leave the current ones unchanged.\n",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
     },
     reply: {
       type: ["string", "null"],
@@ -59803,6 +59971,20 @@ export const SMSStatsByCategoryResponseWritableSchema = {
     "Per-category breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).",
 } as const;
 
+export const SMSContentTypeStatsPointWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Aggregate delivery and latency stats for a single message type over the requested period.",
+} as const;
+
+export const SMSStatsByContentTypeResponseWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Per-message-type breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).",
+} as const;
+
 export const SMSTagStatsPointWritableSchema = {
   type: "object",
   additionalProperties: false,
@@ -65033,6 +65215,7 @@ export const WhatsAppKeywordRuleWritableSchema = {
     "scope",
     "operation",
     "keywords",
+    "excluded_keywords",
     "effective_keywords",
     "created_at",
     "updated_at",
@@ -65064,17 +65247,27 @@ export const WhatsAppKeywordRuleWritableSchema = {
     keywords: {
       type: "array",
       description:
-        "The keywords this rule adds. For one of Bird's own rules this is the full set Bird ships. For a rule you created it is only what you added on top: it never restates or removes Bird's keywords, so `effective_keywords` is what actually matches.\n",
+        "The keywords this rule adds. For one of Bird's own rules this is the full set Bird ships. For a rule you created it is only what you added on top: it never restates Bird's keywords, so `effective_keywords` is what actually matches.\n",
       items: {
         type: "string",
         minLength: 1,
       },
       example: ["no more texts", "remove me"],
     },
+    excluded_keywords: {
+      type: "array",
+      description:
+        "Bird's keywords this rule removes from the set it inherits. A message that is exactly one of them opts no one in or out and gets no reply for the people the rule covers, and Bird's own rule does not act on it instead. Excluding every one of Bird's keywords switches them off, though a keyword Bird adds later still matches. It removes only from the Bird rule this rule inherits from: a keyword another rule of yours adds, or one Bird ships only in another country's rule, is unaffected. Always empty on one of Bird's own rules.\n",
+      items: {
+        type: "string",
+        minLength: 1,
+      },
+      example: [],
+    },
     effective_keywords: {
       type: "array",
       description:
-        "Every keyword that matches this rule: Bird's keywords for the same operation and country, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.\n\nFor a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.\n",
+        "Every keyword that matches this rule: Bird's keywords for the same operation and country, minus `excluded_keywords`, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.\n\nFor a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.\n",
       items: {
         type: "string",
         minLength: 1,

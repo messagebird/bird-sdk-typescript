@@ -37,7 +37,10 @@ export async function smsStatsSummary() {
 }
 
 export async function smsStatsDaily() {
-  const stats = await bird.sms.stats.daily({ from: "2026-05-01", to: "2026-05-31" });
+  const stats = await bird.sms.stats.daily({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
   for (const point of stats.data ?? []) {
     console.log(point.bucket, point.delivery);
   }
@@ -65,35 +68,60 @@ export async function smsStatsByCountry() {
 }
 
 export async function smsStatsByCarrier() {
-  const stats = await bird.sms.stats.byCarrier({ from: "2026-05-01", to: "2026-05-31" });
+  const stats = await bird.sms.stats.byCarrier({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
   for (const row of stats.data ?? []) {
     console.log(row.carrier, row.delivery);
   }
 }
 
 export async function smsStatsByCategory() {
-  const stats = await bird.sms.stats.byCategory({ from: "2026-05-01", to: "2026-05-31" });
+  const stats = await bird.sms.stats.byCategory({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
   for (const row of stats.data ?? []) {
     console.log(row.category, row.delivery);
   }
 }
 
+export async function smsStatsByContentType() {
+  const stats = await bird.sms.stats.byContentType({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
+  for (const row of stats.data ?? []) {
+    console.log(row.content_type, row.delivery);
+  }
+}
+
 export async function smsStatsByOriginator() {
-  const stats = await bird.sms.stats.byOriginator({ from: "2026-05-01", to: "2026-05-31" });
+  const stats = await bird.sms.stats.byOriginator({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
   for (const row of stats.data ?? []) {
     console.log(row.originator, row.delivery);
   }
 }
 
 export async function smsStatsByStatus() {
-  const stats = await bird.sms.stats.byStatus({ from: "2026-05-01", to: "2026-05-31" });
+  const stats = await bird.sms.stats.byStatus({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
   for (const row of stats.data ?? []) {
     console.log(row.status, row.count);
   }
 }
 
 export async function smsStatsByErrorCode() {
-  const stats = await bird.sms.stats.byErrorCode({ from: "2026-05-01", to: "2026-05-31" });
+  const stats = await bird.sms.stats.byErrorCode({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
   for (const row of stats.data ?? []) {
     // The same value as the error_code filter on bird.sms.list.
     console.log(row.error_code, row.delivery);
@@ -101,7 +129,10 @@ export async function smsStatsByErrorCode() {
 }
 
 export async function smsStatsByTag() {
-  const stats = await bird.sms.stats.byTag({ from: "2026-05-01", to: "2026-05-31" });
+  const stats = await bird.sms.stats.byTag({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
   for (const row of stats.data ?? []) {
     // A message carrying several tags counts once under each, so rows do not sum
     // to the period total.
@@ -110,7 +141,10 @@ export async function smsStatsByTag() {
 }
 
 export async function smsStatsByCostCenter() {
-  const stats = await bird.sms.stats.byCostCenter({ from: "2026-05-01", to: "2026-05-31" });
+  const stats = await bird.sms.stats.byCostCenter({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
   for (const row of stats.data) {
     // Messages sent without a cost center are not counted, so rows do not sum to
     // the period total.
@@ -119,12 +153,18 @@ export async function smsStatsByCostCenter() {
 }
 
 export async function smsStatsInboundSummary() {
-  const summary = await bird.sms.stats.inbound.summary({ from: "2026-05-01", to: "2026-05-31" });
+  const summary = await bird.sms.stats.inbound.summary({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
   console.log(summary.received);
 }
 
 export async function smsStatsInboundDaily() {
-  const stats = await bird.sms.stats.inbound.daily({ from: "2026-05-01", to: "2026-05-31" });
+  const stats = await bird.sms.stats.inbound.daily({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
   for (const point of stats.data ?? []) {
     console.log(point.bucket, point.received);
   }
@@ -141,14 +181,30 @@ export async function smsStatsInboundHourly() {
 }
 
 export async function smsStatsInboundByCountry() {
-  const stats = await bird.sms.stats.inbound.byCountry({ from: "2026-05-01", to: "2026-05-31" });
+  const stats = await bird.sms.stats.inbound.byCountry({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
   for (const row of stats.data ?? []) {
     console.log(row.country, row.received);
   }
 }
 
+export async function smsStatsInboundByContentType() {
+  const stats = await bird.sms.stats.inbound.byContentType({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
+  for (const row of stats.data ?? []) {
+    console.log(row.content_type, row.received);
+  }
+}
+
 export async function smsStatsInboundByOperator() {
-  const stats = await bird.sms.stats.inbound.byOperator({ from: "2026-05-01", to: "2026-05-31" });
+  const stats = await bird.sms.stats.inbound.byOperator({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
   for (const row of stats.data ?? []) {
     // Messages whose operator the carrier did not report are excluded, so these
     // rows can sum to less than the inbound summary for the same period.
@@ -157,7 +213,10 @@ export async function smsStatsInboundByOperator() {
 }
 
 export async function smsStatsInboundByNumber() {
-  const stats = await bird.sms.stats.inbound.byNumber({ from: "2026-05-01", to: "2026-05-31" });
+  const stats = await bird.sms.stats.inbound.byNumber({
+    from: "2026-05-01",
+    to: "2026-05-31",
+  });
   for (const row of stats.data ?? []) {
     console.log(row.number, row.received);
   }
@@ -165,7 +224,11 @@ export async function smsStatsInboundByNumber() {
 
 export async function smsSuppressionsList() {
   for await (const suppression of bird.smsSuppressions.list()) {
-    console.log(suppression.originator, suppression.destination, suppression.reason);
+    console.log(
+      suppression.originator,
+      suppression.destination,
+      suppression.reason,
+    );
   }
 }
 

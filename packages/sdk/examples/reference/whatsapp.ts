@@ -440,7 +440,7 @@ export async function whatsappKeywordRulesUpdate() {
 }
 
 export async function whatsappKeywordRulesDelete() {
-  // The next rule in the ladder answers the scope, which is another rule of yours if you hold a less specific one; STOP never stops working.
+  // The next rule in the ladder answers the scope, which is another rule of yours if you hold a less specific one.
   await bird.whatsapp.keywordRules.delete("wkr_01m2kj8x4te9p0rr7e5w2n1abc");
 }
 

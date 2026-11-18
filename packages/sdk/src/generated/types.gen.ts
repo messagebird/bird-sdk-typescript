@@ -1826,6 +1826,11 @@ export type EmailStatsByComplaintTypeResponse = {
 };
 
 /**
+ * Message content type. A nonempty subject or media list selects MMS.
+ */
+export type SmsContentType = "sms" | "mms";
+
+/**
  * The window the server actually computed against. The summary serves two window grains: calendar days (bounds are YYYY-MM-DD) and hours (bounds are RFC 3339 instants on the hour). The grain of `from` and `to` mirrors the grain of the request's bounds.
  *
  */
@@ -2168,6 +2173,41 @@ export type SmsStatsByCategoryResponse = {
 };
 
 /**
+ * Aggregate delivery and latency stats for a single message type over the requested period.
+ */
+export type SmsContentTypeStatsPoint = {
+  /**
+   * Message type used for reporting. Previously recorded statistics remain attributed to SMS. New activity uses the message type.
+   */
+  readonly content_type: SmsContentType;
+  readonly delivery: SmsDeliveryStats;
+  readonly latency: SmsLatencyStats;
+  /**
+   * Per-bucket lifecycle counts for this message type, using `trend_grain`. Includes only buckets with activity. Present when `include_trend=true`.
+   */
+  readonly trend?: Array<SmsStatsPoint>;
+};
+
+/**
+ * Per-message-type breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByContentTypeResponse = {
+  /**
+   * The date range the response covers (echoed back from the request), plus `data_as_of`, the freshness boundary the data is current to.
+   */
+  readonly period: SmsStatsSummaryPeriod;
+  /**
+   * Message-type breakdown rows, ranked by the `sort` metric (default `accepted`) descending. Empty when no messages were sent in the period.
+   */
+  readonly data: Array<SmsContentTypeStatsPoint>;
+  /**
+   * Total number of distinct message types with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   *
+   */
+  readonly total: number;
+};
+
+/**
  * Aggregate delivery and latency stats for a single tag (`name:value`) over the requested period.
  */
 export type SmsTagStatsPoint = {
@@ -2370,6 +2410,38 @@ export type SmsInboundStatsByCountryResponse = {
   readonly data: Array<SmsInboundCountryStatsPoint>;
   /**
    * Total number of distinct countries the messages arrived in with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
+   */
+  readonly total: number;
+};
+
+/**
+ * Received-message volume for one message type.
+ *
+ */
+export type SmsInboundContentTypeStatsPoint = {
+  /**
+   * Message type used for reporting. Previously recorded statistics remain attributed to SMS. New activity uses the message type.
+   */
+  readonly content_type: SmsContentType;
+  /**
+   * Distinct messages received on numbers in this message type during the period.
+   */
+  readonly received: number;
+};
+
+/**
+ * Received-message volume broken down by message type, ranked by volume.
+ *
+ */
+export type SmsInboundStatsByContentTypeResponse = {
+  readonly period: SmsStatsSummaryPeriod;
+  /**
+   * One row per message type with activity in the period, most messages first, capped at the requested `limit`. A message type with no messages in the period is absent rather than zero-filled, because unlike a time bucket it is not part of a continuous axis.
+   *
+   */
+  readonly data: Array<SmsInboundContentTypeStatsPoint>;
+  /**
+   * Total number of distinct message types with activity in the period, regardless of `limit`. When it exceeds the number of rows returned, the ranking was capped; raise `limit` (up to 200) or narrow the window to see more.
    */
   readonly total: number;
 };
@@ -6636,11 +6708,6 @@ export type MessageDirection = "outbound" | "inbound";
  */
 export type SmsMessageCategory =
   "transactional" | "marketing" | "authentication" | "service";
-
-/**
- * Message content type. A nonempty subject or media list selects MMS.
- */
-export type SmsContentType = "sms" | "mms";
 
 export type SmsMessageId = string;
 
@@ -15015,7 +15082,7 @@ export type AmbSuppression = {
    * When we last recorded this suppression being stated. Later than `created_at` when it was stated again while already in force: your workspace adding it again, or the customer closing the conversation again. A repeat adds no new record.
    *
    */
-  readonly last_asserted_at?: string;
+  readonly last_asserted_at: string;
   /**
    * When this stopped applying. Null while it is still stopping messages.
    */
@@ -18157,7 +18224,7 @@ export type WhatsAppSuppression = {
    * When we last recorded this suppression being stated. Later than `created_at` when your workspace added it again while it was already in force; a repeat adds no new record.
    *
    */
-  readonly last_asserted_at?: string;
+  readonly last_asserted_at: string;
 };
 
 export type WhatsAppSuppressionList = {
@@ -18227,12 +18294,17 @@ export type WhatsAppKeywordRule = {
    */
   waba?: string | null;
   /**
-   * The keywords this rule adds. For one of Bird's own rules this is the full set Bird ships. For a rule you created it is only what you added on top: it never restates or removes Bird's keywords, so `effective_keywords` is what actually matches.
+   * The keywords this rule adds. For one of Bird's own rules this is the full set Bird ships. For a rule you created it is only what you added on top: it never restates Bird's keywords, so `effective_keywords` is what actually matches.
    *
    */
   keywords: Array<string>;
   /**
-   * Every keyword that matches this rule: Bird's keywords for the same operation and country, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.
+   * Bird's keywords this rule removes from the set it inherits. A message that is exactly one of them opts no one in or out and gets no reply for the people the rule covers, and Bird's own rule does not act on it instead. Excluding every one of Bird's keywords switches them off, though a keyword Bird adds later still matches. It removes only from the Bird rule this rule inherits from: a keyword another rule of yours adds, or one Bird ships only in another country's rule, is unaffected. Always empty on one of Bird's own rules.
+   *
+   */
+  excluded_keywords: Array<string>;
+  /**
+   * Every keyword that matches this rule: Bird's keywords for the same operation and country, minus `excluded_keywords`, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.
    *
    * For a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.
    *
@@ -18293,10 +18365,15 @@ export type WhatsAppKeywordRuleCreate = {
    */
   waba?: string;
   /**
-   * Extra keywords to match, on top of the ones Bird already ships for this operation. Omit to keep Bird's keywords and change only the reply, including keywords Bird adds later. You cannot remove one of Bird's keywords, and a keyword Bird has bound to the other operation cannot be reused here.
+   * Extra keywords to match, on top of the ones Bird already ships for this operation. Omit to keep Bird's keywords and change only the reply, including keywords Bird adds later. Use `excluded_keywords` to remove one of Bird's. A keyword Bird has bound to the other operation cannot be reused here.
    *
    */
   keywords?: Array<string>;
+  /**
+   * Bird's keywords to remove for the people this rule covers. A message that is exactly one of them then opts no one in or out and gets no reply, and you must honour opt-outs it carries yourself. Exclude every one of Bird's keywords to switch them off; a keyword Bird adds later still matches. It removes only from the Bird rule this one inherits from, not from your other rules. A keyword cannot be both added and excluded.
+   *
+   */
+  excluded_keywords?: Array<string>;
   /**
    * The message to send back when a keyword matches. Omit it to send nothing.
    *
@@ -18305,7 +18382,7 @@ export type WhatsAppKeywordRuleCreate = {
 };
 
 /**
- * Changes the reply and the added keywords. What a rule applies to (its operation, country and WhatsApp Business Account) is fixed once created: those decide which inbound messages reach it, so changing one would make it a different rule. Delete it and create the one you want.
+ * Changes the reply, the added keywords and the excluded ones. What a rule applies to (its operation, country and WhatsApp Business Account) is fixed once created: those decide which inbound messages reach it, so changing one would make it a different rule. Delete it and create the one you want.
  *
  */
 export type WhatsAppKeywordRuleUpdate = {
@@ -18314,6 +18391,11 @@ export type WhatsAppKeywordRuleUpdate = {
    *
    */
   keywords?: Array<string>;
+  /**
+   * Replaces the Bird keywords this rule removes. Send an empty array to remove none. Omit to leave the current ones unchanged.
+   *
+   */
+  excluded_keywords?: Array<string>;
   /**
    * Replaces the message sent back when a keyword matches. Set it to null to send nothing. Omit to leave it unchanged.
    *
@@ -32983,6 +33065,20 @@ export type SmsStatsByCategoryResponseWritable = {
 };
 
 /**
+ * Aggregate delivery and latency stats for a single message type over the requested period.
+ */
+export type SmsContentTypeStatsPointWritable = {
+  [key: string]: never;
+};
+
+/**
+ * Per-message-type breakdown for the requested period, ranked by the `sort` metric (default `accepted`) descending and capped at the requested `limit` (default 50, max 200).
+ */
+export type SmsStatsByContentTypeResponseWritable = {
+  [key: string]: never;
+};
+
+/**
  * Aggregate delivery and latency stats for a single tag (`name:value`) over the requested period.
  */
 export type SmsTagStatsPointWritable = {
@@ -35682,12 +35778,17 @@ export type WhatsAppKeywordRuleWritable = {
    */
   waba?: string | null;
   /**
-   * The keywords this rule adds. For one of Bird's own rules this is the full set Bird ships. For a rule you created it is only what you added on top: it never restates or removes Bird's keywords, so `effective_keywords` is what actually matches.
+   * The keywords this rule adds. For one of Bird's own rules this is the full set Bird ships. For a rule you created it is only what you added on top: it never restates Bird's keywords, so `effective_keywords` is what actually matches.
    *
    */
   keywords: Array<string>;
   /**
-   * Every keyword that matches this rule: Bird's keywords for the same operation and country, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.
+   * Bird's keywords this rule removes from the set it inherits. A message that is exactly one of them opts no one in or out and gets no reply for the people the rule covers, and Bird's own rule does not act on it instead. Excluding every one of Bird's keywords switches them off, though a keyword Bird adds later still matches. It removes only from the Bird rule this rule inherits from: a keyword another rule of yours adds, or one Bird ships only in another country's rule, is unaffected. Always empty on one of Bird's own rules.
+   *
+   */
+  excluded_keywords: Array<string>;
+  /**
+   * Every keyword that matches this rule: Bird's keywords for the same operation and country, minus `excluded_keywords`, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.
    *
    * For a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.
    *
@@ -39474,6 +39575,11 @@ export type OrderAsc = SortOrder;
  *
  */
 export type StatsTimezone = string;
+
+/**
+ * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+ */
+export type SmsStatsContentType = SmsContentType;
 
 /**
  * Limits the response to resources created at or after this timestamp. Combine it with `created_before` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
@@ -45597,6 +45703,10 @@ export type ListSmsMessagesData = {
      */
     created_before?: string;
     /**
+     * Filter by the message's actual type: sms or mms. Omit to include both. Binary messages count as SMS. Message history retains the stored type; previously recorded statistics may attribute the same message to SMS.
+     */
+    content_type?: SmsContentType;
+    /**
      * Filter by direction. Omit for both.
      */
     direction?: MessageDirection;
@@ -49925,6 +50035,10 @@ export type CreateWorkspaceComplianceSubmissionErrors = {
    */
   409: Error;
   /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -50092,6 +50206,10 @@ export type UpdateWorkspaceComplianceSubmissionErrors = {
    */
   409: Error;
   /**
+   * Precondition failed
+   */
+  412: Error;
+  /**
    * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
    *
    */
@@ -50239,6 +50357,10 @@ export type GetSmsStatsSummaryData = {
   path?: never;
   query?: {
     /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
+    /**
      * Inclusive start of the window: a calendar day (YYYY-MM-DD) or an RFC 3339 instant rounded down to the hour. The `timezone` parameter makes a calendar day local and rounds an instant down to the local hour. Omit `timezone` to use UTC. When `timezone` is set, a numeric UTC offset such as `+05:45` is rejected; use a calendar day or a `Z` (UTC) instant. This value must use the same form as `to`. When omitted, it defaults to 30 days before `to` for day windows or 168 hours (7 days) before `to` for hour windows.
      *
      */
@@ -50352,6 +50474,10 @@ export type GetSmsStatsDailyData = {
   path?: never;
   query?: {
     /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
+    /**
      * Start date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted.
      */
     from?: string;
@@ -50457,6 +50583,10 @@ export type GetSmsStatsHourlyData = {
   };
   path?: never;
   query?: {
+    /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
     /**
      * Start of the window (ISO 8601 instant), rounded down to the start of its hour and included. The boundary uses the local hour when `timezone` is set and the UTC hour otherwise. When `timezone` is set, a numeric UTC offset such as `+05:45` is rejected; use a `Z` (UTC) instant. Defaults to 7 days before `to` when omitted.
      */
@@ -50564,6 +50694,10 @@ export type GetSmsStatsByOriginatorData = {
   path?: never;
   query?: {
     /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
+    /**
      * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to keep the window within the 720-hour trend cap.
      */
     from?: string;
@@ -50662,6 +50796,10 @@ export type GetSmsStatsByCountryData = {
   };
   path?: never;
   query?: {
+    /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
     /**
      * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to keep the window within the 720-hour trend cap.
      */
@@ -50762,6 +50900,10 @@ export type GetSmsStatsByCategoryData = {
   path?: never;
   query?: {
     /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
+    /**
      * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to keep the window within the 720-hour trend cap.
      */
     from?: string;
@@ -50846,6 +50988,109 @@ export type GetSmsStatsByCategoryResponses = {
 export type GetSmsStatsByCategoryResponse =
   GetSmsStatsByCategoryResponses[keyof GetSmsStatsByCategoryResponses];
 
+export type GetSmsStatsByContentTypeData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
+    /**
+     * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to keep the window within the 720-hour trend cap.
+     */
+    from?: string;
+    /**
+     * End date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to today in that timezone when omitted. Window may not exceed 365 days.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Metric to rank rows by, applied descending. Any lifecycle count or derived rate in the response may be used; rows whose rate is undefined (zero denominator) sort last. Defaults to `accepted`.
+     *
+     */
+    sort?: SmsStatsSortMetric;
+    /**
+     * Maximum number of message-type rows to return, ranked by the `sort` field descending.
+     */
+    limit?: number;
+    /**
+     * When true, each row also carries a `trend` array: a short per-bucket lifecycle-count series for that row over the window. Returned only when `limit` is 50 or fewer and the window is at most 90 days (trend_grain=daily) or 720 hours (trend_grain=hourly); a larger request returns 422.
+     *
+     */
+    include_trend?: boolean;
+    /**
+     * Bucket grain for the `trend` series. Has no effect unless `include_trend=true`.
+     */
+    trend_grain?: StatsTrendGrain;
+  };
+  url: "/v1/sms/stats/content-types";
+};
+
+export type GetSmsStatsByContentTypeErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetSmsStatsByContentTypeError =
+  GetSmsStatsByContentTypeErrors[keyof GetSmsStatsByContentTypeErrors];
+
+export type GetSmsStatsByContentTypeResponses = {
+  /**
+   * Per-message-type breakdown for the requested period.
+   */
+  200: SmsStatsByContentTypeResponse;
+};
+
+export type GetSmsStatsByContentTypeResponse =
+  GetSmsStatsByContentTypeResponses[keyof GetSmsStatsByContentTypeResponses];
+
 export type GetSmsStatsByErrorCodeData = {
   body?: never;
   headers?: {
@@ -50860,6 +51105,10 @@ export type GetSmsStatsByErrorCodeData = {
   };
   path?: never;
   query?: {
+    /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
     /**
      * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to keep the window within the 720-hour trend cap.
      */
@@ -50960,6 +51209,10 @@ export type GetSmsStatsByCarrierData = {
   path?: never;
   query?: {
     /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
+    /**
      * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to keep the window within the 720-hour trend cap.
      */
     from?: string;
@@ -51058,6 +51311,10 @@ export type GetSmsStatsByTagData = {
   };
   path?: never;
   query?: {
+    /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
     /**
      * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to keep the window within the 720-hour trend cap.
      */
@@ -51158,6 +51415,10 @@ export type GetSmsStatsByCostCenterData = {
   path?: never;
   query?: {
     /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
+    /**
      * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted; with `include_trend=true` and `trend_grain=hourly` the default tightens to keep the window within the 720-hour trend cap.
      */
     from?: string;
@@ -51257,6 +51518,10 @@ export type GetSmsStatsByStatusData = {
   path?: never;
   query?: {
     /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
+    /**
      * Start date (inclusive) in YYYY-MM-DD, interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted.
      */
     from?: string;
@@ -51337,6 +51602,10 @@ export type GetSmsInboundStatsSummaryData = {
   };
   path?: never;
   query?: {
+    /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
     /**
      * Inclusive start of the window, either a calendar day (YYYY-MM-DD) or an RFC 3339 instant rounded down to the hour. The form you use selects the grain the total is resolved at. Interpreted in `timezone`, or in UTC when `timezone` is omitted. Must use the same form as `to`. A numeric UTC offset (for example `+05:45`) is rejected when `timezone` is set; pass a calendar day or a `Z` instant instead. Defaults to 30 days before `to` for day windows, or 168 hours before `to` for hour windows.
      *
@@ -51426,6 +51695,10 @@ export type GetSmsInboundStatsDailyData = {
   path?: never;
   query?: {
     /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
+    /**
      * Start date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted.
      */
     from?: string;
@@ -51506,6 +51779,10 @@ export type GetSmsInboundStatsHourlyData = {
   };
   path?: never;
   query?: {
+    /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
     /**
      * Start of the window (inclusive), an RFC 3339 instant truncated to the hour. Defaults to 7 days (168 hours) before `to` when omitted.
      */
@@ -51588,6 +51865,10 @@ export type GetSmsInboundStatsByCountryData = {
   path?: never;
   query?: {
     /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
+    /**
      * Start date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted.
      */
     from?: string;
@@ -51658,6 +51939,95 @@ export type GetSmsInboundStatsByCountryResponses = {
 export type GetSmsInboundStatsByCountryResponse =
   GetSmsInboundStatsByCountryResponses[keyof GetSmsInboundStatsByCountryResponses];
 
+export type GetSmsInboundStatsByContentTypeData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
+    /**
+     * Start date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted.
+     */
+    from?: string;
+    /**
+     * End date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to today in that timezone when omitted. Window may not exceed 365 days.
+     */
+    to?: string;
+    /**
+     * IANA timezone identifier used to group statistics, for example `Asia/Kathmandu`. The default is UTC. Day and hour boundaries, including the default window when `from` and `to` are omitted, follow this timezone. When this parameter is set, pass `from` and `to` as calendar days or `Z` instants instead of timestamps with explicit UTC offsets.
+     *
+     */
+    timezone?: string;
+    /**
+     * Maximum rows to return, ranked by volume. Defaults to 50; the maximum is 200, and asking for more returns 422 rather than silently returning fewer.
+     */
+    limit?: number;
+  };
+  url: "/v1/sms/stats/inbound/content-types";
+};
+
+export type GetSmsInboundStatsByContentTypeErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetSmsInboundStatsByContentTypeError =
+  GetSmsInboundStatsByContentTypeErrors[keyof GetSmsInboundStatsByContentTypeErrors];
+
+export type GetSmsInboundStatsByContentTypeResponses = {
+  /**
+   * Received-message volume by message type for the requested period.
+   */
+  200: SmsInboundStatsByContentTypeResponse;
+};
+
+export type GetSmsInboundStatsByContentTypeResponse =
+  GetSmsInboundStatsByContentTypeResponses[keyof GetSmsInboundStatsByContentTypeResponses];
+
 export type GetSmsInboundStatsByOperatorData = {
   body?: never;
   headers?: {
@@ -51672,6 +52042,10 @@ export type GetSmsInboundStatsByOperatorData = {
   };
   path?: never;
   query?: {
+    /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
     /**
      * Start date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted.
      */
@@ -51757,6 +52131,10 @@ export type GetSmsInboundStatsByNumberData = {
   };
   path?: never;
   query?: {
+    /**
+     * Restrict statistics to SMS or MMS. Omit to include both. This filter can be combined with an existing dimension filter where the operation supports one. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS.
+     */
+    content_type?: SmsContentType;
     /**
      * Start date (inclusive), YYYY-MM-DD. Interpreted as a calendar day in `timezone` (a UTC day when `timezone` is omitted). Defaults to 30 days before `to` when omitted.
      */
@@ -64041,7 +64419,7 @@ export type ListWhatsAppKeywordRulesData = {
      */
     operation?: WhatsAppKeywordOperation;
     /**
-     * Keep only Bird's own rules (`system`) or only the rules you created (`workspace`). Omit for both.
+     * Keep only Bird's own rules (`system`) or only the rules you created (`workspace`). Omit for both, in which case a Bird rule that one of yours replaces is left out.
      *
      */
     scope?: WhatsAppKeywordRuleScope;

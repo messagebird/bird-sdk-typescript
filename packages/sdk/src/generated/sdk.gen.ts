@@ -709,6 +709,9 @@ import type {
   GetRealtimeAppChannelData,
   GetRealtimeAppChannelErrors,
   GetRealtimeAppChannelResponses,
+  GetSmsInboundStatsByContentTypeData,
+  GetSmsInboundStatsByContentTypeErrors,
+  GetSmsInboundStatsByContentTypeResponses,
   GetSmsInboundStatsByCountryData,
   GetSmsInboundStatsByCountryErrors,
   GetSmsInboundStatsByCountryResponses,
@@ -741,6 +744,9 @@ import type {
   GetSmsStatsByCategoryData,
   GetSmsStatsByCategoryErrors,
   GetSmsStatsByCategoryResponses,
+  GetSmsStatsByContentTypeData,
+  GetSmsStatsByContentTypeErrors,
+  GetSmsStatsByContentTypeResponses,
   GetSmsStatsByCostCenterData,
   GetSmsStatsByCostCenterErrors,
   GetSmsStatsByCostCenterResponses,
@@ -3753,7 +3759,7 @@ export const unassignAudienceContact = <ThrowOnError extends boolean = false>(
  * List SMS messages
  *
  * Returns the workspace's SMS messages as a cursor-paginated list, newest
- * first. Filter by direction, status, category, recipient, sender,
+ * first. Filter by message type, direction, status, category, recipient, sender,
  * destination country, failure reason, tag, or creation time; pass the
  * response's `next_cursor` back as `starting_after` to fetch the next page.
  * To follow a single message's delivery, use
@@ -5361,6 +5367,9 @@ export const getComplianceDocumentTemplate = <
  * Submits every answer at once. Because submissions have no multi-call draft, send a complete
  * set; anything missing or malformed comes back named field by field.
  *
+ * A business verification returns `412 Precondition Failed` (`E33003`) while the organization is
+ * not eligible to verify a business.
+ *
  * Each answer is then reviewed on its own. Submitting again for a registration that already has
  * one returns a 409. Use `POST /v1/compliance/submissions/{submission_id}/resupply` to replace
  * rejected, expired, or missing answers, and read the submission ID from the requirements for
@@ -5451,7 +5460,8 @@ export const getWorkspaceComplianceSubmission = <
  *
  * Replaces rejected, expired, or missing answers on an existing submission, and a business
  * contact still `awaiting_confirmation`. Accepted answers normally cannot be changed and should
- * be omitted.
+ * be omitted. A business verification returns `412 Precondition Failed` (`E33003`) while the
+ * organization is not eligible to verify a business.
  *
  * A number, emergency calling service, business identity or SMS sender registration accepts changes to any answer until its submission is approved, including
  * answers awaiting review or already accepted; read `answers_editable` on the requirements. Each
@@ -5743,6 +5753,35 @@ export const getSmsStatsByCategory = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/sms/stats/categories",
+    ...options,
+  });
+
+/**
+ * Get outbound SMS statistics by message type
+ *
+ * Returns delivery counts, rates and latency grouped by SMS or MMS over the requested period. Previously recorded statistics remain attributed to SMS. New activity uses the message type, so a late MMS delivery can appear under MMS while its earlier send remains under SMS. A type-filtered delivery rate is null when that type has no accepted messages. Delivery reports belong to the period when the message was accepted, including reports received later.
+ */
+export const getSmsStatsByContentType = <ThrowOnError extends boolean = false>(
+  options?: Options<GetSmsStatsByContentTypeData, ThrowOnError>,
+): RequestResult<
+  GetSmsStatsByContentTypeResponses,
+  GetSmsStatsByContentTypeErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetSmsStatsByContentTypeResponses,
+    GetSmsStatsByContentTypeErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/sms/stats/content-types",
     ...options,
   });
 
@@ -6047,6 +6086,37 @@ export const getSmsInboundStatsByCountry = <
       },
     ],
     url: "/v1/sms/stats/inbound/countries",
+    ...options,
+  });
+
+/**
+ * Get inbound SMS statistics by message type
+ *
+ * Returns received-message counts grouped by SMS or MMS over the requested period. Previously recorded statistics remain attributed to SMS. New activity uses the message type.
+ */
+export const getSmsInboundStatsByContentType = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetSmsInboundStatsByContentTypeData, ThrowOnError>,
+): RequestResult<
+  GetSmsInboundStatsByContentTypeResponses,
+  GetSmsInboundStatsByContentTypeErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetSmsInboundStatsByContentTypeResponses,
+    GetSmsInboundStatsByContentTypeErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/sms/stats/inbound/content-types",
     ...options,
   });
 
@@ -11148,9 +11218,9 @@ export const getWhatsAppSuppression = <ThrowOnError extends boolean = false>(
 /**
  * List WhatsApp keyword rules
  *
- * Returns the keyword rules that apply to inbound messages, most specific first. Bird's own rules are included, so opt-out and opt-in work on every inbound-capable number before you configure anything.
+ * Returns the keyword rules that apply to inbound messages, most specific first. Bird's own rules are included, so opt-out and opt-in work on every inbound-capable number before you configure anything. A rule of yours with no `waba` replaces Bird's rule for the same operation and country, so that Bird rule is left out and yours carries its keywords in `effective_keywords`.
  *
- * Use the filters to narrow the full, unpaginated list. Set `scope=system` for Bird's rules only, or `scope=workspace` for the ones you created.
+ * Use the filters to narrow the full, unpaginated list. Set `scope=system` for Bird's rules only, including the ones yours replace, or `scope=workspace` for the ones you created.
  *
  */
 export const listWhatsAppKeywordRules = <ThrowOnError extends boolean = false>(
@@ -11182,7 +11252,7 @@ export const listWhatsAppKeywordRules = <ThrowOnError extends boolean = false>(
  *
  * Creates a keyword rule. Use it to replace the reply Bird sends for `opt_out` or `opt_in`, or to add keywords your customers actually type.
  *
- * Your rule takes precedence over Bird's at the same grain and keeps Bird's keywords unless you add more, so replacing a reply takes two fields. A keyword Bird has bound to one operation cannot be reused for the other.
+ * Your rule takes precedence over Bird's at the same grain and keeps Bird's keywords, so replacing a reply takes two fields. Set `excluded_keywords` to remove some of Bird's for the people the rule covers: a message that is exactly one of them then opts no one in or out and gets no reply. A keyword Bird has bound to one operation cannot be reused for the other.
  *
  */
 export const createWhatsAppKeywordRule = <ThrowOnError extends boolean = false>(
@@ -11216,7 +11286,7 @@ export const createWhatsAppKeywordRule = <ThrowOnError extends boolean = false>(
 /**
  * Delete a WhatsApp keyword rule
  *
- * Deletes a rule you created. The next rule in the ladder answers that scope straight away, so Bird's own keywords keep opting people out; the keywords the rule added go with it, and a word only that rule matched stops meaning anything. Which rule answers next is not always one of yours: the order runs from your rule for an account and country, through your rule for the account, your rule for the country, Bird's rule for the sender's country, your worldwide rule, and finally Bird's worldwide one. So deleting your rule for a country hands the scope to Bird's rule for that country before your own worldwide rule. List the rules to read the order for your workspace. Bird's own rules cannot be deleted.
+ * Deletes a rule you created. The next rule in the ladder answers that scope straight away with its own keywords; the keywords the deleted rule added or excluded go with it, and a word only that rule matched stops meaning anything. Which rule answers next is not always one of yours: the order runs from your rule for an account and country, through your rule for the account, your rule for the country, Bird's rule for the sender's country, your worldwide rule, and finally Bird's worldwide one. So deleting your rule for a country hands the scope to Bird's rule for that country before your own worldwide rule. List the rules to read the order for your workspace. Bird's own rules cannot be deleted.
  *
  */
 export const deleteWhatsAppKeywordRule = <ThrowOnError extends boolean = false>(
@@ -11276,7 +11346,7 @@ export const getWhatsAppKeywordRule = <ThrowOnError extends boolean = false>(
 /**
  * Update a WhatsApp keyword rule
  *
- * Changes the reply or the added keywords of a rule you created. Bird's own rules cannot be changed. To replace one, create a rule with the same operation and country and yours takes precedence.
+ * Changes the reply, the added keywords or the excluded keywords of a rule you created. Bird's own rules cannot be changed. To replace one, create a rule with the same operation and country and yours takes precedence.
  *
  * What the rule applies to is fixed once created, so this changes the reply and the keywords only.
  *
