@@ -3172,22 +3172,28 @@ for await (const tpl of bird.whatsapp.templates.list()) {
 }
 
 export async function _ex_420() {
+for await (const event of bird.whatsapp.templates.listEvents("order_update", { language: "en-US" })) {
+  console.log(event.created_at, event.type, event.summary);
+}
+}
+
+export async function _ex_421() {
 const template = await bird.whatsapp.templates.update("order_update", {
   name: "Order shipped",
 });
 console.log(template.slug, template.name);
 }
 
-export async function _ex_421() {
+export async function _ex_422() {
 const draft = await bird.whatsapp.templates.versions.create("order_update");
 console.log(draft.id);
 }
 
-export async function _ex_422() {
+export async function _ex_423() {
 await bird.whatsapp.templates.versions.delete("order_update", "wav_01krdgeqcxet5s7t44vh8rt9mg");
 }
 
-export async function _ex_423() {
+export async function _ex_424() {
 const version = await bird.whatsapp.templates.versions.get(
   "bird_otp",
   "wav_01ky4x8e4genzb7way45txfkm1",
@@ -3195,7 +3201,7 @@ const version = await bird.whatsapp.templates.versions.get(
 console.log(version.id, Object.keys(version.languages));
 }
 
-export async function _ex_424() {
+export async function _ex_425() {
 await bird.whatsapp.templates.versions.languages.delete(
   "order_update",
   "wav_01krdgeqcxet5s7t44vh8rt9mg",
@@ -3203,7 +3209,7 @@ await bird.whatsapp.templates.versions.languages.delete(
 );
 }
 
-export async function _ex_425() {
+export async function _ex_426() {
 const restored = await bird.whatsapp.templates.versions.languages.discard(
   "order_update",
   "wav_01krdgeqcxet5s7t44vh8rt9mg",
@@ -3212,7 +3218,7 @@ const restored = await bird.whatsapp.templates.versions.languages.discard(
 console.log(restored.language, restored.revision);
 }
 
-export async function _ex_426() {
+export async function _ex_427() {
 const language = await bird.whatsapp.templates.versions.languages.get(
   "bird_otp",
   "wav_01ky4x8e4genzb7way45txfkm1",
@@ -3221,7 +3227,7 @@ const language = await bird.whatsapp.templates.versions.languages.get(
 for (const component of language.components) console.log(component.type);
 }
 
-export async function _ex_427() {
+export async function _ex_428() {
 const { data } = await bird.whatsapp.templates.versions.languages.list(
   "bird_otp",
   "wav_01ky4x8e4genzb7way45txfkm1",
@@ -3229,7 +3235,7 @@ const { data } = await bird.whatsapp.templates.versions.languages.list(
 for (const language of data) console.log(language.language, language.status);
 }
 
-export async function _ex_428() {
+export async function _ex_429() {
 const saved = await bird.whatsapp.templates.versions.languages.set(
   "order_update",
   "wav_01krdgeqcxet5s7t44vh8rt9mg",
@@ -3247,13 +3253,13 @@ const saved = await bird.whatsapp.templates.versions.languages.set(
 console.log(saved.language, saved.revision);
 }
 
-export async function _ex_429() {
+export async function _ex_430() {
 for await (const version of bird.whatsapp.templates.versions.list("bird_otp")) {
   console.log(version.id, version.version_number);
 }
 }
 
-export async function _ex_430() {
+export async function _ex_431() {
 const draftId = "wav_01krdgeqcxet5s7t44vh8rt9mg";
 const check = await bird.whatsapp.templates.versions.submit("order_update", draftId, {
   validate_only: true,
@@ -3265,19 +3271,19 @@ if (check.valid) {
 }
 }
 
-export async function _ex_431() {
+export async function _ex_432() {
 const workspace = await bird.workspace.get();
 console.log(workspace.id, workspace.name); // "ws_…" "Production"
 }
 
-export async function _ex_432() {
+export async function _ex_433() {
 const { data } = await bird.workspace.quotas.list();
 for (const quota of data) {
   console.log(quota.key, quota.limit, quota.organization_limit);
 }
 }
 
-export async function _ex_433() {
+export async function _ex_434() {
 // Workspace limits matter with several workspaces, or one that kept a limit after a deletion.
 const { data } = await bird.workspace.rateLimits.list();
 for (const policy of data) {

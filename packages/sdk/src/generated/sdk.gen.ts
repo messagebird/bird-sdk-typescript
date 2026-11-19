@@ -1201,6 +1201,9 @@ import type {
   ListWhatsAppSuppressionsData,
   ListWhatsAppSuppressionsErrors,
   ListWhatsAppSuppressionsResponses,
+  ListWhatsAppTemplateEventsData,
+  ListWhatsAppTemplateEventsErrors,
+  ListWhatsAppTemplateEventsResponses,
   ListWhatsAppTemplatesData,
   ListWhatsAppTemplatesErrors,
   ListWhatsAppTemplatesResponses,
@@ -6773,7 +6776,7 @@ export const createVerificationCheck = <ThrowOnError extends boolean = false>(
  *
  * The send bypasses the resend cooldown and does not draw on the recipient's hourly send cap; what bounds it is the channel plan, since each call advances by at most one channel. Passcodes sent earlier remain valid. The response sets `last_channel` to the most recent completed send. Concurrent requests each advance the plan by at most one channel and return committed state.
  *
- * A recipient with no in-progress verification returns `404 E13000`, whether none was ever created or the most recent one is already resolved. A recipient who has already verified is in that set, so a `404` here is not evidence they still need verifying, and creating another verification would send a passcode they no longer need. A plan with no further channel returns `422 NoNextChannel`; create the verification again to resend on the current channel. If every remaining channel fails, the operation returns `422 NoAvailableChannel`. Requests that exceed the send rate limit return `429`.
+ * A recipient with no in-progress verification returns `404 E13000`, whether none was ever created or the most recent one is already resolved. A recipient who has already verified is in that set, so a `404` here is not evidence they still need verifying, and creating another verification would send a passcode they no longer need. A plan with no further channel returns `422 NoNextChannel`; create the verification again to resend on the current channel. If every remaining channel fails, the operation returns `422 NoAvailableChannel`. When one cause explains every remaining channel it is named instead, as `402 WalletInsufficientBalance` for a wallet that refused them all or `422 VerificationBlockedByFraudProtection` for fraud protection that blocked them all. Requests that exceed the send rate limit return `429`.
  *
  */
 export const createVerificationNextChannel = <
@@ -8336,6 +8339,51 @@ export const createWhatsAppTemplateDraft = <
       },
     ],
     url: "/v1/whatsapp/templates/{template_ref}/versions",
+    ...options,
+  });
+
+/**
+ * List WhatsApp template events
+ *
+ * Returns the template's history since Bird began recording it, newest
+ * first:
+ *
+ * - A status WhatsApp gave one of its languages, such as an approval, a
+ *   rejection, a pause, a reinstatement, or a deletion.
+ * - A change in a language's quality rating.
+ *
+ * Use it to see when a language was paused or its quality dropped, rather
+ * than polling
+ * [Get a WhatsApp template](/docs/api/reference/get-whatsapp-template).
+ * Changes Bird makes, such as submitting a language for review or deleting
+ * it at your request, are not listed. A Bird-managed template has no
+ * history and returns an empty page. A template that does not belong to the
+ * workspace, or no longer exists, returns `404`.
+ *
+ */
+export const listWhatsAppTemplateEvents = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<ListWhatsAppTemplateEventsData, ThrowOnError>,
+): RequestResult<
+  ListWhatsAppTemplateEventsResponses,
+  ListWhatsAppTemplateEventsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    ListWhatsAppTemplateEventsResponses,
+    ListWhatsAppTemplateEventsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/whatsapp/templates/{template_ref}/events",
     ...options,
   });
 

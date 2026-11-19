@@ -14192,6 +14192,48 @@ export type WhatsAppTemplateVersion = {
   readonly created_at: string | null;
 };
 
+export type WhatsAppTemplateEventId = string;
+
+export type WhatsAppTemplateEvent = {
+  /**
+   * Event ID.
+   */
+  readonly id: WhatsAppTemplateEventId;
+  /**
+   * Type of template event. `whatsapp_template.status_changed` records a status WhatsApp gave the language. `whatsapp_template.quality_updated` records a change in its quality rating. Open enum: new event types may be added over time, so treat any unrecognized value as a future event rather than an error. The values below are the types known at this version.
+   */
+  type: string;
+  /**
+   * Language the event concerns, as a BCP-47 tag.
+   */
+  language: LanguageTag;
+  /**
+   * Version whose language changed. A pause or a quality change applies to the version that is sending, when one exists, which is not always the newest one.
+   */
+  version_id: WhatsAppTemplateVersionId;
+  /**
+   * Human-readable summary of what changed.
+   */
+  summary: string;
+  /**
+   * Structured details for the event. `from` and `to` carry the values that changed: a language status for `whatsapp_template.status_changed`, or a quality score for `whatsapp_template.quality_updated`. `from` is the value Bird held before the change, and is absent when Bird held none. A change to `rejected` also carries the `rejection`, in the same shape as the language, when WhatsApp gave a reason. A new pause on a language that was already paused has the same `from` and `to`.
+   */
+  metadata: {
+    [key: string]: unknown;
+  };
+  /**
+   * When Bird recorded the event.
+   */
+  created_at: string;
+};
+
+export type WhatsAppTemplateEventList = {
+  /**
+   * Page of template events, newest first.
+   */
+  data: Array<WhatsAppTemplateEvent>;
+} & ListEnvelope;
+
 /**
  * The account the copy is created on, plus optional overrides. Everything else is inherited from the source.
  */
@@ -35432,6 +35474,42 @@ export type WhatsAppTemplateVersionWritable = {
     [key in LanguageTag]?: WhatsAppTemplateVersionLanguageWritable;
   };
 };
+
+export type WhatsAppTemplateEventWritable = {
+  /**
+   * Type of template event. `whatsapp_template.status_changed` records a status WhatsApp gave the language. `whatsapp_template.quality_updated` records a change in its quality rating. Open enum: new event types may be added over time, so treat any unrecognized value as a future event rather than an error. The values below are the types known at this version.
+   */
+  type: string;
+  /**
+   * Language the event concerns, as a BCP-47 tag.
+   */
+  language: LanguageTag;
+  /**
+   * Version whose language changed. A pause or a quality change applies to the version that is sending, when one exists, which is not always the newest one.
+   */
+  version_id: WhatsAppTemplateVersionId;
+  /**
+   * Human-readable summary of what changed.
+   */
+  summary: string;
+  /**
+   * Structured details for the event. `from` and `to` carry the values that changed: a language status for `whatsapp_template.status_changed`, or a quality score for `whatsapp_template.quality_updated`. `from` is the value Bird held before the change, and is absent when Bird held none. A change to `rejected` also carries the `rejection`, in the same shape as the language, when WhatsApp gave a reason. A new pause on a language that was already paused has the same `from` and `to`.
+   */
+  metadata: {
+    [key: string]: unknown;
+  };
+  /**
+   * When Bird recorded the event.
+   */
+  created_at: string;
+};
+
+export type WhatsAppTemplateEventListWritable = {
+  /**
+   * Page of template events, newest first.
+   */
+  data: Array<WhatsAppTemplateEventWritable>;
+} & ListEnvelope;
 
 /**
  * The outcome of a submit. The shape is the same whether the submit was a check or a real one: read `valid` and `version` to see what happened.
@@ -57415,6 +57493,91 @@ export type CreateWhatsAppTemplateDraftResponses = {
 
 export type CreateWhatsAppTemplateDraftResponse =
   CreateWhatsAppTemplateDraftResponses[keyof CreateWhatsAppTemplateDraftResponses];
+
+export type ListWhatsAppTemplateEventsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Template ID (`wat_` prefix) or slug. A value that parses as a valid ID resolves by ID; any other value resolves as a slug.
+     *
+     */
+    template_ref: string;
+  };
+  query?: {
+    /**
+     * Return only this language's events. A BCP-47 tag; case and separator differences are accepted and normalized.
+     */
+    language?: LanguageTag;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+  };
+  url: "/v1/whatsapp/templates/{template_ref}/events";
+};
+
+export type ListWhatsAppTemplateEventsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListWhatsAppTemplateEventsError =
+  ListWhatsAppTemplateEventsErrors[keyof ListWhatsAppTemplateEventsErrors];
+
+export type ListWhatsAppTemplateEventsResponses = {
+  /**
+   * A page of template events.
+   */
+  200: WhatsAppTemplateEventList;
+};
+
+export type ListWhatsAppTemplateEventsResponse =
+  ListWhatsAppTemplateEventsResponses[keyof ListWhatsAppTemplateEventsResponses];
 
 export type DuplicateWhatsAppTemplateData = {
   body: WhatsAppTemplateDuplicate;

@@ -25630,6 +25630,99 @@ export const WhatsAppTemplateVersionSchema = {
     "One version of a template: the content of every language it holds, frozen when it was submitted, alongside what Meta made of each. A draft is a version too: a mutable one, with no number and no submission date.\n",
 } as const;
 
+export const WhatsAppTemplateEventIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^wte_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "wte_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const WhatsAppTemplateEventSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "id",
+    "type",
+    "language",
+    "version_id",
+    "summary",
+    "metadata",
+    "created_at",
+  ],
+  properties: {
+    id: {
+      readOnly: true,
+      $ref: "#/components/schemas/WhatsAppTemplateEventID",
+      description: "Event ID.",
+    },
+    type: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Type of template event. `whatsapp_template.status_changed` records a status WhatsApp gave the language. `whatsapp_template.quality_updated` records a change in its quality rating. Open enum: new event types may be added over time, so treat any unrecognized value as a future event rather than an error. The values below are the types known at this version.",
+      "x-extensible-enum": [
+        "whatsapp_template.status_changed",
+        "whatsapp_template.quality_updated",
+      ],
+      example: "whatsapp_template.status_changed",
+    },
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description: "Language the event concerns, as a BCP-47 tag.",
+      example: "en-US",
+    },
+    version_id: {
+      $ref: "#/components/schemas/WhatsAppTemplateVersionID",
+      description:
+        "Version whose language changed. A pause or a quality change applies to the version that is sending, when one exists, which is not always the newest one.",
+    },
+    summary: {
+      type: "string",
+      minLength: 1,
+      description: "Human-readable summary of what changed.",
+      example: "Status changed to paused.",
+    },
+    metadata: {
+      type: "object",
+      description:
+        "Structured details for the event. `from` and `to` carry the values that changed: a language status for `whatsapp_template.status_changed`, or a quality score for `whatsapp_template.quality_updated`. `from` is the value Bird held before the change, and is absent when Bird held none. A change to `rejected` also carries the `rejection`, in the same shape as the language, when WhatsApp gave a reason. A new pause on a language that was already paused has the same `from` and `to`.",
+      additionalProperties: true,
+      example: {
+        from: "approved",
+        to: "paused",
+      },
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When Bird recorded the event.",
+      example: "2026-11-18T14:02:11Z",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateEventListSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of template events, newest first.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppTemplateEvent",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
+} as const;
+
 export const WhatsAppTemplateDuplicateSchema = {
   type: "object",
   additionalProperties: false,
@@ -64335,6 +64428,86 @@ export const WhatsAppTemplateVersionWritableSchema = {
   },
   description:
     "One version of a template: the content of every language it holds, frozen when it was submitted, alongside what Meta made of each. A draft is a version too: a mutable one, with no number and no submission date.\n",
+} as const;
+
+export const WhatsAppTemplateEventWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "type",
+    "language",
+    "version_id",
+    "summary",
+    "metadata",
+    "created_at",
+  ],
+  properties: {
+    type: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Type of template event. `whatsapp_template.status_changed` records a status WhatsApp gave the language. `whatsapp_template.quality_updated` records a change in its quality rating. Open enum: new event types may be added over time, so treat any unrecognized value as a future event rather than an error. The values below are the types known at this version.",
+      "x-extensible-enum": [
+        "whatsapp_template.status_changed",
+        "whatsapp_template.quality_updated",
+      ],
+      example: "whatsapp_template.status_changed",
+    },
+    language: {
+      $ref: "#/components/schemas/LanguageTag",
+      description: "Language the event concerns, as a BCP-47 tag.",
+      example: "en-US",
+    },
+    version_id: {
+      $ref: "#/components/schemas/WhatsAppTemplateVersionID",
+      description:
+        "Version whose language changed. A pause or a quality change applies to the version that is sending, when one exists, which is not always the newest one.",
+    },
+    summary: {
+      type: "string",
+      minLength: 1,
+      description: "Human-readable summary of what changed.",
+      example: "Status changed to paused.",
+    },
+    metadata: {
+      type: "object",
+      description:
+        "Structured details for the event. `from` and `to` carry the values that changed: a language status for `whatsapp_template.status_changed`, or a quality score for `whatsapp_template.quality_updated`. `from` is the value Bird held before the change, and is absent when Bird held none. A change to `rejected` also carries the `rejection`, in the same shape as the language, when WhatsApp gave a reason. A new pause on a language that was already paused has the same `from` and `to`.",
+      additionalProperties: true,
+      example: {
+        from: "approved",
+        to: "paused",
+      },
+    },
+    created_at: {
+      type: "string",
+      format: "date-time",
+      minLength: 1,
+      description: "When Bird recorded the event.",
+      example: "2026-11-18T14:02:11Z",
+    },
+  },
+} as const;
+
+export const WhatsAppTemplateEventListWritableSchema = {
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          description: "Page of template events, newest first.",
+          items: {
+            $ref: "#/components/schemas/WhatsAppTemplateEventWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelope",
+    },
+  ],
 } as const;
 
 export const WhatsAppTemplateSubmitResultWritableSchema = {

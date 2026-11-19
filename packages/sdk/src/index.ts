@@ -325,8 +325,10 @@ export type {
 } from "./resources/whatsappConversations.gen.js";
 export type {
   WhatsAppTemplate,
+  WhatsAppTemplateEvent,
   WhatsappTemplatesCreateParams,
   WhatsappTemplatesDuplicateParams,
+  WhatsappTemplatesListEventsQuery,
   WhatsappTemplatesListQuery,
   WhatsappTemplatesUpdateParams,
 } from "./resources/whatsappTemplates.gen.js";

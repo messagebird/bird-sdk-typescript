@@ -125,6 +125,12 @@ export async function whatsappTemplatesDelete() {
   await bird.whatsapp.templates.delete("order_update");
 }
 
+export async function whatsappTemplatesListEvents() {
+  for await (const event of bird.whatsapp.templates.listEvents("order_update", { language: "en-US" })) {
+    console.log(event.created_at, event.type, event.summary);
+  }
+}
+
 export async function whatsappTemplatesDuplicate() {
   const copy = await bird.whatsapp.templates.duplicate("bird_otp", {
     waba: "102290129340398",
