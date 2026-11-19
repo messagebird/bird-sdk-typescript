@@ -450,6 +450,26 @@ export type OrganizationId = string;
  */
 export type Timezone = string;
 
+/**
+ * What the quota's limit is measured in. `null` for a quota whose `type` is `boolean`, because its limit is a switch rather than an amount. `label` names what is counted.
+ *
+ * - `count`: a plain number: a count of things, such as domains or mailboxes, or a ratio such as a percentage or multiple.
+ * - `bytes`: stored data, in bytes.
+ * - `days`: a period, in days.
+ * - `microunits`: an amount of money in millionths of the billing currency's main unit.
+ *
+ */
+export type QuotaUnit = string | null;
+
+/**
+ * How to read the quota's limit.
+ *
+ * - `integer`: a count or amount, measured in `unit`.
+ * - `boolean`: a feature switch. A limit of `1` turns the feature on and `0` turns it off.
+ *
+ */
+export type QuotaType = "integer" | "boolean" | (string & {});
+
 export type DocsSearchResult = {
   /**
    * Title of the documentation page this result belongs to.
@@ -748,26 +768,6 @@ export type WorkspaceRateLimit = {
 export type WorkspaceRateLimitList = {
   data: Array<WorkspaceRateLimit>;
 };
-
-/**
- * What the quota's limit is measured in. `null` for a quota whose `type` is `boolean`, because its limit is a switch rather than an amount. `label` names what is counted.
- *
- * - `count`: a plain number: a count of things, such as domains or mailboxes, or a ratio such as a percentage or multiple.
- * - `bytes`: stored data, in bytes.
- * - `days`: a period, in days.
- * - `microunits`: an amount of money in millionths of the billing currency's main unit.
- *
- */
-export type QuotaUnit = string | null;
-
-/**
- * How to read the quota's limit.
- *
- * - `integer`: a count or amount, measured in `unit`.
- * - `boolean`: a feature switch. A limit of `1` turns the feature on and `0` turns it off.
- *
- */
-export type QuotaType = "integer" | "boolean" | (string & {});
 
 /**
  * What the quota limits.
@@ -4503,7 +4503,7 @@ export type EmailMessage = {
    */
   readonly scheduled_at?: string;
   /**
-   * The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.
+   * The business whose email preferences and unsubscribe page apply.
    *
    */
   readonly brand_id?: BrandId | null;
@@ -4676,7 +4676,7 @@ export type EmailMessageSendRequest = {
    */
   scheduled_at?: string;
   /**
-   * Preview: selects the business whose email preferences and unsubscribe page apply; explicit input returns `422` when selection is unavailable. When selection is available, omission or null selects the workspace's default Brand. The selection stays fixed for scheduled sends and retries. An explicit ID must belong to this workspace and must not be archived. An unknown, foreign or archived Brand returns `422`. Omitted or null values preserve existing sending behavior while selection is unavailable.
+   * Selects the business whose email preferences and unsubscribe page apply; omission or null selects the workspace's default Brand. The selection stays fixed for scheduled sends and retries. An explicit ID must belong to this workspace and must not be archived. An unknown, foreign or archived Brand returns `422`.
    */
   brand_id?: BrandId | null;
 };
@@ -4731,7 +4731,7 @@ export type EmailMessageBatchItem = {
    */
   readonly scheduled_at?: string;
   /**
-   * The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.
+   * The business whose email preferences and unsubscribe page apply.
    *
    */
   readonly brand_id?: BrandId | null;
@@ -5516,7 +5516,7 @@ export type EmailBroadcast = {
    */
   readonly failure_parameters?: EmailBroadcastFailureParameters;
   /**
-   * The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.
+   * The business whose email preferences and unsubscribe page apply.
    */
   readonly brand_id?: BrandId | null;
 };
@@ -5621,7 +5621,7 @@ export type EmailBroadcastCreateRequest = {
    */
   scheduled_at?: string;
   /**
-   * Preview: selects the business whose email preferences and unsubscribe page apply. Explicit selection returns `422` when unavailable. When available, omission or null selects the workspace's default Brand when the broadcast is first scheduled or sent. An explicit ID must belong to this workspace and be active; unknown, foreign or archived IDs return `422`. The selected Brand stays fixed through delivery and retries. Omitted or null input preserves existing sending behavior while selection is unavailable.
+   * Selects the business whose email preferences and unsubscribe page apply. Omission or null selects the workspace's default Brand when the broadcast is first scheduled or sent. An explicit ID must belong to this workspace and be active; unknown, foreign or archived IDs return `422`. The selected Brand stays fixed through delivery and retries.
    */
   brand_id?: BrandId | null;
 };
@@ -5702,7 +5702,7 @@ export type EmailBroadcastUpdateRequest = {
    */
   category?: "marketing" | "transactional";
   /**
-   * Preview: changes the business whose email preferences and unsubscribe page apply while this broadcast is a draft. Omission keeps the selection; null clears it so the workspace's default Brand is selected at first scheduling or sending. Explicit selection returns `422` when unavailable or when the ID is unknown, belongs to another workspace or is archived. Changing the Brand on a scheduled broadcast returns `422`. Broadcasts that are no longer editable retain the existing `409` conflict response.
+   * Changes the business whose email preferences and unsubscribe page apply while this broadcast is a draft. Omission keeps the selection; null clears it so the workspace's default Brand is selected at first scheduling or sending. Explicit selection returns `422` when unavailable or when the ID is unknown, belongs to another workspace or is archived. Changing the Brand on a scheduled broadcast returns `422`. Broadcasts that are no longer editable retain the existing `409` conflict response.
    */
   brand_id?: BrandId | null;
 };
@@ -5924,7 +5924,7 @@ export type EmailBroadcastInputOverrides = {
    */
   headers?: EmailBroadcastHeaders;
   /**
-   * Preview Brand selection. An explicit ID is unavailable until selection is enabled. Changes the Brand for this validation, preview or test only, without changing the saved broadcast. Null resolves the workspace default when selection is enabled; otherwise it clears the request's Brand to unbranded. Omission keeps a historical broadcast's saved identity. An unavailable saved Brand remains renderable with a brand_unavailable diagnostic. Before sending a test, preview again with an available ID or null, then send the same override and fresh preview_fingerprint. Explicit unavailable overrides return 422.
+   * Changes the Brand for this validation, preview or test only, without changing the saved broadcast. Null selects the workspace default Brand. Omission keeps a historical broadcast's saved identity. An unavailable saved Brand remains renderable with a brand_unavailable diagnostic. Before sending a test, preview again with an available ID or null, then send the same override and fresh preview_fingerprint. Explicit unavailable overrides return 422.
    */
   brand_id?: BrandId | null;
 };
@@ -6510,7 +6510,7 @@ export type Preference = {
    */
   readonly contact_id?: ContactId | null;
   /**
-   * The business this email preference belongs to. Brand attribution is in preview.
+   * The business this email preference belongs to.
    */
   readonly brand_id?: BrandId | null;
 } & Timestamps;
@@ -6542,7 +6542,7 @@ export type PreferenceStatement = {
    */
   consented_at?: string;
   /**
-   * Brand selection is in preview. Select the business for an email preference. Omitted or null selects the original business. Unsupported on other channels. An additional Brand supports non_transactional coverage only. Explicit selection returns 422 when unavailable. Existing opt-outs can be recorded for archived Brands; grants to archived Brands return 422. Consent grants for active additional Brands return 422 when unavailable. A Brand not found in this workspace returns 404.
+   * Select the business for an email preference. Omitted or null selects the original business. Unsupported on other channels. An additional Brand supports non_transactional coverage only. Existing opt-outs can be recorded for archived Brands; grants to archived Brands return 422. A Brand not found in this workspace returns 404.
    */
   brand_id?: BrandId | null;
 };
@@ -25479,7 +25479,13 @@ export type EmailSmtpConfig = {
    * Whether click events are tracked for messages submitted over SMTP with this key.
    */
   track_clicks: boolean;
-} & Timestamps;
+} & Timestamps & {
+    /**
+     * Brand selected for SMTP messages submitted with this key. `null` means messages use the workspace default Brand.
+     *
+     */
+    brand_id?: string | null;
+  };
 
 export type EmailSmtpConfigList = {
   /**
@@ -25522,6 +25528,11 @@ export type EmailSmtpConfigUpdate = {
    * Whether to track click events for messages submitted over SMTP with this key. Omit to leave unchanged.
    */
   track_clicks?: boolean;
+  /**
+   * Select an active Brand in this workspace for messages submitted with this key. Send `null` to use the workspace default Brand, or omit to keep the current selection. An unavailable selection returns `422`; a Brand whose setup is incomplete returns `503`. When rotating an API key, configure the replacement key's Brand before switching SMTP traffic; the new key does not inherit these settings.
+   *
+   */
+  brand_id?: string | null;
 };
 
 /**
@@ -26287,7 +26298,7 @@ export type EventEmailBase = {
    */
   broadcast_id: EmailBroadcastId | null;
   /**
-   * The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.
+   * The business whose email preferences and unsubscribe page apply.
    *
    */
   readonly brand_id?: BrandId | null;
@@ -26395,7 +26406,7 @@ export type EventEmailMessageBase = {
    */
   reference?: MessageReference;
   /**
-   * The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.
+   * The business whose email preferences and unsubscribe page apply.
    *
    */
   readonly brand_id?: BrandId | null;
@@ -27175,7 +27186,7 @@ export type EventPreferenceBase = {
    */
   contact_id: ContactId | null;
   /**
-   * The business this email preference belongs to. Brand attribution is in preview.
+   * The business this email preference belongs to.
    */
   brand_id?: BrandId | null;
 };
@@ -29020,7 +29031,9 @@ export type VoiceSessionCredential = {
  * For all other reasons, contact support and provide the leg `id`:
  *
  * - `routing_not_configured`: This trunk has no dial plan, which can happen on
- *   a new trunk.
+ *   a new trunk. For a SIP user's call, the trunk has no outbound routing, or
+ *   the phone dialled a number without a country code on a trunk with no
+ *   `country`: set the trunk's country or dial in international format.
  * - `no_route_found`: A dial plan is attached, but no rule in it covers this
  *   destination.
  * - `destination_blocked`: The destination is blocked by our routing
@@ -37692,6 +37705,12 @@ export type EmailSmtpConfigWritable = {
    * Whether click events are tracked for messages submitted over SMTP with this key.
    */
   track_clicks: boolean;
+} & {
+  /**
+   * Brand selected for SMTP messages submitted with this key. `null` means messages use the workspace default Brand.
+   *
+   */
+  brand_id?: string | null;
 };
 
 export type EmailSmtpConfigListWritable = {
@@ -40209,7 +40228,7 @@ export type EmailBroadcastSearchFilter = string;
 export type BroadcastTestIdempotencyKey = string;
 
 /**
- * Preview: return only this Brand's email preferences, including older preferences belonging to the original business. Explicit selection returns 422 where unavailable. Omit to return all matching preferences. Empty, repeated or malformed values return 422. Where the endpoint also accepts a channel filter, it must be email. A Brand not found in this workspace returns 404.
+ * Return only this Brand's email preferences, including older preferences belonging to the original business. Omit to return all matching preferences. Empty, repeated or malformed values return 422. Where the endpoint also accepts a channel filter, it must be email. A Brand not found in this workspace returns 404.
  */
 export type PreferenceBrandId = BrandId;
 
@@ -44742,7 +44761,7 @@ export type ListContactPreferencesData = {
   };
   query?: {
     /**
-     * Preview: return only this Brand's email preferences, including older preferences belonging to the original business. Explicit selection returns 422 where unavailable. Omit to return all matching preferences. Empty, repeated or malformed values return 422. Where the endpoint also accepts a channel filter, it must be email. A Brand not found in this workspace returns 404.
+     * Return only this Brand's email preferences, including older preferences belonging to the original business. Omit to return all matching preferences. Empty, repeated or malformed values return 422. Where the endpoint also accepts a channel filter, it must be email. A Brand not found in this workspace returns 404.
      */
     brand_id?: BrandId;
     /**
@@ -44835,7 +44854,7 @@ export type ListPreferencesData = {
      */
     handle?: string;
     /**
-     * Preview: return only this Brand's email preferences, including older preferences belonging to the original business. Explicit selection returns 422 where unavailable. Omit to return all matching preferences. Empty, repeated or malformed values return 422. Where the endpoint also accepts a channel filter, it must be email. A Brand not found in this workspace returns 404.
+     * Return only this Brand's email preferences, including older preferences belonging to the original business. Omit to return all matching preferences. Empty, repeated or malformed values return 422. Where the endpoint also accepts a channel filter, it must be email. A Brand not found in this workspace returns 404.
      */
     brand_id?: BrandId;
     /**

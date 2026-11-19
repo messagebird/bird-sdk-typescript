@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.145.1
+
+- Clarify Brand selection and default behavior in public API and SDK documentation.
+
 ## 0.145.0
 
 - **Breaking:** requesting Apple Messages conversation authentication takes parameters as its second argument and request options as its third, so a call that passes request options must add a parameters argument before them. The optional `template` in the parameters names the sign-in message template to send in place of the business's sign-in message.

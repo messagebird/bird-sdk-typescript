@@ -689,6 +689,23 @@ export const TimezoneSchema = {
   example: "America/New_York",
 } as const;
 
+export const QuotaUnitSchema = {
+  type: ["string", "null"],
+  minLength: 1,
+  "x-extensible-enum": ["count", "bytes", "days", "microunits"],
+  example: "count",
+  description:
+    "What the quota's limit is measured in. `null` for a quota whose `type` is `boolean`, because its limit is a switch rather than an amount. `label` names what is counted.\n\n- `count`: a plain number: a count of things, such as domains or mailboxes, or a ratio such as a percentage or multiple.\n- `bytes`: stored data, in bytes.\n- `days`: a period, in days.\n- `microunits`: an amount of money in millionths of the billing currency's main unit.\n",
+} as const;
+
+export const QuotaTypeSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": ["integer", "boolean"],
+  description:
+    "How to read the quota's limit.\n\n- `integer`: a count or amount, measured in `unit`.\n- `boolean`: a feature switch. A limit of `1` turns the feature on and `0` turns it off.\n",
+} as const;
+
 export const DocsSearchResultSchema = {
   type: "object",
   additionalProperties: false,
@@ -1213,23 +1230,6 @@ export const WorkspaceRateLimitListSchema = {
       },
     },
   },
-} as const;
-
-export const QuotaUnitSchema = {
-  type: ["string", "null"],
-  minLength: 1,
-  "x-extensible-enum": ["count", "bytes", "days", "microunits"],
-  example: "count",
-  description:
-    "What the quota's limit is measured in. `null` for a quota whose `type` is `boolean`, because its limit is a switch rather than an amount. `label` names what is counted.\n\n- `count`: a plain number: a count of things, such as domains or mailboxes, or a ratio such as a percentage or multiple.\n- `bytes`: stored data, in bytes.\n- `days`: a period, in days.\n- `microunits`: an amount of money in millionths of the billing currency's main unit.\n",
-} as const;
-
-export const QuotaTypeSchema = {
-  type: "string",
-  minLength: 1,
-  "x-extensible-enum": ["integer", "boolean"],
-  description:
-    "How to read the quota's limit.\n\n- `integer`: a count or amount, measured in `unit`.\n- `boolean`: a feature switch. A limit of `1` turns the feature on and `0` turns it off.\n",
 } as const;
 
 export const WorkspaceQuotaKindSchema = {
@@ -8123,7 +8123,7 @@ export const EmailMessageSchema = {
       ],
       readOnly: true,
       description:
-        "The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.\n",
+        "The business whose email preferences and unsubscribe page apply.\n",
     },
   },
 } as const;
@@ -8415,7 +8415,7 @@ export const EmailMessageSendRequestSchema = {
         },
       ],
       description:
-        "Preview: selects the business whose email preferences and unsubscribe page apply; explicit input returns `422` when selection is unavailable. When selection is available, omission or null selects the workspace's default Brand. The selection stays fixed for scheduled sends and retries. An explicit ID must belong to this workspace and must not be archived. An unknown, foreign or archived Brand returns `422`. Omitted or null values preserve existing sending behavior while selection is unavailable.",
+        "Selects the business whose email preferences and unsubscribe page apply; omission or null selects the workspace's default Brand. The selection stays fixed for scheduled sends and retries. An explicit ID must belong to this workspace and must not be archived. An unknown, foreign or archived Brand returns `422`.",
     },
   },
   example: {
@@ -8587,7 +8587,7 @@ export const EmailMessageBatchItemSchema = {
       ],
       readOnly: true,
       description:
-        "The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.\n",
+        "The business whose email preferences and unsubscribe page apply.\n",
     },
   },
 } as const;
@@ -9658,7 +9658,7 @@ export const EmailBroadcastSchema = {
       ],
       readOnly: true,
       description:
-        "The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.",
+        "The business whose email preferences and unsubscribe page apply.",
     },
   },
   example: {
@@ -9840,7 +9840,7 @@ export const EmailBroadcastCreateRequestSchema = {
         },
       ],
       description:
-        "Preview: selects the business whose email preferences and unsubscribe page apply. Explicit selection returns `422` when unavailable. When available, omission or null selects the workspace's default Brand when the broadcast is first scheduled or sent. An explicit ID must belong to this workspace and be active; unknown, foreign or archived IDs return `422`. The selected Brand stays fixed through delivery and retries. Omitted or null input preserves existing sending behavior while selection is unavailable.",
+        "Selects the business whose email preferences and unsubscribe page apply. Omission or null selects the workspace's default Brand when the broadcast is first scheduled or sent. An explicit ID must belong to this workspace and be active; unknown, foreign or archived IDs return `422`. The selected Brand stays fixed through delivery and retries.",
     },
   },
   example: {
@@ -9987,7 +9987,7 @@ export const EmailBroadcastUpdateRequestSchema = {
         },
       ],
       description:
-        "Preview: changes the business whose email preferences and unsubscribe page apply while this broadcast is a draft. Omission keeps the selection; null clears it so the workspace's default Brand is selected at first scheduling or sending. Explicit selection returns `422` when unavailable or when the ID is unknown, belongs to another workspace or is archived. Changing the Brand on a scheduled broadcast returns `422`. Broadcasts that are no longer editable retain the existing `409` conflict response.",
+        "Changes the business whose email preferences and unsubscribe page apply while this broadcast is a draft. Omission keeps the selection; null clears it so the workspace's default Brand is selected at first scheduling or sending. Explicit selection returns `422` when unavailable or when the ID is unknown, belongs to another workspace or is archived. Changing the Brand on a scheduled broadcast returns `422`. Broadcasts that are no longer editable retain the existing `409` conflict response.",
     },
   },
   example: {
@@ -10336,7 +10336,7 @@ export const EmailBroadcastInputOverridesSchema = {
         },
       ],
       description:
-        "Preview Brand selection. An explicit ID is unavailable until selection is enabled. Changes the Brand for this validation, preview or test only, without changing the saved broadcast. Null resolves the workspace default when selection is enabled; otherwise it clears the request's Brand to unbranded. Omission keeps a historical broadcast's saved identity. An unavailable saved Brand remains renderable with a brand_unavailable diagnostic. Before sending a test, preview again with an available ID or null, then send the same override and fresh preview_fingerprint. Explicit unavailable overrides return 422.",
+        "Changes the Brand for this validation, preview or test only, without changing the saved broadcast. Null selects the workspace default Brand. Omission keeps a historical broadcast's saved identity. An unavailable saved Brand remains renderable with a brand_unavailable diagnostic. Before sending a test, preview again with an available ID or null, then send the same override and fresh preview_fingerprint. Explicit unavailable overrides return 422.",
     },
   },
 } as const;
@@ -11485,8 +11485,7 @@ export const PreferenceSchema = {
           ],
           readOnly: true,
           example: null,
-          description:
-            "The business this email preference belongs to. Brand attribution is in preview.",
+          description: "The business this email preference belongs to.",
         },
       },
     },
@@ -11569,7 +11568,7 @@ export const PreferenceStatementSchema = {
         },
       ],
       description:
-        "Brand selection is in preview. Select the business for an email preference. Omitted or null selects the original business. Unsupported on other channels. An additional Brand supports non_transactional coverage only. Explicit selection returns 422 when unavailable. Existing opt-outs can be recorded for archived Brands; grants to archived Brands return 422. Consent grants for active additional Brands return 422 when unavailable. A Brand not found in this workspace returns 404.",
+        "Select the business for an email preference. Omitted or null selects the original business. Unsupported on other channels. An additional Brand supports non_transactional coverage only. Existing opt-outs can be recorded for archived Brands; grants to archived Brands return 422. A Brand not found in this workspace returns 404.",
     },
   },
 } as const;
@@ -23357,7 +23356,8 @@ export const ConversationLabelsSchema = {
     type: "string",
     minLength: 1,
     maxLength: 64,
-    pattern: "^[^,\\s](?:[^,]*[^,\\s])?$",
+    pattern:
+      "^[^,\\s\\x00-\\x1F\\x7F-\\x9F](?:[^,\\x00-\\x1F\\x7F-\\x9F]*[^,\\s\\x00-\\x1F\\x7F-\\x9F])?$",
   },
   uniqueItems: true,
   description:
@@ -23518,7 +23518,8 @@ export const _ConversationUpdateSchema = {
         type: "string",
         minLength: 1,
         maxLength: 64,
-        pattern: "^[^,\\s](?:[^,]*[^,\\s])?$",
+        pattern:
+          "^[^,\\s\\x00-\\x1F\\x7F-\\x9F](?:[^,\\x00-\\x1F\\x7F-\\x9F]*[^,\\s\\x00-\\x1F\\x7F-\\x9F])?$",
       },
       maxItems: 20,
       uniqueItems: true,
@@ -45667,7 +45668,8 @@ export const EmailLabelsUpdateSchema = {
         type: "string",
         minLength: 1,
         maxLength: 64,
-        pattern: "^[^,\\s](?:[^,]*[^,\\s])?$",
+        pattern:
+          "^[^,\\s\\x00-\\x1F\\x7F-\\x9F](?:[^,\\x00-\\x1F\\x7F-\\x9F]*[^,\\s\\x00-\\x1F\\x7F-\\x9F])?$",
       },
       maxItems: 20,
       description: "Labels to apply.",
@@ -45679,7 +45681,8 @@ export const EmailLabelsUpdateSchema = {
         type: "string",
         minLength: 1,
         maxLength: 64,
-        pattern: "^[^,\\s](?:[^,]*[^,\\s])?$",
+        pattern:
+          "^[^,\\s\\x00-\\x1F\\x7F-\\x9F](?:[^,\\x00-\\x1F\\x7F-\\x9F]*[^,\\s\\x00-\\x1F\\x7F-\\x9F])?$",
       },
       maxItems: 20,
       description: "Labels to take off.",
@@ -46179,6 +46182,17 @@ export const EmailSmtpConfigSchema = {
     {
       $ref: "#/components/schemas/Timestamps",
     },
+    {
+      type: "object",
+      properties: {
+        brand_id: {
+          type: ["string", "null"],
+          pattern: "^bnd_[0-9a-hjkmnp-tv-z]{26}$",
+          description:
+            "Brand selected for SMTP messages submitted with this key. `null` means messages use the workspace default Brand.\n",
+        },
+      },
+    },
   ],
 } as const;
 
@@ -46239,6 +46253,12 @@ export const EmailSmtpConfigUpdateSchema = {
       type: "boolean",
       description:
         "Whether to track click events for messages submitted over SMTP with this key. Omit to leave unchanged.",
+    },
+    brand_id: {
+      type: ["string", "null"],
+      pattern: "^bnd_[0-9a-hjkmnp-tv-z]{26}$",
+      description:
+        "Select an active Brand in this workspace for messages submitted with this key. Send `null` to use the workspace default Brand, or omit to keep the current selection. An unavailable selection returns `422`; a Brand whose setup is incomplete returns `503`. When rotating an API key, configure the replacement key's Brand before switching SMTP traffic; the new key does not inherit these settings.\n",
     },
   },
 } as const;
@@ -47749,7 +47769,7 @@ export const EventEmailBaseSchema = {
       ],
       readOnly: true,
       description:
-        "The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.\n",
+        "The business whose email preferences and unsubscribe page apply.\n",
     },
   },
 } as const;
@@ -47929,7 +47949,7 @@ export const EventEmailMessageBaseSchema = {
       ],
       readOnly: true,
       description:
-        "The business whose email preferences and unsubscribe page apply. Brand attribution is in preview.\n",
+        "The business whose email preferences and unsubscribe page apply.\n",
     },
   },
 } as const;
@@ -49256,8 +49276,7 @@ export const EventPreferenceBaseSchema = {
           type: "null",
         },
       ],
-      description:
-        "The business this email preference belongs to. Brand attribution is in preview.",
+      description: "The business this email preference belongs to.",
     },
   },
 } as const;
@@ -52473,7 +52492,7 @@ export const VoiceLegRejectionReasonSchema = {
     "emergency_carrier_unavailable",
   ],
   description:
-    "Why we rejected the leg. Use `rejection_reason` to identify the cause;\n`sip_response_code` alone cannot distinguish these reasons. Treat an\nunrecognized value as a reason added later.\n\nYou can resolve these issues:\n\n- `source_not_allowed`: The leg came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it or use a verified caller ID.\n- `number_ownership_not_verified`: The ownership documents for this purchased\n  number have not yet been accepted under its country's requirements. We\n  block outgoing and incoming legs on the number until verification is\n  complete. Blocked incoming legs never reach your PBX, and their route type\n  is `reject` regardless of the number's configuration. Open the number\n  under **Numbers** and complete its ownership requirements, then retry\n  the leg.\n- `destination_not_enabled`: Calling to this destination country is disabled.\n  Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet balance was too low for the leg.\n  Top up or enable automatic top-ups.\n- `daily_spend_exceeded`: The leg would exceed your organization's daily\n  voice spend limit. Retry after the limit resets at the start of the next\n  UTC day.\n- `concurrent_calls_exceeded`: You already have as many legs in progress as\n  your account allows. Wait for one to end or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed legs faster than your account\n  allows. Reduce your dialing rate and retry.\n- `sequence_paused`: The sequence receiving this call is paused. Resume it\n  to receive calls.\n- `sequence_archived`: The sequence receiving this call is archived. Route\n  the number to an available sequence.\n- `sequence_unpublished`: The sequence receiving this call has no active\n  publication. Publish it to receive calls.\n\n- `emergency_number_inactive`: The trunk's emergency number is not active, or\n  the workspace has no active emergency site for a browser call. Set up an\n  emergency site if needed. If the service is pending, wait for activation.\n  If it needs changes, complete the filing. If it was rejected or canceled,\n  start a new service or choose another emergency number.\n- `emergency_country_mismatch`: The dialed emergency number is not recognised\n  in the configured emergency site's country. Dial an emergency number for\n  that country or use another line.\n- `emergency_cap_exceeded`: The trunk already carries 10 emergency calls.\n  The 11th is refused until one ends.\n\nFor all other reasons, contact support and provide the leg `id`:\n\n- `routing_not_configured`: This trunk has no dial plan, which can happen on\n  a new trunk.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The leg could not be priced for your account.\n- `emergency_carrier_unavailable`: No carrier we use accepts emergency calls\n  from the trunk's emergency number.\n",
+    "Why we rejected the leg. Use `rejection_reason` to identify the cause;\n`sip_response_code` alone cannot distinguish these reasons. Treat an\nunrecognized value as a reason added later.\n\nYou can resolve these issues:\n\n- `source_not_allowed`: The leg came from an IP address that is not in the\n  trunk's allowed-address list. Add the address your PBX sends from.\n- `caller_id_not_verified`: The number in the `From` header is not a verified\n  caller ID for this workspace. Verify it or use a verified caller ID.\n- `number_ownership_not_verified`: The ownership documents for this purchased\n  number have not yet been accepted under its country's requirements. We\n  block outgoing and incoming legs on the number until verification is\n  complete. Blocked incoming legs never reach your PBX, and their route type\n  is `reject` regardless of the number's configuration. Open the number\n  under **Numbers** and complete its ownership requirements, then retry\n  the leg.\n- `destination_not_enabled`: Calling to this destination country is disabled.\n  Enable it in your voice destination settings.\n- `insufficient_balance`: Your wallet balance was too low for the leg.\n  Top up or enable automatic top-ups.\n- `daily_spend_exceeded`: The leg would exceed your organization's daily\n  voice spend limit. Retry after the limit resets at the start of the next\n  UTC day.\n- `concurrent_calls_exceeded`: You already have as many legs in progress as\n  your account allows. Wait for one to end or ask support to raise the limit.\n- `calls_per_second_exceeded`: You placed legs faster than your account\n  allows. Reduce your dialing rate and retry.\n- `sequence_paused`: The sequence receiving this call is paused. Resume it\n  to receive calls.\n- `sequence_archived`: The sequence receiving this call is archived. Route\n  the number to an available sequence.\n- `sequence_unpublished`: The sequence receiving this call has no active\n  publication. Publish it to receive calls.\n\n- `emergency_number_inactive`: The trunk's emergency number is not active, or\n  the workspace has no active emergency site for a browser call. Set up an\n  emergency site if needed. If the service is pending, wait for activation.\n  If it needs changes, complete the filing. If it was rejected or canceled,\n  start a new service or choose another emergency number.\n- `emergency_country_mismatch`: The dialed emergency number is not recognised\n  in the configured emergency site's country. Dial an emergency number for\n  that country or use another line.\n- `emergency_cap_exceeded`: The trunk already carries 10 emergency calls.\n  The 11th is refused until one ends.\n\nFor all other reasons, contact support and provide the leg `id`:\n\n- `routing_not_configured`: This trunk has no dial plan, which can happen on\n  a new trunk. For a SIP user's call, the trunk has no outbound routing, or\n  the phone dialled a number without a country code on a trunk with no\n  `country`: set the trunk's country or dial in international format.\n- `no_route_found`: A dial plan is attached, but no rule in it covers this\n  destination.\n- `destination_blocked`: The destination is blocked by our routing\n  configuration.\n- `call_not_permitted`: The leg could not be priced for your account.\n- `emergency_carrier_unavailable`: No carrier we use accepts emergency calls\n  from the trunk's emergency number.\n",
   example: "destination_not_enabled",
 } as const;
 
@@ -68664,6 +68683,17 @@ export const EmailSmtpConfigWritableSchema = {
           type: "boolean",
           description:
             "Whether click events are tracked for messages submitted over SMTP with this key.",
+        },
+      },
+    },
+    {
+      type: "object",
+      properties: {
+        brand_id: {
+          type: ["string", "null"],
+          pattern: "^bnd_[0-9a-hjkmnp-tv-z]{26}$",
+          description:
+            "Brand selected for SMTP messages submitted with this key. `null` means messages use the workspace default Brand.\n",
         },
       },
     },

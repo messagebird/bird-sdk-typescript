@@ -2369,15 +2369,14 @@ export const listEmailBroadcasts = <ThrowOnError extends boolean = false>(
  * [List recipients of a broadcast](/docs/api/reference/list-email-broadcast-recipients).
  * With `send`, the request returns `422` if any of these are true:
  *
- * - A Brand is selected while selection is disabled, or the selected Brand does not exist in this workspace or is archived.
+ * - The selected Brand does not exist in this workspace or is archived.
  * - The sender domain is not verified.
  * - No audience is selected, or the selected audience no longer exists.
  * - The audience has no contact with an email address, or every contact is suppressed for the broadcast's category.
  * - No template is set, or the set template has no published version.
  * - The organization has used its broadcast allowance for the current billing period, or (for an immediate send) is already at its concurrent-broadcast limit; schedule the send instead to wait for a free slot.
  *
- * Brand selection is in preview and unavailable until enabled. When enabled,
- * the first send or schedule fixes the selected Brand, or the workspace default
+ * The first send or schedule fixes the selected Brand, or the workspace default
  * if no Brand was selected. Preferences are evaluated for that Brand; retries
  * keep the same identity.
  *
@@ -2802,15 +2801,14 @@ export const sendEmailBroadcastTest = <ThrowOnError extends boolean = false>(
  * The audience's contacts at send time become the recipients after suppressions.
  * The request returns `422` if any of these are true:
  *
- * - A Brand is selected while selection is disabled, or the selected Brand does not exist in this workspace or is archived.
+ * - The selected Brand does not exist in this workspace or is archived.
  * - The sender domain is not verified.
  * - No audience is selected, or the selected audience no longer exists.
  * - The audience has no contact with an email address, or every contact is suppressed for the broadcast's category.
  * - No template is set, or the set template has no published version.
  * - The organization has used its broadcast allowance for the current billing period, or (for an immediate send) is already at its concurrent-broadcast limit; schedule the send instead to wait for a free slot.
  *
- * Brand selection is in preview and unavailable until enabled. When enabled,
- * the first send or schedule fixes the selected Brand, or the workspace default
+ * The first send or schedule fixes the selected Brand, or the workspace default
  * if no Brand was selected. Preferences are evaluated for that Brand; retries
  * keep the same identity.
  *
@@ -2881,7 +2879,7 @@ export const cancelEmailBroadcast = <ThrowOnError extends boolean = false>(
 /**
  * Resume a broadcast
  *
- * Continues a `paused` broadcast using its saved template references and recipient list, skipping recipients already sent to and applying current consent and suppression checks for its saved category and Brand. Brand selection is in preview. If the broadcast has a `brand_id`, resuming keeps that ID; it does not select the current default. Legacy broadcasts with `brand_id: null` keep their original consent scope. Workspace-wide protections still apply. The selected Brand stays in use while the broadcast waits for funds, is paused, or resumes, even if Brand selection is later disabled. It cannot be archived until the broadcast finishes or cancellation completes. Marketing broadcasts skip newly unsubscribed recipients; transactional broadcasts retain their category exemptions. Resuming does not use another broadcast from your monthly allowance. A `202` returns `status: sending`; delivery continues asynchronously. Use [get the broadcast](/docs/api/reference/get-email-broadcast) to follow progress.
+ * Continues a `paused` broadcast using its saved template references and recipient list, skipping recipients already sent to and applying current consent and suppression checks for its saved category and Brand. If the broadcast has a `brand_id`, resuming keeps that ID; it does not select the current default. Legacy broadcasts with `brand_id: null` keep their original consent scope. Workspace-wide protections still apply. The selected Brand stays in use while the broadcast waits for funds, is paused, or resumes. It cannot be archived until the broadcast finishes or cancellation completes. Marketing broadcasts skip newly unsubscribed recipients; transactional broadcasts retain their category exemptions. Resuming does not use another broadcast from your monthly allowance. A `202` returns `status: sending`; delivery continues asynchronously. Use [get the broadcast](/docs/api/reference/get-email-broadcast) to follow progress.
  *
  * If the broadcast first started sending at least 24 hours ago, review its message and set `confirm` to `true` to acknowledge late delivery. For older broadcasts without `started_at`, the threshold uses the send authorization time, or the creation time if neither timestamp was recorded. You can also send `confirm: true` before that threshold; it does not skip other checks. To review the message, first [get the template](/docs/api/reference/get-email-template) with the broadcast's `template.id` and check its `scope`, which the version read does not return. A `scope` of `system` marks a built-in template, whose lookups return current catalogue content; a `404` means a deleted workspace template, whose pinned version stays readable by ID. For a workspace template, use `template.id` and `template.version_id` with [get a template version](/docs/api/reference/get-email-template-version), then check `template.language` or the version's `default_language`. Both reads require `email_management:read`. Published workspace versions retain their original content and remain readable by ID after template deletion; a deleted or reused slug cannot identify the original message. Broadcasts with frozen content keep sending that content, but older broadcasts can read the catalogue again when resumed. Neither the current lookup nor a copy of an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Once the funding wait has ended, adding funds alone does not restart a paused broadcast: call this operation explicitly after reviewing its content.
  *
