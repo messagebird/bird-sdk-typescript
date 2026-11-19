@@ -1,5 +1,6 @@
 import { EmailCompetitiveResource } from "./emailCompetitive.js";
 import { EmailInboxInsightsResource } from "./emailInboxInsights.js";
+import { EmailSeedingResource } from "./emailSeeding.js";
 // `bird.email` — the email channel: send email messages and read their delivery status.
 
 import {
@@ -57,6 +58,9 @@ export class EmailResource<
   readonly competitive: EmailCompetitiveResource;
   readonly inboxInsights: EmailInboxInsightsResource;
 
+  /** Automatic email seeding — `bird.email.seeding.settings.get()`, `.runs.list(...)`, … */
+  readonly seeding: EmailSeedingResource;
+
   /** Email statistics — `bird.email.stats.summary(...)`, `.daily(...)`, `.byTag(...)`, … */
   readonly stats: EmailStatsResource;
 
@@ -78,6 +82,7 @@ export class EmailResource<
     this.#defaults = defaults;
     this.competitive = new EmailCompetitiveResource(core, client);
     this.inboxInsights = new EmailInboxInsightsResource(core, client);
+    this.seeding = new EmailSeedingResource(core, client);
     this.stats = new EmailStatsResource(core, client);
     this.mailboxes = new EmailMailboxesResource(core, client, defaults);
     this.threads = new EmailThreadsResource(core, client);

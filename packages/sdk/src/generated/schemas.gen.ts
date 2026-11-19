@@ -600,6 +600,23 @@ export const ErrorSchema = {
   },
 } as const;
 
+export const TemplateSlugSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 63,
+  pattern: "^[a-z0-9]([a-z0-9_-]*[a-z0-9])?$",
+  description:
+    "A template's slug: what you send it by, for example `welcome-email`. Email and SMS slugs stay fixed after creation. WhatsApp slugs can change only before the first submission. A slug can contain lowercase letters, numbers, hyphens, and underscores, has to start and end with a letter or a number, and can be up to 63 characters long.\n",
+  example: "welcome-email",
+} as const;
+
+export const UserIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^usr_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const _ListEnvelopeWithTotalSchema = {
   allOf: [
     {
@@ -632,13 +649,6 @@ export const WorkspaceIDSchema = {
   minLength: 1,
   pattern: "^ws_[0-9a-hjkmnp-tv-z]{26}$",
   example: "ws_01krdgeqcxet5s7t44vh8rt9mg",
-} as const;
-
-export const UserIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^usr_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "usr_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const TenantNameSchema = {
@@ -5465,7 +5475,7 @@ export const AMBContentKindSchema = {
     "interactive",
   ],
   description:
-    "Derived message classification for filtering and statistics. Send requests use the `text`, `rich_link` and `interactive` keys. `apple_pay` and `authenticate` appear on existing messages. Sends and templates do not accept them.\n\n- text: Text, optionally with a subject.\n- attachment: One or more files, images, audio clips, or videos.\n- rich_link: A link with a preview card.\n- quick_reply: Two to five reply choices.\n- list_picker: A grouped menu of choices.\n- time_picker: Appointment time slots; a reply may contain only a selected label.\n- form: A multi-page form.\n- imessage_app: A custom iMessage app interaction on a compatible device.\n- interactive: An opaque interactive reference whose subtype is unknown.\n- apple_pay: An Apple Pay request, or the customer's response to one. Apple Pay requests are in preview.\n- authenticate: An identity verification request, or the customer's response to one.",
+    "Derived message classification for filtering and statistics. Send requests use the `text`, `rich_link` and `interactive` keys. `apple_pay` and `authenticate` appear on existing messages. Sends do not accept them, and templates do not accept `apple_pay`. A sign-in message template has the kind `authenticate`.\n\n- text: Text, optionally with a subject.\n- attachment: One or more files, images, audio clips, or videos.\n- rich_link: A link with a preview card.\n- quick_reply: Two to five reply choices.\n- list_picker: A grouped menu of choices.\n- time_picker: Appointment time slots; a reply may contain only a selected label.\n- form: A multi-page form.\n- imessage_app: A custom iMessage app interaction on a compatible device.\n- interactive: An opaque interactive reference whose subtype is unknown.\n- apple_pay: An Apple Pay request, or the customer's response to one. Apple Pay requests are in preview.\n- authenticate: A sign-in request, the customer's response to one, or a sign-in message template.",
 } as const;
 
 export const AMBStatsSummaryPeriodSchema = {
@@ -8044,7 +8054,7 @@ export const EmailMessageSchema = {
       additionalProperties: true,
       readOnly: true,
       description:
-        "The substitution values this send supplied, whether inline or from a template, or null if none were supplied. They are the values applied to `subject` and to the bodies the content endpoint returns, kept so you can see what produced the delivered copy and not only the result.\n",
+        "Public substitution values used for the subject and message bodies, whether supplied inline or through a template. Reserved internal keys and the exact top-level `bird_unsub_token` key are omitted, even if caller-supplied. Returns null when no public values remain.\n",
     },
     attachments: {
       type: "array",
@@ -8157,16 +8167,6 @@ export const EmailAddressInputSchema = {
       $ref: "#/components/schemas/EmailAddress",
     },
   ],
-} as const;
-
-export const TemplateSlugSchema = {
-  type: "string",
-  minLength: 1,
-  maxLength: 63,
-  pattern: "^[a-z0-9]([a-z0-9_-]*[a-z0-9])?$",
-  description:
-    "A template's slug: what you send it by, for example `welcome-email`. Email and SMS slugs stay fixed after creation. WhatsApp slugs can change only before the first submission. A slug can contain lowercase letters, numbers, hyphens, and underscores, has to start and end with a letter or a number, and can be up to 63 characters long.\n",
-  example: "welcome-email",
 } as const;
 
 export const EmailTemplateSendSchema = {
@@ -9068,7 +9068,7 @@ export const EmailBroadcastParametersSchema = {
     type: ["string", "number", "boolean", "null"],
   },
   description:
-    "Complete template input map. Each value is a string, number, boolean or null and is used exactly as given, so text containing braces or code-like syntax is never evaluated. Objects and lists are not accepted. Use bird.contact.first_name in the template for contact data. Names must be bare input names outside the bird namespace. Omission retains the map unless the template ID changes, which clears it; an empty object clears it, and null is invalid. The compact map is limited to 16384 UTF-8 bytes and 128 names. Individual email parameters keep their own format.",
+    "Complete template input map. Each value is a string, number, boolean or null and is used exactly as given, so text containing braces or code-like syntax is never evaluated. A value the template uses that opens Liquid (`{{`, or `{%` not followed by a digit) stops the broadcast from sending. Objects and lists are not accepted. Use bird.contact.first_name in the template for contact data. Names must be bare input names outside the bird namespace. Omission retains the map unless the template ID changes, which clears it; an empty object clears it, and null is invalid. The compact map is limited to 16384 UTF-8 bytes and 128 names. Individual email parameters keep their own format.",
 } as const;
 
 export const EmailBroadcastParameterOverridesSchema = {
@@ -9173,12 +9173,13 @@ export const EmailBroadcastParameterProblemCodeSchema = {
   type: "string",
   minLength: 1,
   description:
-    "What a broadcast input diagnostic found.\n\n- `parameter_json_invalid`: the request body or an input map is not valid JSON.\n- `parameter_map_invalid`: `template.parameters` or `template.parameter_overrides` is not a JSON object of input names.\n- `parameter_name_invalid`: an input name is not a bare name outside the `bird` namespace.\n- `parameter_value_unsupported`: an input value is an object or a list. Values must be a string, number, boolean or null.\n- `parameter_duplicate_key`: an input name, or two spellings of one language tag, appears twice.\n- `parameter_bytes_exceeded`: an input map is larger than 16384 UTF-8 bytes.\n- `parameter_names_exceeded`: `template.parameters` and every language together hold more than 128 distinct names.\n- `parameter_depth_exceeded`: an input value is nested too deeply.\n- `parameter_language_invalid`: a `template.parameter_overrides` key is not a valid BCP-47 language tag.\n- `parameter_required`: the template or envelope uses an input that has no value.\n- `sensitive_input_unsupported`: the template uses an input it marks sensitive, which a broadcast cannot supply.\n- `render_profile_unsupported`: the template uses a Liquid operation that rendering with broadcast inputs does not support.\n- `rendered_envelope_invalid`: the rendered subject, sender name, reply-to addresses or a header is not valid for an email, for example because it contains a line break.\n- `contact_property_unknown`: the template reads a contact property this workspace has not defined.\n- `template_unavailable`: the broadcast has no template, or its template no longer exists or has no published version.\n- `language_unavailable`: the published version has no content in the selected language.\n- `sender_unavailable`: the broadcast cannot send from its `from` address or IP pool.\n- `brand_unavailable`: the saved Brand is archived or unavailable for selection. Preview with an available Brand override before sending a test.\n- `audience_unavailable`: the broadcast's audience cannot be used for this send.\n- `recipient_render_failed`: content could not be rendered for a recipient while the broadcast was sending.\n- `render_budget_exceeded`: rendering went over a limit, named by `budget` with its `limit`.\n- `transport_missing`: the saved content of a prepared broadcast is unavailable. Contact Bird support.\n- `transport_invalid`: the saved content of a prepared broadcast no longer matches what was prepared. Contact Bird support.\n",
+    "What a broadcast input diagnostic found.\n\n- `parameter_json_invalid`: the request body or an input map is not valid JSON.\n- `parameter_map_invalid`: `template.parameters` or `template.parameter_overrides` is not a JSON object of input names.\n- `parameter_name_invalid`: an input name is not a bare name outside the `bird` namespace.\n- `parameter_value_unsupported`: an input value is an object or a list. Values must be a string, number, boolean or null.\n- `parameter_liquid_unsupported`: an input value the email uses contains Liquid, such as `{{` or `{%`. Values are sent as written, so the broadcast cannot send; put Liquid in the template instead.\n- `parameter_duplicate_key`: an input name, or two spellings of one language tag, appears twice.\n- `parameter_bytes_exceeded`: an input map is larger than 16384 UTF-8 bytes.\n- `parameter_names_exceeded`: `template.parameters` and every language together hold more than 128 distinct names.\n- `parameter_depth_exceeded`: an input value is nested too deeply.\n- `parameter_language_invalid`: a `template.parameter_overrides` key is not a valid BCP-47 language tag.\n- `parameter_required`: the template or envelope uses an input that has no value.\n- `sensitive_input_unsupported`: the template uses an input it marks sensitive, which a broadcast cannot supply.\n- `render_profile_unsupported`: the template uses a Liquid operation that rendering with broadcast inputs does not support.\n- `rendered_envelope_invalid`: the rendered subject, sender name, reply-to addresses or a header is not valid for an email, for example because it contains a line break.\n- `contact_property_unknown`: the template reads a contact property this workspace has not defined.\n- `template_unavailable`: the broadcast has no template, or its template no longer exists or has no published version.\n- `language_unavailable`: the published version has no content in the selected language.\n- `sender_unavailable`: the broadcast cannot send from its `from` address or IP pool.\n- `brand_unavailable`: the saved Brand is archived or unavailable for selection. Preview with an available Brand override before sending a test.\n- `audience_unavailable`: the broadcast's audience cannot be used for this send.\n- `recipient_render_failed`: content could not be rendered for a recipient while the broadcast was sending.\n- `render_budget_exceeded`: rendering went over a limit, named by `budget` with its `limit`.\n- `transport_missing`: the saved content of a prepared broadcast is unavailable. Contact Bird support.\n- `transport_invalid`: the saved content of a prepared broadcast no longer matches what was prepared. Contact Bird support.\n",
   "x-extensible-enum": [
     "parameter_json_invalid",
     "parameter_map_invalid",
     "parameter_name_invalid",
     "parameter_value_unsupported",
+    "parameter_liquid_unsupported",
     "parameter_duplicate_key",
     "parameter_bytes_exceeded",
     "parameter_names_exceeded",
@@ -10639,6 +10640,175 @@ export const EmailBroadcastResumeSchema = {
   },
   example: {
     confirm: true,
+  },
+} as const;
+
+export const LabelIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^lbl_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "lbl_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const LabelNameSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 64,
+  pattern:
+    "^[^,\\s\\x00-\\x1F\\x7F-\\x9F](?:[^,\\x00-\\x1F\\x7F-\\x9F]*[^,\\s\\x00-\\x1F\\x7F-\\x9F])?$",
+  description:
+    "The label name, unique in the workspace regardless of case. No commas, control characters, or leading or trailing whitespace. System names such as `inbox`, `sent`, `unread`, `open` or `assigned` are reserved.",
+  example: "Hot lead",
+} as const;
+
+export const LabelColorSchema = {
+  type: "string",
+  minLength: 7,
+  maxLength: 7,
+  pattern: "^#[0-9A-Fa-f]{6}$",
+  description: "The label colour as a `#RRGGBB` hex value.",
+  example: "#E5484D",
+} as const;
+
+export const LabelDescriptionSchema = {
+  type: "string",
+  minLength: 1,
+  maxLength: 500,
+  description:
+    "When to apply the label. People and agents read it when they decide which label fits.",
+  example:
+    "Inbound sales enquiry from a company. Not support requests or vendors.",
+} as const;
+
+export const LabelSchema = {
+  readOnly: true,
+  description:
+    "A label in the workspace catalogue. Its `id` is accepted by every operation that takes a `label_id` and stays the same when the label is renamed.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "id",
+        "name",
+        "color",
+        "description",
+        "created_at",
+        "updated_at",
+      ],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/LabelID",
+          description:
+            "ID of the label, accepted by every operation that takes a `label_id`. It stays the same when the label is renamed.",
+        },
+        name: {
+          $ref: "#/components/schemas/LabelName",
+        },
+        color: {
+          oneOf: [
+            {
+              $ref: "#/components/schemas/LabelColor",
+            },
+            {
+              type: "null",
+            },
+          ],
+          description:
+            "The label colour as a `#RRGGBB` hex value, or `null` when none is set.",
+        },
+        description: {
+          oneOf: [
+            {
+              $ref: "#/components/schemas/LabelDescription",
+            },
+            {
+              type: "null",
+            },
+          ],
+          description: "When to apply the label, or `null` when none is set.",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+} as const;
+
+export const LabelListSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/Label",
+      },
+      description: "Every label in the workspace, ordered by name.",
+    },
+  },
+} as const;
+
+export const LabelCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["name"],
+  properties: {
+    name: {
+      $ref: "#/components/schemas/LabelName",
+    },
+    color: {
+      $ref: "#/components/schemas/LabelColor",
+    },
+    description: {
+      $ref: "#/components/schemas/LabelDescription",
+    },
+  },
+  example: {
+    name: "Hot lead",
+    color: "#E5484D",
+    description:
+      "Inbound sales enquiry from a company. Not support requests or vendors.",
+  },
+} as const;
+
+export const LabelUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  minProperties: 1,
+  description:
+    "Fields to change. Omitted fields are left unchanged; `null` clears `color` or `description`. A body with none of `name`, `color` or `description` is refused; one that resends current values is accepted.",
+  properties: {
+    name: {
+      $ref: "#/components/schemas/LabelName",
+    },
+    color: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LabelColor",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description: "The new colour, or `null` to remove it.",
+    },
+    description: {
+      oneOf: [
+        {
+          $ref: "#/components/schemas/LabelDescription",
+        },
+        {
+          type: "null",
+        },
+      ],
+      description: "The new description, or `null` to remove it.",
+    },
+  },
+  example: {
+    name: "Qualified lead",
   },
 } as const;
 
@@ -24991,7 +25161,7 @@ export const WhatsAppTemplateLanguageUpsertSchema = {
         },
       ],
       description:
-        "This language's maximum price. Omit it to keep the current one. A new language written without it uses Meta's standard rate. Send `null` to return to the standard rate. Changing only the price updates Meta without a new review. A send at a maximum price needs the business account's `marketing_messages_onboarding_status` to be `onboarded`. Otherwise it fails with WhatsApp error 131061.\n",
+        "This language's maximum price. Omit it to keep the current one. A new language written without it uses Meta's standard rate. Send `null` to return to the standard rate. Changing only the price updates Meta without a new review.\n",
     },
     message_send_ttl_seconds: {
       type: ["integer", "null"],
@@ -27511,6 +27681,13 @@ export const AMBAuthenticationProviderIDSchema = {
   example: "aauthp_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
+export const AMBTemplateIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^amt_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "amt_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
 export const AMBEntryPointSchema = {
   type: "object",
   additionalProperties: false,
@@ -28450,7 +28627,7 @@ export const AMBRichLinkConstructSchema = {
     },
   },
   description:
-    "Asks Apple to build the rich link preview when the message is sent. Use `POST /v1/amb/messages/construct-payload` beforehand only to check the URL and see the preview's title.",
+    "Asks Apple to build the rich link preview from `url` when the message is sent.",
 } as const;
 
 export const AMBRichLinkSchema = {
@@ -30249,7 +30426,7 @@ export const AMBMessagePartSchema = {
       type: "string",
       minLength: 1,
       description:
-        "The title a card showed. On a `link_preview` part it is the page's title, read when the part was sent. On a `rich_link` part Apple built from its URL it is the title Apple returned for the card, or the linked page's title when Apple returned none. A title longer than 512 bytes is cut to that length. Absent on other parts, on a part Apple did not accept, and on a `rich_link` Apple built when neither Apple nor a page Bird could read supplied a title. On a `link_preview` part it is also absent when Bird sent the part in an earlier attempt of a retried send, or had to save the send's result again.",
+        "The title a card showed. On a `link_preview` part it is the page's title, read when the part was sent. On a `rich_link` part Apple built from its URL it is the title Apple returned for the card. When Apple returned none, or returned a web address in its place, it is the linked page's title. Apple builds that card on the device, so the title it shows can differ. A title longer than 512 bytes is cut to that length. Absent on other parts, on a part Apple did not accept, and on a `rich_link` Apple built when Apple supplied no title or only a web address and the linked page supplied none or Bird could not read it. On a `link_preview` part it is also absent when Bird sent the part in an earlier attempt of a retried send, or had to save the send's result again.",
       example: "Your order",
       "x-sensitive": true,
     },
@@ -30341,13 +30518,6 @@ export const AMBErrorSchema = {
       description: "When the failure occurred.",
     },
   },
-} as const;
-
-export const AMBTemplateIDSchema = {
-  type: "string",
-  minLength: 1,
-  pattern: "^amt_[0-9a-hjkmnp-tv-z]{26}$",
-  example: "amt_01krdgeqcxet5s7t44vh8rt9mg",
 } as const;
 
 export const AMBTemplateVersionIDSchema = {
@@ -31621,6 +31791,81 @@ export const AMBConversationUpdateSchema = {
   unevaluatedProperties: false,
 } as const;
 
+export const AMBAuthenticationTemplateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "A sign-in message template reference. Identify the template by `id` or `slug`. Supply exactly one reference, optionally select a language, and pass variable values in `parameters`.\n",
+  oneOf: [
+    {
+      required: ["id"],
+    },
+    {
+      required: ["slug"],
+    },
+  ],
+  properties: {
+    id: {
+      description:
+        "The workspace or built-in sign-in message template to send, by ID.",
+      $ref: "#/components/schemas/AMBTemplateID",
+    },
+    slug: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/TemplateSlug",
+        },
+      ],
+      description:
+        "The workspace or built-in sign-in message template to send, by its immutable slug. Read the template's live version to see its variables.\n",
+      example: "account_sign_in",
+    },
+    language: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/LanguageTag",
+        },
+      ],
+      description:
+        "Which of the template's languages to send. When the template does not have the language you ask for, its `on_missing_language` setting decides whether the closest available language is sent instead or the request is rejected. Omit it to send the first of these the template has: the conversation's locale, the business's default locale, then the template's default language. A request that omits it is never rejected for its language, and `language_source_required` does not apply.\n",
+      example: "fr",
+    },
+    parameters: {
+      type: "object",
+      additionalProperties: true,
+      description:
+        "Values for the template's variables, keyed by variable name. Read the live version to see the accepted keys and formats. A missing required key, an undeclared key, an invalid value, or a serialized object over 16 KiB returns `422`.\n",
+      example: {
+        first_name: "Avery",
+      },
+    },
+  },
+} as const;
+
+export const AMBAuthenticationCreateSchema = {
+  type: "object",
+  additionalProperties: false,
+  description:
+    "Options for a sign-in request. Omit the body to send the business's sign-in message.\n",
+  properties: {
+    template: {
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBAuthenticationTemplate",
+        },
+      ],
+      description:
+        "The sign-in message template to send in place of the business's sign-in message. The template must be a published sign-in message.\n",
+    },
+  },
+  example: {
+    template: {
+      slug: "account_sign_in",
+      language: "fr",
+    },
+  },
+} as const;
+
 export const AMBConversationTypingEventSchema = {
   type: "string",
   minLength: 1,
@@ -32383,6 +32628,48 @@ export const AMBTemplateListSchema = {
   ],
 } as const;
 
+export const AMBSignInMessageSchema = {
+  type: "object",
+  additionalProperties: false,
+  "x-sensitive": true,
+  description:
+    "The message an authentication request sends: the sign-in request bubble, the bubble that replaces it after sign-in, their images and an optional confirmation text. Only a template holds it. An authentication request renders the template and sends it. A message send does not accept it.",
+  required: ["received_message", "reply_message"],
+  properties: {
+    received_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
+      description: "The sign-in request bubble the customer receives.",
+    },
+    reply_message: {
+      $ref: "#/components/schemas/AMBMessageBubble",
+      description: "The bubble Messages shows after the customer signs in.",
+    },
+    images: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/AMBNativeImage",
+      },
+      description: "Images the bubbles reference by `image_identifier`.",
+    },
+    confirmation_text: {
+      type: "string",
+      minLength: 1,
+      description:
+        "Text Bird sends as a message after the customer's device confirms the sign-in. Omit it to send no confirmation. It may contain `{{ }}` placeholders.",
+    },
+  },
+  example: {
+    received_message: {
+      title: "Sign in to Example",
+      subtitle: "Use your Example account",
+    },
+    reply_message: {
+      title: "Signed in",
+    },
+    confirmation_text: "Welcome back, {{ first_name }}.",
+  },
+} as const;
+
 export const AMBTemplateSchema = {
   type: "object",
   additionalProperties: false,
@@ -32770,6 +33057,16 @@ export const AMBTemplateVersionLanguageSchema = {
       description:
         "Stored interaction. Includes its `{{ variable }}` placeholders.",
     },
+    sign_in: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBSignInMessage",
+        },
+      ],
+      description:
+        "Stored sign-in message. Includes its `{{ variable }}` placeholders.",
+    },
     revision: {
       type: "integer",
       minimum: 0,
@@ -33015,6 +33312,16 @@ export const AMBTemplateLanguageSchema = {
       ],
       description:
         "Stored interaction. Includes its `{{ variable }}` placeholders.",
+    },
+    sign_in: {
+      readOnly: true,
+      allOf: [
+        {
+          $ref: "#/components/schemas/AMBSignInMessage",
+        },
+      ],
+      description:
+        "Stored sign-in message. Includes its `{{ variable }}` placeholders.",
     },
     revision: {
       type: "integer",
@@ -33944,7 +34251,7 @@ export const WhatsAppKeywordRuleSchema = {
     excluded_keywords: {
       type: "array",
       description:
-        "Bird's keywords this rule removes from the set it inherits. A message that is exactly one of them opts no one in or out and gets no reply for the people the rule covers, and Bird's own rule does not act on it instead. Excluding every one of Bird's keywords switches them off, though a keyword Bird adds later still matches. It removes only from the Bird rule this rule inherits from: a keyword another rule of yours adds, or one Bird ships only in another country's rule, is unaffected. Always empty on one of Bird's own rules.\n",
+        "Bird's keywords this rule removes from the set it inherits. Rules are tried most specific first, and a rule of yours with neither `country` nor `waba` comes after Bird's rule for the sender's country, as `effective_keywords` explains. When this rule answers a message that is exactly an excluded keyword, no one is opted in or out, no reply is sent, and no later rule acts on it, whether Bird's or another of yours that matches the same keyword. A more specific rule that answers first is unaffected. A rule with no `country` inherits Bird's keywords for each sender's country, so its exclusions apply only to senders whose set has the keyword. Excluding every one of Bird's keywords switches them off where this rule answers, though a keyword Bird adds later still matches unless it is already excluded. It changes no other rule's keywords. Always empty on one of Bird's own rules.\n",
       items: {
         type: "string",
         minLength: 1,
@@ -33954,7 +34261,7 @@ export const WhatsAppKeywordRuleSchema = {
     effective_keywords: {
       type: "array",
       description:
-        "Every keyword that matches this rule: Bird's keywords for the same operation and country, minus `excluded_keywords`, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.\n\nFor a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.\n",
+        "Every keyword that matches this rule: Bird's keywords for the same operation and country, minus `excluded_keywords`, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.\n\nFor a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so when a sender in a country Bird ships a rule for writes one of Bird's keywords, that rule answers and your reply is not used. A keyword you added reaches your rule only when no earlier rule matches it, and for a given sender the matched set can differ from this list in either direction. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.\n",
       items: {
         type: "string",
         minLength: 1,
@@ -34052,7 +34359,7 @@ export const WhatsAppKeywordRuleCreateSchema = {
     excluded_keywords: {
       type: "array",
       description:
-        "Bird's keywords to remove for the people this rule covers. A message that is exactly one of them then opts no one in or out and gets no reply, and you must honour opt-outs it carries yourself. Exclude every one of Bird's keywords to switch them off; a keyword Bird adds later still matches. It removes only from the Bird rule this one inherits from, not from your other rules. A keyword cannot be both added and excluded.\n",
+        "Bird's keywords to remove for the people this rule covers. Rules are tried most specific first: a more specific rule of yours answers before this one, and with neither `country` nor `waba` so does Bird's rule for the sender's country. When this rule answers a message that is exactly an excluded keyword, no one is opted in or out, no reply is sent, and no less specific rule acts on it, so you must honour opt-outs it carries yourself. Without a `country`, the rule inherits Bird's keywords for each sender's country, so an exclusion covers only senders whose set has that keyword. Exclude every one of Bird's keywords to switch them off where this rule answers; a keyword Bird adds later still matches unless it is already excluded. It changes none of your other rules. A keyword cannot be both added and excluded.\n",
       items: {
         type: "string",
         minLength: 1,
@@ -35718,6 +36025,624 @@ export const EmailInboxInsightsSeedEngagementProfileSchema = {
     "Which engagement behaviour the seed addresses simulate. `all` mixes engaged and dormant seeds, which is what makes an engagement split measurable; single-cohort profiles exist too, and the usable set comes from the seed-test options rather than from this list.\n",
   "x-extensible-enum": ["all", "engaging", "non_engaging"],
   example: "all",
+} as const;
+
+export const AutomaticSeedingSettingsSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["enabled", "revision"],
+  description:
+    "Workspace automatic seeding settings. Before setup, revision is zero and the trigger address is absent. Unset list type, engagement profile and regions are omitted. Saved preferences are not checked against available seed-test options.",
+  properties: {
+    revision: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Current settings revision. Supply it when updating settings. Initialize settings before rotating the trigger address.",
+    },
+    trigger_address: {
+      type: "string",
+      format: "email",
+      maxLength: 254,
+      description:
+        "Workspace trigger address for seeding examples. Absent before the first settings update. Using it requires authenticated sending access to this workspace; the address itself grants no access.",
+    },
+    enabled: {
+      type: "boolean",
+      description: "Saved automatic-seeding preference.",
+    },
+    list_type: {
+      $ref: "#/components/schemas/EmailInboxInsightsSeedListType",
+      maxLength: 100,
+    },
+    engagement_profile: {
+      $ref: "#/components/schemas/EmailInboxInsightsSeedEngagementProfile",
+      maxLength: 100,
+    },
+    regions: {
+      type: "array",
+      maxItems: 100,
+      uniqueItems: true,
+      description:
+        "Saved regions to place seeds in, as `regions[].value` names from `GET /v1/email/inbox-insights/seed-tests/configuration`. They are not checked against that list when saved.",
+      items: {
+        type: "string",
+        minLength: 1,
+        maxLength: 100,
+      },
+    },
+  },
+  example: {
+    revision: 3,
+    trigger_address: "4f9a2c7e1b8d4a60935ce7f2b1d0a8c3@seeds.bird.com",
+    enabled: true,
+    list_type: "private",
+    engagement_profile: "all",
+    regions: ["North America - US"],
+  },
+} as const;
+
+export const AutomaticSeedingSettingsUpdateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["expected_revision", "enabled"],
+  description:
+    "Replace automatic seeding settings. Omitted selections clear the saved values. Enabling requires a list type, engagement profile and at least one region. Preferences are not checked against available seed-test options. A stale revision returns a conflict without changing settings.",
+  properties: {
+    expected_revision: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      example: 0,
+      description:
+        "Revision from the latest settings read, or zero for initial setup.",
+    },
+    enabled: {
+      type: "boolean",
+      example: false,
+      description: "Saved automatic-seeding preference.",
+    },
+    list_type: {
+      $ref: "#/components/schemas/EmailInboxInsightsSeedListType",
+      maxLength: 100,
+    },
+    engagement_profile: {
+      $ref: "#/components/schemas/EmailInboxInsightsSeedEngagementProfile",
+      maxLength: 100,
+    },
+    regions: {
+      type: "array",
+      maxItems: 100,
+      uniqueItems: true,
+      description:
+        "Regions to place seeds in. Use `regions[].value` exactly as returned by `GET /v1/email/inbox-insights/seed-tests/configuration` for the sending domain your examples come from. Whitespace-only names are rejected, but names are not checked against that list when saved; a name it does not offer makes a later run end with `selection_unavailable`.",
+      items: {
+        type: "string",
+        minLength: 1,
+        maxLength: 100,
+      },
+    },
+  },
+} as const;
+
+export const AutomaticSeedingRotateSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["expected_revision"],
+  description:
+    "Rotate the trigger address once at the supplied settings revision. Settings must have been initialized by a successful settings update; rotation before setup returns 404. A stale revision returns 409 without rotating again.",
+  properties: {
+    expected_revision: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      example: 1,
+      description:
+        "Revision from the latest settings read after initial setup. Revision zero from an unconfigured workspace cannot be used to rotate an address.",
+    },
+  },
+} as const;
+
+export const AutomaticSeedingRunSortSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Automatic seeding run ordering field.",
+} as const;
+
+export const AutomaticSeedingSourceKindSchema = {
+  type: "string",
+  description:
+    "Origin of the source: `api` is an immediate API submission; `smtp` is an immediate SMTP submission; `scheduled` is an API-scheduled email; `broadcast` is a broadcast. This identifies origin regardless of capture outcome or run creation, including skipped unsupported broadcasts. Scheduled examples can be captured only when due. SMTP submissions cannot be scheduled.",
+  enum: ["api", "smtp", "scheduled", "broadcast"],
+} as const;
+
+export const AutomaticSeedingRunStateSchema = {
+  type: "string",
+  enum: [
+    "pending",
+    "registering",
+    "registration_uncertain",
+    "ready",
+    "dispatching",
+    "dispatch_complete",
+    "stopped",
+    "failed",
+  ],
+  description:
+    "Execution state, separate from delivery and inbox placement:\n- `pending`: the run is recorded and registration has not started.\n- `registering`: registration is in progress. A stop request can coexist with an in-flight registration.\n- `registration_uncertain`: the registration result is unknown. Registration is not automatically repeated, and uncertainty remains visible after a stop.\n- `ready`: registration has produced a retained seed plan; dispatch scheduling has not started.\n- `dispatching`: the scheduler is admitting planned copies or recovering earlier handoffs.\n- `dispatch_complete`: scheduler work is acknowledged. Uncertain admission and pending delivery can remain.\n- `stopped`: new admissions are closed by a stop request, settings or trigger changes, or the dispatch deadline. Already granted copies may still send.\n- `failed`: registration failed or the source control was refused. New admissions cannot proceed; retained progress describes any copies already granted.\nInspect progress and stop_requested_at alongside this state. A terminal run state does not recall previously granted or queued copies.\n",
+} as const;
+
+export const AutomaticSeedingRunIDSchema = {
+  type: "string",
+  minLength: 1,
+  pattern: "^esrun_[0-9a-hjkmnp-tv-z]{26}$",
+  example: "esrun_01krdgeqcxet5s7t44vh8rt9mg",
+} as const;
+
+export const AutomaticSeedingEmailSourceKindSchema = {
+  type: "string",
+  enum: ["api", "smtp", "scheduled"],
+  description: "Original source kind for this reference.",
+} as const;
+
+export const AutomaticSeedingEmailSourceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["kind", "email_id"],
+  properties: {
+    kind: {
+      $ref: "#/components/schemas/AutomaticSeedingEmailSourceKind",
+    },
+    email_id: {
+      $ref: "#/components/schemas/EmailID",
+    },
+  },
+} as const;
+
+export const AutomaticSeedingBroadcastSourceKindSchema = {
+  type: "string",
+  enum: ["broadcast"],
+  description: "Original source kind for this reference.",
+} as const;
+
+export const AutomaticSeedingBroadcastSourceSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["kind", "broadcast_id"],
+  properties: {
+    kind: {
+      $ref: "#/components/schemas/AutomaticSeedingBroadcastSourceKind",
+    },
+    broadcast_id: {
+      $ref: "#/components/schemas/EmailBroadcastID",
+    },
+  },
+} as const;
+
+export const AutomaticSeedingSourceSchema = {
+  description:
+    "Original customer source. This never identifies a generated seed copy. Scheduled means an API-scheduled email.",
+  oneOf: [
+    {
+      $ref: "#/components/schemas/AutomaticSeedingEmailSource",
+    },
+    {
+      $ref: "#/components/schemas/AutomaticSeedingBroadcastSource",
+    },
+  ],
+} as const;
+
+export const AutomaticSeedingTriggerLabelSchema = {
+  type: "string",
+  description:
+    "Label from a trigger address, such as `spring-launch` in `<token>+spring-launch@...`. It is a display name and selects nothing.",
+  minLength: 1,
+  maxLength: 32,
+  pattern: "^[a-z0-9_-]+$",
+} as const;
+
+export const AutomaticSeedingProgressSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "planned",
+    "admitted",
+    "provider_accepted",
+    "delivered",
+    "failed",
+    "not_sent",
+    "unknown",
+    "pending",
+  ],
+  properties: {
+    planned: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Number of retained planned copies.",
+    },
+    admitted: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Copies admitted to Bird email processing. Independent milestone; not provider acceptance.",
+    },
+    provider_accepted: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Copies explicitly accepted by the sending provider. Independent milestone; not delivery or placement.",
+    },
+    delivered: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Copies with receiving-server delivery or complaint evidence. Does not establish inbox placement.",
+    },
+    failed: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Copies with terminal bounce, rejection or block evidence.",
+    },
+    not_sent: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Copies refused or canceled before sending, including ungranted copies after a run fence.",
+    },
+    unknown: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description:
+        "Copies with unresolved admission or provider outcome uncertainty.",
+    },
+    pending: {
+      type: "integer",
+      format: "int64",
+      minimum: 0,
+      description: "Remaining copies awaiting admission or a delivery outcome.",
+    },
+  },
+  description:
+    "Delivered, failed, not_sent, unknown and pending partition planned copies. Admitted and provider_accepted overlap those buckets and must not be added to them. Late outcomes can move a copy between buckets.",
+} as const;
+
+export const AutomaticSeedingReasonSchema = {
+  type: "string",
+  minLength: 1,
+  "x-extensible-enum": [
+    "registration_rejected",
+    "allowance_exhausted",
+    "selection_unavailable",
+    "sending_domain_not_measured",
+    "vendor_outcome_unknown",
+    "invalid_registration_response",
+    "canceled_or_expired",
+    "run_stopped",
+    "settings_disabled",
+    "trigger_rotated",
+    "dispatch_deadline_exceeded",
+    "control_rejected",
+    "source_stopped",
+    "conflicting_examples",
+    "unsupported_source",
+    "mixed_recipients",
+    "invalid_trigger",
+    "seeding_unavailable",
+    "contact_template_unsupported",
+    "source_not_authorized",
+    "content_blocked",
+    "capture_expired",
+    "capture_failed",
+    "preparation_unavailable",
+    "policy_refused",
+    "unavailable",
+    "bounced",
+    "rejected",
+    "blocked",
+    "canceled",
+    "provider_outcome_unknown",
+    "admission_uncertain",
+    "admission_refused",
+  ],
+  description:
+    "A reason for a run or source outcome, or a seed-copy delivery or admission outcome.\n\n- `registration_rejected` means the seed-list registration was refused; no seed plan was created.\n- `allowance_exhausted` means the organization's seed-test allowance for this billing period was used up before registration; no seed plan was created.\n- `selection_unavailable` means the saved seed-list type, engagement profile or region is no longer offered for the sending domain; no seed plan was created.\n- `sending_domain_not_measured` means Inbox Insights is not measuring the example's sending domain; no seed plan was created.\n- `vendor_outcome_unknown` means the seed-list registration result is unknown; automatic registration retries are stopped and investigation is required.\n- `invalid_registration_response` means the returned seed list could not be used; no copies will be sent from that response.\n- `canceled_or_expired` means new seed admissions stopped because the run was canceled or its eligibility expired.\n- `run_stopped` means a stop request ended future seed admissions; already granted copies may still send.\n- `settings_disabled` means automatic seeding was disabled before the copy was granted.\n- `trigger_rotated` means the run's cancellation generation changed before the copy was granted, either through trigger rotation or disabling seeding. Re-enabling does not advance the generation or undo that fence. This code alone does not establish that the trigger address changed.\n- `dispatch_deadline_exceeded` means the deadline for admitting this copy passed.\n- `control_rejected` means the trigger message was rejected.\n- `source_stopped` means the original source no longer authorizes seed sending.\n- `conflicting_examples` means the source contained conflicting examples, so none was selected.\n- `unsupported_source` means capture is unavailable for this source type.\n- `mixed_recipients` means the original message did not have exactly one recipient consisting of the trigger address.\n- `invalid_trigger` means the trigger address was invalid or no longer valid for this workspace.\n- `seeding_unavailable` means automatic-seeding capture was unavailable for this source.\n- `contact_template_unsupported` means the source template uses contact values that this capture path cannot freeze.\n- `source_not_authorized` means the source failed sending authorization during capture or registration.\n- `content_blocked` means the source content was rejected before capture.\n- `capture_expired` means the example capture deadline passed.\n- `capture_failed` means the example could not be captured.\n- `preparation_unavailable` means the frozen example could not be used for registration or preparation of a seed copy.\n- `policy_refused` means the seed copy failed sending-policy checks.\n- `unavailable` means a more specific reason cannot be shown.\n- `bounced` means the seed copy received a bounce outcome.\n- `rejected` means the seed copy received a rejection outcome.\n- `blocked` means the seed copy was blocked from sending.\n- `canceled` means the seed copy was canceled before sending.\n- `provider_outcome_unknown` means a provider submission may have occurred, but its result is unknown; the copy is not automatically resent.\n- `admission_uncertain` means the seed copy may have entered sending, but admission is unconfirmed; it is not automatically admitted again.\n- `admission_refused` means the seed copy was refused before entering sending.\n",
+} as const;
+
+export const AutomaticSeedingIssueSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["code", "count"],
+  properties: {
+    code: {
+      $ref: "#/components/schemas/AutomaticSeedingReason",
+      description:
+        "A reason or delivery status affecting these copies. Unrecognized persisted reasons become unavailable.",
+    },
+    count: {
+      type: "integer",
+      format: "int64",
+      minimum: 1,
+    },
+  },
+} as const;
+
+export const AutomaticSeedingRunSchema = {
+  description:
+    "Retained run metadata. `created_at` records run intent creation; `updated_at` records run metadata changes, not every delivery outcome. `label` is omitted when the trigger address carried none.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "id",
+        "state",
+        "source",
+        "source_created_at",
+        "retain_until",
+        "progress",
+        "issues",
+      ],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/AutomaticSeedingRunID",
+        },
+        state: {
+          $ref: "#/components/schemas/AutomaticSeedingRunState",
+        },
+        source: {
+          $ref: "#/components/schemas/AutomaticSeedingSource",
+        },
+        label: {
+          $ref: "#/components/schemas/AutomaticSeedingTriggerLabel",
+        },
+        source_created_at: {
+          type: "string",
+          format: "date-time",
+          description: "Original source execution time.",
+          minLength: 1,
+        },
+        retain_until: {
+          type: "string",
+          format: "date-time",
+          description: "Time after which this run is no longer available.",
+          minLength: 1,
+        },
+        progress: {
+          $ref: "#/components/schemas/AutomaticSeedingProgress",
+        },
+        sending_domain: {
+          type: "string",
+          description:
+            "Present after registration establishes the sending domain.",
+        },
+        list_type: {
+          $ref: "#/components/schemas/EmailInboxInsightsSeedListType",
+          maxLength: 100,
+          description: "List type frozen at run admission.",
+        },
+        engagement_profile: {
+          $ref: "#/components/schemas/EmailInboxInsightsSeedEngagementProfile",
+          maxLength: 100,
+          description: "Engagement profile frozen at run admission.",
+        },
+        regions: {
+          type: "array",
+          maxItems: 100,
+          uniqueItems: true,
+          items: {
+            type: "string",
+            minLength: 1,
+            maxLength: 100,
+          },
+          description: "Regions frozen at run admission.",
+        },
+        registration_started_at: {
+          type: "string",
+          format: "date-time",
+          description: "Registration admission time.",
+        },
+        registration_finished_at: {
+          type: "string",
+          format: "date-time",
+          description: "Time the registration response was persisted.",
+        },
+        dispatch_deadline: {
+          type: "string",
+          format: "date-time",
+          description: "Fixed deadline for new seed admissions.",
+        },
+        dispatch_finished_at: {
+          type: "string",
+          format: "date-time",
+          description:
+            "Time scheduler work completed; uncertain admission or delivery may remain.",
+        },
+        stop_requested_at: {
+          type: "string",
+          format: "date-time",
+          description:
+            "First durable stop, whether requested explicitly or imposed automatically. Already granted copies may still send.",
+        },
+        reason: {
+          $ref: "#/components/schemas/AutomaticSeedingReason",
+          description:
+            "Sanitized reason code. Unknown stored details become unavailable; provider error text is never returned.",
+        },
+        issues: {
+          type: "array",
+          description:
+            "Counts of sanitized terminal or uncertain copy outcomes. No seed addresses or provider error text. Counts overlap the progress buckets.",
+          items: {
+            $ref: "#/components/schemas/AutomaticSeedingIssue",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+  example: {
+    id: "esrun_01krdgeqcxet5s7t44vh8rt9mg",
+    state: "dispatch_complete",
+    source: {
+      kind: "api",
+      email_id: "em_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    label: "spring-launch",
+    source_created_at: "2026-05-20T09:14:52Z",
+    retain_until: "2027-06-19T09:14:52Z",
+    progress: {
+      planned: 48,
+      admitted: 48,
+      provider_accepted: 48,
+      delivered: 46,
+      failed: 1,
+      not_sent: 0,
+      unknown: 0,
+      pending: 1,
+    },
+    sending_domain: "mail.example.com",
+    list_type: "private",
+    engagement_profile: "all",
+    regions: ["North America - US"],
+    registration_started_at: "2026-05-20T09:14:55Z",
+    registration_finished_at: "2026-05-20T09:15:02Z",
+    dispatch_deadline: "2026-05-20T10:14:52Z",
+    dispatch_finished_at: "2026-05-20T09:31:10Z",
+    issues: [
+      {
+        code: "bounced",
+        count: 1,
+      },
+    ],
+    created_at: "2026-05-20T09:14:53Z",
+    updated_at: "2026-05-20T09:31:10Z",
+  },
+} as const;
+
+export const AutomaticSeedingRunListSchema = {
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/AutomaticSeedingRun",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const AutomaticSeedingSourceSortSchema = {
+  type: "string",
+  enum: ["created_at"],
+  default: "created_at",
+  description: "Automatic seeding source ordering field.",
+} as const;
+
+export const AutomaticSeedingSourceStateSchema = {
+  type: "string",
+  enum: ["scheduled", "capturing", "captured", "skipped", "stopped", "failed"],
+  description:
+    "State of the source example, separate from the run's sending progress:\n- `scheduled`: the API-scheduled source is waiting for its due time; capture has not started.\n- `capturing`: capture is in progress and can already have an associated run.\n- `captured`: immutable example content was committed for a run; this does not mean seeds were sent.\n- `skipped`: the source did not complete eligible capture. The reason explains the refusal; a run can exist if refusal occurred after admission.\n- `stopped`: the scheduled source was canceled; capture will not continue.\n- `failed`: the scheduled source failed; capture will not continue.\nSource observations can exist without a run. run_id is present only while an associated run is retained.\n",
+} as const;
+
+export const AutomaticSeedingSourceObservationSchema = {
+  description:
+    "Retained capture observation. `created_at` records observation creation; `updated_at` records the last capture observation change. `label` is omitted when the trigger address carried none.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: ["source", "source_created_at", "retain_until", "state"],
+      properties: {
+        source: {
+          $ref: "#/components/schemas/AutomaticSeedingSource",
+        },
+        source_created_at: {
+          type: "string",
+          format: "date-time",
+          description: "Original source execution time.",
+          minLength: 1,
+        },
+        retain_until: {
+          type: "string",
+          format: "date-time",
+          description: "Time after which the observation is unavailable.",
+          minLength: 1,
+        },
+        state: {
+          $ref: "#/components/schemas/AutomaticSeedingSourceState",
+        },
+        reason: {
+          $ref: "#/components/schemas/AutomaticSeedingReason",
+          description:
+            "Sanitized capture reason; absent for a successful or pending observation.",
+        },
+        run_id: {
+          $ref: "#/components/schemas/AutomaticSeedingRunID",
+        },
+        label: {
+          $ref: "#/components/schemas/AutomaticSeedingTriggerLabel",
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/Timestamps",
+    },
+  ],
+  example: {
+    source: {
+      kind: "api",
+      email_id: "em_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    source_created_at: "2026-05-20T09:14:52Z",
+    retain_until: "2027-06-19T09:14:52Z",
+    state: "captured",
+    run_id: "esrun_01krdgeqcxet5s7t44vh8rt9mg",
+    label: "spring-launch",
+    created_at: "2026-05-20T09:14:53Z",
+    updated_at: "2026-05-20T09:14:58Z",
+  },
+} as const;
+
+export const AutomaticSeedingSourceListSchema = {
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/AutomaticSeedingSourceObservation",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
 } as const;
 
 export const EmailInboxInsightsSeedTestSummarySchema = {
@@ -44261,7 +45186,7 @@ export const EmailThreadLabelsUpdateSchema = {
     remove: ["pending"],
   },
   description:
-    "Custom labels to add or remove, or the full set to replace them with. Send `set` on its own; combining it with `add` or `remove` returns 422. System names are refused; use read and folder for thread state. Reserved names are refused too, except a label the conversation already carries from before its name was reserved, which can still be removed, and kept in a `set` in any casing. The resulting custom-label set must contain at most 20 labels; larger sets return 422. A custom name added or set that the workspace does not have yet becomes a workspace label that stays after it is removed from every conversation; once the workspace has 100 labels, a write that would create one more is refused with `E17058`. Custom label names match the workspace's labels in any casing, so adding `Urgent` where the workspace has `urgent` applies `urgent`, and responses return the workspace's spelling.",
+    "Custom labels to add or remove, or the full set to replace them with. Send `set` on its own; combining it with `add` or `remove` returns 422. System names are refused; use read and folder for thread state. Reserved names are refused too, except a label the conversation already carries from before its name was reserved, which can still be removed, and kept in a `set` in any casing. The resulting custom-label set must contain at most 20 labels; larger sets return 422. A custom name added or set that the workspace does not have yet becomes a workspace label that stays after it is removed from every conversation; once the workspace has 100 labels, a write that would create one more is refused with `E17057`. Custom label names match the workspace's labels in any casing, so adding `Urgent` where the workspace has `urgent` applies `urgent`, and responses return the workspace's spelling.",
   properties: {
     add: {
       type: "array",
@@ -44734,7 +45659,7 @@ export const EmailLabelsUpdateSchema = {
     remove: ["pending"],
   },
   description:
-    "Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. `set` instead replaces every custom label and leaves system labels as they are; send it on its own, since combining it with `add` or `remove` returns 422. On a message, adding or removing `unread` flips read state. Adding or removing `trash` moves it to or out of the trash. Placement labels cannot be applied to a message; use `folder` on [Update a thread](/docs/api/reference/update-email-thread) (`PATCH /v1/email/threads/{thread_id}`) to move its conversation. A sent message cannot use unread. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `assigned`, `closed`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `open`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be applied as custom labels, in any casing. A label applied before its name was reserved can still be removed, added again under the same name with no effect, and kept in a `set` in any casing. A conversation or message has at most 20 labels, system labels included. A custom name added or set that the workspace does not have yet becomes a workspace label that stays after it is removed from every conversation; once the workspace has 100 labels, a write that would create one more is refused with `E17058`. A name in both `add` and `remove` is removed and does not count as added. Custom label names match the workspace's labels in any casing: adding `Urgent` where the workspace has `urgent` applies `urgent`, and responses return the workspace's spelling.\n",
+    "Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. `set` instead replaces every custom label and leaves system labels as they are; send it on its own, since combining it with `add` or `remove` returns 422. On a message, adding or removing `unread` flips read state. Adding or removing `trash` moves it to or out of the trash. Placement labels cannot be applied to a message; use `folder` on [Update a thread](/docs/api/reference/update-email-thread) (`PATCH /v1/email/threads/{thread_id}`) to move its conversation. A sent message cannot use unread. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `assigned`, `closed`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `open`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be applied as custom labels, in any casing. A label applied before its name was reserved can still be removed, added again under the same name with no effect, and kept in a `set` in any casing. A conversation or message has at most 20 labels, system labels included. A custom name added or set that the workspace does not have yet becomes a workspace label that stays after it is removed from every conversation; once the workspace has 100 labels, a write that would create one more is refused with `E17057`. A name in both `add` and `remove` is removed and does not count as added. Custom label names match the workspace's labels in any casing: adding `Urgent` where the workspace has `urgent` applies `urgent`, and responses return the workspace's spelling.\n",
   properties: {
     add: {
       type: "array",
@@ -45196,47 +46121,6 @@ export const EmailMailboxComposeRequestSchema = {
     to: ["delivered@messagebird.dev"],
     subject: "Your quote",
     text: "Hi, here is the quote you asked for.",
-  },
-} as const;
-
-export const EmailMailboxLabelSchema = {
-  type: "object",
-  additionalProperties: false,
-  description: "One label available in a mailbox.",
-  required: ["name", "type"],
-  properties: {
-    name: {
-      type: "string",
-      readOnly: true,
-      minLength: 1,
-      maxLength: 64,
-      description:
-        "The label name, as it appears on conversations and messages.",
-      example: "inbox",
-    },
-    type: {
-      type: "string",
-      readOnly: true,
-      minLength: 1,
-      enum: ["system", "custom"],
-      description:
-        "`system` labels are the built-in placements a message can be in:\n\n- Inbox.\n- Archive.\n- Spam.\n- Blocked.\n- Sent.\n- Trash.\n- Unread.\n\n`custom` labels are the workspace's own tags.",
-    },
-  },
-} as const;
-
-export const EmailMailboxLabelListSchema = {
-  type: "object",
-  additionalProperties: false,
-  description: "The labels available in a mailbox.",
-  required: ["data"],
-  properties: {
-    data: {
-      type: "array",
-      items: {
-        $ref: "#/components/schemas/EmailMailboxLabel",
-      },
-    },
   },
 } as const;
 
@@ -46112,6 +46996,11 @@ export const EventAMBAcceptedSchema = {
             },
           ],
           cost: null,
+          requested_language: null,
+          resolved_language: null,
+          template_id: null,
+          template_version_id: null,
+          template_content_hash: null,
           created_at: "2026-09-25T11:59:59Z",
         },
       },
@@ -46367,6 +47256,11 @@ export const EventAMBReceivedSchema = {
           },
           locale: "en_US",
           cost: null,
+          requested_language: null,
+          resolved_language: null,
+          template_id: null,
+          template_version_id: null,
+          template_content_hash: null,
           created_at: "2026-09-25T12:00:00Z",
         },
       },
@@ -46424,6 +47318,11 @@ export const EventAMBRejectedSchema = {
             },
           ],
           cost: null,
+          requested_language: null,
+          resolved_language: null,
+          template_id: null,
+          template_version_id: null,
+          template_content_hash: null,
           created_at: "2026-09-25T11:59:59Z",
           last_error: {
             code: "bird:price_missing",
@@ -46487,6 +47386,11 @@ export const EventAMBSendFailedSchema = {
             },
           ],
           cost: null,
+          requested_language: null,
+          resolved_language: null,
+          template_id: null,
+          template_version_id: null,
+          template_content_hash: null,
           created_at: "2026-09-25T11:59:59Z",
           last_error: {
             code: "apple:404",
@@ -46549,6 +47453,11 @@ export const EventAMBSentSchema = {
             },
           ],
           cost: null,
+          requested_language: null,
+          resolved_language: null,
+          template_id: null,
+          template_version_id: null,
+          template_content_hash: null,
           created_at: "2026-09-25T11:59:59Z",
           sent_at: "2026-09-25T12:00:00Z",
         },
@@ -60787,7 +61696,7 @@ export const EmailBroadcastParametersWritableSchema = {
     type: ["string", "number", "boolean", "null"],
   },
   description:
-    "Complete template input map. Each value is a string, number, boolean or null and is used exactly as given, so text containing braces or code-like syntax is never evaluated. Objects and lists are not accepted. Use bird.contact.first_name in the template for contact data. Names must be bare input names outside the bird namespace. Omission retains the map unless the template ID changes, which clears it; an empty object clears it, and null is invalid. The compact map is limited to 16384 UTF-8 bytes and 128 names. Individual email parameters keep their own format.",
+    "Complete template input map. Each value is a string, number, boolean or null and is used exactly as given, so text containing braces or code-like syntax is never evaluated. A value the template uses that opens Liquid (`{{`, or `{%` not followed by a digit) stops the broadcast from sending. Objects and lists are not accepted. Use bird.contact.first_name in the template for contact data. Names must be bare input names outside the bird namespace. Omission retains the map unless the template ID changes, which clears it; an empty object clears it, and null is invalid. The compact map is limited to 16384 UTF-8 bytes and 128 names. Individual email parameters keep their own format.",
 } as const;
 
 export const EmailBroadcastParameterOverridesWritableSchema = {
@@ -61051,6 +61960,74 @@ export const EmailBroadcastTestResultWritableSchema = {
   ],
   description:
     "The email accepted for asynchronous test delivery. Acceptance does not confirm delivery.",
+} as const;
+
+export const LabelWritableSchema = {
+  readOnly: true,
+  description:
+    "A label in the workspace catalogue. Its `id` is accepted by every operation that takes a `label_id` and stays the same when the label is renamed.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "id",
+        "name",
+        "color",
+        "description",
+        "created_at",
+        "updated_at",
+      ],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/LabelID",
+          description:
+            "ID of the label, accepted by every operation that takes a `label_id`. It stays the same when the label is renamed.",
+        },
+        name: {
+          $ref: "#/components/schemas/LabelName",
+        },
+        color: {
+          oneOf: [
+            {
+              $ref: "#/components/schemas/LabelColor",
+            },
+            {
+              type: "null",
+            },
+          ],
+          description:
+            "The label colour as a `#RRGGBB` hex value, or `null` when none is set.",
+        },
+        description: {
+          oneOf: [
+            {
+              $ref: "#/components/schemas/LabelDescription",
+            },
+            {
+              type: "null",
+            },
+          ],
+          description: "When to apply the label, or `null` when none is set.",
+        },
+      },
+    },
+  ],
+} as const;
+
+export const LabelListWritableSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["data"],
+  properties: {
+    data: {
+      type: "array",
+      items: {
+        $ref: "#/components/schemas/LabelWritable",
+      },
+      description: "Every label in the workspace, ordered by name.",
+    },
+  },
 } as const;
 
 export const AudienceRefWritableSchema = {
@@ -65257,7 +66234,7 @@ export const WhatsAppKeywordRuleWritableSchema = {
     excluded_keywords: {
       type: "array",
       description:
-        "Bird's keywords this rule removes from the set it inherits. A message that is exactly one of them opts no one in or out and gets no reply for the people the rule covers, and Bird's own rule does not act on it instead. Excluding every one of Bird's keywords switches them off, though a keyword Bird adds later still matches. It removes only from the Bird rule this rule inherits from: a keyword another rule of yours adds, or one Bird ships only in another country's rule, is unaffected. Always empty on one of Bird's own rules.\n",
+        "Bird's keywords this rule removes from the set it inherits. Rules are tried most specific first, and a rule of yours with neither `country` nor `waba` comes after Bird's rule for the sender's country, as `effective_keywords` explains. When this rule answers a message that is exactly an excluded keyword, no one is opted in or out, no reply is sent, and no later rule acts on it, whether Bird's or another of yours that matches the same keyword. A more specific rule that answers first is unaffected. A rule with no `country` inherits Bird's keywords for each sender's country, so its exclusions apply only to senders whose set has the keyword. Excluding every one of Bird's keywords switches them off where this rule answers, though a keyword Bird adds later still matches unless it is already excluded. It changes no other rule's keywords. Always empty on one of Bird's own rules.\n",
       items: {
         type: "string",
         minLength: 1,
@@ -65267,7 +66244,7 @@ export const WhatsAppKeywordRuleWritableSchema = {
     effective_keywords: {
       type: "array",
       description:
-        "Every keyword that matches this rule: Bird's keywords for the same operation and country, minus `excluded_keywords`, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.\n\nFor a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.\n",
+        "Every keyword that matches this rule: Bird's keywords for the same operation and country, minus `excluded_keywords`, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.\n\nFor a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so when a sender in a country Bird ships a rule for writes one of Bird's keywords, that rule answers and your reply is not used. A keyword you added reaches your rule only when no earlier rule matches it, and for a given sender the matched set can differ from this list in either direction. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.\n",
       items: {
         type: "string",
         minLength: 1,
@@ -65362,6 +66339,256 @@ export const EmailInboxInsightsSpamTrapsWritableSchema = {
   allOf: [
     {
       $ref: "#/components/schemas/EmailInboxInsightsEnvelopeWritable",
+    },
+  ],
+} as const;
+
+export const AutomaticSeedingRunWritableSchema = {
+  description:
+    "Retained run metadata. `created_at` records run intent creation; `updated_at` records run metadata changes, not every delivery outcome. `label` is omitted when the trigger address carried none.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: [
+        "id",
+        "state",
+        "source",
+        "source_created_at",
+        "retain_until",
+        "progress",
+        "issues",
+      ],
+      properties: {
+        id: {
+          $ref: "#/components/schemas/AutomaticSeedingRunID",
+        },
+        state: {
+          $ref: "#/components/schemas/AutomaticSeedingRunState",
+        },
+        source: {
+          $ref: "#/components/schemas/AutomaticSeedingSource",
+        },
+        label: {
+          $ref: "#/components/schemas/AutomaticSeedingTriggerLabel",
+        },
+        source_created_at: {
+          type: "string",
+          format: "date-time",
+          description: "Original source execution time.",
+          minLength: 1,
+        },
+        retain_until: {
+          type: "string",
+          format: "date-time",
+          description: "Time after which this run is no longer available.",
+          minLength: 1,
+        },
+        progress: {
+          $ref: "#/components/schemas/AutomaticSeedingProgress",
+        },
+        sending_domain: {
+          type: "string",
+          description:
+            "Present after registration establishes the sending domain.",
+        },
+        list_type: {
+          $ref: "#/components/schemas/EmailInboxInsightsSeedListType",
+          maxLength: 100,
+          description: "List type frozen at run admission.",
+        },
+        engagement_profile: {
+          $ref: "#/components/schemas/EmailInboxInsightsSeedEngagementProfile",
+          maxLength: 100,
+          description: "Engagement profile frozen at run admission.",
+        },
+        regions: {
+          type: "array",
+          maxItems: 100,
+          uniqueItems: true,
+          items: {
+            type: "string",
+            minLength: 1,
+            maxLength: 100,
+          },
+          description: "Regions frozen at run admission.",
+        },
+        registration_started_at: {
+          type: "string",
+          format: "date-time",
+          description: "Registration admission time.",
+        },
+        registration_finished_at: {
+          type: "string",
+          format: "date-time",
+          description: "Time the registration response was persisted.",
+        },
+        dispatch_deadline: {
+          type: "string",
+          format: "date-time",
+          description: "Fixed deadline for new seed admissions.",
+        },
+        dispatch_finished_at: {
+          type: "string",
+          format: "date-time",
+          description:
+            "Time scheduler work completed; uncertain admission or delivery may remain.",
+        },
+        stop_requested_at: {
+          type: "string",
+          format: "date-time",
+          description:
+            "First durable stop, whether requested explicitly or imposed automatically. Already granted copies may still send.",
+        },
+        reason: {
+          $ref: "#/components/schemas/AutomaticSeedingReason",
+          description:
+            "Sanitized reason code. Unknown stored details become unavailable; provider error text is never returned.",
+        },
+        issues: {
+          type: "array",
+          description:
+            "Counts of sanitized terminal or uncertain copy outcomes. No seed addresses or provider error text. Counts overlap the progress buckets.",
+          items: {
+            $ref: "#/components/schemas/AutomaticSeedingIssue",
+          },
+        },
+      },
+    },
+  ],
+  example: {
+    id: "esrun_01krdgeqcxet5s7t44vh8rt9mg",
+    state: "dispatch_complete",
+    source: {
+      kind: "api",
+      email_id: "em_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    label: "spring-launch",
+    source_created_at: "2026-05-20T09:14:52Z",
+    retain_until: "2027-06-19T09:14:52Z",
+    progress: {
+      planned: 48,
+      admitted: 48,
+      provider_accepted: 48,
+      delivered: 46,
+      failed: 1,
+      not_sent: 0,
+      unknown: 0,
+      pending: 1,
+    },
+    sending_domain: "mail.example.com",
+    list_type: "private",
+    engagement_profile: "all",
+    regions: ["North America - US"],
+    registration_started_at: "2026-05-20T09:14:55Z",
+    registration_finished_at: "2026-05-20T09:15:02Z",
+    dispatch_deadline: "2026-05-20T10:14:52Z",
+    dispatch_finished_at: "2026-05-20T09:31:10Z",
+    issues: [
+      {
+        code: "bounced",
+        count: 1,
+      },
+    ],
+    created_at: "2026-05-20T09:14:53Z",
+    updated_at: "2026-05-20T09:31:10Z",
+  },
+} as const;
+
+export const AutomaticSeedingRunListWritableSchema = {
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/AutomaticSeedingRunWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
+    },
+  ],
+} as const;
+
+export const AutomaticSeedingSourceObservationWritableSchema = {
+  description:
+    "Retained capture observation. `created_at` records observation creation; `updated_at` records the last capture observation change. `label` is omitted when the trigger address carried none.",
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: ["source", "source_created_at", "retain_until", "state"],
+      properties: {
+        source: {
+          $ref: "#/components/schemas/AutomaticSeedingSource",
+        },
+        source_created_at: {
+          type: "string",
+          format: "date-time",
+          description: "Original source execution time.",
+          minLength: 1,
+        },
+        retain_until: {
+          type: "string",
+          format: "date-time",
+          description: "Time after which the observation is unavailable.",
+          minLength: 1,
+        },
+        state: {
+          $ref: "#/components/schemas/AutomaticSeedingSourceState",
+        },
+        reason: {
+          $ref: "#/components/schemas/AutomaticSeedingReason",
+          description:
+            "Sanitized capture reason; absent for a successful or pending observation.",
+        },
+        run_id: {
+          $ref: "#/components/schemas/AutomaticSeedingRunID",
+        },
+        label: {
+          $ref: "#/components/schemas/AutomaticSeedingTriggerLabel",
+        },
+      },
+    },
+  ],
+  example: {
+    source: {
+      kind: "api",
+      email_id: "em_01krdgeqcxet5s7t44vh8rt9mg",
+    },
+    source_created_at: "2026-05-20T09:14:52Z",
+    retain_until: "2027-06-19T09:14:52Z",
+    state: "captured",
+    run_id: "esrun_01krdgeqcxet5s7t44vh8rt9mg",
+    label: "spring-launch",
+    created_at: "2026-05-20T09:14:53Z",
+    updated_at: "2026-05-20T09:14:58Z",
+  },
+} as const;
+
+export const AutomaticSeedingSourceListWritableSchema = {
+  unevaluatedProperties: false,
+  allOf: [
+    {
+      type: "object",
+      required: ["data"],
+      properties: {
+        data: {
+          type: "array",
+          items: {
+            $ref: "#/components/schemas/AutomaticSeedingSourceObservationWritable",
+          },
+        },
+      },
+    },
+    {
+      $ref: "#/components/schemas/_ListEnvelopeWithTotal",
     },
   ],
 } as const;
@@ -67400,18 +68627,6 @@ export const EmailMailboxScheduledMessageListWritableSchema = {
   ],
 } as const;
 
-export const EmailMailboxLabelListWritableSchema = {
-  type: "object",
-  additionalProperties: false,
-  description: "The labels available in a mailbox.",
-  required: ["data"],
-  properties: {
-    data: {
-      type: "array",
-    },
-  },
-} as const;
-
 export const EmailSmtpConfigWritableSchema = {
   allOf: [
     {
@@ -67874,6 +69089,11 @@ export const EventAMBAcceptedWritableSchema = {
             },
           ],
           cost: null,
+          requested_language: null,
+          resolved_language: null,
+          template_id: null,
+          template_version_id: null,
+          template_content_hash: null,
           created_at: "2026-09-25T11:59:59Z",
         },
       },
@@ -67958,6 +69178,11 @@ export const EventAMBReceivedWritableSchema = {
           },
           locale: "en_US",
           cost: null,
+          requested_language: null,
+          resolved_language: null,
+          template_id: null,
+          template_version_id: null,
+          template_content_hash: null,
           created_at: "2026-09-25T12:00:00Z",
         },
       },
@@ -68007,6 +69232,11 @@ export const EventAMBRejectedWritableSchema = {
             },
           ],
           cost: null,
+          requested_language: null,
+          resolved_language: null,
+          template_id: null,
+          template_version_id: null,
+          template_content_hash: null,
           created_at: "2026-09-25T11:59:59Z",
           last_error: {
             code: "bird:price_missing",
@@ -68062,6 +69292,11 @@ export const EventAMBSendFailedWritableSchema = {
             },
           ],
           cost: null,
+          requested_language: null,
+          resolved_language: null,
+          template_id: null,
+          template_version_id: null,
+          template_content_hash: null,
           created_at: "2026-09-25T11:59:59Z",
           last_error: {
             code: "apple:404",
@@ -68116,6 +69351,11 @@ export const EventAMBSentWritableSchema = {
             },
           ],
           cost: null,
+          requested_language: null,
+          resolved_language: null,
+          template_id: null,
+          template_version_id: null,
+          template_content_hash: null,
           created_at: "2026-09-25T11:59:59Z",
           sent_at: "2026-09-25T12:00:00Z",
         },

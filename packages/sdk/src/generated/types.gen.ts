@@ -412,6 +412,14 @@ export type Error = {
   error: ErrorBody;
 };
 
+/**
+ * A template's slug: what you send it by, for example `welcome-email`. Email and SMS slugs stay fixed after creation. WhatsApp slugs can change only before the first submission. A slug can contain lowercase letters, numbers, hyphens, and underscores, has to start and end with a letter or a number, and can be up to 63 characters long.
+ *
+ */
+export type TemplateSlug = string;
+
+export type UserId = string;
+
 export type ListEnvelopeWithTotal = ListEnvelope & {
   /**
    * Total number of items matching the request's filters across all pages. Present only when `include_total=true` was passed, and omitted otherwise.
@@ -422,8 +430,6 @@ export type ListEnvelopeWithTotal = ListEnvelope & {
 export type ApiKeyId = string;
 
 export type WorkspaceId = string;
-
-export type UserId = string;
 
 /**
  * Must include at least one letter or number.
@@ -2944,7 +2950,7 @@ export type WhatsAppInboundStatsPoint = {
 export type AmbBusinessId = string;
 
 /**
- * Derived message classification for filtering and statistics. Send requests use the `text`, `rich_link` and `interactive` keys. `apple_pay` and `authenticate` appear on existing messages. Sends and templates do not accept them.
+ * Derived message classification for filtering and statistics. Send requests use the `text`, `rich_link` and `interactive` keys. `apple_pay` and `authenticate` appear on existing messages. Sends do not accept them, and templates do not accept `apple_pay`. A sign-in message template has the kind `authenticate`.
  *
  * - text: Text, optionally with a subject.
  * - attachment: One or more files, images, audio clips, or videos.
@@ -2956,7 +2962,7 @@ export type AmbBusinessId = string;
  * - imessage_app: A custom iMessage app interaction on a compatible device.
  * - interactive: An opaque interactive reference whose subtype is unknown.
  * - apple_pay: An Apple Pay request, or the customer's response to one. Apple Pay requests are in preview.
- * - authenticate: An identity verification request, or the customer's response to one.
+ * - authenticate: A sign-in request, the customer's response to one, or a sign-in message template.
  */
 export type AmbContentKind =
   | "text"
@@ -4458,7 +4464,7 @@ export type EmailMessage = {
    */
   readonly reference?: MessageReference;
   /**
-   * The substitution values this send supplied, whether inline or from a template, or null if none were supplied. They are the values applied to `subject` and to the bodies the content endpoint returns, kept so you can see what produced the delivered copy and not only the result.
+   * Public substitution values used for the subject and message bodies, whether supplied inline or through a template. Reserved internal keys and the exact top-level `bird_unsub_token` key are omitted, even if caller-supplied. Returns null when no public values remain.
    *
    */
   readonly parameters?: {
@@ -4515,12 +4521,6 @@ export type EmailMessageList = {
  *
  */
 export type EmailAddressInput = string | EmailAddress;
-
-/**
- * A template's slug: what you send it by, for example `welcome-email`. Email and SMS slugs stay fixed after creation. WhatsApp slugs can change only before the first submission. A slug can contain lowercase letters, numbers, hyphens, and underscores, has to start and end with a letter or a number, and can be up to 63 characters long.
- *
- */
-export type TemplateSlug = string;
 
 export type EmailTemplateSend = unknown & {
   /**
@@ -5109,7 +5109,7 @@ export type ContactId = string;
 export type EmailBroadcastParameterName = string;
 
 /**
- * Complete template input map. Each value is a string, number, boolean or null and is used exactly as given, so text containing braces or code-like syntax is never evaluated. Objects and lists are not accepted. Use bird.contact.first_name in the template for contact data. Names must be bare input names outside the bird namespace. Omission retains the map unless the template ID changes, which clears it; an empty object clears it, and null is invalid. The compact map is limited to 16384 UTF-8 bytes and 128 names. Individual email parameters keep their own format.
+ * Complete template input map. Each value is a string, number, boolean or null and is used exactly as given, so text containing braces or code-like syntax is never evaluated. A value the template uses that opens Liquid (`{{`, or `{%` not followed by a digit) stops the broadcast from sending. Objects and lists are not accepted. Use bird.contact.first_name in the template for contact data. Names must be bare input names outside the bird namespace. Omission retains the map unless the template ID changes, which clears it; an empty object clears it, and null is invalid. The compact map is limited to 16384 UTF-8 bytes and 128 names. Individual email parameters keep their own format.
  */
 export type EmailBroadcastParameters = {
   [key in EmailBroadcastParameterName]?: string | number | boolean | null;
@@ -5187,6 +5187,7 @@ export type EmailBroadcastFundingHold = {
  * - `parameter_map_invalid`: `template.parameters` or `template.parameter_overrides` is not a JSON object of input names.
  * - `parameter_name_invalid`: an input name is not a bare name outside the `bird` namespace.
  * - `parameter_value_unsupported`: an input value is an object or a list. Values must be a string, number, boolean or null.
+ * - `parameter_liquid_unsupported`: an input value the email uses contains Liquid, such as `{{` or `{%`. Values are sent as written, so the broadcast cannot send; put Liquid in the template instead.
  * - `parameter_duplicate_key`: an input name, or two spellings of one language tag, appears twice.
  * - `parameter_bytes_exceeded`: an input map is larger than 16384 UTF-8 bytes.
  * - `parameter_names_exceeded`: `template.parameters` and every language together hold more than 128 distinct names.
@@ -5213,6 +5214,7 @@ export type EmailBroadcastParameterProblemCode =
   | "parameter_map_invalid"
   | "parameter_name_invalid"
   | "parameter_value_unsupported"
+  | "parameter_liquid_unsupported"
   | "parameter_duplicate_key"
   | "parameter_bytes_exceeded"
   | "parameter_names_exceeded"
@@ -6087,6 +6089,70 @@ export type EmailBroadcastResume = {
    * Acknowledgment that the message reaches the remaining recipients later than intended. It is required to resume a broadcast that started sending at least 24 hours ago. Before setting it, read the broadcast's `started_at` and have a reviewer with `email_management:read` read its template by `template.id` to check `scope`, then, for a workspace template or one the template read reports deleted (`404`), its pinned version using `template.id` and `template.version_id`. Workspace versions retain the original content. A built-in template (`scope: system`) shows current catalogue content, and only the template read returns `scope`. Broadcasts with frozen content keep it, but older broadcasts can read the catalogue again when resumed. Neither a current lookup nor an earlier message alone proves what remaining recipients will receive. Leave the broadcast paused unless you can verify that content. Ask an authorized teammate if you lack that permission. It does not skip the funds or concurrent-broadcast checks.
    */
   confirm?: boolean;
+};
+
+export type LabelId = string;
+
+/**
+ * The label name, unique in the workspace regardless of case. No commas, control characters, or leading or trailing whitespace. System names such as `inbox`, `sent`, `unread`, `open` or `assigned` are reserved.
+ */
+export type LabelName = string;
+
+/**
+ * The label colour as a `#RRGGBB` hex value.
+ */
+export type LabelColor = string;
+
+/**
+ * When to apply the label. People and agents read it when they decide which label fits.
+ */
+export type LabelDescription = string;
+
+/**
+ * A label in the workspace catalogue. Its `id` is accepted by every operation that takes a `label_id` and stays the same when the label is renamed.
+ */
+export type Label = {
+  /**
+   * ID of the label, accepted by every operation that takes a `label_id`. It stays the same when the label is renamed.
+   */
+  id: LabelId;
+  name: LabelName;
+  /**
+   * The label colour as a `#RRGGBB` hex value, or `null` when none is set.
+   */
+  color: LabelColor | null;
+  /**
+   * When to apply the label, or `null` when none is set.
+   */
+  description: LabelDescription | null;
+} & Timestamps;
+
+export type LabelList = {
+  /**
+   * Every label in the workspace, ordered by name.
+   */
+  data: Array<Label>;
+};
+
+export type LabelCreate = {
+  name: LabelName;
+  color?: LabelColor;
+  description?: LabelDescription;
+};
+
+/**
+ * Fields to change. Omitted fields are left unchanged; `null` clears `color` or `description`. A body with none of `name`, `color` or `description` is refused; one that resends current values is accepted.
+ */
+export type LabelUpdate = {
+  name?: LabelName;
+  /**
+   * The new colour, or `null` to remove it.
+   */
+  color?: LabelColor | null;
+  /**
+   * The new description, or `null` to remove it.
+   */
+  description?: LabelDescription | null;
 };
 
 /**
@@ -13854,7 +13920,7 @@ export type WhatsAppTemplateLanguageUpsert = {
    */
   parameter_bindings?: WhatsAppTemplateParameterBindings | null;
   /**
-   * This language's maximum price. Omit it to keep the current one. A new language written without it uses Meta's standard rate. Send `null` to return to the standard rate. Changing only the price updates Meta without a new review. A send at a maximum price needs the business account's `marketing_messages_onboarding_status` to be `onboarded`. Otherwise it fails with WhatsApp error 131061.
+   * This language's maximum price. Omit it to keep the current one. A new language written without it uses Meta's standard rate. Send `null` to return to the standard rate. Changing only the price updates Meta without a new review.
    *
    */
   optimization_spec?: WhatsAppTemplateOptimizationSpecWrite | null;
@@ -15218,6 +15284,8 @@ export type AmbBusinessAccountAttachmentUpload = {
 
 export type AmbAuthenticationProviderId = string;
 
+export type AmbTemplateId = string;
+
 export type AmbEntryPoint = {
   /**
    * Identifier for this entry point, chosen by you and unique within the business's entry points. A conversation opened through this entry point carries it as `entry_point`.
@@ -15717,7 +15785,7 @@ export type AmbNativeRichLinkData = {
 };
 
 /**
- * Asks Apple to build the rich link preview when the message is sent. Use `POST /v1/amb/messages/construct-payload` beforehand only to check the URL and see the preview's title.
+ * Asks Apple to build the rich link preview from `url` when the message is sent.
  */
 export type AmbRichLinkConstruct = {
   /**
@@ -16470,7 +16538,7 @@ export type AmbMessagePart = {
    */
   url?: string;
   /**
-   * The title a card showed. On a `link_preview` part it is the page's title, read when the part was sent. On a `rich_link` part Apple built from its URL it is the title Apple returned for the card, or the linked page's title when Apple returned none. A title longer than 512 bytes is cut to that length. Absent on other parts, on a part Apple did not accept, and on a `rich_link` Apple built when neither Apple nor a page Bird could read supplied a title. On a `link_preview` part it is also absent when Bird sent the part in an earlier attempt of a retried send, or had to save the send's result again.
+   * The title a card showed. On a `link_preview` part it is the page's title, read when the part was sent. On a `rich_link` part Apple built from its URL it is the title Apple returned for the card. When Apple returned none, or returned a web address in its place, it is the linked page's title. Apple builds that card on the device, so the title it shows can differ. A title longer than 512 bytes is cut to that length. Absent on other parts, on a part Apple did not accept, and on a `rich_link` Apple built when Apple supplied no title or only a web address and the linked page supplied none or Bird could not read it. On a `link_preview` part it is also absent when Bird sent the part in an earlier attempt of a retried send, or had to save the send's result again.
    */
   title?: string;
   /**
@@ -16501,8 +16569,6 @@ export type AmbError = {
    */
   occurred_at: string;
 } | null;
-
-export type AmbTemplateId = string;
 
 export type AmbTemplateVersionId = string;
 
@@ -17131,6 +17197,42 @@ export type AmbConversationUpdate = ConversationUpdate & {
   routing_change?: AmbConversationRoutingChangeDecision;
 };
 
+export type AmbAuthenticationTemplate = unknown & {
+  /**
+   * The workspace or built-in sign-in message template to send, by ID.
+   */
+  id?: AmbTemplateId;
+  /**
+   * The workspace or built-in sign-in message template to send, by its immutable slug. Read the template's live version to see its variables.
+   *
+   */
+  slug?: TemplateSlug;
+  /**
+   * Which of the template's languages to send. When the template does not have the language you ask for, its `on_missing_language` setting decides whether the closest available language is sent instead or the request is rejected. Omit it to send the first of these the template has: the conversation's locale, the business's default locale, then the template's default language. A request that omits it is never rejected for its language, and `language_source_required` does not apply.
+   *
+   */
+  language?: LanguageTag;
+  /**
+   * Values for the template's variables, keyed by variable name. Read the live version to see the accepted keys and formats. A missing required key, an undeclared key, an invalid value, or a serialized object over 16 KiB returns `422`.
+   *
+   */
+  parameters?: {
+    [key: string]: unknown;
+  };
+};
+
+/**
+ * Options for a sign-in request. Omit the body to send the business's sign-in message.
+ *
+ */
+export type AmbAuthenticationCreate = {
+  /**
+   * The sign-in message template to send in place of the business's sign-in message. The template must be a published sign-in message.
+   *
+   */
+  template?: AmbAuthenticationTemplate;
+};
+
 /**
  * The typing signal to send. `typing_start` tells the customer's device that an operator is composing a reply. `typing_end` tells it composition stopped without a message following. Apple expects at most one `typing_start` before the reply it precedes; sending it again before that reply is not meaningful and may be dropped. `typing_end`'s behavior against a live conversation is unproven: the legacy platform's implementation was disabled after it caused issues, so treat it as best-effort.
  *
@@ -17538,6 +17640,28 @@ export type AmbTemplateList = {
 } & ListEnvelope;
 
 /**
+ * The message an authentication request sends: the sign-in request bubble, the bubble that replaces it after sign-in, their images and an optional confirmation text. Only a template holds it. An authentication request renders the template and sends it. A message send does not accept it.
+ */
+export type AmbSignInMessage = {
+  /**
+   * The sign-in request bubble the customer receives.
+   */
+  received_message: AmbMessageBubble;
+  /**
+   * The bubble Messages shows after the customer signs in.
+   */
+  reply_message: AmbMessageBubble;
+  /**
+   * Images the bubbles reference by `image_identifier`.
+   */
+  images?: Array<AmbNativeImage>;
+  /**
+   * Text Bird sends as a message after the customer's device confirms the sign-in. Omit it to send no confirmation. It may contain `{{ }}` placeholders.
+   */
+  confirmation_text?: string;
+};
+
+/**
  * One Apple Messages template identity and its authoring state. Content and variables live on versions, so this resource stays shallow.
  *
  */
@@ -17707,6 +17831,10 @@ export type AmbTemplateVersionLanguage = {
    */
   readonly interactive?: AmbInteractive;
   /**
+   * Stored sign-in message. Includes its `{{ variable }}` placeholders.
+   */
+  readonly sign_in?: AmbSignInMessage;
+  /**
    * This language's revision counter.
    */
   readonly revision: number;
@@ -17811,6 +17939,10 @@ export type AmbTemplateLanguage = {
    * Stored interaction. Includes its `{{ variable }}` placeholders.
    */
   readonly interactive?: AmbInteractive;
+  /**
+   * Stored sign-in message. Includes its `{{ variable }}` placeholders.
+   */
+  readonly sign_in?: AmbSignInMessage;
   /**
    * This language's revision counter, used for concurrent-edit checks on draft writes.
    */
@@ -18299,14 +18431,14 @@ export type WhatsAppKeywordRule = {
    */
   keywords: Array<string>;
   /**
-   * Bird's keywords this rule removes from the set it inherits. A message that is exactly one of them opts no one in or out and gets no reply for the people the rule covers, and Bird's own rule does not act on it instead. Excluding every one of Bird's keywords switches them off, though a keyword Bird adds later still matches. It removes only from the Bird rule this rule inherits from: a keyword another rule of yours adds, or one Bird ships only in another country's rule, is unaffected. Always empty on one of Bird's own rules.
+   * Bird's keywords this rule removes from the set it inherits. Rules are tried most specific first, and a rule of yours with neither `country` nor `waba` comes after Bird's rule for the sender's country, as `effective_keywords` explains. When this rule answers a message that is exactly an excluded keyword, no one is opted in or out, no reply is sent, and no later rule acts on it, whether Bird's or another of yours that matches the same keyword. A more specific rule that answers first is unaffected. A rule with no `country` inherits Bird's keywords for each sender's country, so its exclusions apply only to senders whose set has the keyword. Excluding every one of Bird's keywords switches them off where this rule answers, though a keyword Bird adds later still matches unless it is already excluded. It changes no other rule's keywords. Always empty on one of Bird's own rules.
    *
    */
   excluded_keywords: Array<string>;
   /**
    * Every keyword that matches this rule: Bird's keywords for the same operation and country, minus `excluded_keywords`, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.
    *
-   * For a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.
+   * For a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so when a sender in a country Bird ships a rule for writes one of Bird's keywords, that rule answers and your reply is not used. A keyword you added reaches your rule only when no earlier rule matches it, and for a given sender the matched set can differ from this list in either direction. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.
    *
    */
   effective_keywords: Array<string>;
@@ -18370,7 +18502,7 @@ export type WhatsAppKeywordRuleCreate = {
    */
   keywords?: Array<string>;
   /**
-   * Bird's keywords to remove for the people this rule covers. A message that is exactly one of them then opts no one in or out and gets no reply, and you must honour opt-outs it carries yourself. Exclude every one of Bird's keywords to switch them off; a keyword Bird adds later still matches. It removes only from the Bird rule this one inherits from, not from your other rules. A keyword cannot be both added and excluded.
+   * Bird's keywords to remove for the people this rule covers. Rules are tried most specific first: a more specific rule of yours answers before this one, and with neither `country` nor `waba` so does Bird's rule for the sender's country. When this rule answers a message that is exactly an excluded keyword, no one is opted in or out, no reply is sent, and no less specific rule acts on it, so you must honour opt-outs it carries yourself. Without a `country`, the rule inherits Bird's keywords for each sender's country, so an exclusion covers only senders whose set has that keyword. Exclude every one of Bird's keywords to switch them off where this rule answers; a keyword Bird adds later still matches unless it is already excluded. It changes none of your other rules. A keyword cannot be both added and excluded.
    *
    */
   excluded_keywords?: Array<string>;
@@ -19413,6 +19545,359 @@ export type EmailInboxInsightsSeedListType =
  */
 export type EmailInboxInsightsSeedEngagementProfile =
   "all" | "engaging" | "non_engaging" | (string & {});
+
+/**
+ * Workspace automatic seeding settings. Before setup, revision is zero and the trigger address is absent. Unset list type, engagement profile and regions are omitted. Saved preferences are not checked against available seed-test options.
+ */
+export type AutomaticSeedingSettings = {
+  /**
+   * Current settings revision. Supply it when updating settings. Initialize settings before rotating the trigger address.
+   */
+  revision: number;
+  /**
+   * Workspace trigger address for seeding examples. Absent before the first settings update. Using it requires authenticated sending access to this workspace; the address itself grants no access.
+   */
+  trigger_address?: string;
+  /**
+   * Saved automatic-seeding preference.
+   */
+  enabled: boolean;
+  list_type?: EmailInboxInsightsSeedListType;
+  engagement_profile?: EmailInboxInsightsSeedEngagementProfile;
+  /**
+   * Saved regions to place seeds in, as `regions[].value` names from `GET /v1/email/inbox-insights/seed-tests/configuration`. They are not checked against that list when saved.
+   */
+  regions?: Array<string>;
+};
+
+/**
+ * Replace automatic seeding settings. Omitted selections clear the saved values. Enabling requires a list type, engagement profile and at least one region. Preferences are not checked against available seed-test options. A stale revision returns a conflict without changing settings.
+ */
+export type AutomaticSeedingSettingsUpdate = {
+  /**
+   * Revision from the latest settings read, or zero for initial setup.
+   */
+  expected_revision: number;
+  /**
+   * Saved automatic-seeding preference.
+   */
+  enabled: boolean;
+  list_type?: EmailInboxInsightsSeedListType;
+  engagement_profile?: EmailInboxInsightsSeedEngagementProfile;
+  /**
+   * Regions to place seeds in. Use `regions[].value` exactly as returned by `GET /v1/email/inbox-insights/seed-tests/configuration` for the sending domain your examples come from. Whitespace-only names are rejected, but names are not checked against that list when saved; a name it does not offer makes a later run end with `selection_unavailable`.
+   */
+  regions?: Array<string>;
+};
+
+/**
+ * Rotate the trigger address once at the supplied settings revision. Settings must have been initialized by a successful settings update; rotation before setup returns 404. A stale revision returns 409 without rotating again.
+ */
+export type AutomaticSeedingRotate = {
+  /**
+   * Revision from the latest settings read after initial setup. Revision zero from an unconfigured workspace cannot be used to rotate an address.
+   */
+  expected_revision: number;
+};
+
+/**
+ * Automatic seeding run ordering field.
+ */
+export type AutomaticSeedingRunSort = "created_at";
+
+/**
+ * Origin of the source: `api` is an immediate API submission; `smtp` is an immediate SMTP submission; `scheduled` is an API-scheduled email; `broadcast` is a broadcast. This identifies origin regardless of capture outcome or run creation, including skipped unsupported broadcasts. Scheduled examples can be captured only when due. SMTP submissions cannot be scheduled.
+ */
+export type AutomaticSeedingSourceKind =
+  "api" | "smtp" | "scheduled" | "broadcast";
+
+/**
+ * Execution state, separate from delivery and inbox placement:
+ * - `pending`: the run is recorded and registration has not started.
+ * - `registering`: registration is in progress. A stop request can coexist with an in-flight registration.
+ * - `registration_uncertain`: the registration result is unknown. Registration is not automatically repeated, and uncertainty remains visible after a stop.
+ * - `ready`: registration has produced a retained seed plan; dispatch scheduling has not started.
+ * - `dispatching`: the scheduler is admitting planned copies or recovering earlier handoffs.
+ * - `dispatch_complete`: scheduler work is acknowledged. Uncertain admission and pending delivery can remain.
+ * - `stopped`: new admissions are closed by a stop request, settings or trigger changes, or the dispatch deadline. Already granted copies may still send.
+ * - `failed`: registration failed or the source control was refused. New admissions cannot proceed; retained progress describes any copies already granted.
+ * Inspect progress and stop_requested_at alongside this state. A terminal run state does not recall previously granted or queued copies.
+ *
+ */
+export type AutomaticSeedingRunState =
+  | "pending"
+  | "registering"
+  | "registration_uncertain"
+  | "ready"
+  | "dispatching"
+  | "dispatch_complete"
+  | "stopped"
+  | "failed";
+
+export type AutomaticSeedingRunId = string;
+
+/**
+ * Original source kind for this reference.
+ */
+export type AutomaticSeedingEmailSourceKind = "api" | "smtp" | "scheduled";
+
+export type AutomaticSeedingEmailSource = {
+  kind: AutomaticSeedingEmailSourceKind;
+  email_id: EmailId;
+};
+
+/**
+ * Original source kind for this reference.
+ */
+export type AutomaticSeedingBroadcastSourceKind = "broadcast";
+
+export type AutomaticSeedingBroadcastSource = {
+  kind: AutomaticSeedingBroadcastSourceKind;
+  broadcast_id: EmailBroadcastId;
+};
+
+/**
+ * Original customer source. This never identifies a generated seed copy. Scheduled means an API-scheduled email.
+ */
+export type AutomaticSeedingSource =
+  AutomaticSeedingEmailSource | AutomaticSeedingBroadcastSource;
+
+/**
+ * Label from a trigger address, such as `spring-launch` in `<token>+spring-launch@...`. It is a display name and selects nothing.
+ */
+export type AutomaticSeedingTriggerLabel = string;
+
+/**
+ * Delivered, failed, not_sent, unknown and pending partition planned copies. Admitted and provider_accepted overlap those buckets and must not be added to them. Late outcomes can move a copy between buckets.
+ */
+export type AutomaticSeedingProgress = {
+  /**
+   * Number of retained planned copies.
+   */
+  planned: number;
+  /**
+   * Copies admitted to Bird email processing. Independent milestone; not provider acceptance.
+   */
+  admitted: number;
+  /**
+   * Copies explicitly accepted by the sending provider. Independent milestone; not delivery or placement.
+   */
+  provider_accepted: number;
+  /**
+   * Copies with receiving-server delivery or complaint evidence. Does not establish inbox placement.
+   */
+  delivered: number;
+  /**
+   * Copies with terminal bounce, rejection or block evidence.
+   */
+  failed: number;
+  /**
+   * Copies refused or canceled before sending, including ungranted copies after a run fence.
+   */
+  not_sent: number;
+  /**
+   * Copies with unresolved admission or provider outcome uncertainty.
+   */
+  unknown: number;
+  /**
+   * Remaining copies awaiting admission or a delivery outcome.
+   */
+  pending: number;
+};
+
+/**
+ * A reason for a run or source outcome, or a seed-copy delivery or admission outcome.
+ *
+ * - `registration_rejected` means the seed-list registration was refused; no seed plan was created.
+ * - `allowance_exhausted` means the organization's seed-test allowance for this billing period was used up before registration; no seed plan was created.
+ * - `selection_unavailable` means the saved seed-list type, engagement profile or region is no longer offered for the sending domain; no seed plan was created.
+ * - `sending_domain_not_measured` means Inbox Insights is not measuring the example's sending domain; no seed plan was created.
+ * - `vendor_outcome_unknown` means the seed-list registration result is unknown; automatic registration retries are stopped and investigation is required.
+ * - `invalid_registration_response` means the returned seed list could not be used; no copies will be sent from that response.
+ * - `canceled_or_expired` means new seed admissions stopped because the run was canceled or its eligibility expired.
+ * - `run_stopped` means a stop request ended future seed admissions; already granted copies may still send.
+ * - `settings_disabled` means automatic seeding was disabled before the copy was granted.
+ * - `trigger_rotated` means the run's cancellation generation changed before the copy was granted, either through trigger rotation or disabling seeding. Re-enabling does not advance the generation or undo that fence. This code alone does not establish that the trigger address changed.
+ * - `dispatch_deadline_exceeded` means the deadline for admitting this copy passed.
+ * - `control_rejected` means the trigger message was rejected.
+ * - `source_stopped` means the original source no longer authorizes seed sending.
+ * - `conflicting_examples` means the source contained conflicting examples, so none was selected.
+ * - `unsupported_source` means capture is unavailable for this source type.
+ * - `mixed_recipients` means the original message did not have exactly one recipient consisting of the trigger address.
+ * - `invalid_trigger` means the trigger address was invalid or no longer valid for this workspace.
+ * - `seeding_unavailable` means automatic-seeding capture was unavailable for this source.
+ * - `contact_template_unsupported` means the source template uses contact values that this capture path cannot freeze.
+ * - `source_not_authorized` means the source failed sending authorization during capture or registration.
+ * - `content_blocked` means the source content was rejected before capture.
+ * - `capture_expired` means the example capture deadline passed.
+ * - `capture_failed` means the example could not be captured.
+ * - `preparation_unavailable` means the frozen example could not be used for registration or preparation of a seed copy.
+ * - `policy_refused` means the seed copy failed sending-policy checks.
+ * - `unavailable` means a more specific reason cannot be shown.
+ * - `bounced` means the seed copy received a bounce outcome.
+ * - `rejected` means the seed copy received a rejection outcome.
+ * - `blocked` means the seed copy was blocked from sending.
+ * - `canceled` means the seed copy was canceled before sending.
+ * - `provider_outcome_unknown` means a provider submission may have occurred, but its result is unknown; the copy is not automatically resent.
+ * - `admission_uncertain` means the seed copy may have entered sending, but admission is unconfirmed; it is not automatically admitted again.
+ * - `admission_refused` means the seed copy was refused before entering sending.
+ *
+ */
+export type AutomaticSeedingReason =
+  | "registration_rejected"
+  | "allowance_exhausted"
+  | "selection_unavailable"
+  | "sending_domain_not_measured"
+  | "vendor_outcome_unknown"
+  | "invalid_registration_response"
+  | "canceled_or_expired"
+  | "run_stopped"
+  | "settings_disabled"
+  | "trigger_rotated"
+  | "dispatch_deadline_exceeded"
+  | "control_rejected"
+  | "source_stopped"
+  | "conflicting_examples"
+  | "unsupported_source"
+  | "mixed_recipients"
+  | "invalid_trigger"
+  | "seeding_unavailable"
+  | "contact_template_unsupported"
+  | "source_not_authorized"
+  | "content_blocked"
+  | "capture_expired"
+  | "capture_failed"
+  | "preparation_unavailable"
+  | "policy_refused"
+  | "unavailable"
+  | "bounced"
+  | "rejected"
+  | "blocked"
+  | "canceled"
+  | "provider_outcome_unknown"
+  | "admission_uncertain"
+  | "admission_refused"
+  | (string & {});
+
+export type AutomaticSeedingIssue = {
+  /**
+   * A reason or delivery status affecting these copies. Unrecognized persisted reasons become unavailable.
+   */
+  code: AutomaticSeedingReason;
+  count: number;
+};
+
+/**
+ * Retained run metadata. `created_at` records run intent creation; `updated_at` records run metadata changes, not every delivery outcome. `label` is omitted when the trigger address carried none.
+ */
+export type AutomaticSeedingRun = {
+  id: AutomaticSeedingRunId;
+  state: AutomaticSeedingRunState;
+  source: AutomaticSeedingSource;
+  label?: AutomaticSeedingTriggerLabel;
+  /**
+   * Original source execution time.
+   */
+  source_created_at: string;
+  /**
+   * Time after which this run is no longer available.
+   */
+  retain_until: string;
+  progress: AutomaticSeedingProgress;
+  /**
+   * Present after registration establishes the sending domain.
+   */
+  sending_domain?: string;
+  /**
+   * List type frozen at run admission.
+   */
+  list_type?: EmailInboxInsightsSeedListType;
+  /**
+   * Engagement profile frozen at run admission.
+   */
+  engagement_profile?: EmailInboxInsightsSeedEngagementProfile;
+  /**
+   * Regions frozen at run admission.
+   */
+  regions?: Array<string>;
+  /**
+   * Registration admission time.
+   */
+  registration_started_at?: string;
+  /**
+   * Time the registration response was persisted.
+   */
+  registration_finished_at?: string;
+  /**
+   * Fixed deadline for new seed admissions.
+   */
+  dispatch_deadline?: string;
+  /**
+   * Time scheduler work completed; uncertain admission or delivery may remain.
+   */
+  dispatch_finished_at?: string;
+  /**
+   * First durable stop, whether requested explicitly or imposed automatically. Already granted copies may still send.
+   */
+  stop_requested_at?: string;
+  /**
+   * Sanitized reason code. Unknown stored details become unavailable; provider error text is never returned.
+   */
+  reason?: AutomaticSeedingReason;
+  /**
+   * Counts of sanitized terminal or uncertain copy outcomes. No seed addresses or provider error text. Counts overlap the progress buckets.
+   */
+  issues: Array<AutomaticSeedingIssue>;
+} & Timestamps;
+
+export type AutomaticSeedingRunList = {
+  data: Array<AutomaticSeedingRun>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * Automatic seeding source ordering field.
+ */
+export type AutomaticSeedingSourceSort = "created_at";
+
+/**
+ * State of the source example, separate from the run's sending progress:
+ * - `scheduled`: the API-scheduled source is waiting for its due time; capture has not started.
+ * - `capturing`: capture is in progress and can already have an associated run.
+ * - `captured`: immutable example content was committed for a run; this does not mean seeds were sent.
+ * - `skipped`: the source did not complete eligible capture. The reason explains the refusal; a run can exist if refusal occurred after admission.
+ * - `stopped`: the scheduled source was canceled; capture will not continue.
+ * - `failed`: the scheduled source failed; capture will not continue.
+ * Source observations can exist without a run. run_id is present only while an associated run is retained.
+ *
+ */
+export type AutomaticSeedingSourceState =
+  "scheduled" | "capturing" | "captured" | "skipped" | "stopped" | "failed";
+
+/**
+ * Retained capture observation. `created_at` records observation creation; `updated_at` records the last capture observation change. `label` is omitted when the trigger address carried none.
+ */
+export type AutomaticSeedingSourceObservation = {
+  source: AutomaticSeedingSource;
+  /**
+   * Original source execution time.
+   */
+  source_created_at: string;
+  /**
+   * Time after which the observation is unavailable.
+   */
+  retain_until: string;
+  state: AutomaticSeedingSourceState;
+  /**
+   * Sanitized capture reason; absent for a successful or pending observation.
+   */
+  reason?: AutomaticSeedingReason;
+  run_id?: AutomaticSeedingRunId;
+  label?: AutomaticSeedingTriggerLabel;
+} & Timestamps;
+
+export type AutomaticSeedingSourceList = {
+  data: Array<AutomaticSeedingSourceObservation>;
+} & ListEnvelopeWithTotal;
 
 /**
  * The fields every view of a seed test carries.
@@ -24468,7 +24953,7 @@ export type EmailThreadList = {
 export type EmailThreadWritableFolder = "inbox" | "archive" | "spam";
 
 /**
- * Custom labels to add or remove, or the full set to replace them with. Send `set` on its own; combining it with `add` or `remove` returns 422. System names are refused; use read and folder for thread state. Reserved names are refused too, except a label the conversation already carries from before its name was reserved, which can still be removed, and kept in a `set` in any casing. The resulting custom-label set must contain at most 20 labels; larger sets return 422. A custom name added or set that the workspace does not have yet becomes a workspace label that stays after it is removed from every conversation; once the workspace has 100 labels, a write that would create one more is refused with `E17058`. Custom label names match the workspace's labels in any casing, so adding `Urgent` where the workspace has `urgent` applies `urgent`, and responses return the workspace's spelling.
+ * Custom labels to add or remove, or the full set to replace them with. Send `set` on its own; combining it with `add` or `remove` returns 422. System names are refused; use read and folder for thread state. Reserved names are refused too, except a label the conversation already carries from before its name was reserved, which can still be removed, and kept in a `set` in any casing. The resulting custom-label set must contain at most 20 labels; larger sets return 422. A custom name added or set that the workspace does not have yet becomes a workspace label that stays after it is removed from every conversation; once the workspace has 100 labels, a write that would create one more is refused with `E17057`. Custom label names match the workspace's labels in any casing, so adding `Urgent` where the workspace has `urgent` applies `urgent`, and responses return the workspace's spelling.
  */
 export type EmailThreadLabelsUpdate = {
   /**
@@ -24724,7 +25209,7 @@ export type EmailThreadMessageList = {
 } & ListEnvelope;
 
 /**
- * Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. `set` instead replaces every custom label and leaves system labels as they are; send it on its own, since combining it with `add` or `remove` returns 422. On a message, adding or removing `unread` flips read state. Adding or removing `trash` moves it to or out of the trash. Placement labels cannot be applied to a message; use `folder` on [Update a thread](/docs/api/reference/update-email-thread) (`PATCH /v1/email/threads/{thread_id}`) to move its conversation. A sent message cannot use unread. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `assigned`, `closed`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `open`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be applied as custom labels, in any casing. A label applied before its name was reserved can still be removed, added again under the same name with no effect, and kept in a `set` in any casing. A conversation or message has at most 20 labels, system labels included. A custom name added or set that the workspace does not have yet becomes a workspace label that stays after it is removed from every conversation; once the workspace has 100 labels, a write that would create one more is refused with `E17058`. A name in both `add` and `remove` is removed and does not count as added. Custom label names match the workspace's labels in any casing: adding `Urgent` where the workspace has `urgent` applies `urgent`, and responses return the workspace's spelling.
+ * Label changes to apply. Labels in `add` are applied and labels in `remove` are taken off; other labels are left untouched. Adding a label that is already present, or removing one that is not, has no effect. `set` instead replaces every custom label and leaves system labels as they are; send it on its own, since combining it with `add` or `remove` returns 422. On a message, adding or removing `unread` flips read state. Adding or removing `trash` moves it to or out of the trash. Placement labels cannot be applied to a message; use `folder` on [Update a thread](/docs/api/reference/update-email-thread) (`PATCH /v1/email/threads/{thread_id}`) to move its conversation. A sent message cannot use unread. Custom labels are 1-64 characters with no commas, control characters, or leading or trailing whitespace. System label names and a small reserved set (`all`, `archived`, `assigned`, `closed`, `deleted`, `draft`, `drafts`, `flagged`, `important`, `junk`, `muted`, `none`, `open`, `outbox`, `pinned`, `read`, `scheduled`, `snoozed`, `starred`) cannot be applied as custom labels, in any casing. A label applied before its name was reserved can still be removed, added again under the same name with no effect, and kept in a `set` in any casing. A conversation or message has at most 20 labels, system labels included. A custom name added or set that the workspace does not have yet becomes a workspace label that stays after it is removed from every conversation; once the workspace has 100 labels, a write that would create one more is refused with `E17057`. A name in both `add` and `remove` is removed and does not count as added. Custom label names match the workspace's labels in any casing: adding `Urgent` where the workspace has `urgent` applies `urgent`, and responses return the workspace's spelling.
  *
  */
 export type EmailLabelsUpdate = {
@@ -24959,37 +25444,6 @@ export type EmailMailboxComposeRequest = {
    * When scheduled_at is set, cancel if an inbound message arrives in the conversation before dispatch is claimed. Defaults to false: the frozen parent, recipients and content are sent unchanged even if new mail arrives.
    */
   cancel_on_reply?: boolean;
-};
-
-/**
- * One label available in a mailbox.
- */
-export type EmailMailboxLabel = {
-  /**
-   * The label name, as it appears on conversations and messages.
-   */
-  readonly name: string;
-  /**
-   * `system` labels are the built-in placements a message can be in:
-   *
-   * - Inbox.
-   * - Archive.
-   * - Spam.
-   * - Blocked.
-   * - Sent.
-   * - Trash.
-   * - Unread.
-   *
-   * `custom` labels are the workspace's own tags.
-   */
-  readonly type: "system" | "custom";
-};
-
-/**
- * The labels available in a mailbox.
- */
-export type EmailMailboxLabelList = {
-  data: Array<EmailMailboxLabel>;
 };
 
 export type EmailSmtpConfig = {
@@ -33646,7 +34100,7 @@ export type EmailEventListWritable = {
 } & ListEnvelope;
 
 /**
- * Complete template input map. Each value is a string, number, boolean or null and is used exactly as given, so text containing braces or code-like syntax is never evaluated. Objects and lists are not accepted. Use bird.contact.first_name in the template for contact data. Names must be bare input names outside the bird namespace. Omission retains the map unless the template ID changes, which clears it; an empty object clears it, and null is invalid. The compact map is limited to 16384 UTF-8 bytes and 128 names. Individual email parameters keep their own format.
+ * Complete template input map. Each value is a string, number, boolean or null and is used exactly as given, so text containing braces or code-like syntax is never evaluated. A value the template uses that opens Liquid (`{{`, or `{%` not followed by a digit) stops the broadcast from sending. Objects and lists are not accepted. Use bird.contact.first_name in the template for contact data. Names must be bare input names outside the bird namespace. Omission retains the map unless the template ID changes, which clears it; an empty object clears it, and null is invalid. The compact map is limited to 16384 UTF-8 bytes and 128 names. Individual email parameters keep their own format.
  */
 export type EmailBroadcastParametersWritable = {
   [key in EmailBroadcastParameterName]?: string | number | boolean | null;
@@ -33804,6 +34258,32 @@ export type EmailBroadcastResolvedParametersWritable = {
  * The email accepted for asynchronous test delivery. Acceptance does not confirm delivery.
  */
 export type EmailBroadcastTestResultWritable = EmailMessageWritable;
+
+/**
+ * A label in the workspace catalogue. Its `id` is accepted by every operation that takes a `label_id` and stays the same when the label is renamed.
+ */
+export type LabelWritable = {
+  /**
+   * ID of the label, accepted by every operation that takes a `label_id`. It stays the same when the label is renamed.
+   */
+  id: LabelId;
+  name: LabelName;
+  /**
+   * The label colour as a `#RRGGBB` hex value, or `null` when none is set.
+   */
+  color: LabelColor | null;
+  /**
+   * When to apply the label, or `null` when none is set.
+   */
+  description: LabelDescription | null;
+};
+
+export type LabelListWritable = {
+  /**
+   * Every label in the workspace, ordered by name.
+   */
+  data: Array<LabelWritable>;
+};
 
 /**
  * A compact reference to an audience, carrying its ID and display name.
@@ -35783,14 +36263,14 @@ export type WhatsAppKeywordRuleWritable = {
    */
   keywords: Array<string>;
   /**
-   * Bird's keywords this rule removes from the set it inherits. A message that is exactly one of them opts no one in or out and gets no reply for the people the rule covers, and Bird's own rule does not act on it instead. Excluding every one of Bird's keywords switches them off, though a keyword Bird adds later still matches. It removes only from the Bird rule this rule inherits from: a keyword another rule of yours adds, or one Bird ships only in another country's rule, is unaffected. Always empty on one of Bird's own rules.
+   * Bird's keywords this rule removes from the set it inherits. Rules are tried most specific first, and a rule of yours with neither `country` nor `waba` comes after Bird's rule for the sender's country, as `effective_keywords` explains. When this rule answers a message that is exactly an excluded keyword, no one is opted in or out, no reply is sent, and no later rule acts on it, whether Bird's or another of yours that matches the same keyword. A more specific rule that answers first is unaffected. A rule with no `country` inherits Bird's keywords for each sender's country, so its exclusions apply only to senders whose set has the keyword. Excluding every one of Bird's keywords switches them off where this rule answers, though a keyword Bird adds later still matches unless it is already excluded. It changes no other rule's keywords. Always empty on one of Bird's own rules.
    *
    */
   excluded_keywords: Array<string>;
   /**
    * Every keyword that matches this rule: Bird's keywords for the same operation and country, minus `excluded_keywords`, plus the ones you added. This is what an inbound message is compared against, and the whole message has to equal one of them. Keywords Bird adds later join it without you changing anything.
    *
-   * For a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so a sender in a country Bird ships a rule for is answered by that rule and your reply is not used. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.
+   * For a rule of **yours** with no `country`, this list is not the whole set it matches: such a rule compares against Bird's keywords for the sender's country, which the list cannot show because it does not know who is writing, so it shows Bird's worldwide keywords instead. Which rule answers decides whether that matters. Yours with no `country` and no `waba` sits below Bird's own country rule, so when a sender in a country Bird ships a rule for writes one of Bird's keywords, that rule answers and your reply is not used. A keyword you added reaches your rule only when no earlier rule matches it, and for a given sender the matched set can differ from this list in either direction. Yours with a `waba` and no `country` sits above it, so those senders match that country's keywords and get your reply, which is more keywords than this list names. Set a `country` on your own rule to see and extend exactly the set those senders match. A `system` rule is unaffected: each matches only its own keywords, and the ladder checks Bird's country rules separately from its worldwide one.
    *
    */
   effective_keywords: Array<string>;
@@ -35879,6 +36359,99 @@ export type EmailInboxInsightsComplaintsWritable =
  */
 export type EmailInboxInsightsSpamTrapsWritable =
   EmailInboxInsightsEnvelopeWritable;
+
+/**
+ * Retained run metadata. `created_at` records run intent creation; `updated_at` records run metadata changes, not every delivery outcome. `label` is omitted when the trigger address carried none.
+ */
+export type AutomaticSeedingRunWritable = {
+  id: AutomaticSeedingRunId;
+  state: AutomaticSeedingRunState;
+  source: AutomaticSeedingSource;
+  label?: AutomaticSeedingTriggerLabel;
+  /**
+   * Original source execution time.
+   */
+  source_created_at: string;
+  /**
+   * Time after which this run is no longer available.
+   */
+  retain_until: string;
+  progress: AutomaticSeedingProgress;
+  /**
+   * Present after registration establishes the sending domain.
+   */
+  sending_domain?: string;
+  /**
+   * List type frozen at run admission.
+   */
+  list_type?: EmailInboxInsightsSeedListType;
+  /**
+   * Engagement profile frozen at run admission.
+   */
+  engagement_profile?: EmailInboxInsightsSeedEngagementProfile;
+  /**
+   * Regions frozen at run admission.
+   */
+  regions?: Array<string>;
+  /**
+   * Registration admission time.
+   */
+  registration_started_at?: string;
+  /**
+   * Time the registration response was persisted.
+   */
+  registration_finished_at?: string;
+  /**
+   * Fixed deadline for new seed admissions.
+   */
+  dispatch_deadline?: string;
+  /**
+   * Time scheduler work completed; uncertain admission or delivery may remain.
+   */
+  dispatch_finished_at?: string;
+  /**
+   * First durable stop, whether requested explicitly or imposed automatically. Already granted copies may still send.
+   */
+  stop_requested_at?: string;
+  /**
+   * Sanitized reason code. Unknown stored details become unavailable; provider error text is never returned.
+   */
+  reason?: AutomaticSeedingReason;
+  /**
+   * Counts of sanitized terminal or uncertain copy outcomes. No seed addresses or provider error text. Counts overlap the progress buckets.
+   */
+  issues: Array<AutomaticSeedingIssue>;
+};
+
+export type AutomaticSeedingRunListWritable = {
+  data: Array<AutomaticSeedingRunWritable>;
+} & ListEnvelopeWithTotal;
+
+/**
+ * Retained capture observation. `created_at` records observation creation; `updated_at` records the last capture observation change. `label` is omitted when the trigger address carried none.
+ */
+export type AutomaticSeedingSourceObservationWritable = {
+  source: AutomaticSeedingSource;
+  /**
+   * Original source execution time.
+   */
+  source_created_at: string;
+  /**
+   * Time after which the observation is unavailable.
+   */
+  retain_until: string;
+  state: AutomaticSeedingSourceState;
+  /**
+   * Sanitized capture reason; absent for a successful or pending observation.
+   */
+  reason?: AutomaticSeedingReason;
+  run_id?: AutomaticSeedingRunId;
+  label?: AutomaticSeedingTriggerLabel;
+};
+
+export type AutomaticSeedingSourceListWritable = {
+  data: Array<AutomaticSeedingSourceObservationWritable>;
+} & ListEnvelopeWithTotal;
 
 /**
  * One seed test with its full results.
@@ -37090,13 +37663,6 @@ export type EmailMailboxScheduledMessageWritable = {
 export type EmailMailboxScheduledMessageListWritable = {
   data: Array<EmailMailboxScheduledMessageWritable>;
 } & ListEnvelope;
-
-/**
- * The labels available in a mailbox.
- */
-export type EmailMailboxLabelListWritable = {
-  data: Array<unknown>;
-};
 
 export type EmailSmtpConfigWritable = {
   /**
@@ -39683,6 +40249,26 @@ export type RequiredIdempotencyKey = string;
  *
  */
 export type WhatsAppBusinessAccountRef = string;
+
+/**
+ * Match the original source kind.
+ */
+export type AutomaticSeedingSourceKindFilter = AutomaticSeedingSourceKind;
+
+/**
+ * Match an original email. Cannot be combined with source_broadcast_id or source_kind=broadcast; either combination returns 422.
+ */
+export type AutomaticSeedingSourceEmailFilter = EmailId;
+
+/**
+ * Match an original broadcast. Cannot be combined with source_email_id. If source_kind is supplied, it must be broadcast; conflicting combinations return 422.
+ */
+export type AutomaticSeedingSourceBroadcastFilter = EmailBroadcastId;
+
+/**
+ * Automatic seeding run to read or stop.
+ */
+export type AutomaticSeedingRunIdPath = AutomaticSeedingRunId;
 
 /**
  * Restricts the statistics to a template or a comma-separated union of templates, identified by ID (`emt_…`) or name. This parameter is mutually exclusive with other dimension filters.
@@ -43168,6 +43754,423 @@ export type ResumeEmailBroadcastResponses = {
 
 export type ResumeEmailBroadcastResponse =
   ResumeEmailBroadcastResponses[keyof ResumeEmailBroadcastResponses];
+
+export type ListLabelsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/labels";
+};
+
+export type ListLabelsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type ListLabelsError = ListLabelsErrors[keyof ListLabelsErrors];
+
+export type ListLabelsResponses = {
+  /**
+   * The workspace's labels.
+   */
+  200: LabelList;
+};
+
+export type ListLabelsResponse = ListLabelsResponses[keyof ListLabelsResponses];
+
+export type CreateLabelData = {
+  body: LabelCreate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/labels";
+};
+
+export type CreateLabelErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CreateLabelError = CreateLabelErrors[keyof CreateLabelErrors];
+
+export type CreateLabelResponses = {
+  /**
+   * Label created.
+   */
+  201: Label;
+};
+
+export type CreateLabelResponse =
+  CreateLabelResponses[keyof CreateLabelResponses];
+
+export type DeleteLabelData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The catalogue label to act on.
+     */
+    label_id: LabelId;
+  };
+  query?: never;
+  url: "/v1/labels/{label_id}";
+};
+
+export type DeleteLabelErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type DeleteLabelError = DeleteLabelErrors[keyof DeleteLabelErrors];
+
+export type DeleteLabelResponses = {
+  /**
+   * The label was deleted.
+   */
+  204: void;
+};
+
+export type DeleteLabelResponse =
+  DeleteLabelResponses[keyof DeleteLabelResponses];
+
+export type GetLabelData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The catalogue label to act on.
+     */
+    label_id: LabelId;
+  };
+  query?: never;
+  url: "/v1/labels/{label_id}";
+};
+
+export type GetLabelErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetLabelError = GetLabelErrors[keyof GetLabelErrors];
+
+export type GetLabelResponses = {
+  /**
+   * The label.
+   */
+  200: Label;
+};
+
+export type GetLabelResponse = GetLabelResponses[keyof GetLabelResponses];
+
+export type UpdateLabelData = {
+  body: LabelUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * The catalogue label to act on.
+     */
+    label_id: LabelId;
+  };
+  query?: never;
+  url: "/v1/labels/{label_id}";
+};
+
+export type UpdateLabelErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateLabelError = UpdateLabelErrors[keyof UpdateLabelErrors];
+
+export type UpdateLabelResponses = {
+  /**
+   * The updated label.
+   */
+  200: Label;
+};
+
+export type UpdateLabelResponse =
+  UpdateLabelResponses[keyof UpdateLabelResponses];
 
 export type ListContactsData = {
   body?: never;
@@ -61072,7 +62075,7 @@ export type UpdateAmbConversationResponse =
   UpdateAmbConversationResponses[keyof UpdateAmbConversationResponses];
 
 export type CreateAmbAuthenticationData = {
-  body?: never;
+  body?: AmbAuthenticationCreate;
   headers?: {
     /**
      * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
@@ -65406,6 +66409,668 @@ export type GetEmailInboxInsightsIndustryBenchmarkResponses = {
 
 export type GetEmailInboxInsightsIndustryBenchmarkResponse =
   GetEmailInboxInsightsIndustryBenchmarkResponses[keyof GetEmailInboxInsightsIndustryBenchmarkResponses];
+
+export type GetAutomaticSeedingSettingsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/email/inbox-insights/automatic-seeding";
+};
+
+export type GetAutomaticSeedingSettingsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+};
+
+export type GetAutomaticSeedingSettingsError =
+  GetAutomaticSeedingSettingsErrors[keyof GetAutomaticSeedingSettingsErrors];
+
+export type GetAutomaticSeedingSettingsResponses = {
+  /**
+   * Current automatic seeding settings.
+   */
+  200: AutomaticSeedingSettings;
+};
+
+export type GetAutomaticSeedingSettingsResponse =
+  GetAutomaticSeedingSettingsResponses[keyof GetAutomaticSeedingSettingsResponses];
+
+export type UpdateAutomaticSeedingSettingsData = {
+  body: AutomaticSeedingSettingsUpdate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/email/inbox-insights/automatic-seeding";
+};
+
+export type UpdateAutomaticSeedingSettingsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type UpdateAutomaticSeedingSettingsError =
+  UpdateAutomaticSeedingSettingsErrors[keyof UpdateAutomaticSeedingSettingsErrors];
+
+export type UpdateAutomaticSeedingSettingsResponses = {
+  /**
+   * Current automatic seeding settings.
+   */
+  200: AutomaticSeedingSettings;
+};
+
+export type UpdateAutomaticSeedingSettingsResponse =
+  UpdateAutomaticSeedingSettingsResponses[keyof UpdateAutomaticSeedingSettingsResponses];
+
+export type RotateAutomaticSeedingAddressData = {
+  body: AutomaticSeedingRotate;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: never;
+  url: "/v1/email/inbox-insights/automatic-seeding/rotate";
+};
+
+export type RotateAutomaticSeedingAddressErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type RotateAutomaticSeedingAddressError =
+  RotateAutomaticSeedingAddressErrors[keyof RotateAutomaticSeedingAddressErrors];
+
+export type RotateAutomaticSeedingAddressResponses = {
+  /**
+   * Current automatic seeding settings.
+   */
+  200: AutomaticSeedingSettings;
+};
+
+export type RotateAutomaticSeedingAddressResponse =
+  RotateAutomaticSeedingAddressResponses[keyof RotateAutomaticSeedingAddressResponses];
+
+export type ListAutomaticSeedingRunsData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by. Defaults to `created_at`.
+     */
+    sort?: AutomaticSeedingRunSort;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+    /**
+     * Match the original source kind.
+     */
+    source_kind?: AutomaticSeedingSourceKind;
+    /**
+     * Match an original email. Cannot be combined with source_broadcast_id or source_kind=broadcast; either combination returns 422.
+     */
+    source_email_id?: EmailId;
+    /**
+     * Match an original broadcast. Cannot be combined with source_email_id. If source_kind is supplied, it must be broadcast; conflicting combinations return 422.
+     */
+    source_broadcast_id?: EmailBroadcastId;
+    /**
+     * Limits the response to resources created at or after this timestamp. Combine it with `created_before` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_after?: string;
+    /**
+     * Limits the response to resources created before this timestamp. Combine it with `created_after` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_before?: string;
+    /**
+     * Match the current derived execution state.
+     */
+    state?: AutomaticSeedingRunState;
+    /**
+     * Match the exact sending domain recorded during registration.
+     */
+    sending_domain?: string;
+  };
+  url: "/v1/email/inbox-insights/automatic-seeding/runs";
+};
+
+export type ListAutomaticSeedingRunsErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ListAutomaticSeedingRunsError =
+  ListAutomaticSeedingRunsErrors[keyof ListAutomaticSeedingRunsErrors];
+
+export type ListAutomaticSeedingRunsResponses = {
+  /**
+   * Retained automatic-seeding activity.
+   */
+  200: AutomaticSeedingRunList;
+};
+
+export type ListAutomaticSeedingRunsResponse =
+  ListAutomaticSeedingRunsResponses[keyof ListAutomaticSeedingRunsResponses];
+
+export type GetAutomaticSeedingRunData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Automatic seeding run to read or stop.
+     */
+    run_id: AutomaticSeedingRunId;
+  };
+  query?: never;
+  url: "/v1/email/inbox-insights/automatic-seeding/runs/{run_id}";
+};
+
+export type GetAutomaticSeedingRunErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type GetAutomaticSeedingRunError =
+  GetAutomaticSeedingRunErrors[keyof GetAutomaticSeedingRunErrors];
+
+export type GetAutomaticSeedingRunResponses = {
+  /**
+   * Retained automatic-seeding activity.
+   */
+  200: AutomaticSeedingRun;
+};
+
+export type GetAutomaticSeedingRunResponse =
+  GetAutomaticSeedingRunResponses[keyof GetAutomaticSeedingRunResponses];
+
+export type CancelAutomaticSeedingRunData = {
+  body?: never;
+  headers?: {
+    /**
+     * Client-supplied key. On operations supporting request deduplication, a retained
+     * response is replayed for duplicate requests with the same key within the
+     * idempotency window (3 hours by default). This protection requires a workspace,
+     * organization, or staff-account scope. User-only and unscoped unauthenticated operations,
+     * streams, and operations with a separate replay contract do not use this
+     * response replay.
+     *
+     * On a supported operation, if idempotency protection is unavailable before execution, the API returns
+     * `503 IdempotencyUnavailable` (E01033) without executing this attempt. Retry with
+     * backoff using the same key and request. An operation that takes effect before
+     * its response is retained can still execute again on retry.
+     *
+     * Two distinct 409 errors signal misuse:
+     *
+     * - `request_in_progress` (E01004): The same key is currently being
+     *   processed by a concurrent request. Wait briefly and retry. The lock expires within 30 seconds.
+     * - `idempotency_key_reuse` (E01005): The same key has already completed
+     *   against a different request body or method. Generate a new key.
+     *
+     * Recommended key format is `<event-type>/<entity-id>` (for example `welcome-user/usr_abc123`).
+     *
+     */
+    "Idempotency-Key"?: string;
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path: {
+    /**
+     * Automatic seeding run to read or stop.
+     */
+    run_id: AutomaticSeedingRunId;
+  };
+  query?: never;
+  url: "/v1/email/inbox-insights/automatic-seeding/runs/{run_id}/stop";
+};
+
+export type CancelAutomaticSeedingRunErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * Resource conflict
+   */
+  409: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type CancelAutomaticSeedingRunError =
+  CancelAutomaticSeedingRunErrors[keyof CancelAutomaticSeedingRunErrors];
+
+export type CancelAutomaticSeedingRunResponses = {
+  /**
+   * Retained automatic-seeding activity.
+   */
+  200: AutomaticSeedingRun;
+};
+
+export type CancelAutomaticSeedingRunResponse =
+  CancelAutomaticSeedingRunResponses[keyof CancelAutomaticSeedingRunResponses];
+
+export type ListAutomaticSeedingSourcesData = {
+  body?: never;
+  headers?: {
+    /**
+     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
+     */
+    "X-Workspace-Id"?: string;
+    /**
+     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
+     */
+    "X-Organization-Id"?: string;
+  };
+  path?: never;
+  query?: {
+    /**
+     * Field to sort by. Defaults to `created_at`.
+     */
+    sort?: AutomaticSeedingSourceSort;
+    /**
+     * Sort direction. Defaults to `desc`, which sorts from newest to oldest or largest to smallest, depending on the selected sort field.
+     *
+     */
+    order?: SortOrder;
+    /**
+     * Maximum number of items to return per page.
+     */
+    limit?: number;
+    /**
+     * Cursor from the `next_cursor` field of a previous list response. Returns items immediately after the cursor position in the current sort order.
+     */
+    starting_after?: string;
+    /**
+     * Cursor from the `prev_cursor` or `refresh_cursor` field of a previous list response. Returns items immediately before the cursor position in the current sort order. `prev_cursor` returns the preceding page. `refresh_cursor` anchors at the first row of that response, which on a newest-first sort is how to fetch the items that have appeared since.
+     */
+    ending_before?: string;
+    /**
+     * When true, the response includes a `total` field with the total number of items matching the request's filters across all pages.
+     */
+    include_total?: boolean;
+    /**
+     * Match the original source kind.
+     */
+    source_kind?: AutomaticSeedingSourceKind;
+    /**
+     * Match an original email. Cannot be combined with source_broadcast_id or source_kind=broadcast; either combination returns 422.
+     */
+    source_email_id?: EmailId;
+    /**
+     * Match an original broadcast. Cannot be combined with source_email_id. If source_kind is supplied, it must be broadcast; conflicting combinations return 422.
+     */
+    source_broadcast_id?: EmailBroadcastId;
+    /**
+     * Limits the response to resources created at or after this timestamp. Combine it with `created_before` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_after?: string;
+    /**
+     * Limits the response to resources created before this timestamp. Combine it with `created_after` to select a time window. Use an RFC 3339 timestamp with a timezone offset.
+     */
+    created_before?: string;
+    /**
+     * Match the capture observation state.
+     */
+    state?: AutomaticSeedingSourceState;
+  };
+  url: "/v1/email/inbox-insights/automatic-seeding/sources";
+};
+
+export type ListAutomaticSeedingSourcesErrors = {
+  /**
+   * Bad request
+   */
+  400: Error;
+  /**
+   * Authentication required
+   */
+  401: Error;
+  /**
+   * Insufficient permissions
+   */
+  403: Error;
+  /**
+   * Resource not found
+   */
+  404: Error;
+  /**
+   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
+   *
+   */
+  422: Error;
+  /**
+   * Rate limit exceeded
+   */
+  429: Error;
+  /**
+   * Internal server error
+   */
+  500: Error;
+  /**
+   * The service is temporarily unavailable. If `Retry-After` is present, wait for that delay before retrying; otherwise, retry with exponential backoff. Reuse the same idempotency key and request when retrying a mutation.
+   *
+   */
+  503: Error;
+};
+
+export type ListAutomaticSeedingSourcesError =
+  ListAutomaticSeedingSourcesErrors[keyof ListAutomaticSeedingSourcesErrors];
+
+export type ListAutomaticSeedingSourcesResponses = {
+  /**
+   * Retained automatic-seeding activity.
+   */
+  200: AutomaticSeedingSourceList;
+};
+
+export type ListAutomaticSeedingSourcesResponse =
+  ListAutomaticSeedingSourcesResponses[keyof ListAutomaticSeedingSourcesResponses];
 
 export type GetEmailInboxInsightsSeedTestsData = {
   body?: never;
@@ -73848,73 +75513,6 @@ export type CreateMailboxMessageResponses = {
 
 export type CreateMailboxMessageResponse =
   CreateMailboxMessageResponses[keyof CreateMailboxMessageResponses];
-
-export type ListMailboxLabelsData = {
-  body?: never;
-  headers?: {
-    /**
-     * Workspace context for the request. Required for dashboard authentication and master keys. Workspace keys and access tokens already identify their workspace; send that workspace or omit the header. A different one is rejected.
-     */
-    "X-Workspace-Id"?: string;
-    /**
-     * Organization context for the request. Required for dashboard authentication. An API key or access token carries its own organization, so send either that organization or no header at all; a different one is rejected.
-     */
-    "X-Organization-Id"?: string;
-  };
-  path: {
-    /**
-     * Mailbox ID or email address in this workspace.
-     */
-    mailbox_id: MailboxIdentifier;
-  };
-  query?: never;
-  url: "/v1/email/mailboxes/{mailbox_id}/labels";
-};
-
-export type ListMailboxLabelsErrors = {
-  /**
-   * Bad request
-   */
-  400: Error;
-  /**
-   * Authentication required
-   */
-  401: Error;
-  /**
-   * Insufficient permissions
-   */
-  403: Error;
-  /**
-   * Resource not found
-   */
-  404: Error;
-  /**
-   * The request has invalid field values, violates a business rule, or carries a query parameter the endpoint does not declare. Field validation errors use `type: validation_error` and include the affected fields in `details`. Business-rule errors identify the failed rule in `type`.
-   *
-   */
-  422: Error;
-  /**
-   * Rate limit exceeded
-   */
-  429: Error;
-  /**
-   * Internal server error
-   */
-  500: Error;
-};
-
-export type ListMailboxLabelsError =
-  ListMailboxLabelsErrors[keyof ListMailboxLabelsErrors];
-
-export type ListMailboxLabelsResponses = {
-  /**
-   * The mailbox's labels.
-   */
-  200: EmailMailboxLabelList;
-};
-
-export type ListMailboxLabelsResponse =
-  ListMailboxLabelsResponses[keyof ListMailboxLabelsResponses];
 
 export type ListWebhooksData = {
   body?: never;

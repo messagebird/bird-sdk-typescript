@@ -202,6 +202,50 @@ export const AssetReferenceUsage = {
 export type AssetReferenceUsageValue = (typeof AssetReferenceUsage)[keyof typeof AssetReferenceUsage];
 
 /**
+ * Values of AutomaticSeedingReason known at this SDK version. The wire value is an open
+ * string: a value added by a newer server deserializes unchanged, so switch on
+ * these with a `default` branch rather than treating the set as closed.
+ */
+export const AutomaticSeedingReason = {
+  AdmissionRefused: "admission_refused",
+  AdmissionUncertain: "admission_uncertain",
+  AllowanceExhausted: "allowance_exhausted",
+  Blocked: "blocked",
+  Bounced: "bounced",
+  Canceled: "canceled",
+  CanceledOrExpired: "canceled_or_expired",
+  CaptureExpired: "capture_expired",
+  CaptureFailed: "capture_failed",
+  ConflictingExamples: "conflicting_examples",
+  ContactTemplateUnsupported: "contact_template_unsupported",
+  ContentBlocked: "content_blocked",
+  ControlRejected: "control_rejected",
+  DispatchDeadlineExceeded: "dispatch_deadline_exceeded",
+  InvalidRegistrationResponse: "invalid_registration_response",
+  InvalidTrigger: "invalid_trigger",
+  MixedRecipients: "mixed_recipients",
+  PolicyRefused: "policy_refused",
+  PreparationUnavailable: "preparation_unavailable",
+  ProviderOutcomeUnknown: "provider_outcome_unknown",
+  RegistrationRejected: "registration_rejected",
+  Rejected: "rejected",
+  RunStopped: "run_stopped",
+  SeedingUnavailable: "seeding_unavailable",
+  SelectionUnavailable: "selection_unavailable",
+  SendingDomainNotMeasured: "sending_domain_not_measured",
+  SettingsDisabled: "settings_disabled",
+  SourceNotAuthorized: "source_not_authorized",
+  SourceStopped: "source_stopped",
+  TriggerRotated: "trigger_rotated",
+  Unavailable: "unavailable",
+  UnsupportedSource: "unsupported_source",
+  VendorOutcomeUnknown: "vendor_outcome_unknown",
+} as const;
+
+/** A known AutomaticSeedingReason value. */
+export type AutomaticSeedingReasonValue = (typeof AutomaticSeedingReason)[keyof typeof AutomaticSeedingReason];
+
+/**
  * Values of ComplianceDomainProofMethod known at this SDK version. The wire value is an open
  * string: a value added by a newer server deserializes unchanged, so switch on
  * these with a `default` branch rather than treating the set as closed.
@@ -338,6 +382,7 @@ export const EmailBroadcastParameterProblemCode = {
   ParameterDuplicateKey: "parameter_duplicate_key",
   ParameterJsonInvalid: "parameter_json_invalid",
   ParameterLanguageInvalid: "parameter_language_invalid",
+  ParameterLiquidUnsupported: "parameter_liquid_unsupported",
   ParameterMapInvalid: "parameter_map_invalid",
   ParameterNameInvalid: "parameter_name_invalid",
   ParameterNamesExceeded: "parameter_names_exceeded",

@@ -32,6 +32,7 @@ import { DomainsResource } from "./resources/domains.gen.js";
 import { SuppressionsResource } from "./resources/suppressions.gen.js";
 import { ContactPropertiesResource } from "./resources/contactProperties.gen.js";
 import { ContactsResource } from "./resources/contacts.js";
+import { LabelsResource } from "./resources/labels.gen.js";
 import { PreferencesResource } from "./resources/preferences.js";
 import { AssetsResource } from "./resources/assets.js";
 import { BroadcastsResource } from "./resources/broadcasts.js";
@@ -255,6 +256,8 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
 
   /** Preferences: `bird.preferences.list(...)`, `.get(...)`, `.create(...)`, `.delete(...)`. */
   readonly preferences: PreferencesResource;
+  /** Labels: `bird.labels.list()`, `.get(...)`, `.create(...)`, `.update(...)`, `.delete(...)`. */
+  readonly labels: LabelsResource;
 
   /** Broadcasts: `bird.broadcasts.create(...)`, `.send(...)`, `.list(...)`, … */
   readonly broadcasts: BroadcastsResource;
@@ -435,6 +438,7 @@ export class BirdClient<const O extends BirdClientOptions = BirdClientOptions> {
     this.contacts = new ContactsResource(this.core, this.#client);
     this.assets = new AssetsResource(this.core, this.#client);
     this.preferences = new PreferencesResource(this.core, this.#client);
+    this.labels = new LabelsResource(this.core, this.#client);
     this.broadcasts = new BroadcastsResource(
       this.core,
       this.#client,

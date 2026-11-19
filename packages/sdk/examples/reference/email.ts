@@ -224,11 +224,6 @@ export async function mailboxStats() {
   console.log(stats.summary?.sends_accepted);
 }
 
-export async function mailboxLabels() {
-  const labels = await bird.email.mailboxes.labels("mbx_01abc");
-  console.log(labels.data.map((label) => label.name));
-}
-
 export async function mailboxUpdate() {
   const mailbox = await bird.email.mailboxes.update("mbx_01abc", {
     receive_policy: "open",
@@ -588,4 +583,58 @@ export async function seed_tests_create() {
 
   const report = await bird.email.inboxInsights.seedTests.create({ sending_domain: sendingDomain, list_type: pool.value, engagement_profile: profile.value, regions: [region.value] }, { idempotencyKey });
   console.log(report);
+}
+
+export async function seeding_settings_get() {
+  // Requires inbox_insights:read permission in the target workspace.
+  const settings = await bird.email.seeding.settings.get();
+  console.log(settings.enabled, settings.revision, settings.trigger_address);
+}
+
+export async function seeding_settings_update() {
+  // Requires inbox_insights:write permission in the target workspace.
+  const current = await bird.email.seeding.settings.get();
+  const settings = await bird.email.seeding.settings.update({
+    expected_revision: current.revision,
+    enabled: true,
+    list_type: "private",
+    engagement_profile: "all",
+    regions: ["North America - US"],
+  });
+  console.log(settings.enabled, settings.revision);
+}
+
+export async function seeding_address_rotate() {
+  // Requires inbox_insights:write permission in the target workspace.
+  const current = await bird.email.seeding.settings.get();
+  const settings = await bird.email.seeding.address.rotate({
+    expected_revision: current.revision,
+  });
+  console.log(settings.trigger_address);
+}
+
+export async function seeding_runs_list() {
+  // Requires inbox_insights:read permission in the target workspace.
+  for await (const run of bird.email.seeding.runs.list({ limit: 25 })) {
+    console.log(run.id, run.state);
+  }
+}
+
+export async function seeding_runs_get() {
+  // Requires inbox_insights:read permission in the target workspace.
+  const run = await bird.email.seeding.runs.get("esrun_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(run.state, run.progress);
+}
+
+export async function seeding_runs_cancel() {
+  // Requires inbox_insights:write permission in the target workspace.
+  const run = await bird.email.seeding.runs.cancel("esrun_01krdgeqcxet5s7t44vh8rt9mg");
+  console.log(run.state, run.progress);
+}
+
+export async function seeding_sources_list() {
+  // Requires inbox_insights:read permission in the target workspace.
+  for await (const source of bird.email.seeding.sources.list({ limit: 25 })) {
+    console.log(source.state, source.run_id);
+  }
 }

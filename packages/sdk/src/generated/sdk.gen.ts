@@ -22,6 +22,9 @@ import type {
   CancelAssetUploadSessionData,
   CancelAssetUploadSessionErrors,
   CancelAssetUploadSessionResponses,
+  CancelAutomaticSeedingRunData,
+  CancelAutomaticSeedingRunErrors,
+  CancelAutomaticSeedingRunResponses,
   CancelEmailBroadcastData,
   CancelEmailBroadcastErrors,
   CancelEmailBroadcastResponses,
@@ -133,6 +136,9 @@ import type {
   CreateEsimSubscriberData,
   CreateEsimSubscriberErrors,
   CreateEsimSubscriberResponses,
+  CreateLabelData,
+  CreateLabelErrors,
+  CreateLabelResponses,
   CreateMailboxData,
   CreateMailboxErrors,
   CreateMailboxForwardingAddressData,
@@ -298,6 +304,9 @@ import type {
   DeleteEsimPackageData,
   DeleteEsimPackageErrors,
   DeleteEsimPackageResponses,
+  DeleteLabelData,
+  DeleteLabelErrors,
+  DeleteLabelResponses,
   DeleteMailboxData,
   DeleteMailboxErrors,
   DeleteMailboxReceiveRuleData,
@@ -481,6 +490,12 @@ import type {
   GetAudienceMembershipStatisticsErrors,
   GetAudienceMembershipStatisticsResponses,
   GetAudienceResponses,
+  GetAutomaticSeedingRunData,
+  GetAutomaticSeedingRunErrors,
+  GetAutomaticSeedingRunResponses,
+  GetAutomaticSeedingSettingsData,
+  GetAutomaticSeedingSettingsErrors,
+  GetAutomaticSeedingSettingsResponses,
   GetAvailableNumberData,
   GetAvailableNumberErrors,
   GetAvailableNumberResponses,
@@ -688,6 +703,9 @@ import type {
   GetEsimZoneData,
   GetEsimZoneErrors,
   GetEsimZoneResponses,
+  GetLabelData,
+  GetLabelErrors,
+  GetLabelResponses,
   GetMailboxData,
   GetMailboxErrors,
   GetMailboxResponses,
@@ -961,6 +979,12 @@ import type {
   ListAudiencesData,
   ListAudiencesErrors,
   ListAudiencesResponses,
+  ListAutomaticSeedingRunsData,
+  ListAutomaticSeedingRunsErrors,
+  ListAutomaticSeedingRunsResponses,
+  ListAutomaticSeedingSourcesData,
+  ListAutomaticSeedingSourcesErrors,
+  ListAutomaticSeedingSourcesResponses,
   ListAvailableNumbersData,
   ListAvailableNumbersErrors,
   ListAvailableNumbersResponses,
@@ -1054,12 +1078,12 @@ import type {
   ListEsimZonesData,
   ListEsimZonesErrors,
   ListEsimZonesResponses,
+  ListLabelsData,
+  ListLabelsErrors,
+  ListLabelsResponses,
   ListMailboxesData,
   ListMailboxesErrors,
   ListMailboxesResponses,
-  ListMailboxLabelsData,
-  ListMailboxLabelsErrors,
-  ListMailboxLabelsResponses,
   ListMailboxReceiveRulesData,
   ListMailboxReceiveRulesErrors,
   ListMailboxReceiveRulesResponses,
@@ -1249,6 +1273,9 @@ import type {
   RollbackEmailTemplateData,
   RollbackEmailTemplateErrors,
   RollbackEmailTemplateResponses,
+  RotateAutomaticSeedingAddressData,
+  RotateAutomaticSeedingAddressErrors,
+  RotateAutomaticSeedingAddressResponses,
   RotateWebhookSecretData,
   RotateWebhookSecretErrors,
   RotateWebhookSecretResponses,
@@ -1315,6 +1342,9 @@ import type {
   UpdateAudienceData,
   UpdateAudienceErrors,
   UpdateAudienceResponses,
+  UpdateAutomaticSeedingSettingsData,
+  UpdateAutomaticSeedingSettingsErrors,
+  UpdateAutomaticSeedingSettingsResponses,
   UpdateComplianceIdentityData,
   UpdateComplianceIdentityErrors,
   UpdateComplianceIdentityResponses,
@@ -1348,6 +1378,9 @@ import type {
   UpdateEsimSettingsData,
   UpdateEsimSettingsErrors,
   UpdateEsimSettingsResponses,
+  UpdateLabelData,
+  UpdateLabelErrors,
+  UpdateLabelResponses,
   UpdateMailboxData,
   UpdateMailboxErrors,
   UpdateMailboxResponses,
@@ -2876,6 +2909,163 @@ export const resumeEmailBroadcast = <ThrowOnError extends boolean = false>(
       },
     ],
     url: "/v1/email/broadcasts/{broadcast_id}/resume",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List labels
+ *
+ * Returns every label in the workspace, ordered by name, in one list without
+ * pagination. Each label carries its colour and a description of when to
+ * apply it. A workspace creates no new label once it has 100 or more.
+ *
+ * Mailbox system labels are a fixed set that every mailbox has, so they are
+ * not in this list: `inbox`, `archive`, `spam`, `blocked`, `sent`, `trash`
+ * and `unread`. A thread's `folder` sets `inbox`, `archive` or `spam`, and
+ * its `read` field sets `unread`. Deleting a thread moves it to `trash` and
+ * restoring it moves it back. `sent` and `blocked` are assigned automatically.
+ *
+ */
+export const listLabels = <ThrowOnError extends boolean = false>(
+  options?: Options<ListLabelsData, ThrowOnError>,
+): RequestResult<ListLabelsResponses, ListLabelsErrors, ThrowOnError> =>
+  (options?.client ?? client).get<
+    ListLabelsResponses,
+    ListLabelsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/labels",
+    ...options,
+  });
+
+/**
+ * Create a label
+ *
+ * Adds a label to the workspace's catalogue. Give it a description of when
+ * to apply it, so people and agents label conversations the same way.
+ *
+ * Names are unique in the workspace regardless of case; a name already in
+ * use returns a conflict error. System names such as `inbox`, `sent`,
+ * `unread`, `open` and `assigned` are reserved. Creating a label fails once
+ * the workspace has 100 labels.
+ *
+ */
+export const createLabel = <ThrowOnError extends boolean = false>(
+  options: Options<CreateLabelData, ThrowOnError>,
+): RequestResult<CreateLabelResponses, CreateLabelErrors, ThrowOnError> =>
+  (options.client ?? client).post<
+    CreateLabelResponses,
+    CreateLabelErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/labels",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Delete a label
+ *
+ * Deletes a label from the workspace's catalogue. It leaves every
+ * conversation and message that carried it at once. Deleting cannot be
+ * undone: creating a label with the same name later makes a new label with
+ * a new ID.
+ *
+ */
+export const deleteLabel = <ThrowOnError extends boolean = false>(
+  options: Options<DeleteLabelData, ThrowOnError>,
+): RequestResult<DeleteLabelResponses, DeleteLabelErrors, ThrowOnError> =>
+  (options.client ?? client).delete<
+    DeleteLabelResponses,
+    DeleteLabelErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/labels/{label_id}",
+    ...options,
+  });
+
+/**
+ * Get a label
+ *
+ * Returns one label from the workspace's catalogue.
+ *
+ */
+export const getLabel = <ThrowOnError extends boolean = false>(
+  options: Options<GetLabelData, ThrowOnError>,
+): RequestResult<GetLabelResponses, GetLabelErrors, ThrowOnError> =>
+  (options.client ?? client).get<
+    GetLabelResponses,
+    GetLabelErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/labels/{label_id}",
+    ...options,
+  });
+
+/**
+ * Update a label
+ *
+ * Renames a label, or changes or removes its colour or description.
+ * Omitted fields are left unchanged, and the label keeps its ID. The new
+ * name must not already be in use in the workspace, regardless of case.
+ *
+ */
+export const updateLabel = <ThrowOnError extends boolean = false>(
+  options: Options<UpdateLabelData, ThrowOnError>,
+): RequestResult<UpdateLabelResponses, UpdateLabelErrors, ThrowOnError> =>
+  (options.client ?? client).patch<
+    UpdateLabelResponses,
+    UpdateLabelErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/labels/{label_id}",
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -9935,7 +10125,7 @@ export const updateAmbConversation = <ThrowOnError extends boolean = false>(
 /**
  * Request conversation authentication
  *
- * Sends a native sign-in request to an open conversation whose device advertises `AUTH2`. The business needs an enabled authentication provider. The request expires after ten minutes. Bird validates the provider's response and waits for confirmation from the originating Messages device before storing the verified identity with the conversation. The customer's tokens are never stored or returned. A new request supersedes an unfinished one in the same conversation, including when the new request then fails to send. Reusing an idempotency key returns the original request. The outcome arrives as a webhook event. Read the request to recover a missing event.
+ * Sends a native sign-in request to an open conversation whose device advertises `AUTH2`. The business needs an enabled authentication provider. The request expires after ten minutes. Bird validates the provider's response and waits for confirmation from the originating Messages device before storing the verified identity with the conversation. The customer's tokens are never stored or returned. A new request supersedes an unfinished one in the same conversation, including when the new request then fails to send. Reusing an idempotency key returns the original request. The outcome arrives as a webhook event. Read the request to recover a missing event. The request sends the business's sign-in message, or Bird's built-in message when the business has none. Name a `template` to send another sign-in message template. Bird renders the message when it accepts the request, so a later template change does not alter it.
  *
  */
 export const createAmbAuthentication = <ThrowOnError extends boolean = false>(
@@ -9960,6 +10150,10 @@ export const createAmbAuthentication = <ThrowOnError extends boolean = false>(
     ],
     url: "/v1/amb/conversations/{conversation_id}/authentications",
     ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
   });
 
 /**
@@ -11252,7 +11446,7 @@ export const listWhatsAppKeywordRules = <ThrowOnError extends boolean = false>(
  *
  * Creates a keyword rule. Use it to replace the reply Bird sends for `opt_out` or `opt_in`, or to add keywords your customers actually type.
  *
- * Your rule takes precedence over Bird's at the same grain and keeps Bird's keywords, so replacing a reply takes two fields. Set `excluded_keywords` to remove some of Bird's for the people the rule covers: a message that is exactly one of them then opts no one in or out and gets no reply. A keyword Bird has bound to one operation cannot be reused for the other.
+ * Your rule takes precedence over Bird's at the same grain and keeps Bird's keywords, so replacing a reply takes two fields. Set `excluded_keywords` to remove some of Bird's for the people the rule covers: when this rule is the first to match, a message that is exactly one of them opts no one in or out and gets no reply. A keyword Bird has bound to one operation cannot be reused for the other.
  *
  */
 export const createWhatsAppKeywordRule = <ThrowOnError extends boolean = false>(
@@ -11652,6 +11846,225 @@ export const getEmailInboxInsightsIndustryBenchmark = <
       },
     ],
     url: "/v1/email/inbox-insights/benchmarks/industry",
+    ...options,
+  });
+
+/**
+ * Get automatic seeding settings
+ *
+ * Read settings and the trigger address for this workspace. Requires Inbox Insights read permission. Before initial setup, the revision is zero and the trigger address is absent.
+ */
+export const getAutomaticSeedingSettings = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<GetAutomaticSeedingSettingsData, ThrowOnError>,
+): RequestResult<
+  GetAutomaticSeedingSettingsResponses,
+  GetAutomaticSeedingSettingsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    GetAutomaticSeedingSettingsResponses,
+    GetAutomaticSeedingSettingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/automatic-seeding",
+    ...options,
+  });
+
+/**
+ * Update automatic seeding settings
+ *
+ * Replace settings at the expected revision; omitted selections clear the saved values. Disabling enabled settings permanently stops ungranted copies in existing runs; re-enabling does not resume them. Already granted copies may still send. Use revision zero for initial setup; the first successful update creates a trigger address. A stale revision returns 409 without changing settings. Where automatic seeding is active for the workspace, enabling it lets a send to the trigger address start a seed run, which uses seed-test and email-send allowance.
+ */
+export const updateAutomaticSeedingSettings = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<UpdateAutomaticSeedingSettingsData, ThrowOnError>,
+): RequestResult<
+  UpdateAutomaticSeedingSettingsResponses,
+  UpdateAutomaticSeedingSettingsErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).patch<
+    UpdateAutomaticSeedingSettingsResponses,
+    UpdateAutomaticSeedingSettingsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/automatic-seeding",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * Rotate the automatic seeding address
+ *
+ * Replace the trigger address and permanently stop ungranted copies in existing runs. Granted copies may still send. Initialize settings with PATCH `/v1/email/inbox-insights/automatic-seeding` first; otherwise rotation returns 404. Use the same idempotency key and expected revision after a lost response; a stale revision returns 409 without rotating again.
+ */
+export const rotateAutomaticSeedingAddress = <
+  ThrowOnError extends boolean = false,
+>(
+  options: Options<RotateAutomaticSeedingAddressData, ThrowOnError>,
+): RequestResult<
+  RotateAutomaticSeedingAddressResponses,
+  RotateAutomaticSeedingAddressErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    RotateAutomaticSeedingAddressResponses,
+    RotateAutomaticSeedingAddressErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/automatic-seeding/rotate",
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+/**
+ * List seeding runs
+ *
+ * Read retained run intents and sending progress. Results may lag recent writes and are separate from Inbox Tracker placement results. Filters use retained run metadata; tag and label search is unavailable. When both creation bounds are supplied, created_before must be later than created_after; otherwise the request returns 422.
+ */
+export const listAutomaticSeedingRuns = <ThrowOnError extends boolean = false>(
+  options?: Options<ListAutomaticSeedingRunsData, ThrowOnError>,
+): RequestResult<
+  ListAutomaticSeedingRunsResponses,
+  ListAutomaticSeedingRunsErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListAutomaticSeedingRunsResponses,
+    ListAutomaticSeedingRunsErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/automatic-seeding/runs",
+    ...options,
+  });
+
+/**
+ * Get a seeding run
+ *
+ * Read retained run metadata and sending progress without seed addresses, example content or provider receipts. Provider acceptance and receiving-server delivery do not establish inbox placement.
+ */
+export const getAutomaticSeedingRun = <ThrowOnError extends boolean = false>(
+  options: Options<GetAutomaticSeedingRunData, ThrowOnError>,
+): RequestResult<
+  GetAutomaticSeedingRunResponses,
+  GetAutomaticSeedingRunErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).get<
+    GetAutomaticSeedingRunResponses,
+    GetAutomaticSeedingRunErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/automatic-seeding/runs/{run_id}",
+    ...options,
+  });
+
+/**
+ * Cancel a seeding run
+ *
+ * Stop future seed admissions for this run. Already granted copies may still send; registration uncertainty and late registration results remain visible. The original email, schedule or broadcast is unchanged. Repeating stop is safe; finished or failed runs keep their terminal state. Requires Inbox Insights write permission. Reuse the same idempotency key after a lost response.
+ */
+export const cancelAutomaticSeedingRun = <ThrowOnError extends boolean = false>(
+  options: Options<CancelAutomaticSeedingRunData, ThrowOnError>,
+): RequestResult<
+  CancelAutomaticSeedingRunResponses,
+  CancelAutomaticSeedingRunErrors,
+  ThrowOnError
+> =>
+  (options.client ?? client).post<
+    CancelAutomaticSeedingRunResponses,
+    CancelAutomaticSeedingRunErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/automatic-seeding/runs/{run_id}/stop",
+    ...options,
+  });
+
+/**
+ * List automatic seeding source observations
+ *
+ * Read retained capture observations, including scheduled, skipped or failed sources that never created a run. Reads may lag recent writes. When both creation bounds are supplied, created_before must be later than created_after; otherwise the request returns 422.
+ */
+export const listAutomaticSeedingSources = <
+  ThrowOnError extends boolean = false,
+>(
+  options?: Options<ListAutomaticSeedingSourcesData, ThrowOnError>,
+): RequestResult<
+  ListAutomaticSeedingSourcesResponses,
+  ListAutomaticSeedingSourcesErrors,
+  ThrowOnError
+> =>
+  (options?.client ?? client).get<
+    ListAutomaticSeedingSourcesResponses,
+    ListAutomaticSeedingSourcesErrors,
+    ThrowOnError
+  >({
+    security: [
+      { scheme: "bearer", type: "http" },
+      {
+        in: "cookie",
+        name: "bird_session",
+        type: "apiKey",
+      },
+    ],
+    url: "/v1/email/inbox-insights/automatic-seeding/sources",
     ...options,
   });
 
@@ -14865,53 +15278,6 @@ export const createMailboxMessage = <ThrowOnError extends boolean = false>(
       "Content-Type": "application/json",
       ...options.headers,
     },
-  });
-
-/**
- * List a mailbox's labels
- *
- * Returns the labels available in a mailbox. First, the built-in system
- * labels:
- *
- * - The placements `inbox`, `archive`, `spam`, `blocked`, and `sent`.
- * - `trash`.
- * - `unread`.
- *
- * Then, every custom label in the workspace, ordered by name. All of a
- * workspace's mailboxes share its custom labels. Apply and remove custom
- * labels through the conversation and message update endpoints; applying a
- * custom label name the workspace does not have yet creates that label, and
- * reserved names are refused. Removing a custom label only unassigns it: the
- * label stays in the workspace and in this list until it is deleted. System
- * labels change state instead: a message update takes `unread` and `trash`.
- * A conversation's read state changes through `read` and its folder through
- * `folder` (`inbox`, `archive` or `spam`). Deleting it moves it to the
- * trash, or removes it for good with `permanent=true`; `sent` and `blocked`
- * are set automatically.
- *
- */
-export const listMailboxLabels = <ThrowOnError extends boolean = false>(
-  options: Options<ListMailboxLabelsData, ThrowOnError>,
-): RequestResult<
-  ListMailboxLabelsResponses,
-  ListMailboxLabelsErrors,
-  ThrowOnError
-> =>
-  (options.client ?? client).get<
-    ListMailboxLabelsResponses,
-    ListMailboxLabelsErrors,
-    ThrowOnError
-  >({
-    security: [
-      { scheme: "bearer", type: "http" },
-      {
-        in: "cookie",
-        name: "bird_session",
-        type: "apiKey",
-      },
-    ],
-    url: "/v1/email/mailboxes/{mailbox_id}/labels",
-    ...options,
   });
 
 /**

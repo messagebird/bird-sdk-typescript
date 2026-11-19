@@ -384,6 +384,12 @@ export type {
   PreferencesListQuery,
 } from "./resources/preferences.gen.js";
 export type {
+  Label,
+  LabelList,
+  LabelsCreateParams,
+  LabelsUpdateParams,
+} from "./resources/labels.gen.js";
+export type {
   PreferenceCreateParams,
   PreferenceWriteResult,
 } from "./resources/preferences.js";
@@ -506,6 +512,7 @@ export type { WebhookEventTypeValue } from "./event-types.gen.js";
 export {
   AssetKind,
   AssetReferenceUsage,
+  AutomaticSeedingReason,
   EsimActionName,
   EsimActionUnavailableReason,
   AMBBusinessAccountReviewStatus,
@@ -624,6 +631,7 @@ export {
 export type {
   AssetKindValue,
   AssetReferenceUsageValue,
+  AutomaticSeedingReasonValue,
   EsimActionNameValue,
   EsimActionUnavailableReasonValue,
   AMBBusinessAccountReviewStatusValue,
@@ -747,7 +755,6 @@ export type {
   EmailMailboxesListQuery,
   EmailMailboxesStatsQuery,
   MailboxStatsResponse,
-  EmailMailboxLabelList,
 } from "./resources/emailMailboxes.gen.js";
 export type {
   EmailMailboxesMessagesCreateParams,
@@ -907,6 +914,7 @@ export type {
   AmbConversationsUpdateParams,
   AmbConversationsListMessagesQuery,
   AmbConversationsTypingParams,
+  AmbConversationsRequestAuthenticationParams,
   AmbConversationsListQuery,
   AmbConversation,
 } from "./resources/ambConversations.gen.js";
@@ -983,6 +991,10 @@ export type {
   EmailInboxInsightsSeedTestConfiguration,
   EmailInboxInsightsSeedTestsConfigurationGetQuery,
 } from "./resources/emailInboxInsightsSeedTestsConfiguration.gen.js";
+export type { AutomaticSeedingSettings, EmailSeedingSettingsUpdateParams } from "./resources/emailSeedingSettings.gen.js";
+export type { EmailSeedingAddressRotateParams } from "./resources/emailSeedingAddress.gen.js";
+export type { AutomaticSeedingRun, EmailSeedingRunsListQuery } from "./resources/emailSeedingRuns.gen.js";
+export type { AutomaticSeedingSourceObservation, EmailSeedingSourcesListQuery } from "./resources/emailSeedingSources.gen.js";
 export type {
   EsimSummary,
   Esim,

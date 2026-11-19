@@ -115,6 +115,18 @@ export async function ambConversationsTyping() {
   console.log(result);
 }
 
+export async function ambConversationsRequestAuthentication() {
+  // Use a distinct key for each new sign-in attempt, and reuse that key only when retrying the same attempt.
+  // Omit the options argument to let the SDK generate a fresh key automatically.
+  const idempotencyKey = process.env.IDEMPOTENCY_KEY ?? crypto.randomUUID();
+  const auth = await bird.amb.conversations.requestAuthentication(
+    "acv_01krdgeqcxet5s7t44vh8rt9mg",
+    {},
+    { idempotencyKey },
+  );
+  console.log(auth.id, auth.status);
+}
+
 export async function ambConversationsList() {
   const result = await bird.amb.conversations.list({
     business_account_id: "abz_01krdgeqcxet5s7t44vh8rt9mg",

@@ -10,6 +10,7 @@ export type { AmbAuthentication };
 export type AmbConversationsUpdateParams = NonNullable<UpdateAmbConversationData["body"]>;
 export type AmbConversationsListMessagesQuery = NonNullable<ListAmbConversationMessagesData["query"]>;
 export type AmbConversationsTypingParams = NonNullable<CreateAmbConversationTypingData["body"]>;
+export type AmbConversationsRequestAuthenticationParams = NonNullable<CreateAmbAuthenticationData["body"]>;
 export type AmbConversationsListQuery = NonNullable<ListAmbConversationsData["query"]>;
 
 export class AmbConversationsResource extends Resource {
@@ -73,11 +74,22 @@ export class AmbConversationsResource extends Resource {
   }
 
   /**
-   * Sends a native sign-in request to an open conversation whose device_capabilities include AUTH2. Returns the request as pending; keep its id. The outcome arrives as an amb.authentication.updated webhook event, or read the request. A new request supersedes an unfinished one in the same conversation, so retry with the same idempotency key.
+   * Sends a native sign-in request to an open conversation whose device_capabilities include AUTH2. Sends the business's sign-in message unless the body names a sign-in message template. Returns the request as pending; keep its id. The outcome arrives as an amb.authentication.updated webhook event, or read the request. A new request supersedes an unfinished one in the same conversation, so retry with the same idempotency key.
+   *
+   * @example 
+   * // Use a distinct key for each new sign-in attempt, and reuse that key only when retrying the same attempt.
+   * // Omit the options argument to let the SDK generate a fresh key automatically.
+   * const idempotencyKey = process.env.IDEMPOTENCY_KEY ?? crypto.randomUUID();
+   * const auth = await bird.amb.conversations.requestAuthentication(
+   *   "acv_01krdgeqcxet5s7t44vh8rt9mg",
+   *   {},
+   *   { idempotencyKey },
+   * );
+   * console.log(auth.id, auth.status);
    */
-  requestAuthentication(conversationId: string, options?: RequestOptions): APIPromise<AmbAuthentication> {
+  requestAuthentication(conversationId: string, params: AmbConversationsRequestAuthenticationParams = {}, options?: RequestOptions): APIPromise<AmbAuthentication> {
     return this.call<AmbAuthentication>("POST", options, ({ signal, headers }) =>
-      createAmbAuthentication({ client: this.client, path: { conversation_id: conversationId }, headers, signal }));
+      createAmbAuthentication({ client: this.client, path: { conversation_id: conversationId }, body: params, headers, signal }));
   }
 
   /**
